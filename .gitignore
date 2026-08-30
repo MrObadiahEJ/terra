@@ -1,0 +1,39 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+deploy-backup/
+**/target/deploy/
+**/*-keypair.json
+**/id.json
+**/.anchor/
+
+# --- Rust / Anchor build artifacts ---
+target/
+**/target/
+*.rs.bk
+
+# --- Node / frontend ---
+node_modules/
+**/node_modules/
+dist/
+dist-ssr/
+*.local
+.pnpm-store/
+
+# --- Logs ---
+*.log
+*.tmp
+
+# --- OSM dataset downloads ---
+**/*.osm.pbf
+**/*.osm
+
+# --- Editor / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

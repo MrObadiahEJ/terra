@@ -1,0 +1,17 @@
+[package]
+name = "terra-geo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+geo = "0.29"
+geo-types = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+osmpbf = "0.3"
+sha2 = "0.10"
+
+[[bin]]
+name = "terra-geo"
+path = "src/main.rs"

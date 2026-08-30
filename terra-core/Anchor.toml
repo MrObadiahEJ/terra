@@ -1,0 +1,16 @@
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[programs.devnet]
+terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
+
+[programs.localnet]
+terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
+
+[workspace]
+members = ["programs/terra_registry"]
+
+[test]
+cluster = "localnet"
+startup_wait = 10000
