@@ -14,6 +14,81 @@ export type TerraRegistry = {
   },
   "instructions": [
     {
+      "name": "attachParcel",
+      "docs": [
+        "Attach a parcel to an identity (the person behind its owner wallet).",
+        "Only the parcel's owner may do this, and only for an identity whose",
+        "owner wallet matches."
+      ],
+      "discriminator": [
+        99,
+        215,
+        88,
+        205,
+        231,
+        118,
+        0,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identityHash",
+                "account": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "attest",
       "docs": [
         "Register an attestation that binds heavy off-chain data to this parcel",
@@ -134,6 +209,256 @@ export type TerraRegistry = {
           }
         }
       ]
+    },
+    {
+      "name": "bindIdentity",
+      "docs": [
+        "Bind a person (identified by a hashed credential) to a wallet the person",
+        "holds. `recovery` is a second wallet the person controls, for recovering",
+        "the identity if the main key is lost. The signer becomes `owner`.",
+        "",
+        "This is the root of the resolvable \"who owns this\" link: every on-chain",
+        "actor is ultimately a wallet, and this account binds that wallet to a",
+        "human without ever publishing the credential itself."
+      ],
+      "discriminator": [
+        233,
+        223,
+        188,
+        85,
+        140,
+        1,
+        204,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "identityHash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "identityHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "recovery",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "cancelSuccession",
+      "docs": [
+        "Cancel an in-flight succession. Only the current `owner` (or `recovery`",
+        "for a recovery passation) may cancel, and only before it is effective."
+      ],
+      "discriminator": [
+        206,
+        172,
+        126,
+        132,
+        252,
+        50,
+        143,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identityHash",
+                "account": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claimSuccession",
+      "docs": [
+        "Claim a passation once the grace period has elapsed. The `successor`",
+        "becomes the identity's new owner. Any parcels the identity owned that",
+        "are supplied via `remaining_accounts` are re-pointed to the successor."
+      ],
+      "discriminator": [
+        90,
+        253,
+        80,
+        136,
+        147,
+        71,
+        124,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identityHash",
+                "account": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "grantRight",
@@ -293,6 +618,105 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "requestSuccession",
+      "docs": [
+        "Request a wallet passation (succession, recovery, or deliberate control",
+        "transfer). A Succession account is created and becomes effective only",
+        "after the grace period — within which the original owner can cancel.",
+        "",
+        "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
+        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR."
+      ],
+      "discriminator": [
+        239,
+        203,
+        74,
+        151,
+        24,
+        159,
+        159,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identityHash",
+                "account": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity"
+              },
+              {
+                "kind": "arg",
+                "path": "successor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "successor",
+          "type": "pubkey"
+        },
+        {
+          "name": "kind",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "revokeRight",
       "docs": [
         "Revoke a previously granted right. The parcel owner or the original",
@@ -351,6 +775,102 @@ export type TerraRegistry = {
         {
           "name": "nonce",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "rotateValidators",
+      "docs": [
+        "Replace the validator set on an attestation (the fix for dead/leaving",
+        "validators). Only the parcel owner may rotate. Bumps `version` so a",
+        "reconstituted set is provably newer, and resets `required`/`count`."
+      ],
+      "discriminator": [
+        98,
+        183,
+        54,
+        7,
+        187,
+        27,
+        218,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newRequired",
+          "type": "u8"
+        },
+        {
+          "name": "newValidators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
         }
       ]
     },
@@ -537,6 +1057,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "identity",
+      "discriminator": [
+        58,
+        132,
+        5,
+        12,
+        176,
+        164,
+        85,
+        112
+      ]
+    },
+    {
       "name": "parcel",
       "discriminator": [
         149,
@@ -561,6 +1094,19 @@ export type TerraRegistry = {
         103,
         234
       ]
+    },
+    {
+      "name": "succession",
+      "discriminator": [
+        51,
+        87,
+        221,
+        243,
+        105,
+        19,
+        68,
+        109
+      ]
     }
   ],
   "events": [
@@ -578,6 +1124,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "identityBound",
+      "discriminator": [
+        183,
+        169,
+        144,
+        11,
+        110,
+        67,
+        103,
+        46
+      ]
+    },
+    {
       "name": "infrastructureUpdated",
       "discriminator": [
         198,
@@ -588,6 +1147,19 @@ export type TerraRegistry = {
         83,
         181,
         172
+      ]
+    },
+    {
+      "name": "parcelAttached",
+      "discriminator": [
+        92,
+        181,
+        155,
+        58,
+        230,
+        193,
+        129,
+        6
       ]
     },
     {
@@ -640,6 +1212,58 @@ export type TerraRegistry = {
         34,
         65,
         52
+      ]
+    },
+    {
+      "name": "successionCancelled",
+      "discriminator": [
+        67,
+        67,
+        101,
+        243,
+        100,
+        8,
+        158,
+        53
+      ]
+    },
+    {
+      "name": "successionClaimed",
+      "discriminator": [
+        27,
+        211,
+        3,
+        154,
+        93,
+        191,
+        66,
+        212
+      ]
+    },
+    {
+      "name": "successionRequested",
+      "discriminator": [
+        212,
+        119,
+        41,
+        85,
+        179,
+        61,
+        206,
+        98
+      ]
+    },
+    {
+      "name": "validatorsRotated",
+      "discriminator": [
+        80,
+        217,
+        37,
+        28,
+        47,
+        73,
+        79,
+        88
       ]
     }
   ],
@@ -728,6 +1352,56 @@ export type TerraRegistry = {
       "code": 6016,
       "name": "invalidThreshold",
       "msg": "Required threshold exceeds the number of validators"
+    },
+    {
+      "code": 6017,
+      "name": "emptyIdentityHash",
+      "msg": "Identity hash is required"
+    },
+    {
+      "code": 6018,
+      "name": "emptyRecovery",
+      "msg": "Recovery wallet is required"
+    },
+    {
+      "code": 6019,
+      "name": "identityMismatch",
+      "msg": "Identity owner does not match the parcel owner"
+    },
+    {
+      "code": 6020,
+      "name": "emptySuccessor",
+      "msg": "Successor wallet is required"
+    },
+    {
+      "code": 6021,
+      "name": "invalidSuccessionKind",
+      "msg": "Invalid succession kind"
+    },
+    {
+      "code": 6022,
+      "name": "successorIsOwner",
+      "msg": "Successor must differ from the current owner"
+    },
+    {
+      "code": 6023,
+      "name": "successionAlreadyEffective",
+      "msg": "Succession has already become effective"
+    },
+    {
+      "code": 6024,
+      "name": "notSuccessor",
+      "msg": "Only the named successor may claim this succession"
+    },
+    {
+      "code": 6025,
+      "name": "successionNotYetEffective",
+      "msg": "Succession is not yet effective"
+    },
+    {
+      "code": 6026,
+      "name": "attestationMismatch",
+      "msg": "Attestation does not belong to this parcel"
     }
   ],
   "types": [
@@ -788,7 +1462,19 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
+            "name": "version",
+            "docs": [
+              "Monotonic rotation counter. Each rotate_validators bumps it so a",
+              "reconstituted validator set is provably newer than the previous one."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
             "type": "i64"
           },
           {
@@ -837,6 +1523,94 @@ export type TerraRegistry = {
           {
             "name": "count",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "identity",
+      "docs": [
+        "Binds a person (via a hashed identity credential) to a wallet the person",
+        "actually holds, plus a recovery wallet. This is the resolvable on-chain link",
+        "behind \"who owns this.\" A provisioned wallet is exported to the person; the",
+        "program only ever sees the public keys.",
+        "",
+        "PDA: `[\"identity\", identity_hash]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identityHash",
+            "docs": [
+              "32-byte hash over the person's identity credential (e.g. national ID),",
+              "so the credential itself never lives on-chain."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "docs": [
+              "The active wallet acting on behalf of this identity."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "recovery",
+            "docs": [
+              "A separate wallet the person also controls (backup / recovery). Used to",
+              "request a recovery passation if the main key is lost."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parcelCount",
+            "docs": [
+              "Number of parcels currently owned by this identity."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "identityBound",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "identityHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recovery",
+            "type": "pubkey"
           }
         ]
       }
@@ -932,6 +1706,26 @@ export type TerraRegistry = {
           {
             "name": "updatedAt",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "parcelAttached",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
           }
         ]
       }
@@ -1069,6 +1863,157 @@ export type TerraRegistry = {
           {
             "name": "notes",
             "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "succession",
+      "docs": [
+        "An in-flight passation of wallet control, time-boxed by a grace period so",
+        "the original owner can cancel or object before it settles.",
+        "",
+        "PDA: `[\"succession\", identity, successor]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "docs": [
+              "The Identity whose control is being passed."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "docs": [
+              "The wallet that will take over after the grace period."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "docs": [
+              "succession_kind."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "requestedAt",
+            "type": "i64"
+          },
+          {
+            "name": "effectiveAt",
+            "docs": [
+              "requested_at + SUCCESSION_GRACE_PERIOD_SECS. Claim is only allowed after."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "successionCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "successionClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "parcelsRepointed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "successionRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "effectiveAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "validatorsRotated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "specifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
           }
         ]
       }

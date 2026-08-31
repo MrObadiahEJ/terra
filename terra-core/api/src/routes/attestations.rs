@@ -279,7 +279,7 @@ pub async fn list_documents(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
+pub fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
     let bytes = hex::decode(s).map_err(|_| AppError::bad_request("expected hex"))?;
     if bytes.len() != 32 {
         return Err(AppError::bad_request("expected 32 bytes"));

@@ -19,6 +19,10 @@ impl AppError {
     pub fn conflict(msg: impl Into<String>) -> Self {
         AppError::Conflict(msg.into())
     }
+
+    pub fn not_found(msg: impl Into<String>) -> Self {
+        AppError::NotFound(msg.into())
+    }
 }
 
 impl From<sqlx::Error> for AppError {

@@ -79,4 +79,23 @@ export function attestationPda(
   )
 }
 
+// Derive an identity PDA: ["identity", identity_hash].
+export function identityPda(identityHash: Uint8Array): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [strToBytes('identity'), identityHash],
+    new PublicKey(TERRA_PROGRAM_ID),
+  )
+}
+
+// Derive a succession PDA: ["succession", identity, successor].
+export function successionPda(
+  identity: PublicKey,
+  successor: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [strToBytes('succession'), identity.toBuffer(), successor.toBuffer()],
+    new PublicKey(TERRA_PROGRAM_ID),
+  )
+}
+
 export { getProvider }

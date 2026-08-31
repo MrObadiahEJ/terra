@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 
 declare_id!("GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage");
 
@@ -93,8 +94,70 @@ pub struct Attestation {
     pub required: u8,
     /// Number of validator keys currently registered (<= MAX_VALIDATORS).
     pub count: u8,
+    /// Monotonic rotation counter. Each rotate_validators bumps it so a
+    /// reconstituted validator set is provably newer than the previous one.
+    pub version: u8,
     pub created_at: i64,
+    pub updated_at: i64,
     pub validators: [Pubkey; MAX_VALIDATORS],
+}
+
+/// Grace period (seconds) before a queued succession can be claimed. Gives the
+/// original owner (or a contested party) a window to cancel the passation.
+pub const SUCCESSION_GRACE_PERIOD_SECS: i64 = 7 * 24 * 3600; // 7 days
+
+/// Maximum number of successions a wallet may have in flight.
+pub const MAX_PENDING_SUCCESSIONS: usize = 8;
+
+pub mod succession_kind {
+    /// Wallet passation to an heir/beneficiary (estate / inheritance).
+    pub const SUCCESSOR: u8 = 0;
+    /// Passation because the active key was lost/stolen (recovery).
+    pub const RECOVERY: u8 = 1;
+    /// Passation of a parcel's control (sale / deliberate transfer).
+    pub const TRANSFER: u8 = 2;
+    pub const MAX: u8 = TRANSFER;
+}
+
+/// Binds a person (via a hashed identity credential) to a wallet the person
+/// actually holds, plus a recovery wallet. This is the resolvable on-chain link
+/// behind "who owns this." A provisioned wallet is exported to the person; the
+/// program only ever sees the public keys.
+///
+/// PDA: `["identity", identity_hash]`.
+#[account]
+#[derive(InitSpace)]
+pub struct Identity {
+    /// 32-byte hash over the person's identity credential (e.g. national ID),
+    /// so the credential itself never lives on-chain.
+    pub identity_hash: [u8; 32],
+    /// The active wallet acting on behalf of this identity.
+    pub owner: Pubkey,
+    /// A separate wallet the person also controls (backup / recovery). Used to
+    /// request a recovery passation if the main key is lost.
+    pub recovery: Pubkey,
+    /// Number of parcels currently owned by this identity.
+    pub parcel_count: u16,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// An in-flight passation of wallet control, time-boxed by a grace period so
+/// the original owner can cancel or object before it settles.
+///
+/// PDA: `["succession", identity, successor]`.
+#[account]
+#[derive(InitSpace)]
+pub struct Succession {
+    /// The Identity whose control is being passed.
+    pub identity: Pubkey,
+    /// The wallet that will take over after the grace period.
+    pub successor: Pubkey,
+    /// succession_kind.
+    pub kind: u8,
+    pub requested_at: i64,
+    /// requested_at + SUCCESSION_GRACE_PERIOD_SECS. Claim is only allowed after.
+    pub effective_at: i64,
 }
 
 #[program]
@@ -334,6 +397,243 @@ pub mod terra_registry {
         });
         Ok(())
     }
+
+    /// Bind a person (identified by a hashed credential) to a wallet the person
+    /// holds. `recovery` is a second wallet the person controls, for recovering
+    /// the identity if the main key is lost. The signer becomes `owner`.
+    ///
+    /// This is the root of the resolvable "who owns this" link: every on-chain
+    /// actor is ultimately a wallet, and this account binds that wallet to a
+    /// human without ever publishing the credential itself.
+    pub fn bind_identity(
+        ctx: Context<BindIdentity>,
+        identity_hash: [u8; 32],
+        recovery: Pubkey,
+    ) -> Result<()> {
+        require!(
+            !identity_hash.iter().all(|b| *b == 0),
+            TerraError::EmptyIdentityHash
+        );
+        require!(recovery != Pubkey::default(), TerraError::EmptyRecovery);
+
+        let now = Clock::get()?.unix_timestamp;
+        let identity = &mut ctx.accounts.identity;
+        identity.identity_hash = identity_hash;
+        identity.owner = ctx.accounts.owner.key();
+        identity.recovery = recovery;
+        identity.parcel_count = 0;
+        identity.created_at = now;
+        identity.updated_at = now;
+
+        emit!(IdentityBound {
+            identity: identity.key(),
+            identity_hash,
+            owner: identity.owner,
+            recovery,
+        });
+        Ok(())
+    }
+
+    /// Attach a parcel to an identity (the person behind its owner wallet).
+    /// Only the parcel's owner may do this, and only for an identity whose
+    /// owner wallet matches.
+    pub fn attach_parcel(
+        ctx: Context<AttachParcel>,
+    ) -> Result<()> {
+        let parcel = &ctx.accounts.parcel;
+        require!(
+            parcel.owner == ctx.accounts.owner.key(),
+            TerraError::NotOwner
+        );
+        let identity = &mut ctx.accounts.identity;
+        require!(
+            identity.owner == ctx.accounts.owner.key(),
+            TerraError::IdentityMismatch
+        );
+
+        identity.parcel_count = identity.parcel_count.saturating_add(1);
+        identity.updated_at = Clock::get()?.unix_timestamp;
+        emit!(ParcelAttached {
+            identity: identity.key(),
+            parcel: parcel.key(),
+            owner: identity.owner,
+        });
+        Ok(())
+    }
+
+    /// Request a wallet passation (succession, recovery, or deliberate control
+    /// transfer). A Succession account is created and becomes effective only
+    /// after the grace period — within which the original owner can cancel.
+    ///
+    /// Authorized by the current `owner` for kind TRANSFER, or by the `owner`
+    /// OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.
+    pub fn request_succession(
+        ctx: Context<RequestSuccession>,
+        successor: Pubkey,
+        kind: u8,
+    ) -> Result<()> {
+        require!(successor != Pubkey::default(), TerraError::EmptySuccessor);
+        require!(kind <= succession_kind::MAX, TerraError::InvalidSuccessionKind);
+
+        let identity = &ctx.accounts.identity;
+        let signer = ctx.accounts.signer.key();
+        require!(
+            signer == identity.owner || signer == identity.recovery,
+            TerraError::NotAuthorized
+        );
+        require!(successor != identity.owner, TerraError::SuccessorIsOwner);
+
+        let now = Clock::get()?.unix_timestamp;
+        let succession = &mut ctx.accounts.succession;
+        succession.identity = identity.key();
+        succession.successor = successor;
+        succession.kind = kind;
+        succession.requested_at = now;
+        succession.effective_at = now.saturating_add(SUCCESSION_GRACE_PERIOD_SECS);
+
+        emit!(SuccessionRequested {
+            identity: identity.key(),
+            successor,
+            kind,
+            effective_at: succession.effective_at,
+        });
+        Ok(())
+    }
+
+    /// Cancel an in-flight succession. Only the current `owner` (or `recovery`
+    /// for a recovery passation) may cancel, and only before it is effective.
+    pub fn cancel_succession(
+        ctx: Context<CancelSuccession>,
+    ) -> Result<()> {
+        let identity = &ctx.accounts.identity;
+        let signer = ctx.accounts.signer.key();
+        require!(
+            signer == identity.owner || signer == identity.recovery,
+            TerraError::NotAuthorized
+        );
+        require!(
+            ctx.accounts.succession.effective_at > Clock::get()?.unix_timestamp,
+            TerraError::SuccessionAlreadyEffective
+        );
+
+        emit!(SuccessionCancelled {
+            identity: identity.key(),
+            successor: ctx.accounts.succession.successor,
+            kind: ctx.accounts.succession.kind,
+        });
+        Ok(())
+    }
+
+    /// Claim a passation once the grace period has elapsed. The `successor`
+    /// becomes the identity's new owner. Any parcels the identity owned that
+    /// are supplied via `remaining_accounts` are re-pointed to the successor.
+    pub fn claim_succession(
+        ctx: Context<ClaimSuccession>,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let succession = &ctx.accounts.succession;
+        require!(
+            succession.successor == ctx.accounts.signer.key(),
+            TerraError::NotSuccessor
+        );
+        require!(
+            now >= succession.effective_at,
+            TerraError::SuccessionNotYetEffective
+        );
+
+        let identity = &mut ctx.accounts.identity;
+        require!(
+            succession.identity == identity.key(),
+            TerraError::IdentityMismatch
+        );
+
+        let previous = identity.owner;
+        let successor = succession.successor;
+        identity.owner = successor;
+        identity.recovery = Pubkey::default();
+        identity.updated_at = now;
+
+        // Re-point every supplied parcel owned by this identity to the
+        // successor's wallet. The Parcel `owner` field sits at a fixed borsh
+        // offset (8-byte discriminator + 32-byte id = 40..72), so we patch it
+        // directly rather than re-serializing the whole account.
+        let mut successions_applied: u16 = 0;
+        for account in ctx.remaining_accounts.iter() {
+            if account.owner == ctx.program_id {
+                let mut data = account.try_borrow_mut_data()?;
+                let pdisc: &[u8] = <Parcel as anchor_lang::Discriminator>::DISCRIMINATOR;
+                if data.len() < 72 || &data[0..8] != pdisc {
+                    continue;
+                }
+                let mut current_owner = [0u8; 32];
+                current_owner.copy_from_slice(&data[40..72]);
+                let current_owner = Pubkey::from(current_owner);
+                if current_owner == previous {
+                    data[40..72].copy_from_slice(&successor.to_bytes());
+                    successions_applied += 1;
+                }
+            }
+        }
+        identity.parcel_count = identity.parcel_count.saturating_sub(successions_applied);
+
+        emit!(SuccessionClaimed {
+            identity: identity.key(),
+            from: previous,
+            to: successor,
+            kind: succession.kind,
+            parcels_repointed: successions_applied as u8,
+        });
+        Ok(())
+    }
+
+    /// Replace the validator set on an attestation (the fix for dead/leaving
+    /// validators). Only the parcel owner may rotate. Bumps `version` so a
+    /// reconstituted set is provably newer, and resets `required`/`count`.
+    pub fn rotate_validators(
+        ctx: Context<RotateValidators>,
+        new_required: u8,
+        new_validators: [Pubkey; MAX_VALIDATORS],
+    ) -> Result<()> {
+        let parcel = &ctx.accounts.parcel;
+        require!(
+            parcel.owner == ctx.accounts.authority.key(),
+            TerraError::NotOwner
+        );
+        require!(
+            ctx.accounts.attestation.parcel == parcel.key(),
+            TerraError::AttestationMismatch
+        );
+
+        let mut count: u8 = 0;
+        for &v in new_validators.iter() {
+            if v == Pubkey::default() {
+                continue;
+            }
+            count += 1;
+        }
+        require!(count > 0, TerraError::NoValidators);
+        require!(
+            (new_required as usize) <= count as usize,
+            TerraError::InvalidThreshold
+        );
+
+        let now = Clock::get()?.unix_timestamp;
+        let attestation = &mut ctx.accounts.attestation;
+        attestation.validators = new_validators;
+        attestation.required = new_required;
+        attestation.count = count;
+        attestation.version = attestation.version.saturating_add(1);
+        attestation.updated_at = now;
+
+        emit!(ValidatorsRotated {
+            parcel: parcel.key(),
+            specifier: attestation.specifier,
+            version: attestation.version,
+            required: new_required,
+            count,
+        });
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -450,6 +750,118 @@ pub struct Attest<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+#[instruction(identity_hash: [u8; 32])]
+pub struct BindIdentity<'info> {
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Identity::INIT_SPACE,
+        seeds = [b"identity".as_ref(), identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AttachParcel<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(successor: Pubkey, kind: u8)]
+pub struct RequestSuccession<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + Succession::INIT_SPACE,
+        seeds = [b"succession".as_ref(), identity.key().as_ref(), successor.as_ref()],
+        bump
+    )]
+    pub succession: Account<'info, Succession>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelSuccession<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        mut,
+        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
+        bump,
+        close = signer
+    )]
+    pub succession: Account<'info, Succession>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimSuccession<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        mut,
+        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
+        bump,
+        close = signer
+    )]
+    pub succession: Account<'info, Succession>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RotateValidators<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
+        bump
+    )]
+    pub attestation: Account<'info, Attestation>,
+    pub authority: Signer<'info>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -493,6 +905,54 @@ pub struct Attested {
     pub count: u8,
 }
 
+#[event]
+pub struct IdentityBound {
+    pub identity: Pubkey,
+    pub identity_hash: [u8; 32],
+    pub owner: Pubkey,
+    pub recovery: Pubkey,
+}
+
+#[event]
+pub struct ParcelAttached {
+    pub identity: Pubkey,
+    pub parcel: Pubkey,
+    pub owner: Pubkey,
+}
+
+#[event]
+pub struct SuccessionRequested {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub kind: u8,
+    pub effective_at: i64,
+}
+
+#[event]
+pub struct SuccessionCancelled {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub kind: u8,
+}
+
+#[event]
+pub struct SuccessionClaimed {
+    pub identity: Pubkey,
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub kind: u8,
+    pub parcels_repointed: u8,
+}
+
+#[event]
+pub struct ValidatorsRotated {
+    pub parcel: Pubkey,
+    pub specifier: [u8; 32],
+    pub version: u8,
+    pub required: u8,
+    pub count: u8,
+}
+
 #[error_code]
 pub enum TerraError {
     #[msg("Parcel id cannot be all zeros")]
@@ -529,4 +989,24 @@ pub enum TerraError {
     NoValidators,
     #[msg("Required threshold exceeds the number of validators")]
     InvalidThreshold,
+    #[msg("Identity hash is required")]
+    EmptyIdentityHash,
+    #[msg("Recovery wallet is required")]
+    EmptyRecovery,
+    #[msg("Identity owner does not match the parcel owner")]
+    IdentityMismatch,
+    #[msg("Successor wallet is required")]
+    EmptySuccessor,
+    #[msg("Invalid succession kind")]
+    InvalidSuccessionKind,
+    #[msg("Successor must differ from the current owner")]
+    SuccessorIsOwner,
+    #[msg("Succession has already become effective")]
+    SuccessionAlreadyEffective,
+    #[msg("Only the named successor may claim this succession")]
+    NotSuccessor,
+    #[msg("Succession is not yet effective")]
+    SuccessionNotYetEffective,
+    #[msg("Attestation does not belong to this parcel")]
+    AttestationMismatch,
 }

@@ -116,6 +116,59 @@ This gives non-repudiation (a validator can't deny what they signed) and multi-p
 
 ---
 
+## 🧑‍⚖️ Identity & Wallet Passation (the failure-modes layer)
+
+Land registries fail when a person isn't in the database, when an owner/heir has
+never appeared on the platform, or when a validator/owner dies. Terra handles
+these three cases with an on-chain **Identity** account and a time-boxed
+**Succession (wallet passation)** mechanism.
+
+### Person → wallet binding (even when the system creates the wallet)
+
+Everything ultimately resolves to a **wallet**, because only a wallet can sign.
+To bind a *person* to that wallet, an `Identity` account (PDA `["identity",
+identity_hash]`) stores a **hash of the person's identity credential** (e.g.
+national ID) plus their `owner` wallet and a separate `recovery` wallet.
+
+- The system can **provision** a wallet for a person who has none — but the
+  private key is **exported to the person** (seed/paper/biometric). The server
+  never holds it, preserving the "security can't be traded" principle.
+- The identity **hash** (never the raw credential) is what appears on-chain, so
+  the person isn't exposed but the binding is cryptographically resolvable.
+- A `validator` and a `classic owner` are the **same wallet primitive** — their
+  difference is a *role in state* (`Attestation.validators` vs `Parcel.owner`),
+  enforced by program logic, not a different key type.
+
+### Wallet passation (`Succession`) — heirs, recovery, transfer of control
+
+A `Succession` account (PDA `["succession", identity, successor]`) queues a
+control transfer that becomes effective only after a **grace period** (7 days):
+
+- `request_succession` — the owner (or the recovery wallet, for key-loss) names
+  a successor: kind `0`=heir, `1`=recovery, `2`=transfer.
+- The **original owner can `cancel`** within the window (no theft).
+- `claim_succession` — after the grace period the successor takes over the
+  identity; any owned parcels are **re-pointed** to their wallet in the same
+  instruction (`remaining_accounts`).
+
+### Dead / leaving validators — `rotate_validators`
+
+If validators die and quorum becomes unreachable, the **parcel owner** calls
+`rotate_validators` to replace the validator set on the `Attestation` (with a
+monotonic `version` bump so a reconstituted set is auditable). Combined with
+thresholds below `count`, this means:
+- threshold already survives some deaths (`required` < `count`);
+- when deaths exceed the slack, **rotation** restores reachability instead of a
+  permanent deadlock; and
+- if the *owner* is gone too, **succession** passes control to an heir first,
+  then the heir rotates the validators.
+
+These three mechanisms (`Identity`, `Succession`, `rotate_validators`) are the
+recovery layer that makes the registry resilient to disconnected people,
+unknown/absent owners, and mortality.
+
+---
+
 ## 📚 Key References
 
 - ISO 19152 — Land Administration Domain Model (LADM), Parts 1, 2, and 5 (spatial plan / 3D-4D urban integration)
@@ -133,7 +186,7 @@ This gives non-repudiation (a validator can't deny what they signed) and multi-p
 - [x] **Phase 1 — Devnet MVP**: flat parcel registry, Anchor program, ownership transfer, rights, Cesium globe
 - [x] **Phase 2 — Pilot data layer**: PostGIS fusion database, OSM road-graph ingestion, geo-engine
 - [x] **Phase 3 — Road-access validation**: off-chain Dijkstra/BFS reachability, on-chain flag + digest hashing
-- [x] **Phase 4 (partial) — Attestation**: on-chain content-hash anchor + multi-validator Ed25519 validation
+- [x] **Phase 4 — Attestation + recovery**: on-chain content-hash anchor, multi-validator Ed25519 validation, Identity binding, wallet passation (Succession), and validator rotation
 - [ ] **Phase 5 — Legal 3D/air-rights layer**: legal volume extension (LADM Part 1 extension)
 - [ ] **Phase 6 — Country config layer**: tenure-type abstraction, multi-authority attestation workflows
 - [ ] **Phase 7 — Regional expansion**: Central Africa -> Africa -> World

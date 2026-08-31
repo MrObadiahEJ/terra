@@ -173,6 +173,55 @@ export interface RegisterDocumentInput {
   owner: string
 }
 
+// ---- Off-chain API: identities + wallet passation --------------------------
+
+export interface BindIdentityInput {
+  identity_hash: string // hex(32) sha256 over the person's identity credential
+  owner: string // base58 wallet the person holds
+  recovery: string // base58 backup/recovery wallet
+  display_name?: string
+  national_id?: string
+  phone?: string
+}
+
+export interface IdentityRow {
+  id: string
+  identity_hash: string
+  owner: string
+  recovery: string
+  parcel_count: number
+  created_at: string
+}
+
+export interface IdentityView extends IdentityRow {
+  display_name?: string | null
+  national_id?: string | null
+  phone?: string | null
+}
+
+export interface RequestSuccessionInput {
+  successor: string // base58 wallet gaining control
+  kind: number // 0=successor(heir), 1=recovery, 2=transfer
+}
+
+export interface SuccessionRow {
+  id: string
+  identity_id: string
+  identity_hash: string
+  kind: number
+  successor: string
+  requested_at: string
+  effective_at: string
+  status: string
+}
+
+export interface RotateValidatorsInput {
+  version: number
+  required: number
+  validators: string[]
+  rotated_by: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -273,6 +322,32 @@ export const api = {
     }),
   listDocuments: (parcelId: string) =>
     request<BoundDocument[]>(`/parcels/${parcelId}/documents`),
+
+  // identities + wallet passation (person->wallet binding, recovery, succession)
+  bindIdentity: (input: BindIdentityInput) =>
+    request<IdentityView>(`/identities`, { method: 'POST', body: JSON.stringify(input) }),
+  getIdentityByWallet: (wallet: string) =>
+    request<IdentityView>(`/identities/${wallet}`),
+  requestSuccession: (identityHash: string, input: RequestSuccessionInput) =>
+    request<SuccessionRow>(`/identities/${identityHash}/successions`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  cancelSuccession: (identityHash: string, successor: string) =>
+    request<SuccessionRow>(`/identities/${identityHash}/successions/${successor}/cancel`, {
+      method: 'POST',
+    }),
+  claimSuccession: (identityHash: string, successor: string) =>
+    request<IdentityRow>(`/identities/${identityHash}/successions/${successor}/claim`, {
+      method: 'POST',
+    }),
+
+  // validator rotation (fix for dead/leaving validators) on a parcel's attestation
+  rotateValidators: (parcelId: string, specifier: string, input: RotateValidatorsInput) =>
+    request<{ attestation_id: string; version: number; required: number; validators: string[] }>(
+      `/parcels/${parcelId}/attestations/${specifier}/rotation`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

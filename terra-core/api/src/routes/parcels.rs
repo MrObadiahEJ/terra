@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::geoutil::geojson_polygon;
-use crate::routes::attestations;
+use crate::routes::{attestations, identities};
 use crate::state::AppState;
 
 fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
@@ -75,6 +75,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/{id}/attestations/{specifier}/validations",
             post(attestations::submit_validation),
+        )
+        .route(
+            "/{id}/attestations/{specifier}/rotation",
+            post(identities::rotate_validators),
         )
         .route("/{id}/documents", post(attestations::register_document))
         .route("/{id}/documents", get(attestations::list_documents))
