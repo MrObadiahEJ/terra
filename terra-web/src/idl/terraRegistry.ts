@@ -14,6 +14,128 @@ export type TerraRegistry = {
   },
   "instructions": [
     {
+      "name": "attest",
+      "docs": [
+        "Register an attestation that binds heavy off-chain data to this parcel",
+        "and records the set of validator wallets required to validate it.",
+        "",
+        "`validators` holds the public keys of the (possibly several) parties",
+        "who must sign off on the transaction; `required` is how many signatures",
+        "are needed. The signer must be the parcel owner or a registered",
+        "registrar. Per-validator Ed25519 signatures live off-chain but are",
+        "verified against this on-chain identity set and `content_hash`."
+      ],
+      "discriminator": [
+        83,
+        148,
+        120,
+        119,
+        144,
+        139,
+        117,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "specifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "specifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "contentHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "required",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "grantRight",
       "docs": [
         "Grant a right on a parcel to `holder`. Owner-only.",
@@ -402,6 +524,19 @@ export type TerraRegistry = {
   ],
   "accounts": [
     {
+      "name": "attestation",
+      "discriminator": [
+        152,
+        125,
+        183,
+        86,
+        36,
+        146,
+        121,
+        73
+      ]
+    },
+    {
       "name": "parcel",
       "discriminator": [
         149,
@@ -429,6 +564,19 @@ export type TerraRegistry = {
     }
   ],
   "events": [
+    {
+      "name": "attested",
+      "discriminator": [
+        184,
+        102,
+        113,
+        199,
+        220,
+        197,
+        96,
+        50
+      ]
+    },
     {
       "name": "infrastructureUpdated",
       "discriminator": [
@@ -560,9 +708,139 @@ export type TerraRegistry = {
       "code": 6012,
       "name": "emptyAccessHash",
       "msg": "Access hash is required"
+    },
+    {
+      "code": 6013,
+      "name": "emptySpecifier",
+      "msg": "Attestation specifier is required"
+    },
+    {
+      "code": 6014,
+      "name": "emptyContentHash",
+      "msg": "Content hash is required"
+    },
+    {
+      "code": 6015,
+      "name": "noValidators",
+      "msg": "Attestation requires at least one validator"
+    },
+    {
+      "code": 6016,
+      "name": "invalidThreshold",
+      "msg": "Required threshold exceeds the number of validators"
     }
   ],
   "types": [
+    {
+      "name": "attestation",
+      "docs": [
+        "An on-chain attestation that binds a set of off-chain documents/data to a",
+        "parcel and records *who* (which wallets) must validate a transaction.",
+        "",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
+        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
+        "anchored here by `content_hash`, and each validator's public key is recorded",
+        "so that any signature can be independently verified against this list."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "specifier",
+            "docs": [
+              "32-byte specifier (e.g. sha256 over the artifact/signing-session id)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "contentHash",
+            "docs": [
+              "sha-256 over the off-chain payload (documents, deed, survey, ...)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "Required threshold of validator signatures to consider this validated."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "docs": [
+              "Number of validator keys currently registered (<= MAX_VALIDATORS)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "attested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "specifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "contentHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "infrastructureUpdated",
       "type": {

@@ -456,4 +456,33 @@ mod tests {
         assert_eq!(a.access_hash, b.access_hash);
         assert_ne!(a.access_hash, c.access_hash, "parcel id must change the digest");
     }
+
+    /// Cross-layer contract: the digest a client anchors on-chain
+    /// (`Parcel::access_hash`) must equal the explicit `access_digest`
+    /// construction over the report's flags and serialized metrics. This pins
+    /// the exact bytes so the Rust API and any on-chain client stay in lockstep.
+    #[test]
+    fn report_digest_matches_canonical_construction() {
+        let graph = sample_graph();
+        let network = NetworkGraph::build(&graph);
+        let parcel_id = [42u8; 32];
+        let parcel = polygon![
+            (x: 11.8, y: -0.01),
+            (x: 11.9, y: -0.01),
+            (x: 11.9, y: 0.01),
+            (x: 11.8, y: 0.01),
+        ];
+
+        let report = analyze(&network, &graph, &parcel, &parcel_id);
+        let metrics = encode_metrics(&report);
+
+        // The digest the API/handler recomputes and the frontend anchors.
+        let canonical = access_digest(&parcel_id, report.flags, &metrics);
+        assert_eq!(
+            report.access_hash, canonical,
+            "analyze() digest must equal access_digest(id, flags, metrics)"
+        );
+        // It really is 32 bytes of sha-256 entropy, not a placeholder.
+        assert!(!canonical.iter().all(|b| *b == 0));
+    }
 }

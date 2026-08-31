@@ -1,5 +1,6 @@
 use axum::Router;
 
+pub mod attestations;
 pub mod fusion;
 pub mod geo;
 pub mod health;

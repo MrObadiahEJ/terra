@@ -52,18 +52,20 @@ Legal tenure types, proof-of-ownership rules, and attesting-authority definition
 ## 🧱 Technology Stack
 
 ### Frontend — `terra-web`
-- **React 18** + **Vite** (chosen over Create React App for lower memory/build overhead on constrained hardware)
-- **Tailwind CSS** for styling
-- **Leaflet / MapLibre GL** for map rendering (open-source, no per-tile billing — unlike Google Maps)
-- **@solana/web3.js** + **@coral-xyz/anchor** for on-chain interaction
-- **Zustand** or React Context for lightweight state management (avoiding heavier Redux overhead)
+- **React 19** + **Vite 8** (es2022 target), styled with custom design-system CSS utilities
+- **CesiumJS 3D globe** for global 3D city rendering (parcel polygons, roads, POIs, draw-mode cadastral capture)
+- **pnpm** for dependencies (shared store — deliberate for constrained storage)
+- **@solana/web3.js 1.98 + @coral-xyz/anchor 0.32** for on-chain interaction
+- **@solana/wallet-adapter + Wallet Standard** for hardened browser wallet signing, with **Ed25519 signature verification** before any transaction is sent
+- **Zustand** for lightweight state management
 
-### Backend — `terra-core`
-- **Rust** — core language across both on-chain and off-chain services
-- **Anchor** framework — Solana smart contract (program) development
+### Backend — `terra-core` (Rust workspace)
+- **Anchor** framework — Solana smart contract (program): parcels, rights, transfers, infra flags, and **multi-validator attestations**
 - **PostGIS** (PostgreSQL + spatial extension) — off-chain geospatial fusion database for parcels, roads, and terrain
-- **Axum** or **Actix-web** — REST/API service layer between the frontend and both PostGIS + Solana
-- **Solana Devnet → Mainnet** — blockchain layer for immutable ownership records and validation-flag hashes
+- **Axum 0.8 + sqlx** — REST/API service layer between the frontend and both PostGIS + Solana
+- **`terra-geo` (geo-engine)** — pure-Rust OSM road graph + Dijkstra/BFS reachability + SHA-256 canonical digests
+- **ed25519-dalek + bs58** — off-chain verification of validator signatures against wallet public keys
+- **Solana Devnet → Mainnet** — blockchain layer for immutable ownership records, content-hash anchors, and validation signatures
 
 ### Data & Validation Layer
 - Off-chain geometry computation (road-access reachability, boundary validation) — never run expensive geometry directly on-chain
@@ -93,9 +95,24 @@ Legal tenure types, proof-of-ownership rules, and attesting-authority definition
 
 A non-blocking advisory layer that flags — but never prevents — a land transaction:
 
-- **Reachability check**: graph search from parcel to nearest public road node (BFS/Dijkstra over parcel-adjacency graph)
-- **Frontage check**: distance from parcel boundary to nearest road-graph edge
-- Result stored on-chain as `{status, evidence_hash, computed_at, computed_by}` — geometry itself stays off-chain in PostGIS; only the auditable result and its hash go on Solana
+- **Reachability check**: Dijkstra over the parcel-adjacent road graph (min-heap), plus a BFS connected-component labeling to measure how much sealed (paved/main) network a parcel can actually reach.
+- **Frontage check**: distance from parcel boundary to the nearest road edge (with a `ROAD_ACCESS_THRESHOLD_M` of 50 m).
+- Result is reduced to a **canonical SHA-256 digest** — `access_digest(parcel_id || flags || metrics)` — that is anchored on-chain in `Parcel::access_hash`. Geometry itself stays off-chain in PostGIS; only the auditable digest and the derived flag bitmask go on Solana. The API independently recomputes this digest during reconciliation and rejects an inconsistent anchor.
+
+---
+
+## 🧾 On-Chain Attestation & Multi-Validator Validation
+
+Heavy off-chain data (deeds, surveys, contracts, notarizations) is bonded to the on-chain record by a content-hash anchor and **wallet-bound cryptographic signatures** — so a document can be traced to its owning wallet, and each validator can be verified by what they actually signed.
+
+- **On-chain `Attestation` account** (PDA `["attestation", parcel, specifier]`) anchors:
+  - `content_hash` — SHA-256 over the off-chain payload (documents/signing artifact)
+  - the set of **validator wallets** (up to 8) and a **required threshold** — i.e. *who* must sign off, useful when several parties validate a land purchase
+- **Per-validator signatures** are stored off-chain (`validations`) and cryptographically verified with Ed25519 against the wallet's public key over the fixed canonical message `content_hash || onchain_id`.
+- An endpoint recomputes each signature's validity and exposes `has_quorum` (valid signatures ≥ threshold), so anyone can confirm from a validator's wallet exactly what they signed and validated.
+- **Documents** are bound to a parcel + owner wallet off-chain (`documents` table) with a content hash and storage reference.
+
+This gives non-repudiation (a validator can't deny what they signed) and multi-party approval tracking without bloating the chain with heavy payloads.
 
 ---
 
@@ -113,13 +130,14 @@ A non-blocking advisory layer that flags — but never prevents — a land trans
 
 - [x] Architecture research — LADM standard, comparable Solana land-registry repos, data-source legal review
 - [x] Country-agnostic core data model designed (Parcel / Rights / Owner / InfrastructureFlag)
-- [ ] **Phase 1 — Devnet MVP** *(current, 7-day build)*: flat parcel registry, Anchor program, basic ownership transfer
-- [ ] **Phase 2 — Pilot data layer**: PostGIS fusion database, OSM road graph ingestion, drone photogrammetry for one pilot zone (Soa/Biteng)
-- [ ] **Phase 3 — Road-access validation**: off-chain reachability algorithm, on-chain flag hashing
-- [ ] **Phase 4 — 3D/air-rights layer**: legal volume extension (LADM Part 1 extension)
-- [ ] **Phase 5 — Country config layer**: tenure-type abstraction, multi-authority attestation
-- [ ] **Phase 6 — Regional expansion**: Central Africa -> Africa -> World
-- [ ] **Phase 7 — Global platform**: smart-city digital twin integration, cross-border interoperability
+- [x] **Phase 1 — Devnet MVP**: flat parcel registry, Anchor program, ownership transfer, rights, Cesium globe
+- [x] **Phase 2 — Pilot data layer**: PostGIS fusion database, OSM road-graph ingestion, geo-engine
+- [x] **Phase 3 — Road-access validation**: off-chain Dijkstra/BFS reachability, on-chain flag + digest hashing
+- [x] **Phase 4 (partial) — Attestation**: on-chain content-hash anchor + multi-validator Ed25519 validation
+- [ ] **Phase 5 — Legal 3D/air-rights layer**: legal volume extension (LADM Part 1 extension)
+- [ ] **Phase 6 — Country config layer**: tenure-type abstraction, multi-authority attestation workflows
+- [ ] **Phase 7 — Regional expansion**: Central Africa -> Africa -> World
+- [ ] **Phase 8 — Global platform**: smart-city digital twin integration, cross-border interoperability
 
 ---
 
@@ -127,112 +145,74 @@ A non-blocking advisory layer that flags — but never prevents — a land trans
 
 ```
 terra/
-├── terra-web/              # React + Vite frontend
+├── terra-web/                   # React 19 + Vite + CesiumJS frontend
 │   ├── src/
 │   │   ├── components/
-│   │   ├── pages/
-│   │   ├── hooks/
-│   │   └── lib/             # Solana/Anchor client bindings
-│   └── package.json
-├── terra-core/              # Rust workspace
-│   ├── programs/
-│   │   └── terra_registry/  # Anchor on-chain program
-│   ├── api/                 # Axum/Actix off-chain API service
-│   └── geo-engine/          # Rust geospatial validation logic (road-access, boundary checks)
+│   │   │   ├── map/             # TerraGlobe (Cesium viewer, drawing)
+│   │   │   ├── panels/          # register / parcel / list panels
+│   │   │   └── layout/          # navbar (wallet buttons)
+│   │   ├── pages/               # GlobePage
+│   │   ├── idl/                 # generated IDL + typed Anchor client
+│   │   ├── store/               # zustand app store
+│   │   └── lib/                 # api, program, wallet, codec, constants
+│   └── package.json             # pnpm
+├── terra-core/                  # Rust + Anchor workspace
+│   ├── programs/terra_registry/ # Anchor on-chain program (parcel/rights/attest)
+│   ├── api/                     # Axum 0.8 + sqlx/PostGIS service
+│   │   ├── src/routes/          # parcels, geo, fusion, pilot-zones, attestations
+│   │   └── migrations/          # 0001..0005 PostGIS schema
+│   └── geo-engine/              # OSM graph + reachability + digest (terra-geo)
 ├── data/
-│   ├── postgis/              # DB schema + migrations
-│   └── scripts/              # OSM ingestion, photogrammetry pipeline helpers
-├── docs/
-│   └── ladm-mapping.md       # LADM layer-to-schema mapping reference
+│   └── *.osm.pbf                # OSM extracts for the geo-engine
 └── README.md
 ```
 
 ---
 
-## ⚙️ Setup — Commands to Start the Project
+## ⚙️ Running Locally
 
-> Run these in order. Frontend and backend are separate workspaces inside one monorepo.
+> Frontend and backend are separate workspaces inside one monorepo.
 
-### 1. Create the monorepo root
+### 1. Database (PostGIS)
 
 ```bash
-mkdir terra && cd terra
-git init
+docker run --name terra-postgis \
+  -e POSTGRES_PASSWORD=terra -e POSTGRES_DB=terra_dev \
+  -p 5432:5432 -d postgis/postgis:16-3.4
 ```
 
-### 2. Scaffold the frontend (`terra-web`)
+### 2. Backend (`terra-core`)
 
 ```bash
-npm create vite@latest terra-web -- --template react
+cd terra-core
+# configuration lives in api/.env (see api/.env.example)
+cargo check --workspace        # confirm everything compiles
+cargo test -p terra-geo --lib  # road-access + digest unit tests
+cargo run -p terra-api         # serves API on :8080 (migrations auto-applied)
+```
+
+The Anchor program:
+```bash
+anchor build                   # compiles the program + regenerates terra-web/src/idl/*
+```
+
+### 3. Frontend (`terra-web`)
+
+```bash
 cd terra-web
-npm install
-npm install tailwindcss @tailwindcss/vite leaflet react-leaflet @solana/web3.js @coral-xyz/anchor zustand
-cd ..
+pnpm install
+pnpm dev                       # Vite dev server (proxies /api to :8080)
 ```
 
-### 3. Scaffold the backend Rust workspace (`terra-core`)
+### 4. Verification
 
 ```bash
-cargo new terra-core --name terra-core
-cd terra-core
+cd terra-web && npx tsc -b && ./node_modules/.bin/eslint . && pnpm build
 ```
 
-Create a `Cargo.toml` workspace at `terra-core/Cargo.toml`:
-
-```toml
-[workspace]
-members = ["programs/terra_registry", "api", "geo-engine"]
-resolver = "2"
-```
-
-### 4. Initialize the Anchor on-chain program
-
-```bash
-# install Anchor CLI if not already present
-cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-avm install latest
-avm use latest
-
-cd terra-core
-anchor init programs/terra_registry --no-git
-```
-
-### 5. Scaffold the off-chain API service
-
-```bash
-cargo new api --name terra-api
-cd api
-cargo add axum tokio --features tokio/full
-cargo add sqlx --features postgres,runtime-tokio-rustls
-cd ..
-```
-
-### 6. Scaffold the geospatial validation engine
-
-```bash
-cargo new geo-engine --name terra-geo
-cd geo-engine
-cargo add geo geo-types postgis
-cd ../..
-```
-
-### 7. Set up PostGIS (local development database)
-
-```bash
-# using Docker — lightweight, isolated, avoids native install overhead
-docker run --name terra-postgis -e POSTGRES_PASSWORD=terra -e POSTGRES_DB=terra_dev -p 5432:5432 -d postgis/postgis:16-3.4
-```
-
-### 8. Verify everything is wired
-
-```bash
-# from terra-core/
-anchor build
-anchor test
-
-# from terra-web/
-npm run dev
-```
+> **Note (storage):** the repo uses **pnpm** for the frontend and gitignores
+> `node_modules`, `dist`, and `public/cesium` (Cesium's 7.8 MB static assets are
+> copied at build/dev time). The Rust `target/` dir is also untracked.
 
 ---
 

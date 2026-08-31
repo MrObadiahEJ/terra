@@ -68,4 +68,15 @@ export function rightsPda(parcel: PublicKey, nonce: number): [PublicKey, number]
   )
 }
 
+// Derive an attestation PDA: ["attestation", parcel, specifier].
+export function attestationPda(
+  parcel: PublicKey,
+  specifier: Uint8Array,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [strToBytes('attestation'), parcel.toBuffer(), specifier],
+    new PublicKey(TERRA_PROGRAM_ID),
+  )
+}
+
 export { getProvider }

@@ -70,6 +70,33 @@ pub struct Rights {
     pub notes: String,
 }
 
+/// Maximum number of validators that can approve a single attestation.
+/// Keeps the account space bounded and predictable.
+pub const MAX_VALIDATORS: usize = 8;
+
+/// An on-chain attestation that binds a set of off-chain documents/data to a
+/// parcel and records *who* (which wallets) must validate a transaction.
+///
+/// PDA: `["attestation", parcel, specifier]`. The heavy payload — actual
+/// documents and per-validator Ed25519 signatures — lives off-chain, but it is
+/// anchored here by `content_hash`, and each validator's public key is recorded
+/// so that any signature can be independently verified against this list.
+#[account]
+#[derive(InitSpace)]
+pub struct Attestation {
+    pub parcel: Pubkey,
+    /// 32-byte specifier (e.g. sha256 over the artifact/signing-session id).
+    pub specifier: [u8; 32],
+    /// sha-256 over the off-chain payload (documents, deed, survey, ...).
+    pub content_hash: [u8; 32],
+    /// Required threshold of validator signatures to consider this validated.
+    pub required: u8,
+    /// Number of validator keys currently registered (<= MAX_VALIDATORS).
+    pub count: u8,
+    pub created_at: i64,
+    pub validators: [Pubkey; MAX_VALIDATORS],
+}
+
 #[program]
 pub mod terra_registry {
     use super::*;
@@ -244,6 +271,69 @@ pub mod terra_registry {
         });
         Ok(())
     }
+
+    /// Register an attestation that binds heavy off-chain data to this parcel
+    /// and records the set of validator wallets required to validate it.
+    ///
+    /// `validators` holds the public keys of the (possibly several) parties
+    /// who must sign off on the transaction; `required` is how many signatures
+    /// are needed. The signer must be the parcel owner or a registered
+    /// registrar. Per-validator Ed25519 signatures live off-chain but are
+    /// verified against this on-chain identity set and `content_hash`.
+    pub fn attest(
+        ctx: Context<Attest>,
+        specifier: [u8; 32],
+        content_hash: [u8; 32],
+        required: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
+    ) -> Result<()> {
+        let parcel = &ctx.accounts.parcel;
+        // Only the parcel owner (or program authority) may create attestations.
+        require!(
+            parcel.owner == ctx.accounts.authority.key(),
+            TerraError::NotOwner
+        );
+        require!(
+            !specifier.iter().all(|b| *b == 0),
+            TerraError::EmptySpecifier
+        );
+        require!(
+            !content_hash.iter().all(|b| *b == 0),
+            TerraError::EmptyContentHash
+        );
+
+        let mut count: u8 = 0;
+        for &v in validators.iter() {
+            if v == Pubkey::default() {
+                continue;
+            }
+            count += 1;
+        }
+        require!(count > 0, TerraError::NoValidators);
+        require!(
+            (required as usize) <= count as usize,
+            TerraError::InvalidThreshold
+        );
+
+        let now = Clock::get()?.unix_timestamp;
+        let attestation = &mut ctx.accounts.attestation;
+        attestation.parcel = parcel.key();
+        attestation.specifier = specifier;
+        attestation.content_hash = content_hash;
+        attestation.required = required;
+        attestation.count = count;
+        attestation.created_at = now;
+        attestation.validators = validators;
+
+        emit!(Attested {
+            parcel: parcel.key(),
+            specifier,
+            content_hash,
+            required,
+            count,
+        });
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -339,6 +429,27 @@ pub struct UpdateInfrastructure<'info> {
     pub owner: Signer<'info>,
 }
 
+#[derive(Accounts)]
+#[instruction(specifier: [u8; 32])]
+pub struct Attest<'info> {
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Attestation::INIT_SPACE,
+        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), specifier.as_ref()],
+        bump
+    )]
+    pub attestation: Account<'info, Attestation>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -373,6 +484,15 @@ pub struct InfrastructureUpdated {
     pub access_hash: [u8; 32],
 }
 
+#[event]
+pub struct Attested {
+    pub parcel: Pubkey,
+    pub specifier: [u8; 32],
+    pub content_hash: [u8; 32],
+    pub required: u8,
+    pub count: u8,
+}
+
 #[error_code]
 pub enum TerraError {
     #[msg("Parcel id cannot be all zeros")]
@@ -401,4 +521,12 @@ pub enum TerraError {
     InvalidInfrastructureFlags,
     #[msg("Access hash is required")]
     EmptyAccessHash,
+    #[msg("Attestation specifier is required")]
+    EmptySpecifier,
+    #[msg("Content hash is required")]
+    EmptyContentHash,
+    #[msg("Attestation requires at least one validator")]
+    NoValidators,
+    #[msg("Required threshold exceeds the number of validators")]
+    InvalidThreshold,
 }

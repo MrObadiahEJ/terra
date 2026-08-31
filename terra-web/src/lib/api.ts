@@ -112,6 +112,67 @@ export interface PhotogrammetryAsset {
   created_at: string
 }
 
+// ---- Off-chain API: attestations + documents (binding to on-chain) --------
+
+export interface RegisterAttestationInput {
+  onchain_id: string
+  specifier: string
+  content_hash: string
+  required: number
+  count: number
+  validators: string[]
+}
+
+export interface Attestation {
+  id: string
+  parcel_id: string
+  onchain_id: string
+  specifier: string
+  content_hash: string
+  required: number
+  validators: string[]
+  created_at: string
+}
+
+export interface ValidationView {
+  validator: string
+  signature: string
+  valid: boolean
+  created_at: string
+}
+
+export interface AttestationDetail extends Attestation {
+  has_quorum: boolean
+  signatories: number
+  required: number
+  validations: ValidationView[]
+}
+
+export interface SubmitValidationInput {
+  validator: string
+  signature: string
+  content_hash: string
+}
+
+export interface BoundDocument {
+  id: string
+  parcel_id: string
+  title: string
+  category: string
+  content_hash: string
+  storage_ref: string
+  owner: string
+  created_at: string
+}
+
+export interface RegisterDocumentInput {
+  title: string
+  category: string
+  content_hash: string
+  storage_ref: string
+  owner: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -191,6 +252,27 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+
+  // attestations + documents (binding heavy off-chain data to on-chain)
+  registerAttestation: (parcelId: string, input: RegisterAttestationInput) =>
+    request<Attestation>(`/parcels/${parcelId}/attestations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  getAttestation: (parcelId: string, specifier: string) =>
+    request<AttestationDetail>(`/parcels/${parcelId}/attestations/${specifier}`),
+  submitValidation: (parcelId: string, specifier: string, input: SubmitValidationInput) =>
+    request<ValidationView>(`/parcels/${parcelId}/attestations/${specifier}/validations`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  registerDocument: (parcelId: string, input: RegisterDocumentInput) =>
+    request<BoundDocument>(`/parcels/${parcelId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  listDocuments: (parcelId: string) =>
+    request<BoundDocument[]>(`/parcels/${parcelId}/documents`),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

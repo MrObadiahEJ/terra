@@ -20,4 +20,6 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 geo = "0.29"
 hex = "0.4"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+bs58 = "0.5"
 terra-geo = { path = "../geo-engine" }
