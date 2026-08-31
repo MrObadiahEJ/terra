@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>terra-web</title>
+    <title>Terra — Land Registry</title>
+    <script>
+      // CesiumJS must resolve its Workers/Assets/Widgets from a known URL when
+      // bundled by Vite. Our plugin copies them into /cesium at dev & build.
+      window.CESIUM_BASE_URL = '/cesium/'
+    </script>
   </head>
   <body>
     <div id="root"></div>

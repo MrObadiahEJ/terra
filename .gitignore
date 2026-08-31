@@ -22,6 +22,9 @@ dist-ssr/
 *.local
 .pnpm-store/
 
+# Cesium static assets copied from the npm package at build/dev time
+**/public/cesium/
+
 # --- Frontend context / preview tool tmp output (WebLens, PinPoints, etc.) ---
 .tmp/
 **/.tmp/

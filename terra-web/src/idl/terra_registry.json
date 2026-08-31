@@ -1,0 +1,793 @@
+{
+  "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
+  "metadata": {
+    "name": "terra_registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "grant_right",
+      "docs": [
+        "Grant a right on a parcel to `holder`. Owner-only.",
+        "",
+        "`nonce` must equal the parcel's current `rights_count`, which is",
+        "incremented so every right gets a unique PDA."
+      ],
+      "discriminator": [
+        147,
+        166,
+        175,
+        167,
+        132,
+        161,
+        76,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        },
+        {
+          "name": "holder",
+          "type": "pubkey"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "register_parcel",
+      "docs": [
+        "Register a new parcel on-chain. The signer becomes its owner.",
+        "",
+        "`id` is a caller-provided unique 32-byte identifier (e.g. a SHA-256 of",
+        "the parcel geometry). It is also the PDA seed, so it can never change."
+      ],
+      "discriminator": [
+        170,
+        232,
+        221,
+        44,
+        109,
+        149,
+        104,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_right",
+      "docs": [
+        "Revoke a previously granted right. The parcel owner or the original",
+        "granter may revoke. The account is closed and its lamports returned."
+      ],
+      "discriminator": [
+        209,
+        129,
+        92,
+        98,
+        174,
+        82,
+        72,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_nonce",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "transfer_parcel",
+      "docs": [
+        "Transfer ownership of a parcel. Only the current owner can sign."
+      ],
+      "discriminator": [
+        214,
+        120,
+        155,
+        187,
+        215,
+        201,
+        59,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "new_owner"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_infrastructure",
+      "docs": [
+        "Set the parcel's infrastructure flag bitmask together with the canonical",
+        "access digest produced by the off-chain validation engine. Owner-only.",
+        "",
+        "`access_hash` must be non-zero and match the digests the off-chain",
+        "engine derives for these flags on the parcel geometry."
+      ],
+      "discriminator": [
+        166,
+        23,
+        147,
+        198,
+        105,
+        63,
+        108,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "flags",
+          "type": "u16"
+        },
+        {
+          "name": "access_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_status",
+      "docs": [
+        "Update a parcel's status (e.g. for-sale). Owner-only."
+      ],
+      "discriminator": [
+        147,
+        215,
+        74,
+        174,
+        55,
+        191,
+        42,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Parcel",
+      "discriminator": [
+        149,
+        167,
+        245,
+        67,
+        209,
+        244,
+        214,
+        75
+      ]
+    },
+    {
+      "name": "Rights",
+      "discriminator": [
+        79,
+        187,
+        86,
+        85,
+        243,
+        213,
+        103,
+        234
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "InfrastructureUpdated",
+      "discriminator": [
+        198,
+        12,
+        158,
+        169,
+        233,
+        83,
+        181,
+        172
+      ]
+    },
+    {
+      "name": "ParcelRegistered",
+      "discriminator": [
+        135,
+        44,
+        33,
+        59,
+        6,
+        1,
+        21,
+        83
+      ]
+    },
+    {
+      "name": "ParcelTransferred",
+      "discriminator": [
+        242,
+        85,
+        211,
+        205,
+        7,
+        84,
+        243,
+        129
+      ]
+    },
+    {
+      "name": "RightGranted",
+      "discriminator": [
+        251,
+        86,
+        219,
+        230,
+        109,
+        252,
+        94,
+        16
+      ]
+    },
+    {
+      "name": "RightRevoked",
+      "discriminator": [
+        67,
+        219,
+        188,
+        196,
+        202,
+        34,
+        65,
+        52
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidId",
+      "msg": "Parcel id cannot be all zeros"
+    },
+    {
+      "code": 6001,
+      "name": "EmptyName",
+      "msg": "Parcel name cannot be empty"
+    },
+    {
+      "code": 6002,
+      "name": "EmptyGeometryHash",
+      "msg": "Geometry hash is required"
+    },
+    {
+      "code": 6003,
+      "name": "NotOwner",
+      "msg": "Only the current owner can perform this action"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidStatus",
+      "msg": "Invalid parcel status"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidRightKind",
+      "msg": "Invalid right kind"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidNonce",
+      "msg": "Nonce does not match the parcel's rights_count"
+    },
+    {
+      "code": 6007,
+      "name": "RightsLimitExceeded",
+      "msg": "Rights limit reached"
+    },
+    {
+      "code": 6008,
+      "name": "NotesTooLong",
+      "msg": "Notes exceed the maximum length of 128"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidExpiry",
+      "msg": "Expiry must be in the future"
+    },
+    {
+      "code": 6010,
+      "name": "NotAuthorized",
+      "msg": "Not authorized to perform this action"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidInfrastructureFlags",
+      "msg": "Invalid infrastructure flags"
+    },
+    {
+      "code": 6012,
+      "name": "EmptyAccessHash",
+      "msg": "Access hash is required"
+    }
+  ],
+  "types": [
+    {
+      "name": "InfrastructureUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "flags",
+            "type": "u16"
+          },
+          {
+            "name": "access_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Parcel",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "geometry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "rights_count",
+            "docs": [
+              "Monotonic nonce for the parcel's Rights PDAs. Never decremented."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "infrastructure_flags",
+            "type": "u16"
+          },
+          {
+            "name": "access_hash",
+            "docs": [
+              "sha-256 canonical digest over the off-chain infra/access validation",
+              "(parcel id, flags, reachability metrics). Tamper-evidence anchor."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightGranted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Rights",
+      "docs": [
+        "A right attached to a parcel (ownership, usage, easement, ...).",
+        "",
+        "PDA: `[\"rights\", parcel, nonce]`. One or more Rights may exist per parcel;",
+        "`nonce` is allocated from `Parcel::rights_count` at grant time."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          },
+          {
+            "name": "holder",
+            "docs": [
+              "Party holding the right."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "granter",
+            "docs": [
+              "Party who granted the right (invariably the parcel owner)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix timestamp; 0 means no expiration."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "notes",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}
