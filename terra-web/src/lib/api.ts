@@ -202,6 +202,9 @@ export interface IdentityView extends IdentityRow {
 export interface RequestSuccessionInput {
   successor: string // base58 wallet gaining control
   kind: number // 0=successor(heir), 1=recovery, 2=transfer
+  graceSecs?: number // optional grace window (defaults to 30d, clamped 7..180d)
+  requiredValidations?: number // optional validator endorsements required (>=1)
+  validators?: string[] // optional declared local-authority testifiers
 }
 
 export interface SuccessionRow {
@@ -212,7 +215,22 @@ export interface SuccessionRow {
   successor: string
   requested_at: string
   effective_at: string
+  grace_secs: number
+  required: number
+  validations_count: number
   status: string
+}
+
+export interface EndorseSuccessionInput {
+  validator: string // base58 wallet signing the endorsement
+}
+
+export interface JudicialForfeitureInput {
+  caseHash: string // hex of the court order case hash
+  newOwner: string // base58 wallet receiving the forfeited parcel
+  threshold: number // validator signers required (>=2)
+  validators: string[] // declared validator signers
+  relayer: string // court/govt relaying authority wallet
 }
 
 export interface RotateValidatorsInput {
@@ -341,11 +359,23 @@ export const api = {
     request<IdentityRow>(`/identities/${identityHash}/successions/${successor}/claim`, {
       method: 'POST',
     }),
+  endorseSuccession: (identityHash: string, successor: string, input: EndorseSuccessionInput) =>
+    request<SuccessionRow>(
+      `/identities/${identityHash}/successions/${successor}/endorsement`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
 
   // validator rotation (fix for dead/leaving validators) on a parcel's attestation
   rotateValidators: (parcelId: string, specifier: string, input: RotateValidatorsInput) =>
     request<{ attestation_id: string; version: number; required: number; validators: string[] }>(
       `/parcels/${parcelId}/attestations/${specifier}/rotation`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ),
+
+  // judicial forfeiture (collective validator seizure per court order)
+  judicialForfeiture: (parcelId: string, input: JudicialForfeitureInput) =>
+    request<{ parcel_id: string; from: string; to: string; threshold: number }>(
+      `/parcels/${parcelId}/forfeiture`,
       { method: 'POST', body: JSON.stringify(input) },
     ),
 }

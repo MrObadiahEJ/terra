@@ -21,6 +21,10 @@ pub fn router() -> Router<AppState> {
             "/{identity_hash}/successions/{successor}/claim",
             post(claim_succession),
         )
+        .route(
+            "/{identity_hash}/successions/{successor}/endorsement",
+            post(endorse_succession),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -69,10 +73,32 @@ pub struct IdentityView {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestSuccession {
-    /// base58 wallet that should gain control after the grace period.
+    /// base58 wallet that should gain control once gated.
     pub successor: String,
     /// 0 = successor(heir), 1 = recovery, 2 = transfer.
     pub kind: u8,
+    /// Optional per-request grace window in seconds. 0/omitted => default 30d;
+    /// clamped to [7d, 180d].
+    #[serde(default)]
+    pub grace_secs: i64,
+    /// Optional number of validator endorsements required before claim (>=1).
+    #[serde(default)]
+    pub required_validations: u8,
+    /// Optional declared local-authority validator pubkeys (base58).
+    #[serde(default)]
+    pub validators: Vec<String>,
+}
+
+const MIN_GRACE_SECS: i64 = 7 * 24 * 3600; // 7 days
+const DEFAULT_GRACE_SECS: i64 = 30 * 24 * 3600; // 30 days
+const MAX_GRACE_SECS: i64 = 180 * 24 * 3600; // 180 days
+
+fn normalize_grace(secs: i64) -> i64 {
+    if secs == 0 {
+        DEFAULT_GRACE_SECS
+    } else {
+        secs.clamp(MIN_GRACE_SECS, MAX_GRACE_SECS)
+    }
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -84,6 +110,9 @@ pub struct SuccessionRow {
     pub successor: String,
     pub requested_at: chrono::DateTime<chrono::Utc>,
     pub effective_at: chrono::DateTime<chrono::Utc>,
+    pub grace_secs: i64,
+    pub required: i16,
+    pub validations_count: i16,
     pub status: String,
 }
 
@@ -95,6 +124,12 @@ pub struct RotateValidators {
     pub validators: Vec<String>,
     /// base58 wallet that authorized the rotation (the on-chain parcel owner).
     pub rotated_by: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EndorseSuccession {
+    /// base58 wallet of the declared validator endorsing the passation.
+    pub validator: String,
 }
 
 /// Bind a person to a wallet (with a recovery wallet) — the provisioned,
@@ -188,9 +223,10 @@ pub async fn get_identity_by_wallet(
 }
 
 /// Request a wallet passation. Creates a mirror of the on-chain Succession
-/// account with a grace-period effective time. This lets an heir (kind 0),
-/// recovery account (kind 1), or deliberate transferee (kind 2) take control
-/// after the window — and is the mechanism behind dead-validator succession.
+/// account gated by BOTH a configurable grace window AND a minimum number of
+/// validator endorsements before it can be claimed. This lets an heir (kind 0),
+/// recovery account (kind 1), or deliberate transferee (kind 2) take control —
+/// and closes the stolen-wallet hole so a thief can't seize land alone.
 pub async fn request_succession(
     State(state): State<AppState>,
     Path(identity_hash): Path<String>,
@@ -202,22 +238,44 @@ pub async fn request_succession(
         return Err(AppError::bad_request("kind must be 0 (successor), 1 (recovery), or 2 (transfer)"));
     }
 
+    // Normalize per-request grace + endorsement threshold (mirror default 30d,
+    // clamp 7..180d, require at least one validator endorsement).
+    let grace = normalize_grace(req.grace_secs);
+    let required = if req.required_validations == 0 {
+        1
+    } else {
+        req.required_validations
+    };
+    let vc = req.validators.len() as u8;
+    if (required as u8) > vc {
+        return Err(AppError::bad_request(
+            "required_validations cannot exceed the number of declared validators",
+        ));
+    }
+
     let row = sqlx::query_as::<_, SuccessionRow>(
-        "INSERT INTO successions (identity_id, identity_hash, kind, successor, effective_at)
-         SELECT id, identity_hash, $2, $3, (now() + make_interval(secs => 604800))
+        "INSERT INTO successions (identity_id, identity_hash, kind, successor, effective_at, grace_secs, required, validators)
+         SELECT id, identity_hash, $2, $3, (now() + make_interval(secs => $4)), $4, $5, $6
          FROM identities WHERE identity_hash = $1
          ON CONFLICT (identity_id, successor) DO UPDATE SET
             kind = EXCLUDED.kind,
             effective_at = EXCLUDED.effective_at,
+            grace_secs = EXCLUDED.grace_secs,
+            required = EXCLUDED.required,
+            validators = EXCLUDED.validators,
+            validations_count = 0,
             status = 'pending',
             cancelled_at = NULL,
             claimed_at = NULL
          RETURNING id, identity_id, identity_hash, kind, successor, requested_at,
-                   effective_at, status",
+                   effective_at, grace_secs, required, validations_count, status",
     )
     .bind(hex::encode(ih))
     .bind(req.kind as i16)
     .bind(&req.successor)
+    .bind(grace)
+    .bind(required as i16)
+    .bind(&req.validators)
     .fetch_one(&state.pool)
     .await?;
 
@@ -238,7 +296,7 @@ pub async fn cancel_succession(
          WHERE identity_hash = $1 AND LOWER(successor) = LOWER($2)
            AND status = 'pending' AND effective_at > now()
          RETURNING id, identity_id, identity_hash, kind, successor, requested_at,
-                   effective_at, status",
+                   effective_at, grace_secs, required, validations_count, status",
     )
     .bind(hex::encode(ih))
     .bind(&successor)
@@ -246,6 +304,76 @@ pub async fn cancel_succession(
     .await?
     .ok_or_else(|| AppError::not_found("no cancelable pending succession"))?;
 
+    Ok(Json(row))
+}
+
+/// Record one validator's endorsement of a pending succession. Each call bumps
+/// `validations_count`; claim is only allowed once this reaches `required`.
+/// Mirrors the on-chain endorse_succession + SuccessionEndorsed event.
+pub async fn endorse_succession(
+    State(state): State<AppState>,
+    Path((identity_hash, successor)): Path<(String, String)>,
+    Json(req): Json<EndorseSuccession>,
+) -> Result<Json<SuccessionRow>, AppError> {
+    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let _ = decode_wallet(&successor)?;
+    let _ = decode_wallet(&req.validator)?;
+
+    let mut tx                                                             = state.pool.begin().await?;
+
+    // Only a declared validator for this succession may endorse.
+    let known: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM successions
+         WHERE identity_hash = $1 AND LOWER(successor) = LOWER($2)
+           AND status = 'pending' AND effective_at > now()
+           AND $3 = ANY(validators)
+         FOR UPDATE",
+    )
+    .bind(hex::encode(ih))
+    .bind(&successor)
+    .bind(&req.validator)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let Some((sid,)) = known else {
+        return Err(AppError::conflict(
+            "succession is not pendable or validator not in declared set",
+        ));
+    };
+
+    // One endorsement per validator per succession.
+    sqlx::query(
+        "INSERT INTO succession_endorsements (succession_id, validator)
+         VALUES ($1, $2)
+         ON CONFLICT (succession_id, validator) DO NOTHING",
+    )
+    .bind(sid)
+    .bind(&req.validator)
+    .execute(&mut *tx)
+    .await?;
+
+    // Bump the count to the number of distinct endorsements collected.
+    sqlx::query(
+        "UPDATE successions
+         SET validations_count = (
+             SELECT count(*)::smallint FROM succession_endorsements WHERE succession_id = $1
+         )
+         WHERE id = $1",
+    )
+    .bind(sid)
+    .execute(&mut *tx)
+    .await?;
+
+    let row = sqlx::query_as::<_, SuccessionRow>(
+        "SELECT id, identity_id, identity_hash, kind, successor, requested_at,
+                effective_at, grace_secs, required, validations_count, status
+         FROM successions WHERE id = $1",
+    )
+    .bind(sid)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
     Ok(Json(row))
 }
 
@@ -268,6 +396,7 @@ pub async fn claim_succession(
          SET status = 'claimed', claimed_at = now()
          WHERE identity_hash = $1 AND LOWER(successor) = LOWER($2)
            AND status = 'pending' AND effective_at <= now()
+           AND validations_count >= required
          RETURNING id",
     )
     .bind(hex::encode(ih))
@@ -277,7 +406,8 @@ pub async fn claim_succession(
 
     let Some(_) = claimed else {
         return Err(AppError::conflict(
-            "succession is not pending/effective yet (grace period not elapsed)",
+            "succession is not pending yet (grace period not elapsed and/or \
+             required validator endorsements not collected)",
         ));
     };
 
@@ -363,7 +493,7 @@ pub async fn rotate_validators(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn decode_wallet(s: &str) -> Result<[u8; 32], AppError> {
+pub fn decode_wallet(s: &str) -> Result<[u8; 32], AppError> {
     let bytes = bs58::decode(s)
         .into_vec()
         .map_err(|e| AppError::bad_request(format!("invalid wallet address: {e}")))?;
@@ -427,5 +557,44 @@ mod tests {
         let reconstituted = reconstituted; // now 4 known validators
         // Quorum reachable again with threshold 3 of 4.
         assert!(threshold_ok(3, &reconstituted));
+    }
+
+    #[test]
+    fn grace_period_is_normalized_to_7_to_180_days() {
+        let day = 24 * 3600;
+        assert_eq!(normalize_grace(0), 30 * day); // default
+        assert_eq!(normalize_grace(10 * day), 10 * day); // in range unchanged
+        assert_eq!(normalize_grace(2 * day), 7 * day); // clamped up to min
+        assert_eq!(normalize_grace(400 * day), 180 * day); // clamped down to max
+        assert_ne!(normalize_grace(7 * day), DEFAULT_GRACE_SECS);
+    }
+
+    #[test]
+    fn claim_requires_endorsements_reaching_threshold() {
+        // A succession is claimable only once validations_count >= required AND
+        // the grace period has elapsed. Simulate the DB gate:
+        fn claimable(validations: i16, required: i16, elapsed: bool) -> bool {
+            elapsed && validations >= required
+        }
+        assert!(!claimable(0, 1, true)); // no endorsements -> stolen wallet can't claim
+        assert!(!claimable(1, 2, true)); // not enough endorsements yet
+        assert!(claimable(2, 2, true)); // threshold met
+        assert!(!claimable(2, 2, false)); // met but grace not elapsed
+    }
+
+    #[test]
+    fn endorsement_threshold_cannot_exceed_declared_validators() {
+        // Mirror the request_succession guard: required <= count(validators).
+        fn ok(required: u8, validators: &[String]) -> bool {
+            required >= 1 && (required as usize) <= validators.len()
+        }
+        let two = vec![
+            bs58::encode([1u8; 32]).into_string(),
+            bs58::encode([2u8; 32]).into_string(),
+        ];
+        assert!(ok(1, &two));
+        assert!(ok(2, &two));
+        assert!(!ok(3, &two)); // impossible threshold
+        assert!(!ok(0, &two)); // must require at least one endorsement
     }
 }

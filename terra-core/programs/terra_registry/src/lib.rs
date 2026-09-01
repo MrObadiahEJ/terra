@@ -102,12 +102,20 @@ pub struct Attestation {
     pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
-/// Grace period (seconds) before a queued succession can be claimed. Gives the
-/// original owner (or a contested party) a window to cancel the passation.
-pub const SUCCESSION_GRACE_PERIOD_SECS: i64 = 7 * 24 * 3600; // 7 days
+/// Minimum grace period (seconds) a requester may choose. Chosen so legitimate
+/// heirs far from a local validator aren't rushed, while still bounding the
+/// theft window.
+pub const MIN_SUCCESSION_GRACE_SECS: i64 = 7 * 24 * 3600; // 7 days
+/// Maximum grace period a requester may choose.
+pub const MAX_SUCCESSION_GRACE_SECS: i64 = 180 * 24 * 3600; // 180 days
+/// Default grace period when a requester passes 0.
+pub const DEFAULT_SUCCESSION_GRACE_SECS: i64 = 30 * 24 * 3600; // 30 days
+/// Floor for the number of validator endorsements required on a passation.
+pub const MIN_SUCCESSION_VALIDATIONS: u8 = 1;
+/// Floor for the number of validator signers required to forfeit a parcel.
+pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
 
-/// Maximum number of successions a wallet may have in flight.
-pub const MAX_PENDING_SUCCESSIONS: usize = 8;
+/// The account struct (below) uses these — bump the account size accordingly.
 
 pub mod succession_kind {
     /// Wallet passation to an heir/beneficiary (estate / inheritance).
@@ -142,8 +150,9 @@ pub struct Identity {
     pub updated_at: i64,
 }
 
-/// An in-flight passation of wallet control, time-boxed by a grace period so
-/// the original owner can cancel or object before it settles.
+/// An in-flight passation of wallet control, gated by BOTH a configurable grace
+/// period AND a minimum number of validator endorsements (so a stolen wallet
+/// can't seize land) before it can be claimed.
 ///
 /// PDA: `["succession", identity, successor]`.
 #[account]
@@ -151,13 +160,22 @@ pub struct Identity {
 pub struct Succession {
     /// The Identity whose control is being passed.
     pub identity: Pubkey,
-    /// The wallet that will take over after the grace period.
+    /// The wallet that will take over once gated.
     pub successor: Pubkey,
     /// succession_kind.
     pub kind: u8,
     pub requested_at: i64,
-    /// requested_at + SUCCESSION_GRACE_PERIOD_SECS. Claim is only allowed after.
+    /// effective = requested_at + grace_secs. Claim only allowed after this
+    /// AND validations_count >= required.
     pub effective_at: i64,
+    /// Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS).
+    pub grace_secs: i64,
+    /// Number of validator endorsements required before claim (>= MIN, <= count).
+    pub required: u8,
+    /// Number of endorsements collected so far.
+    pub validations_count: u8,
+    /// Declared local-authority validator set acting as testifiers.
+    pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
 #[program]
@@ -467,10 +485,19 @@ pub mod terra_registry {
     ///
     /// Authorized by the current `owner` for kind TRANSFER, or by the `owner`
     /// OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.
+    ///
+    /// `grace_secs` lets the requester choose the window (0 => default 30d),
+    /// clamped to [MIN, MAX]. `required_validations` is the number of declared
+    /// local validators that must endorse the passation before it can be
+    /// claimed (>= 1) — so a stolen wallet can't seize land alone.
+    /// `validators` declares the local-authority testifiers for this passation.
     pub fn request_succession(
         ctx: Context<RequestSuccession>,
         successor: Pubkey,
         kind: u8,
+        grace_secs: i64,
+        required_validations: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         require!(successor != Pubkey::default(), TerraError::EmptySuccessor);
         require!(kind <= succession_kind::MAX, TerraError::InvalidSuccessionKind);
@@ -483,19 +510,86 @@ pub mod terra_registry {
         );
         require!(successor != identity.owner, TerraError::SuccessorIsOwner);
 
+        let mut count: u8 = 0;
+        for &v in validators.iter() {
+            if v == Pubkey::default() {
+                continue;
+            }
+            count += 1;
+        }
+        require!(count > 0, TerraError::NoValidators);
+        require!(
+            (required_validations as usize) <= count as usize,
+            TerraError::InvalidThreshold
+        );
+        require!(
+            required_validations >= MIN_SUCCESSION_VALIDATIONS,
+            TerraError::InvalidThreshold
+        );
+
+        let grace = if grace_secs == 0 {
+            DEFAULT_SUCCESSION_GRACE_SECS
+        } else {
+            grace_secs.clamp(MIN_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS)
+        };
+
         let now = Clock::get()?.unix_timestamp;
         let succession = &mut ctx.accounts.succession;
         succession.identity = identity.key();
         succession.successor = successor;
         succession.kind = kind;
         succession.requested_at = now;
-        succession.effective_at = now.saturating_add(SUCCESSION_GRACE_PERIOD_SECS);
+        succession.grace_secs = grace;
+        succession.effective_at = now.saturating_add(grace);
+        succession.required = required_validations;
+        succession.validations_count = 0;
+        succession.validators = validators;
 
         emit!(SuccessionRequested {
             identity: identity.key(),
             successor,
             kind,
+            grace_secs: grace,
+            required: required_validations,
+            count,
             effective_at: succession.effective_at,
+        });
+        Ok(())
+    }
+
+    /// Record one validator's endorsement of a pending succession. The signing
+    /// validator must be in the succession's declared validator set; this bumps
+    /// `validations_count`. Each endorsement is an Ed25519 signature because the
+    /// validator signs this transaction with their wallet. Only meaningful
+    /// before the succession becomes effective (validations are then moot).
+    pub fn endorse_succession(
+        ctx: Context<EndorseSuccession>,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let succession = &mut ctx.accounts.succession;
+        require!(
+            now < succession.effective_at,
+            TerraError::SuccessionAlreadyEffective
+        );
+        require!(
+            (succession.validations_count as usize) < (succession.required as usize),
+            TerraError::ValidationLimitReached
+        );
+
+        let validator = ctx.accounts.validator.key();
+        require!(
+            succession.validators.contains(&validator),
+            TerraError::NotValidator
+        );
+
+        succession.validations_count += 1;
+
+        emit!(SuccessionEndorsed {
+            identity: succession.identity,
+            successor: succession.successor,
+            validator,
+            validations_count: succession.validations_count,
+            required: succession.required,
         });
         Ok(())
     }
@@ -524,9 +618,10 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Claim a passation once the grace period has elapsed. The `successor`
-    /// becomes the identity's new owner. Any parcels the identity owned that
-    /// are supplied via `remaining_accounts` are re-pointed to the successor.
+    /// Claim a passation once BOTH the grace period has elapsed AND the required
+    /// number of validators have endorsed it. The `successor` becomes the
+    /// identity's new owner. Any parcels the identity owned that are supplied
+    /// via `remaining_accounts` are re-pointed to the successor.
     pub fn claim_succession(
         ctx: Context<ClaimSuccession>,
     ) -> Result<()> {
@@ -536,9 +631,16 @@ pub mod terra_registry {
             succession.successor == ctx.accounts.signer.key(),
             TerraError::NotSuccessor
         );
+        // Two independent gates: time AND validator endorsement. A stolen wallet
+        // alone (or a thief who happens to know the successor) still can't claim
+        // without the local validators testifying.
         require!(
             now >= succession.effective_at,
             TerraError::SuccessionNotYetEffective
+        );
+        require!(
+            succession.validations_count >= succession.required,
+            TerraError::InsufficientValidations
         );
 
         let identity = &mut ctx.accounts.identity;
@@ -631,6 +733,74 @@ pub mod terra_registry {
             version: attestation.version,
             required: new_required,
             count,
+        });
+        Ok(())
+    }
+
+    /// Force-transfer a parcel's ownership away from a non-compliant owner, per
+    /// a court order. This is deliberately heavier than a normal transfer:
+    /// at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must
+    /// sign this transaction themselves, and the order is bound to a
+    /// `case_hash` (e.g. SHA-256 of the court order document) for auditability.
+    ///
+    /// This is how validators collectively inform the chain that land no longer
+    /// belongs to someone who refuses to release it — e.g. repossession by a
+    /// government, or a court ruling that title passed to another person.
+    pub fn judicial_forfeiture(
+        ctx: Context<JudicialForfeiture>,
+        case_hash: [u8; 32],
+        new_owner: Pubkey,
+        threshold: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
+    ) -> Result<()> {
+        require!(
+            !case_hash.iter().all(|b| *b == 0),
+            TerraError::EmptyCaseHash
+        );
+        require!(new_owner != Pubkey::default(), TerraError::EmptyNewOwner);
+        require!(
+            threshold >= MIN_FORFEIT_VALIDATORS,
+            TerraError::InvalidThreshold
+        );
+
+        let mut count: u8 = 0;
+        for &v in validators.iter() {
+            if v == Pubkey::default() {
+                continue;
+            }
+            count += 1;
+        }
+        require!((threshold as usize) <= count as usize, TerraError::InvalidThreshold);
+
+        let parcel = &mut ctx.accounts.parcel;
+        let from = parcel.owner;
+
+        // Count how many of the discovered validator signers are part of the
+        // declared set AND actually signed this transaction.
+        let mut present: u8 = 0;
+        for signer in ctx.remaining_accounts.iter() {
+            if signer.is_signer && validators.contains(&signer.key()) {
+                present += 1;
+            }
+        }
+        require!(present >= threshold, TerraError::InsufficientValidatorSigners);
+
+        // The relaying party must not be the current owner (prevents self-forfeit).
+        require!(
+            ctx.accounts.authority.key() != from,
+            TerraError::OwnerCannotSelfForfeit
+        );
+
+        parcel.owner = new_owner;
+        parcel.updated_at = Clock::get()?.unix_timestamp;
+
+        emit!(ParcelForfeited {
+            parcel: parcel.key(),
+            case_hash,
+            from,
+            to: new_owner,
+            threshold,
+            present,
         });
         Ok(())
     }
@@ -784,7 +954,7 @@ pub struct AttachParcel<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(successor: Pubkey, kind: u8)]
+#[instruction(successor: Pubkey, kind: u8, grace_secs: i64, required_validations: u8, validators: [Pubkey; MAX_VALIDATORS])]
 pub struct RequestSuccession<'info> {
     #[account(
         mut,
@@ -862,6 +1032,39 @@ pub struct RotateValidators<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct EndorseSuccession<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        mut,
+        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
+        bump
+    )]
+    pub succession: Account<'info, Succession>,
+    /// A declared local validator endorsing the passation (signs this tx).
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(case_hash: [u8; 32])]
+pub struct JudicialForfeiture<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// Relaying authority (court clerk / govt channel). Must NOT be the owner.
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -925,7 +1128,19 @@ pub struct SuccessionRequested {
     pub identity: Pubkey,
     pub successor: Pubkey,
     pub kind: u8,
+    pub grace_secs: i64,
+    pub required: u8,
+    pub count: u8,
     pub effective_at: i64,
+}
+
+#[event]
+pub struct SuccessionEndorsed {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub validator: Pubkey,
+    pub validations_count: u8,
+    pub required: u8,
 }
 
 #[event]
@@ -951,6 +1166,16 @@ pub struct ValidatorsRotated {
     pub version: u8,
     pub required: u8,
     pub count: u8,
+}
+
+#[event]
+pub struct ParcelForfeited {
+    pub parcel: Pubkey,
+    pub case_hash: [u8; 32],
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub threshold: u8,
+    pub present: u8,
 }
 
 #[error_code]
@@ -1009,4 +1234,18 @@ pub enum TerraError {
     SuccessionNotYetEffective,
     #[msg("Attestation does not belong to this parcel")]
     AttestationMismatch,
+    #[msg("Succession requires validator endorsements before it can be claimed")]
+    InsufficientValidations,
+    #[msg("Signing wallet is not a declared validator for this succession")]
+    NotValidator,
+    #[msg("No more validators may endorse this succession (limit reached)")]
+    ValidationLimitReached,
+    #[msg("Court case hash is required")]
+    EmptyCaseHash,
+    #[msg("New forfeiture owner is required")]
+    EmptyNewOwner,
+    #[msg("Not enough validator signers to forfeit this parcel")]
+    InsufficientValidatorSigners,
+    #[msg("The current owner cannot self-forfeit their own parcel")]
+    OwnerCannotSelfForfeit,
 }

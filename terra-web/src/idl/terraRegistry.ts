@@ -461,6 +461,95 @@ export type TerraRegistry = {
       "args": []
     },
     {
+      "name": "endorseSuccession",
+      "docs": [
+        "Record one validator's endorsement of a pending succession. The signing",
+        "validator must be in the succession's declared validator set; each",
+        "endorsement is an Ed25519 signature (the validator signs this tx).",
+        "Claim is only allowed once the required number of endorsements are met",
+        "AND the grace period has elapsed."
+      ],
+      "discriminator": [
+        70,
+        125,
+        62,
+        184,
+        108,
+        245,
+        74,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identityHash",
+                "account": "identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "grantRight",
       "docs": [
         "Grant a right on a parcel to `holder`. Owner-only.",
@@ -537,6 +626,91 @@ export type TerraRegistry = {
         {
           "name": "notes",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "judicialForfeiture",
+      "docs": [
+        "Force-transfer a parcel's ownership away from a non-compliant owner per",
+        "a court order. Deliberately heavier than a normal transfer: at least",
+        "`threshold` (>=2) validators must sign this transaction themselves, and",
+        "the order is bound to a `caseHash` for auditability.",
+        "",
+        "This is how validators collectively inform the chain that land no longer",
+        "belongs to someone who refuses to release it (e.g. repossession by a",
+        "government, or a court ruling that title passed to another person)."
+      ],
+      "discriminator": [
+        34,
+        185,
+        214,
+        40,
+        233,
+        253,
+        255,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "caseHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "newOwner",
+          "type": "pubkey"
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
         }
       ]
     },
@@ -622,10 +796,16 @@ export type TerraRegistry = {
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
         "transfer). A Succession account is created and becomes effective only",
-        "after the grace period — within which the original owner can cancel.",
+        "after BOTH the configurable grace period AND the required number of",
+        "validator endorsements are met — so a stolen wallet can't seize land.",
+        "Within the grace window the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
-        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR."
+        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
+        "",
+        "`graceSecs` is the per-request grace window (0 => default 30d, clamped",
+        "to [7d, 180d]). `requiredValidations` is the validator endorsements",
+        "needed before claim (>= 1). `validators` declares the local authorities."
       ],
       "discriminator": [
         239,
@@ -713,6 +893,23 @@ export type TerraRegistry = {
         {
           "name": "kind",
           "type": "u8"
+        },
+        {
+          "name": "graceSecs",
+          "type": "i64"
+        },
+        {
+          "name": "requiredValidations",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
         }
       ]
     },
@@ -1163,6 +1360,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "parcelForfeited",
+      "discriminator": [
+        169,
+        221,
+        21,
+        91,
+        124,
+        141,
+        210,
+        97
+      ]
+    },
+    {
       "name": "parcelRegistered",
       "discriminator": [
         135,
@@ -1238,6 +1448,19 @@ export type TerraRegistry = {
         191,
         66,
         212
+      ]
+    },
+    {
+      "name": "successionEndorsed",
+      "discriminator": [
+        207,
+        163,
+        114,
+        67,
+        56,
+        134,
+        119,
+        241
       ]
     },
     {
@@ -1402,6 +1625,41 @@ export type TerraRegistry = {
       "code": 6026,
       "name": "attestationMismatch",
       "msg": "Attestation does not belong to this parcel"
+    },
+    {
+      "code": 6027,
+      "name": "insufficientValidations",
+      "msg": "Succession requires validator endorsements before it can be claimed"
+    },
+    {
+      "code": 6028,
+      "name": "notValidator",
+      "msg": "Signing wallet is not a declared validator for this succession"
+    },
+    {
+      "code": 6029,
+      "name": "validationLimitReached",
+      "msg": "No more validators may endorse this succession (limit reached)"
+    },
+    {
+      "code": 6030,
+      "name": "emptyCaseHash",
+      "msg": "Court case hash is required"
+    },
+    {
+      "code": 6031,
+      "name": "emptyNewOwner",
+      "msg": "New forfeiture owner is required"
+    },
+    {
+      "code": 6032,
+      "name": "insufficientValidatorSigners",
+      "msg": "Not enough validator signers to forfeit this parcel"
+    },
+    {
+      "code": 6033,
+      "name": "ownerCannotSelfForfeit",
+      "msg": "The current owner cannot self-forfeit their own parcel"
     }
   ],
   "types": [
@@ -1731,6 +1989,43 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "parcelForfeited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "caseHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "present",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "parcelRegistered",
       "type": {
         "kind": "struct",
@@ -1906,9 +2201,43 @@ export type TerraRegistry = {
           {
             "name": "effectiveAt",
             "docs": [
-              "requested_at + SUCCESSION_GRACE_PERIOD_SECS. Claim is only allowed after."
+              "effective = requested_at + grace_secs. Claim only allowed after this",
+              "AND validations_count >= required."
             ],
             "type": "i64"
+          },
+          {
+            "name": "graceSecs",
+            "docs": [
+              "Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "docs": [
+              "Number of validator endorsements required before claim (>= MIN, <= count)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "validationsCount",
+            "docs": [
+              "Number of endorsements collected so far."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "validators",
+            "docs": [
+              "Declared local-authority validator set acting as testifiers."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
           }
         ]
       }
@@ -1962,6 +2291,34 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "successionEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "validationsCount",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "successionRequested",
       "type": {
         "kind": "struct",
@@ -1976,6 +2333,18 @@ export type TerraRegistry = {
           },
           {
             "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "graceSecs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
             "type": "u8"
           },
           {

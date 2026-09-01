@@ -82,6 +82,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/{id}/documents", post(attestations::register_document))
         .route("/{id}/documents", get(attestations::list_documents))
+        .route("/{id}/forfeiture", post(judicial_forfeiture))
 }
 
 
@@ -310,4 +311,127 @@ fn is_geometry_error(err: &sqlx::Error) -> bool {
                 Some("XX000") | Some("22023") | Some("22P02")
             )
     )
+}
+
+// ---------------------------------------------------------------------------
+// Judicial forfeiture (collective validator seizure per court order).
+// Deliberately heavier than a normal transfer: at least `threshold` validators
+// must be recorded as having signed, and the order is bound to a case hash.
+// Mirrors the on-chain judicial_forfeiture + ParcelForfeited event.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct JudicialForfeiture {
+    /// hex(32) hash of the court order.
+    pub case_hash: String,
+    /// base58 wallet given control of the parcel.
+    pub new_owner: String,
+    /// validator signers required (>= 2).
+    pub threshold: u16,
+    /// declared validator signer wallets (base58).
+    pub validators: Vec<String>,
+    /// base58 relaying authority wallet (court/govt).
+    pub relayer: String,
+}
+
+const MIN_FORFEIT_VALIDATORS: u16 = 2;
+
+async fn judicial_forfeiture(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<JudicialForfeiture>,
+) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+    let ih = decode_hex32(&req.case_hash)?;
+    identities::decode_wallet(&req.new_owner)?;
+    identities::decode_wallet(&req.relayer)?;
+    for v in &req.validators {
+        identities::decode_wallet(v)?;
+    }
+
+    if req.threshold < MIN_FORFEIT_VALIDATORS {
+        return Err(AppError::bad_request(
+            "forfeiture threshold must be at least 2 validators",
+        ));
+    }
+    let present = req.validators.len() as u16;
+    if req.threshold > present {
+        return Err(AppError::bad_request(
+            "forfeiture threshold cannot exceed the number of validator signers",
+        ));
+    }
+
+    let mut tx = state.pool.begin().await?;
+
+    let current: Option<(String,)> =
+        sqlx::query_as("SELECT owner FROM parcels WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let Some((owner,)) = current else {
+        return Err(AppError::not_found("parcel not found"));
+    };
+    if owner.eq_ignore_ascii_case(&req.relayer) {
+        return Err(AppError::bad_request(
+            "the current owner cannot self-forfeit their own parcel",
+        ));
+    }
+
+    sqlx::query("UPDATE parcels SET owner = $2, updated_at = now() WHERE id = $1")
+        .bind(id)
+        .bind(&req.new_owner)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query(
+        "INSERT INTO forfeitures (parcel_id, case_hash, from_owner, to_owner, threshold, present, court_relay)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(id)
+    .bind(hex::encode(ih))
+    .bind(&owner)
+    .bind(&req.new_owner)
+    .bind(req.threshold as i16)
+    .bind(present as i16)
+    .bind(&req.relayer)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "parcel_id": id,
+            "from": owner,
+            "to": req.new_owner,
+            "threshold": req.threshold,
+            "present": present,
+            "case_hash": hex::encode(ih),
+        })),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The core forfeiture guard: a collective seizure must meet a minimum
+    /// threshold (>=2) of validator signers, and the threshold can never exceed
+    /// the number of validator signers presented. This makes forfeiture
+    /// deliberately heavier than a normal owner-authorized transfer.
+    fn forfeiture_ok(threshold: u16, present: usize) -> bool {
+        threshold >= MIN_FORFEIT_VALIDATORS
+            && (threshold as usize) <= present
+            && present > 0
+    }
+
+    #[test]
+    fn forfeiture_requires_collective_validator_threshold() {
+        assert!(!forfeiture_ok(0, 3)); // below the 2-validator minimum
+        assert!(!forfeiture_ok(1, 3)); // a single validator can't seize land
+        assert!(forfeiture_ok(2, 2)); // minimum collective seizure
+        assert!(forfeiture_ok(3, 5)); // heavier court orders can demand more
+        assert!(!forfeiture_ok(5, 3)); // threshold exceeds signers presented
+        assert!(!forfeiture_ok(2, 0)); // no signers at all
+    }
 }

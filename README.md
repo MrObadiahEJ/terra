@@ -121,7 +121,8 @@ This gives non-repudiation (a validator can't deny what they signed) and multi-p
 Land registries fail when a person isn't in the database, when an owner/heir has
 never appeared on the platform, or when a validator/owner dies. Terra handles
 these three cases with an on-chain **Identity** account and a time-boxed
-**Succession (wallet passation)** mechanism.
+**Succession (wallet passation)** mechanism, plus collective validator seizure
+for judicial forfeiture.
 
 ### Person → wallet binding (even when the system creates the wallet)
 
@@ -142,14 +143,30 @@ national ID) plus their `owner` wallet and a separate `recovery` wallet.
 ### Wallet passation (`Succession`) — heirs, recovery, transfer of control
 
 A `Succession` account (PDA `["succession", identity, successor]`) queues a
-control transfer that becomes effective only after a **grace period** (7 days):
+control transfer that becomes effective only after **two independent gates** are
+met: a **configurable grace window** AND a **minimum number of validator
+endorsements** (so a stolen wallet can't seize land alone):
 
 - `request_succession` — the owner (or the recovery wallet, for key-loss) names
-  a successor: kind `0`=heir, `1`=recovery, `2`=transfer.
+  a successor: kind `0`=heir, `1`=recovery, `2`=transfer. The requester picks a
+  per-request grace window (default 30 days, clamped to [7d, 180d]) and a
+  `required_validations` threshold (>= 1) of declared local validators.
+- `endorse_succession` — each declared local validator signs the endorsement tx
+  with their wallet; each endorsement bumps `validations_count` and is
+  immutably recorded in `succession_endorsements` (one endorsement per validator
+  per succession).
+- `claim_succession` — **only after** `validations_count >= required` **AND**
+  `effective_at <= now()` the successor takes over the identity; any owned
+  parcels are **re-pointed** to their wallet in the same instruction
+  (`remaining_accounts`).
 - The **original owner can `cancel`** within the window (no theft).
-- `claim_succession` — after the grace period the successor takes over the
-  identity; any owned parcels are **re-pointed** to their wallet in the same
-  instruction (`remaining_accounts`).
+
+This two-gate mechanism means:
+- a stolen wallet can't claim without the local validators testifying;
+- even a colluding thief who knows the successor still needs the full
+  validator set to endorse; and
+- legitimate heirs far from a local validator get a configurable grace window
+  instead of a rigid 7-day cutoff.
 
 ### Dead / leaving validators — `rotate_validators`
 
@@ -163,9 +180,37 @@ thresholds below `count`, this means:
 - if the *owner* is gone too, **succession** passes control to an heir first,
   then the heir rotates the validators.
 
-These three mechanisms (`Identity`, `Succession`, `rotate_validators`) are the
-recovery layer that makes the registry resilient to disconnected people,
-unknown/absent owners, and mortality.
+### Judicial forfeiture (`judicial_forfeiture`) — collective validator seizure
+
+For cases where an owner refuses to release land despite a court order (e.g.
+repossession by government, or a court ruling that title passed to another
+person), Terra provides a **deliberately heavier** collective forfeiture
+mechanism:
+
+- The relaying authority (court/govt channel) calls `judicial_forfeiture` with
+  a `case_hash` (SHA-256 of the court order document), `new_owner` (the wallet
+  receiving control), a `threshold` (>= 2 validators), and a `validators` list.
+- At least `threshold` of the declared validators must **sign the same
+  transaction** as `Signer` accounts in `remaining_accounts`, making each
+  endorsement cryptographically undeniable (each validator's ed25519 wallet
+  signs the tx).
+- When the threshold is met, the program transfers `Parcel.owner` to `new_owner`
+  and emits a `ParcelForfeited` event with the case hash, from/to, and the
+  threshold/present counts for auditability.
+- The relaying authority **cannot** be the current owner (prevents self-forfeit
+  abuse).
+- This is recorded in the `forfeitures` DB table with a `court_relay` fail-safe
+  column for off-chain reconciliation.
+
+This makes forfeiture deliberately heavier than a normal transfer: at least 2
+validator signers are required, and each signs the actual transaction (not an
+off-chain signature), so the collective validator consent is cryptographically
+unimpeachable.
+
+These four mechanisms (`Identity`, `Succession` with validator endorsement,
+`rotate_validators`, `judicial_forfeiture`) are the recovery layer that makes
+the registry resilient to disconnected people, unknown/absent owners, mortality,
+and judicial seizure.
 
 ---
 
@@ -186,7 +231,7 @@ unknown/absent owners, and mortality.
 - [x] **Phase 1 — Devnet MVP**: flat parcel registry, Anchor program, ownership transfer, rights, Cesium globe
 - [x] **Phase 2 — Pilot data layer**: PostGIS fusion database, OSM road-graph ingestion, geo-engine
 - [x] **Phase 3 — Road-access validation**: off-chain Dijkstra/BFS reachability, on-chain flag + digest hashing
-- [x] **Phase 4 — Attestation + recovery**: on-chain content-hash anchor, multi-validator Ed25519 validation, Identity binding, wallet passation (Succession), and validator rotation
+- [x] **Phase 4 — Attestation + recovery**: on-chain content-hash anchor, multi-validator Ed25519 validation, Identity binding, validator-endorsed wallet passation (configurable grace), validator rotation, and judicial forfeiture
 - [ ] **Phase 5 — Legal 3D/air-rights layer**: legal volume extension (LADM Part 1 extension)
 - [ ] **Phase 6 — Country config layer**: tenure-type abstraction, multi-authority attestation workflows
 - [ ] **Phase 7 — Regional expansion**: Central Africa -> Africa -> World

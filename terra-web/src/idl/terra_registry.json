@@ -368,9 +368,10 @@
     {
       "name": "claim_succession",
       "docs": [
-        "Claim a passation once the grace period has elapsed. The `successor`",
-        "becomes the identity's new owner. Any parcels the identity owned that",
-        "are supplied via `remaining_accounts` are re-pointed to the successor."
+        "Claim a passation once BOTH the grace period has elapsed AND the required",
+        "number of validators have endorsed it. The `successor` becomes the",
+        "identity's new owner. Any parcels the identity owned that are supplied",
+        "via `remaining_accounts` are re-pointed to the successor."
       ],
       "discriminator": [
         90,
@@ -445,6 +446,99 @@
         {
           "name": "signer",
           "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "endorse_succession",
+      "docs": [
+        "Record one validator's endorsement of a pending succession. The signing",
+        "validator must be in the succession's declared validator set; this bumps",
+        "`validations_count`. Each endorsement is an Ed25519 signature because the",
+        "validator signs this transaction with their wallet. Only meaningful",
+        "before the succession becomes effective (validations are then moot)."
+      ],
+      "discriminator": [
+        70,
+        125,
+        62,
+        184,
+        108,
+        245,
+        74,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "Succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "Succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "docs": [
+            "A declared local validator endorsing the passation (signs this tx)."
+          ],
           "signer": true
         },
         {
@@ -535,6 +629,95 @@
       ]
     },
     {
+      "name": "judicial_forfeiture",
+      "docs": [
+        "Force-transfer a parcel's ownership away from a non-compliant owner, per",
+        "a court order. This is deliberately heavier than a normal transfer:",
+        "at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must",
+        "sign this transaction themselves, and the order is bound to a",
+        "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
+        "",
+        "This is how validators collectively inform the chain that land no longer",
+        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "government, or a court ruling that title passed to another person."
+      ],
+      "discriminator": [
+        34,
+        185,
+        214,
+        40,
+        233,
+        253,
+        255,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Relaying authority (court clerk / govt channel). Must NOT be the owner."
+          ],
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "register_parcel",
       "docs": [
         "Register a new parcel on-chain. The signer becomes its owner.",
@@ -619,7 +802,13 @@
         "after the grace period — within which the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
-        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR."
+        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
+        "",
+        "`grace_secs` lets the requester choose the window (0 => default 30d),",
+        "clamped to [MIN, MAX]. `required_validations` is the number of declared",
+        "local validators that must endorse the passation before it can be",
+        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
+        "`validators` declares the local-authority testifiers for this passation."
       ],
       "discriminator": [
         239,
@@ -707,6 +896,23 @@
         {
           "name": "kind",
           "type": "u8"
+        },
+        {
+          "name": "grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "required_validations",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
         }
       ]
     },
@@ -1157,6 +1363,19 @@
       ]
     },
     {
+      "name": "ParcelForfeited",
+      "discriminator": [
+        169,
+        221,
+        21,
+        91,
+        124,
+        141,
+        210,
+        97
+      ]
+    },
+    {
       "name": "ParcelRegistered",
       "discriminator": [
         135,
@@ -1232,6 +1451,19 @@
         191,
         66,
         212
+      ]
+    },
+    {
+      "name": "SuccessionEndorsed",
+      "discriminator": [
+        207,
+        163,
+        114,
+        67,
+        56,
+        134,
+        119,
+        241
       ]
     },
     {
@@ -1396,6 +1628,41 @@
       "code": 6026,
       "name": "AttestationMismatch",
       "msg": "Attestation does not belong to this parcel"
+    },
+    {
+      "code": 6027,
+      "name": "InsufficientValidations",
+      "msg": "Succession requires validator endorsements before it can be claimed"
+    },
+    {
+      "code": 6028,
+      "name": "NotValidator",
+      "msg": "Signing wallet is not a declared validator for this succession"
+    },
+    {
+      "code": 6029,
+      "name": "ValidationLimitReached",
+      "msg": "No more validators may endorse this succession (limit reached)"
+    },
+    {
+      "code": 6030,
+      "name": "EmptyCaseHash",
+      "msg": "Court case hash is required"
+    },
+    {
+      "code": 6031,
+      "name": "EmptyNewOwner",
+      "msg": "New forfeiture owner is required"
+    },
+    {
+      "code": 6032,
+      "name": "InsufficientValidatorSigners",
+      "msg": "Not enough validator signers to forfeit this parcel"
+    },
+    {
+      "code": 6033,
+      "name": "OwnerCannotSelfForfeit",
+      "msg": "The current owner cannot self-forfeit their own parcel"
     }
   ],
   "types": [
@@ -1725,6 +1992,43 @@
       }
     },
     {
+      "name": "ParcelForfeited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "present",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ParcelRegistered",
       "type": {
         "kind": "struct",
@@ -1864,8 +2168,9 @@
     {
       "name": "Succession",
       "docs": [
-        "An in-flight passation of wallet control, time-boxed by a grace period so",
-        "the original owner can cancel or object before it settles.",
+        "An in-flight passation of wallet control, gated by BOTH a configurable grace",
+        "period AND a minimum number of validator endorsements (so a stolen wallet",
+        "can't seize land) before it can be claimed.",
         "",
         "PDA: `[\"succession\", identity, successor]`."
       ],
@@ -1882,7 +2187,7 @@
           {
             "name": "successor",
             "docs": [
-              "The wallet that will take over after the grace period."
+              "The wallet that will take over once gated."
             ],
             "type": "pubkey"
           },
@@ -1900,9 +2205,43 @@
           {
             "name": "effective_at",
             "docs": [
-              "requested_at + SUCCESSION_GRACE_PERIOD_SECS. Claim is only allowed after."
+              "effective = requested_at + grace_secs. Claim only allowed after this",
+              "AND validations_count >= required."
             ],
             "type": "i64"
+          },
+          {
+            "name": "grace_secs",
+            "docs": [
+              "Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "docs": [
+              "Number of validator endorsements required before claim (>= MIN, <= count)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "validations_count",
+            "docs": [
+              "Number of endorsements collected so far."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "validators",
+            "docs": [
+              "Declared local-authority validator set acting as testifiers."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
           }
         ]
       }
@@ -1956,6 +2295,34 @@
       }
     },
     {
+      "name": "SuccessionEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "validations_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "SuccessionRequested",
       "type": {
         "kind": "struct",
@@ -1970,6 +2337,18 @@
           },
           {
             "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
             "type": "u8"
           },
           {
