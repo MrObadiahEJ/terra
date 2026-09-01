@@ -238,7 +238,11 @@ pub struct InitiateShardRotation<'info> {
 pub struct EndorseShardRotation<'info> {
     #[account(mut)]
     pub rotation: Account<'info, vault::VaultShardRotation>,
+    #[account(
+        constraint = vault_record.subject == subject.key() @ TerraError::IdentityMismatch
+    )]
     pub vault_record: Account<'info, vault::VaultRecord>,
+    pub subject: Account<'info, Identity>,
     pub validator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -617,6 +621,8 @@ pub mod terra_registry {
             if v == Pubkey::default() {
                 continue;
             }
+            // Self-dealing check: the identity owner cannot be their own validator.
+            require!(v != identity.owner, TerraError::ValidatorOwnsAsset);
             count += 1;
         }
         require!(count > 0, TerraError::NoValidators);
@@ -682,6 +688,11 @@ pub mod terra_registry {
         require!(
             succession.validators.contains(&validator),
             TerraError::NotValidator
+        );
+        // Self-dealing check: a validator must not be the identity owner.
+        require!(
+            validator != ctx.accounts.identity.owner,
+            TerraError::ValidatorOwnsAsset
         );
 
         succession.validations_count += 1;
@@ -870,6 +881,8 @@ pub mod terra_registry {
             if v == Pubkey::default() {
                 continue;
             }
+            // Self-dealing check: declared validators must not include the parcel owner.
+            require!(v != ctx.accounts.parcel.owner, TerraError::ValidatorOwnsAsset);
             count += 1;
         }
         require!((threshold as usize) <= count as usize, TerraError::InvalidThreshold);
@@ -882,6 +895,8 @@ pub mod terra_registry {
         let mut present: u8 = 0;
         for signer in ctx.remaining_accounts.iter() {
             if signer.is_signer && validators.contains(&signer.key()) {
+                // Self-dealing check: parcel owner cannot sign as validator.
+                require!(signer.key() != from, TerraError::ValidatorOwnsAsset);
                 present += 1;
             }
         }
@@ -1465,6 +1480,8 @@ pub enum TerraError {
     InsufficientValidatorSigners,
     #[msg("The current owner cannot self-forfeit their own parcel")]
     OwnerCannotSelfForfeit,
+    #[msg("A validator cannot be the owner of the asset being validated")]
+    ValidatorOwnsAsset,
     #[msg("Vault already exists for this subject")]
     VaultAlreadyExists,
     #[msg("Vault not found")]

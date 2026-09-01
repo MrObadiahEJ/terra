@@ -655,6 +655,9 @@ export type TerraRegistry = {
           "name": "vaultRecord"
         },
         {
+          "name": "subject"
+        },
+        {
           "name": "validator",
           "signer": true
         },
@@ -2144,126 +2147,131 @@ export type TerraRegistry = {
     },
     {
       "code": 6034,
+      "name": "validatorOwnsAsset",
+      "msg": "A validator cannot be the owner of the asset being validated"
+    },
+    {
+      "code": 6035,
       "name": "vaultAlreadyExists",
       "msg": "Vault already exists for this subject"
     },
     {
-      "code": 6035,
+      "code": 6036,
       "name": "vaultNotFound",
       "msg": "Vault not found"
     },
     {
-      "code": 6036,
+      "code": 6037,
       "name": "thresholdExceedsHolders",
       "msg": "Threshold exceeds the number of shard holders"
     },
     {
-      "code": 6037,
+      "code": 6038,
       "name": "notShardHolder",
       "msg": "Signer is not a shard holder for this vault"
     },
     {
-      "code": 6038,
+      "code": 6039,
       "name": "notActiveValidator",
       "msg": "Signer is not an active validator in this vault"
     },
     {
-      "code": 6039,
+      "code": 6040,
       "name": "ciphertextHashRequired",
       "msg": "Ciphertext hash cannot be all zeros"
     },
     {
-      "code": 6040,
+      "code": 6041,
       "name": "cidRequired",
       "msg": "Ciphertext CID cannot be empty"
     },
     {
-      "code": 6041,
+      "code": 6042,
       "name": "expiryTooFar",
       "msg": "Expiry must be within 24 hours from now"
     },
     {
-      "code": 6042,
+      "code": 6043,
       "name": "expiryInPast",
       "msg": "Expiry must be in the future"
     },
     {
-      "code": 6043,
+      "code": 6044,
       "name": "nonceRequired",
       "msg": "Nonce cannot be all zeros"
     },
     {
-      "code": 6044,
+      "code": 6045,
       "name": "rotationNotFound",
       "msg": "No pending rotation exists for this vault"
     },
     {
-      "code": 6045,
+      "code": 6046,
       "name": "rotationAlreadyFinalized",
       "msg": "Rotation has already been executed or cancelled"
     },
     {
-      "code": 6046,
+      "code": 6047,
       "name": "rotationNotYetEffective",
       "msg": "Rotation time lock has not yet expired"
     },
     {
-      "code": 6047,
+      "code": 6048,
       "name": "quorumNotMetForRotation",
       "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
     },
     {
-      "code": 6048,
+      "code": 6049,
       "name": "alreadyEndorsedRotation",
       "msg": "Validator has already endorsed this rotation"
     },
     {
-      "code": 6049,
+      "code": 6050,
       "name": "selfEndorsementNotAllowed",
       "msg": "Initiator cannot endorse their own rotation"
     },
     {
-      "code": 6050,
+      "code": 6051,
       "name": "pendingRotationExists",
       "msg": "A pending rotation already exists for this vault"
     },
     {
-      "code": 6051,
+      "code": 6052,
       "name": "pingIntervalNotElapsed",
       "msg": "Ping interval has not yet elapsed"
     },
     {
-      "code": 6052,
+      "code": 6053,
       "name": "algorithmNotSupported",
       "msg": "Encryption algorithm is not supported"
     },
     {
-      "code": 6053,
+      "code": 6054,
       "name": "tooManyStorageUris",
       "msg": "Storage URIs exceed the maximum count"
     },
     {
-      "code": 6054,
+      "code": 6055,
       "name": "tooManyShardHolders",
       "msg": "Shard holders exceed the maximum count"
     },
     {
-      "code": 6055,
+      "code": 6056,
       "name": "nonceAlreadyUsed",
       "msg": "This nonce has already been used for this vault"
     },
     {
-      "code": 6056,
+      "code": 6057,
       "name": "notAuthorizedToCreate",
       "msg": "Only the registry admin or subject's recovery wallet can create a vault"
     },
     {
-      "code": 6057,
+      "code": 6058,
       "name": "notAuthorizedToCancel",
       "msg": "Only the admin or initiator can cancel a rotation"
     },
     {
-      "code": 6058,
+      "code": 6059,
       "name": "newThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
     }

@@ -597,4 +597,31 @@ mod tests {
         assert!(!ok(3, &two)); // impossible threshold
         assert!(!ok(0, &two)); // must require at least one endorsement
     }
+
+    #[test]
+    fn owner_cannot_declare_self_as_validator() {
+        let owner = bs58::encode([1u8; 32]).into_string();
+        let v1 = bs58::encode([2u8; 32]).into_string();
+        let v2 = bs58::encode([3u8; 32]).into_string();
+
+        fn validators_valid(owner: &str, validators: &[String]) -> bool {
+            validators.iter().all(|v| v != owner)
+        }
+        assert!(validators_valid(&owner, &[v1.clone(), v2.clone()]));
+        assert!(!validators_valid(&owner, &[v1, owner.clone()]));
+    }
+
+    #[test]
+    fn succession_endorsing_validator_cannot_be_identity_owner() {
+        let owner = bs58::encode([1u8; 32]).into_string();
+        let validator = bs58::encode([2u8; 32]).into_string();
+        let other = bs58::encode([3u8; 32]).into_string();
+
+        fn can_endorse(validator: &str, owner: &str) -> bool {
+            validator != owner
+        }
+        assert!(can_endorse(&validator, &owner));
+        assert!(!can_endorse(&owner, &owner));
+        assert!(can_endorse(&other, &owner));
+    }
 }

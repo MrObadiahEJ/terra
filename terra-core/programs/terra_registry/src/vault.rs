@@ -268,6 +268,11 @@ pub fn endorse_shard_rotation(ctx: Context<super::EndorseShardRotation>) -> Resu
         !rotation.endorsements.contains(&validator_key),
         super::TerraError::AlreadyEndorsedRotation
     );
+    // Self-dealing check: validator must not be the vault subject's owner.
+    require!(
+        validator_key != ctx.accounts.subject.owner,
+        super::TerraError::ValidatorOwnsAsset
+    );
 
     rotation.endorsements.push(validator_key);
 

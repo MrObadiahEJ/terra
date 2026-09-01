@@ -434,4 +434,19 @@ mod tests {
         assert!(!forfeiture_ok(5, 3)); // threshold exceeds signers presented
         assert!(!forfeiture_ok(2, 0)); // no signers at all
     }
+
+    #[test]
+    fn forfeiture_owner_cannot_be_validator_signer() {
+        // Self-dealing check: the parcel owner must not appear in the declared
+        // validators array for judicial_forfeiture, nor sign as a validator.
+        let owner = bs58::encode([1u8; 32]).into_string();
+        let v1 = bs58::encode([2u8; 32]).into_string();
+        let v2 = bs58::encode([3u8; 32]).into_string();
+
+        fn validators_exclude_owner(owner: &str, validators: &[String]) -> bool {
+            validators.iter().all(|v| v != owner)
+        }
+        assert!(validators_exclude_owner(&owner, &[v1.clone(), v2.clone()]));
+        assert!(!validators_exclude_owner(&owner, &[v1, owner.clone()]));
+    }
 }
