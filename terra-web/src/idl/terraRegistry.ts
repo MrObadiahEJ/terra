@@ -1815,6 +1815,71 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "rotationEndorsed",
+      "discriminator": [
+        238,
+        193,
+        191,
+        93,
+        217,
+        213,
+        91,
+        230
+      ]
+    },
+    {
+      "name": "shardPinged",
+      "discriminator": [
+        114,
+        228,
+        60,
+        52,
+        97,
+        79,
+        88,
+        55
+      ]
+    },
+    {
+      "name": "shardRotationCancelled",
+      "discriminator": [
+        148,
+        213,
+        25,
+        213,
+        152,
+        212,
+        90,
+        31
+      ]
+    },
+    {
+      "name": "shardRotationExecuted",
+      "discriminator": [
+        207,
+        240,
+        193,
+        208,
+        187,
+        113,
+        36,
+        135
+      ]
+    },
+    {
+      "name": "shardRotationInitiated",
+      "discriminator": [
+        193,
+        160,
+        222,
+        157,
+        254,
+        127,
+        137,
+        223
+      ]
+    },
+    {
       "name": "successionCancelled",
       "discriminator": [
         67,
@@ -1877,6 +1942,32 @@ export type TerraRegistry = {
         73,
         79,
         88
+      ]
+    },
+    {
+      "name": "vaultAccessAuthorized",
+      "discriminator": [
+        76,
+        112,
+        168,
+        177,
+        253,
+        40,
+        233,
+        150
+      ]
+    },
+    {
+      "name": "vaultCreated",
+      "discriminator": [
+        117,
+        25,
+        120,
+        254,
+        75,
+        236,
+        78,
+        115
       ]
     }
   ],
@@ -2093,76 +2184,86 @@ export type TerraRegistry = {
     },
     {
       "code": 6042,
+      "name": "expiryInPast",
+      "msg": "Expiry must be in the future"
+    },
+    {
+      "code": 6043,
+      "name": "nonceRequired",
+      "msg": "Nonce cannot be all zeros"
+    },
+    {
+      "code": 6044,
       "name": "rotationNotFound",
       "msg": "No pending rotation exists for this vault"
     },
     {
-      "code": 6043,
+      "code": 6045,
       "name": "rotationAlreadyFinalized",
       "msg": "Rotation has already been executed or cancelled"
     },
     {
-      "code": 6044,
+      "code": 6046,
       "name": "rotationNotYetEffective",
       "msg": "Rotation time lock has not yet expired"
     },
     {
-      "code": 6045,
+      "code": 6047,
       "name": "quorumNotMetForRotation",
       "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
     },
     {
-      "code": 6046,
+      "code": 6048,
       "name": "alreadyEndorsedRotation",
       "msg": "Validator has already endorsed this rotation"
     },
     {
-      "code": 6047,
+      "code": 6049,
       "name": "selfEndorsementNotAllowed",
       "msg": "Initiator cannot endorse their own rotation"
     },
     {
-      "code": 6048,
+      "code": 6050,
       "name": "pendingRotationExists",
       "msg": "A pending rotation already exists for this vault"
     },
     {
-      "code": 6049,
+      "code": 6051,
       "name": "pingIntervalNotElapsed",
       "msg": "Ping interval has not yet elapsed"
     },
     {
-      "code": 6050,
+      "code": 6052,
       "name": "algorithmNotSupported",
       "msg": "Encryption algorithm is not supported"
     },
     {
-      "code": 6051,
+      "code": 6053,
       "name": "tooManyStorageUris",
       "msg": "Storage URIs exceed the maximum count"
     },
     {
-      "code": 6052,
+      "code": 6054,
       "name": "tooManyShardHolders",
       "msg": "Shard holders exceed the maximum count"
     },
     {
-      "code": 6053,
+      "code": 6055,
       "name": "nonceAlreadyUsed",
       "msg": "This nonce has already been used for this vault"
     },
     {
-      "code": 6054,
+      "code": 6056,
       "name": "notAuthorizedToCreate",
       "msg": "Only the registry admin or subject's recovery wallet can create a vault"
     },
     {
-      "code": 6055,
+      "code": 6057,
       "name": "notAuthorizedToCancel",
       "msg": "Only the admin or initiator can cancel a rotation"
     },
     {
-      "code": 6056,
+      "code": 6058,
       "name": "newThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
     }
@@ -2668,6 +2769,151 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "rotationEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsementsCount",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shardPinged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pingedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shardRotationCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "cancelledBy",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shardRotationExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "newCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "newVersion",
+            "type": "u32"
+          },
+          {
+            "name": "newThreshold",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "shardRotationInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "newCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "initiatedBy",
+            "type": "pubkey"
+          },
+          {
+            "name": "effectiveAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "succession",
       "docs": [
         "An in-flight passation of wallet control, gated by BOTH a configurable grace",
@@ -2888,6 +3134,86 @@ export type TerraRegistry = {
           },
           {
             "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vaultAccessAuthorized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "offChainNonce",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expiry",
+            "type": "i64"
+          },
+          {
+            "name": "blockTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vaultCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "ciphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "algorithmId",
+            "type": "u8"
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "holderCount",
             "type": "u8"
           }
         ]

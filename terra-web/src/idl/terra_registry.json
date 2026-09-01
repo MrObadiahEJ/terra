@@ -1809,6 +1809,71 @@
       ]
     },
     {
+      "name": "RotationEndorsed",
+      "discriminator": [
+        238,
+        193,
+        191,
+        93,
+        217,
+        213,
+        91,
+        230
+      ]
+    },
+    {
+      "name": "ShardPinged",
+      "discriminator": [
+        114,
+        228,
+        60,
+        52,
+        97,
+        79,
+        88,
+        55
+      ]
+    },
+    {
+      "name": "ShardRotationCancelled",
+      "discriminator": [
+        148,
+        213,
+        25,
+        213,
+        152,
+        212,
+        90,
+        31
+      ]
+    },
+    {
+      "name": "ShardRotationExecuted",
+      "discriminator": [
+        207,
+        240,
+        193,
+        208,
+        187,
+        113,
+        36,
+        135
+      ]
+    },
+    {
+      "name": "ShardRotationInitiated",
+      "discriminator": [
+        193,
+        160,
+        222,
+        157,
+        254,
+        127,
+        137,
+        223
+      ]
+    },
+    {
       "name": "SuccessionCancelled",
       "discriminator": [
         67,
@@ -1871,6 +1936,32 @@
         73,
         79,
         88
+      ]
+    },
+    {
+      "name": "VaultAccessAuthorized",
+      "discriminator": [
+        76,
+        112,
+        168,
+        177,
+        253,
+        40,
+        233,
+        150
+      ]
+    },
+    {
+      "name": "VaultCreated",
+      "discriminator": [
+        117,
+        25,
+        120,
+        254,
+        75,
+        236,
+        78,
+        115
       ]
     }
   ],
@@ -2087,76 +2178,86 @@
     },
     {
       "code": 6042,
+      "name": "ExpiryInPast",
+      "msg": "Expiry must be in the future"
+    },
+    {
+      "code": 6043,
+      "name": "NonceRequired",
+      "msg": "Nonce cannot be all zeros"
+    },
+    {
+      "code": 6044,
       "name": "RotationNotFound",
       "msg": "No pending rotation exists for this vault"
     },
     {
-      "code": 6043,
+      "code": 6045,
       "name": "RotationAlreadyFinalized",
       "msg": "Rotation has already been executed or cancelled"
     },
     {
-      "code": 6044,
+      "code": 6046,
       "name": "RotationNotYetEffective",
       "msg": "Rotation time lock has not yet expired"
     },
     {
-      "code": 6045,
+      "code": 6047,
       "name": "QuorumNotMetForRotation",
       "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
     },
     {
-      "code": 6046,
+      "code": 6048,
       "name": "AlreadyEndorsedRotation",
       "msg": "Validator has already endorsed this rotation"
     },
     {
-      "code": 6047,
+      "code": 6049,
       "name": "SelfEndorsementNotAllowed",
       "msg": "Initiator cannot endorse their own rotation"
     },
     {
-      "code": 6048,
+      "code": 6050,
       "name": "PendingRotationExists",
       "msg": "A pending rotation already exists for this vault"
     },
     {
-      "code": 6049,
+      "code": 6051,
       "name": "PingIntervalNotElapsed",
       "msg": "Ping interval has not yet elapsed"
     },
     {
-      "code": 6050,
+      "code": 6052,
       "name": "AlgorithmNotSupported",
       "msg": "Encryption algorithm is not supported"
     },
     {
-      "code": 6051,
+      "code": 6053,
       "name": "TooManyStorageUris",
       "msg": "Storage URIs exceed the maximum count"
     },
     {
-      "code": 6052,
+      "code": 6054,
       "name": "TooManyShardHolders",
       "msg": "Shard holders exceed the maximum count"
     },
     {
-      "code": 6053,
+      "code": 6055,
       "name": "NonceAlreadyUsed",
       "msg": "This nonce has already been used for this vault"
     },
     {
-      "code": 6054,
+      "code": 6056,
       "name": "NotAuthorizedToCreate",
       "msg": "Only the registry admin or subject's recovery wallet can create a vault"
     },
     {
-      "code": 6055,
+      "code": 6057,
       "name": "NotAuthorizedToCancel",
       "msg": "Only the admin or initiator can cancel a rotation"
     },
     {
-      "code": 6056,
+      "code": 6058,
       "name": "NewThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
     }
@@ -2662,6 +2763,151 @@
       }
     },
     {
+      "name": "RotationEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShardPinged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pinged_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShardRotationCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShardRotationExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_version",
+            "type": "u32"
+          },
+          {
+            "name": "new_threshold",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShardRotationInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "initiated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Succession",
       "docs": [
         "An in-flight passation of wallet control, gated by BOTH a configurable grace",
@@ -2882,6 +3128,86 @@
           },
           {
             "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultAccessAuthorized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "off_chain_nonce",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expiry",
+            "type": "i64"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "algorithm_id",
+            "type": "u8"
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "holder_count",
             "type": "u8"
           }
         ]

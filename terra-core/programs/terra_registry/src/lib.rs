@@ -1330,6 +1330,71 @@ pub struct ParcelForfeited {
     pub present: u8,
 }
 
+// ---------------------------------------------------------------------------
+// Vault events (RFC-003)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct VaultCreated {
+    pub subject: Pubkey,
+    pub vault: Pubkey,
+    pub ciphertext_hash: [u8; 32],
+    pub algorithm_id: u8,
+    pub threshold: u8,
+    pub holder_count: u8,
+}
+
+#[event]
+pub struct VaultAccessAuthorized {
+    pub subject: Pubkey,
+    pub vault: Pubkey,
+    pub purpose: String,
+    pub validators: Vec<Pubkey>,
+    pub off_chain_nonce: [u8; 32],
+    pub expiry: i64,
+    pub block_time: i64,
+}
+
+#[event]
+pub struct ShardRotationInitiated {
+    pub vault: Pubkey,
+    pub old_ciphertext_hash: [u8; 32],
+    pub new_ciphertext_hash: [u8; 32],
+    pub initiated_by: Pubkey,
+    pub effective_at: i64,
+}
+
+#[event]
+pub struct RotationEndorsed {
+    pub vault: Pubkey,
+    pub new_ciphertext_hash: [u8; 32],
+    pub validator: Pubkey,
+    pub endorsements_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct ShardRotationExecuted {
+    pub vault: Pubkey,
+    pub new_ciphertext_hash: [u8; 32],
+    pub new_version: u32,
+    pub new_threshold: u8,
+}
+
+#[event]
+pub struct ShardRotationCancelled {
+    pub vault: Pubkey,
+    pub new_ciphertext_hash: [u8; 32],
+    pub cancelled_by: Pubkey,
+}
+
+#[event]
+pub struct ShardPinged {
+    pub vault: Pubkey,
+    pub validator: Pubkey,
+    pub pinged_at: i64,
+}
+
 #[error_code]
 pub enum TerraError {
     #[msg("Parcel id cannot be all zeros")]
@@ -1416,6 +1481,10 @@ pub enum TerraError {
     CidRequired,
     #[msg("Expiry must be within 24 hours from now")]
     ExpiryTooFar,
+    #[msg("Expiry must be in the future")]
+    ExpiryInPast,
+    #[msg("Nonce cannot be all zeros")]
+    NonceRequired,
     #[msg("No pending rotation exists for this vault")]
     RotationNotFound,
     #[msg("Rotation has already been executed or cancelled")]
