@@ -240,6 +240,85 @@ export interface RotateValidatorsInput {
   rotated_by: string
 }
 
+// ---- Vault shard protocol (RFC-003) ----------------------------------------
+
+export interface VaultRecord {
+  id: number
+  subject_pubkey: string
+  vault_pubkey: string
+  ciphertext_cid: string
+  ciphertext_hash: string
+  algorithm_id: number
+  storage_uris: string[]
+  shard_holders: string[]
+  threshold: number
+  version: number
+  last_ping_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VaultShardRotation {
+  id: number
+  rotation_pubkey: string
+  vault_pubkey: string
+  old_ciphertext_hash: string
+  new_ciphertext_hash: string
+  new_shard_holders: string[]
+  new_threshold: number
+  initiated_by: string
+  endorsements: string[]
+  required_endorsements: number
+  initiated_at: string
+  effective_at: string
+  status: number
+  created_at: string
+}
+
+export interface VaultAccessLog {
+  id: number
+  vault_pubkey: string
+  subject_pubkey: string
+  authority: string
+  purpose: string
+  expiry: string
+  nonce: string
+  block_time: string
+}
+
+export interface CreateVaultInput {
+  subject_pubkey: string
+  ciphertext_cid: string
+  ciphertext_hash: string
+  algorithm_id: number
+  storage_uris: string[]
+  shard_holders: string[]
+  threshold: number
+}
+
+export interface AuthorizeVaultAccessInput {
+  authority: string
+  purpose: string
+  expiry: string
+  nonce: string
+}
+
+export interface InitiateRotationInput {
+  initiator: string
+  old_ciphertext_hash: string
+  new_ciphertext_hash: string
+  new_shard_holders: string[]
+  new_threshold: number
+}
+
+export interface EndorseRotationInput {
+  validator: string
+}
+
+export interface PingShardInput {
+  validator: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -378,6 +457,50 @@ export const api = {
       `/parcels/${parcelId}/forfeiture`,
       { method: 'POST', body: JSON.stringify(input) },
     ),
+
+  // ---- Vault shard protocol (RFC-003) -----------------------------------
+
+  createVault: (input: CreateVaultInput) =>
+    request<VaultRecord>('/vaults', { method: 'POST', body: JSON.stringify(input) }),
+
+  getVault: (vaultPubkey: string) =>
+    request<VaultRecord>(`/vaults/${vaultPubkey}`),
+
+  listVaults: () =>
+    request<VaultRecord[]>('/vaults'),
+
+  authorizeVaultAccess: (vaultPubkey: string, input: AuthorizeVaultAccessInput) =>
+    request<VaultAccessLog>(`/vaults/${vaultPubkey}/access`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  initiateShardRotation: (vaultPubkey: string, input: InitiateRotationInput) =>
+    request<VaultShardRotation>(`/vaults/${vaultPubkey}/rotations`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  endorseShardRotation: (vaultPubkey: string, rotationPubkey: string, input: EndorseRotationInput) =>
+    request<VaultShardRotation>(`/vaults/${vaultPubkey}/rotations/${rotationPubkey}/endorse`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  executeShardRotation: (vaultPubkey: string, rotationPubkey: string) =>
+    request<VaultRecord>(`/vaults/${vaultPubkey}/rotations/${rotationPubkey}/execute`, {
+      method: 'POST',
+    }),
+
+  cancelShardRotation: (vaultPubkey: string, rotationPubkey: string) =>
+    request<VaultShardRotation>(`/vaults/${vaultPubkey}/rotations/${rotationPubkey}/cancel`, {
+      method: 'POST',
+    }),
+
+  pingShard: (vaultPubkey: string, input: PingShardInput) =>
+    request<VaultRecord>(`/vaults/${vaultPubkey}/ping`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  listAccessLogs: (vaultPubkey: string) =>
+    request<VaultAccessLog[]>(`/vaults/${vaultPubkey}/access-logs`),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

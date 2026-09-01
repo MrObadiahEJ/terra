@@ -211,6 +211,56 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "authorizeVaultAccess",
+      "discriminator": [
+        241,
+        177,
+        105,
+        203,
+        97,
+        122,
+        137,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "vaultRecord",
+          "writable": true
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "purpose",
+          "type": "string"
+        },
+        {
+          "name": "expiry",
+          "type": "i64"
+        },
+        {
+          "name": "offChainNonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "bindIdentity",
       "docs": [
         "Bind a person (identified by a hashed credential) to a wallet the person",
@@ -282,6 +332,38 @@ export type TerraRegistry = {
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "cancelShardRotation",
+      "discriminator": [
+        41,
+        160,
+        228,
+        229,
+        31,
+        131,
+        109,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vaultRecord"
+        },
+        {
+          "name": "canceller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "cancelSuccession",
@@ -374,9 +456,10 @@ export type TerraRegistry = {
     {
       "name": "claimSuccession",
       "docs": [
-        "Claim a passation once the grace period has elapsed. The `successor`",
-        "becomes the identity's new owner. Any parcels the identity owned that",
-        "are supplied via `remaining_accounts` are re-pointed to the successor."
+        "Claim a passation once BOTH the grace period has elapsed AND the required",
+        "number of validators have endorsed it. The `successor` becomes the",
+        "identity's new owner. Any parcels the identity owned that are supplied",
+        "via `remaining_accounts` are re-pointed to the successor."
       ],
       "discriminator": [
         90,
@@ -461,13 +544,135 @@ export type TerraRegistry = {
       "args": []
     },
     {
+      "name": "createVault",
+      "discriminator": [
+        29,
+        237,
+        247,
+        208,
+        193,
+        82,
+        54,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "vaultRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "ciphertextCid",
+          "type": "string"
+        },
+        {
+          "name": "ciphertextHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "algorithmId",
+          "type": "u8"
+        },
+        {
+          "name": "storageUris",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "shardHolders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "endorseShardRotation",
+      "discriminator": [
+        132,
+        217,
+        137,
+        226,
+        97,
+        88,
+        106,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vaultRecord"
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "endorseSuccession",
       "docs": [
         "Record one validator's endorsement of a pending succession. The signing",
-        "validator must be in the succession's declared validator set; each",
-        "endorsement is an Ed25519 signature (the validator signs this tx).",
-        "Claim is only allowed once the required number of endorsements are met",
-        "AND the grace period has elapsed."
+        "validator must be in the succession's declared validator set; this bumps",
+        "`validations_count`. Each endorsement is an Ed25519 signature because the",
+        "validator signs this transaction with their wallet. Only meaningful",
+        "before the succession becomes effective (validations are then moot)."
       ],
       "discriminator": [
         70,
@@ -528,7 +733,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity"
+                "path": "succession.identity",
+                "account": "succession"
               },
               {
                 "kind": "account",
@@ -540,6 +746,42 @@ export type TerraRegistry = {
         },
         {
           "name": "validator",
+          "docs": [
+            "A declared local validator endorsing the passation (signs this tx)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "executeShardRotation",
+      "discriminator": [
+        241,
+        227,
+        238,
+        115,
+        108,
+        210,
+        193,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vaultRecord",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
           "signer": true
         },
         {
@@ -630,16 +872,107 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "initiateShardRotation",
+      "discriminator": [
+        48,
+        48,
+        204,
+        149,
+        150,
+        34,
+        235,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  115,
+                  104,
+                  97,
+                  114,
+                  100,
+                  95,
+                  114,
+                  111,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vaultRecord"
+              },
+              {
+                "kind": "arg",
+                "path": "newCiphertextHash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vaultRecord",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "newCiphertextHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "newShardHolders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "newThreshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "judicialForfeiture",
       "docs": [
-        "Force-transfer a parcel's ownership away from a non-compliant owner per",
-        "a court order. Deliberately heavier than a normal transfer: at least",
-        "`threshold` (>=2) validators must sign this transaction themselves, and",
-        "the order is bound to a `caseHash` for auditability.",
+        "Force-transfer a parcel's ownership away from a non-compliant owner, per",
+        "a court order. This is deliberately heavier than a normal transfer:",
+        "at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must",
+        "sign this transaction themselves, and the order is bound to a",
+        "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it (e.g. repossession by a",
-        "government, or a court ruling that title passed to another person)."
+        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
         34,
@@ -678,6 +1011,9 @@ export type TerraRegistry = {
         },
         {
           "name": "authority",
+          "docs": [
+            "Relaying authority (court clerk / govt channel). Must NOT be the owner."
+          ],
           "signer": true
         },
         {
@@ -713,6 +1049,34 @@ export type TerraRegistry = {
           }
         }
       ]
+    },
+    {
+      "name": "pingShard",
+      "discriminator": [
+        148,
+        232,
+        132,
+        244,
+        167,
+        20,
+        100,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "vaultRecord",
+          "writable": true
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "registerParcel",
@@ -796,16 +1160,16 @@ export type TerraRegistry = {
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
         "transfer). A Succession account is created and becomes effective only",
-        "after BOTH the configurable grace period AND the required number of",
-        "validator endorsements are met — so a stolen wallet can't seize land.",
-        "Within the grace window the original owner can cancel.",
+        "after the grace period — within which the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
         "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
         "",
-        "`graceSecs` is the per-request grace window (0 => default 30d, clamped",
-        "to [7d, 180d]). `requiredValidations` is the validator endorsements",
-        "needed before claim (>= 1). `validators` declares the local authorities."
+        "`grace_secs` lets the requester choose the window (0 => default 30d),",
+        "clamped to [MIN, MAX]. `required_validations` is the number of declared",
+        "local validators that must endorse the passation before it can be",
+        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
+        "`validators` declares the local-authority testifiers for this passation."
       ],
       "discriminator": [
         239,
@@ -1304,6 +1668,32 @@ export type TerraRegistry = {
         68,
         109
       ]
+    },
+    {
+      "name": "vaultRecord",
+      "discriminator": [
+        47,
+        1,
+        218,
+        116,
+        82,
+        70,
+        124,
+        119
+      ]
+    },
+    {
+      "name": "vaultShardRotation",
+      "discriminator": [
+        33,
+        187,
+        116,
+        141,
+        215,
+        66,
+        44,
+        139
+      ]
     }
   ],
   "events": [
@@ -1660,6 +2050,121 @@ export type TerraRegistry = {
       "code": 6033,
       "name": "ownerCannotSelfForfeit",
       "msg": "The current owner cannot self-forfeit their own parcel"
+    },
+    {
+      "code": 6034,
+      "name": "vaultAlreadyExists",
+      "msg": "Vault already exists for this subject"
+    },
+    {
+      "code": 6035,
+      "name": "vaultNotFound",
+      "msg": "Vault not found"
+    },
+    {
+      "code": 6036,
+      "name": "thresholdExceedsHolders",
+      "msg": "Threshold exceeds the number of shard holders"
+    },
+    {
+      "code": 6037,
+      "name": "notShardHolder",
+      "msg": "Signer is not a shard holder for this vault"
+    },
+    {
+      "code": 6038,
+      "name": "notActiveValidator",
+      "msg": "Signer is not an active validator in this vault"
+    },
+    {
+      "code": 6039,
+      "name": "ciphertextHashRequired",
+      "msg": "Ciphertext hash cannot be all zeros"
+    },
+    {
+      "code": 6040,
+      "name": "cidRequired",
+      "msg": "Ciphertext CID cannot be empty"
+    },
+    {
+      "code": 6041,
+      "name": "expiryTooFar",
+      "msg": "Expiry must be within 24 hours from now"
+    },
+    {
+      "code": 6042,
+      "name": "rotationNotFound",
+      "msg": "No pending rotation exists for this vault"
+    },
+    {
+      "code": 6043,
+      "name": "rotationAlreadyFinalized",
+      "msg": "Rotation has already been executed or cancelled"
+    },
+    {
+      "code": 6044,
+      "name": "rotationNotYetEffective",
+      "msg": "Rotation time lock has not yet expired"
+    },
+    {
+      "code": 6045,
+      "name": "quorumNotMetForRotation",
+      "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
+    },
+    {
+      "code": 6046,
+      "name": "alreadyEndorsedRotation",
+      "msg": "Validator has already endorsed this rotation"
+    },
+    {
+      "code": 6047,
+      "name": "selfEndorsementNotAllowed",
+      "msg": "Initiator cannot endorse their own rotation"
+    },
+    {
+      "code": 6048,
+      "name": "pendingRotationExists",
+      "msg": "A pending rotation already exists for this vault"
+    },
+    {
+      "code": 6049,
+      "name": "pingIntervalNotElapsed",
+      "msg": "Ping interval has not yet elapsed"
+    },
+    {
+      "code": 6050,
+      "name": "algorithmNotSupported",
+      "msg": "Encryption algorithm is not supported"
+    },
+    {
+      "code": 6051,
+      "name": "tooManyStorageUris",
+      "msg": "Storage URIs exceed the maximum count"
+    },
+    {
+      "code": 6052,
+      "name": "tooManyShardHolders",
+      "msg": "Shard holders exceed the maximum count"
+    },
+    {
+      "code": 6053,
+      "name": "nonceAlreadyUsed",
+      "msg": "This nonce has already been used for this vault"
+    },
+    {
+      "code": 6054,
+      "name": "notAuthorizedToCreate",
+      "msg": "Only the registry admin or subject's recovery wallet can create a vault"
+    },
+    {
+      "code": 6055,
+      "name": "notAuthorizedToCancel",
+      "msg": "Only the admin or initiator can cancel a rotation"
+    },
+    {
+      "code": 6056,
+      "name": "newThresholdExceedsHolders",
+      "msg": "New threshold exceeds the number of new shard holders"
     }
   ],
   "types": [
@@ -2165,8 +2670,9 @@ export type TerraRegistry = {
     {
       "name": "succession",
       "docs": [
-        "An in-flight passation of wallet control, time-boxed by a grace period so",
-        "the original owner can cancel or object before it settles.",
+        "An in-flight passation of wallet control, gated by BOTH a configurable grace",
+        "period AND a minimum number of validator endorsements (so a stolen wallet",
+        "can't seize land) before it can be claimed.",
         "",
         "PDA: `[\"succession\", identity, successor]`."
       ],
@@ -2183,7 +2689,7 @@ export type TerraRegistry = {
           {
             "name": "successor",
             "docs": [
-              "The wallet that will take over after the grace period."
+              "The wallet that will take over once gated."
             ],
             "type": "pubkey"
           },
@@ -2382,6 +2888,129 @@ export type TerraRegistry = {
           },
           {
             "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vaultRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "ciphertextCid",
+            "type": "string"
+          },
+          {
+            "name": "ciphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "algorithmId",
+            "type": "u8"
+          },
+          {
+            "name": "storageUris",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "shardHolders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "lastPingAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vaultShardRotation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "oldCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "newCiphertextHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "newShardHolders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "newThreshold",
+            "type": "u8"
+          },
+          {
+            "name": "initiatedBy",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "requiredEndorsements",
+            "type": "u8"
+          },
+          {
+            "name": "initiatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "effectiveAt",
+            "type": "i64"
+          },
+          {
+            "name": "status",
             "type": "u8"
           }
         ]

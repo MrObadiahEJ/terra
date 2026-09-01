@@ -178,6 +178,108 @@ pub struct Succession {
     pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
+pub mod vault;
+
+// ---------------------------------------------------------------------------
+// Vault instruction contexts (RFC-003)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(ciphertext_cid: String, ciphertext_hash: [u8; 32], algorithm_id: u8, storage_uris: Vec<String>, shard_holders: Vec<Pubkey>, threshold: u8)]
+pub struct CreateVault<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + vault::VaultRecord::INIT_SPACE,
+        seeds = [b"vault_record", subject.key().as_ref()],
+        bump
+    )]
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    pub subject: Account<'info, Identity>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(purpose: String, expiry: i64)]
+pub struct AuthorizeVaultAccess<'info> {
+    #[account(mut)]
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    pub subject: Account<'info, Identity>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_ciphertext_hash: [u8; 32], new_shard_holders: Vec<Pubkey>)]
+pub struct InitiateShardRotation<'info> {
+    #[account(
+        init,
+        payer = initiator,
+        space = 8 + vault::VaultShardRotation::INIT_SPACE,
+        seeds = [
+            b"vault_shard_rotation",
+            vault_record.key().as_ref(),
+            new_ciphertext_hash.as_ref()
+        ],
+        bump
+    )]
+    pub rotation: Account<'info, vault::VaultShardRotation>,
+    #[account(mut)]
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    #[account(mut)]
+    pub initiator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct EndorseShardRotation<'info> {
+    #[account(mut)]
+    pub rotation: Account<'info, vault::VaultShardRotation>,
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteShardRotation<'info> {
+    #[account(
+        mut,
+        close = initiator,
+        constraint = rotation.vault == vault_record.key() @ TerraError::RotationNotFound
+    )]
+    pub rotation: Account<'info, vault::VaultShardRotation>,
+    #[account(mut)]
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    #[account(mut)]
+    pub initiator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelShardRotation<'info> {
+    #[account(
+        mut,
+        close = canceller,
+        constraint = rotation.vault == vault_record.key() @ TerraError::RotationNotFound
+    )]
+    pub rotation: Account<'info, vault::VaultShardRotation>,
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    #[account(mut)]
+    pub canceller: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct PingShard<'info> {
+    #[account(mut)]
+    pub vault_record: Account<'info, vault::VaultRecord>,
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[program]
 pub mod terra_registry {
     use super::*;
@@ -804,6 +906,56 @@ pub mod terra_registry {
         });
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // Vault shard protocol (RFC-003)
+    // -----------------------------------------------------------------------
+
+    pub fn create_vault(
+        ctx: Context<CreateVault>,
+        ciphertext_cid: String,
+        ciphertext_hash: [u8; 32],
+        algorithm_id: u8,
+        storage_uris: Vec<String>,
+        shard_holders: Vec<Pubkey>,
+        threshold: u8,
+    ) -> Result<()> {
+        vault::create_vault(ctx, ciphertext_cid, ciphertext_hash, algorithm_id, storage_uris, shard_holders, threshold)
+    }
+
+    pub fn authorize_vault_access(
+        ctx: Context<AuthorizeVaultAccess>,
+        purpose: String,
+        expiry: i64,
+        off_chain_nonce: [u8; 32],
+    ) -> Result<()> {
+        vault::authorize_vault_access(ctx, purpose, expiry, off_chain_nonce)
+    }
+
+    pub fn initiate_shard_rotation(
+        ctx: Context<InitiateShardRotation>,
+        new_ciphertext_hash: [u8; 32],
+        new_shard_holders: Vec<Pubkey>,
+        new_threshold: u8,
+    ) -> Result<()> {
+        vault::initiate_shard_rotation(ctx, new_ciphertext_hash, new_shard_holders, new_threshold)
+    }
+
+    pub fn endorse_shard_rotation(ctx: Context<EndorseShardRotation>) -> Result<()> {
+        vault::endorse_shard_rotation(ctx)
+    }
+
+    pub fn execute_shard_rotation(ctx: Context<ExecuteShardRotation>) -> Result<()> {
+        vault::execute_shard_rotation(ctx)
+    }
+
+    pub fn cancel_shard_rotation(ctx: Context<CancelShardRotation>) -> Result<()> {
+        vault::cancel_shard_rotation(ctx)
+    }
+
+    pub fn ping_shard(ctx: Context<PingShard>) -> Result<()> {
+        vault::ping_shard(ctx)
+    }
 }
 
 #[derive(Accounts)]
@@ -1248,4 +1400,50 @@ pub enum TerraError {
     InsufficientValidatorSigners,
     #[msg("The current owner cannot self-forfeit their own parcel")]
     OwnerCannotSelfForfeit,
+    #[msg("Vault already exists for this subject")]
+    VaultAlreadyExists,
+    #[msg("Vault not found")]
+    VaultNotFound,
+    #[msg("Threshold exceeds the number of shard holders")]
+    ThresholdExceedsHolders,
+    #[msg("Signer is not a shard holder for this vault")]
+    NotShardHolder,
+    #[msg("Signer is not an active validator in this vault")]
+    NotActiveValidator,
+    #[msg("Ciphertext hash cannot be all zeros")]
+    CiphertextHashRequired,
+    #[msg("Ciphertext CID cannot be empty")]
+    CidRequired,
+    #[msg("Expiry must be within 24 hours from now")]
+    ExpiryTooFar,
+    #[msg("No pending rotation exists for this vault")]
+    RotationNotFound,
+    #[msg("Rotation has already been executed or cancelled")]
+    RotationAlreadyFinalized,
+    #[msg("Rotation time lock has not yet expired")]
+    RotationNotYetEffective,
+    #[msg("Not enough endorsements for rotation (need ceil(2n/3))")]
+    QuorumNotMetForRotation,
+    #[msg("Validator has already endorsed this rotation")]
+    AlreadyEndorsedRotation,
+    #[msg("Initiator cannot endorse their own rotation")]
+    SelfEndorsementNotAllowed,
+    #[msg("A pending rotation already exists for this vault")]
+    PendingRotationExists,
+    #[msg("Ping interval has not yet elapsed")]
+    PingIntervalNotElapsed,
+    #[msg("Encryption algorithm is not supported")]
+    AlgorithmNotSupported,
+    #[msg("Storage URIs exceed the maximum count")]
+    TooManyStorageUris,
+    #[msg("Shard holders exceed the maximum count")]
+    TooManyShardHolders,
+    #[msg("This nonce has already been used for this vault")]
+    NonceAlreadyUsed,
+    #[msg("Only the registry admin or subject's recovery wallet can create a vault")]
+    NotAuthorizedToCreate,
+    #[msg("Only the admin or initiator can cancel a rotation")]
+    NotAuthorizedToCancel,
+    #[msg("New threshold exceeds the number of new shard holders")]
+    NewThresholdExceedsHolders,
 }

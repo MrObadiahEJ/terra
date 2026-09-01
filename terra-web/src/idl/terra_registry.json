@@ -205,6 +205,56 @@
       ]
     },
     {
+      "name": "authorize_vault_access",
+      "discriminator": [
+        241,
+        177,
+        105,
+        203,
+        97,
+        122,
+        137,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "purpose",
+          "type": "string"
+        },
+        {
+          "name": "expiry",
+          "type": "i64"
+        },
+        {
+          "name": "off_chain_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "bind_identity",
       "docs": [
         "Bind a person (identified by a hashed credential) to a wallet the person",
@@ -276,6 +326,38 @@
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "cancel_shard_rotation",
+      "discriminator": [
+        41,
+        160,
+        228,
+        229,
+        31,
+        131,
+        109,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vault_record"
+        },
+        {
+          "name": "canceller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "cancel_succession",
@@ -456,6 +538,128 @@
       "args": []
     },
     {
+      "name": "create_vault",
+      "discriminator": [
+        29,
+        237,
+        247,
+        208,
+        193,
+        82,
+        54,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "vault_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "ciphertext_cid",
+          "type": "string"
+        },
+        {
+          "name": "ciphertext_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "algorithm_id",
+          "type": "u8"
+        },
+        {
+          "name": "storage_uris",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "shard_holders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "endorse_shard_rotation",
+      "discriminator": [
+        132,
+        217,
+        137,
+        226,
+        97,
+        88,
+        106,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vault_record"
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "endorse_succession",
       "docs": [
         "Record one validator's endorsement of a pending succession. The signing",
@@ -549,6 +753,39 @@
       "args": []
     },
     {
+      "name": "execute_shard_rotation",
+      "discriminator": [
+        241,
+        227,
+        238,
+        115,
+        108,
+        210,
+        193,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "grant_right",
       "docs": [
         "Grant a right on a parcel to `holder`. Owner-only.",
@@ -625,6 +862,96 @@
         {
           "name": "notes",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initiate_shard_rotation",
+      "discriminator": [
+        48,
+        48,
+        204,
+        149,
+        150,
+        34,
+        235,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  115,
+                  104,
+                  97,
+                  114,
+                  100,
+                  95,
+                  114,
+                  111,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_record"
+              },
+              {
+                "kind": "arg",
+                "path": "new_ciphertext_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_ciphertext_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_shard_holders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "new_threshold",
+          "type": "u8"
         }
       ]
     },
@@ -716,6 +1043,34 @@
           }
         }
       ]
+    },
+    {
+      "name": "ping_shard",
+      "discriminator": [
+        148,
+        232,
+        132,
+        244,
+        167,
+        20,
+        100,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "register_parcel",
@@ -1307,6 +1662,32 @@
         68,
         109
       ]
+    },
+    {
+      "name": "VaultRecord",
+      "discriminator": [
+        47,
+        1,
+        218,
+        116,
+        82,
+        70,
+        124,
+        119
+      ]
+    },
+    {
+      "name": "VaultShardRotation",
+      "discriminator": [
+        33,
+        187,
+        116,
+        141,
+        215,
+        66,
+        44,
+        139
+      ]
     }
   ],
   "events": [
@@ -1663,6 +2044,121 @@
       "code": 6033,
       "name": "OwnerCannotSelfForfeit",
       "msg": "The current owner cannot self-forfeit their own parcel"
+    },
+    {
+      "code": 6034,
+      "name": "VaultAlreadyExists",
+      "msg": "Vault already exists for this subject"
+    },
+    {
+      "code": 6035,
+      "name": "VaultNotFound",
+      "msg": "Vault not found"
+    },
+    {
+      "code": 6036,
+      "name": "ThresholdExceedsHolders",
+      "msg": "Threshold exceeds the number of shard holders"
+    },
+    {
+      "code": 6037,
+      "name": "NotShardHolder",
+      "msg": "Signer is not a shard holder for this vault"
+    },
+    {
+      "code": 6038,
+      "name": "NotActiveValidator",
+      "msg": "Signer is not an active validator in this vault"
+    },
+    {
+      "code": 6039,
+      "name": "CiphertextHashRequired",
+      "msg": "Ciphertext hash cannot be all zeros"
+    },
+    {
+      "code": 6040,
+      "name": "CidRequired",
+      "msg": "Ciphertext CID cannot be empty"
+    },
+    {
+      "code": 6041,
+      "name": "ExpiryTooFar",
+      "msg": "Expiry must be within 24 hours from now"
+    },
+    {
+      "code": 6042,
+      "name": "RotationNotFound",
+      "msg": "No pending rotation exists for this vault"
+    },
+    {
+      "code": 6043,
+      "name": "RotationAlreadyFinalized",
+      "msg": "Rotation has already been executed or cancelled"
+    },
+    {
+      "code": 6044,
+      "name": "RotationNotYetEffective",
+      "msg": "Rotation time lock has not yet expired"
+    },
+    {
+      "code": 6045,
+      "name": "QuorumNotMetForRotation",
+      "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
+    },
+    {
+      "code": 6046,
+      "name": "AlreadyEndorsedRotation",
+      "msg": "Validator has already endorsed this rotation"
+    },
+    {
+      "code": 6047,
+      "name": "SelfEndorsementNotAllowed",
+      "msg": "Initiator cannot endorse their own rotation"
+    },
+    {
+      "code": 6048,
+      "name": "PendingRotationExists",
+      "msg": "A pending rotation already exists for this vault"
+    },
+    {
+      "code": 6049,
+      "name": "PingIntervalNotElapsed",
+      "msg": "Ping interval has not yet elapsed"
+    },
+    {
+      "code": 6050,
+      "name": "AlgorithmNotSupported",
+      "msg": "Encryption algorithm is not supported"
+    },
+    {
+      "code": 6051,
+      "name": "TooManyStorageUris",
+      "msg": "Storage URIs exceed the maximum count"
+    },
+    {
+      "code": 6052,
+      "name": "TooManyShardHolders",
+      "msg": "Shard holders exceed the maximum count"
+    },
+    {
+      "code": 6053,
+      "name": "NonceAlreadyUsed",
+      "msg": "This nonce has already been used for this vault"
+    },
+    {
+      "code": 6054,
+      "name": "NotAuthorizedToCreate",
+      "msg": "Only the registry admin or subject's recovery wallet can create a vault"
+    },
+    {
+      "code": 6055,
+      "name": "NotAuthorizedToCancel",
+      "msg": "Only the admin or initiator can cancel a rotation"
+    },
+    {
+      "code": 6056,
+      "name": "NewThresholdExceedsHolders",
+      "msg": "New threshold exceeds the number of new shard holders"
     }
   ],
   "types": [
@@ -2386,6 +2882,129 @@
           },
           {
             "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "ciphertext_cid",
+            "type": "string"
+          },
+          {
+            "name": "ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "algorithm_id",
+            "type": "u8"
+          },
+          {
+            "name": "storage_uris",
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "shard_holders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "threshold",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "last_ping_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultShardRotation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_ciphertext_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_shard_holders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "new_threshold",
+            "type": "u8"
+          },
+          {
+            "name": "initiated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required_endorsements",
+            "type": "u8"
+          },
+          {
+            "name": "initiated_at",
+            "type": "i64"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          },
+          {
+            "name": "status",
             "type": "u8"
           }
         ]
