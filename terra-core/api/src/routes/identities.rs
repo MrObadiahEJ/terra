@@ -135,6 +135,10 @@ pub struct EndorseSuccession {
 /// Bind a person to a wallet (with a recovery wallet) — the provisioned,
 /// person-held key model. Mirrors the on-chain Identity account and records
 /// optional human metadata.
+///
+/// Security: If the identity already exists, the caller MUST prove ownership
+/// of the current owner wallet by providing the same owner address. This
+/// prevents identity takeover via race condition.
 pub async fn bind_identity(
     State(state): State<AppState>,
     Json(req): Json<BindIdentity>,
@@ -145,6 +149,23 @@ pub async fn bind_identity(
     let _ = decode_wallet(&req.recovery)?;
 
     let mut tx = state.pool.begin().await?;
+
+    // Check if identity already exists — if so, require owner match.
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT owner FROM identities WHERE identity_hash = $1",
+    )
+    .bind(hex::encode(identity_hash))
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    if let Some((current_owner,)) = existing {
+        // Identity exists — only allow update if the caller owns the current wallet.
+        if !current_owner.eq_ignore_ascii_case(&req.owner) {
+            return Err(AppError::bad_request(
+                "identity already exists with a different owner; transfer ownership on-chain first",
+            ));
+        }
+    }
 
     let row = sqlx::query_as::<_, IdentityRow>(
         "INSERT INTO identities (identity_hash, owner, recovery)

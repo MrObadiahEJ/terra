@@ -39,8 +39,8 @@ pub struct Dispute {
     pub status: u8,
     /// Required validator co-signatures to advance this dispute.
     pub required: u8,
-    /// Number of validators who have co-signed so far.
-    pub count: u8,
+    /// Number of validators declared at filing time (NOT actual signatures collected).
+    pub declared_count: u8,
     /// Declared validator set for this dispute.
     pub validators: [Pubkey; MAX_VALIDATORS],
     pub filed_at: i64,
@@ -105,7 +105,7 @@ pub fn file_dispute(
     dispute.case_hash = case_hash;
     dispute.status = dispute_status::FILED;
     dispute.required = required;
-    dispute.count = count;
+    dispute.declared_count = count;
     dispute.validators = validators;
     dispute.filed_at = now;
 
@@ -120,7 +120,7 @@ pub fn file_dispute(
         filed_by: dispute.filed_by,
         case_hash,
         required,
-        count,
+        declared_count: count,
     });
     Ok(())
 }
@@ -139,16 +139,22 @@ pub fn freeze_parcel(ctx: Context<super::FreezeParcel>) -> Result<()> {
         TerraError::DisputeExpired
     );
 
-    // Require validator co-signatures for freezing (same anti-grief as filing).
-    require!(
-        dispute.count >= dispute.required,
-        TerraError::InsufficientValidatorSigners
-    );
-
     // The parcel must currently be DISPUTED.
     require!(
         ctx.accounts.parcel.status == parcel_status::DISPUTED,
         TerraError::InvalidStatus
+    );
+
+    // Count actual signer validators via remaining_accounts.
+    let mut present: u8 = 0;
+    for signer in ctx.remaining_accounts.iter() {
+        if signer.is_signer && dispute.validators.contains(&signer.key()) {
+            present += 1;
+        }
+    }
+    require!(
+        present >= dispute.required,
+        TerraError::InsufficientValidatorSigners
     );
 
     let dispute = &mut ctx.accounts.dispute;
@@ -190,9 +196,15 @@ pub fn adjudicate_dispute(
         TerraError::DisputeExpired
     );
 
-    // Require validator endorsement.
+    // Count actual signer validators via remaining_accounts.
+    let mut present: u8 = 0;
+    for signer in ctx.remaining_accounts.iter() {
+        if signer.is_signer && dispute.validators.contains(&signer.key()) {
+            present += 1;
+        }
+    }
     require!(
-        dispute.count >= dispute.required,
+        present >= dispute.required,
         TerraError::InsufficientValidatorSigners
     );
 
@@ -301,7 +313,7 @@ pub struct DisputeFiled {
     pub filed_by: Pubkey,
     pub case_hash: [u8; 32],
     pub required: u8,
-    pub count: u8,
+    pub declared_count: u8,
 }
 
 #[event]

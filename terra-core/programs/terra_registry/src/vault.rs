@@ -92,7 +92,7 @@ pub fn create_vault(
         super::TerraError::TooManyShardHolders
     );
     require!(
-        threshold >= 1 && (threshold as usize) <= shard_holders.len(),
+        threshold >= 2 && (threshold as usize) <= shard_holders.len(),
         super::TerraError::ThresholdExceedsHolders
     );
 
@@ -133,6 +133,7 @@ pub fn create_vault(
 /// Guards:
 /// - subject must match the vault's subject
 /// - authority must be one of the shard holders
+/// - at least `threshold` signers in `remaining_accounts` must be in `shard_holders`
 /// - expiry must be in the future and within 24 hours
 /// - off_chain_nonce must not be all zeros
 pub fn authorize_vault_access(
@@ -142,15 +143,13 @@ pub fn authorize_vault_access(
     off_chain_nonce: [u8; 32],
 ) -> Result<()> {
     let clock = Clock::get()?;
+    let vault = &ctx.accounts.vault_record;
     require!(
-        ctx.accounts.vault_record.subject == ctx.accounts.subject.key(),
+        vault.subject == ctx.accounts.subject.key(),
         super::TerraError::IdentityMismatch
     );
     require!(
-        ctx.accounts
-            .vault_record
-            .shard_holders
-            .contains(&ctx.accounts.authority.key()),
+        vault.shard_holders.contains(&ctx.accounts.authority.key()),
         super::TerraError::NotShardHolder
     );
     require!(expiry > clock.unix_timestamp, super::TerraError::ExpiryInPast);
@@ -163,11 +162,26 @@ pub fn authorize_vault_access(
         super::TerraError::NonceRequired
     );
 
+    // Count actual signer validators via remaining_accounts.
+    let mut present: u8 = 0;
+    for signer in ctx.remaining_accounts.iter() {
+        if signer.is_signer && vault.shard_holders.contains(&signer.key()) {
+            present += 1;
+        }
+    }
+    require!(
+        present >= vault.threshold,
+        super::TerraError::InsufficientValidatorSigners
+    );
+
     emit!(super::VaultAccessAuthorized {
         subject: ctx.accounts.subject.key(),
-        vault: ctx.accounts.vault_record.key(),
+        vault: vault.key(),
         purpose,
-        validators: ctx.accounts.vault_record.shard_holders.clone(),
+        validators: ctx.remaining_accounts.iter()
+            .filter(|s| s.is_signer && vault.shard_holders.contains(&s.key()))
+            .map(|s| s.key())
+            .collect(),
         off_chain_nonce,
         expiry,
         block_time: clock.unix_timestamp,
