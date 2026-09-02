@@ -179,6 +179,8 @@ pub struct Succession {
 }
 
 pub mod vault;
+pub mod authority_registry;
+pub mod ipfs_docs;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -281,6 +283,126 @@ pub struct PingShard<'info> {
     #[account(mut)]
     pub vault_record: Account<'info, vault::VaultRecord>,
     pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// AuthorityRegistry v2 contexts (progressive decentralization)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct CreateRegistry<'info> {
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + authority_registry::AuthorityRegistry::INIT_SPACE,
+        seeds = [b"authority_registry"],
+        bump
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddValidator<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    /// Admin signer — required in bootstrap mode, ignored in peer-consensus
+    /// (the endorsement account carries authority instead).
+    #[account(mut)]
+    pub admin_signer: Signer<'info>,
+    #[account(
+        init_if_needed,
+        payer = admin_signer,
+        space = 8 + authority_registry::ValidatorEndorsement::INIT_SPACE,
+        seeds = [
+            b"validator_endorsement",
+            registry.key().as_ref(),
+            validator.key().as_ref()
+        ],
+        bump
+    )]
+    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    /// CHECK: validated as a non-zero pubkey in handler.
+    pub validator: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RemoveValidator<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub admin_signer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [
+            b"validator_endorsement",
+            registry.key().as_ref(),
+            validator.key().as_ref()
+        ],
+        bump,
+    )]
+    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    /// CHECK: validated against registry in handler.
+    pub validator: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct EndorseValidatorAdd<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_endorsement",
+            registry.key().as_ref(),
+            endorsement.proposed.as_ref()
+        ],
+        bump,
+    )]
+    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub endorser: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FlipToConsensus<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub admin_signer: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// IPFS document storage contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(cid: String, content_hash: [u8; 32], category: String)]
+pub struct RegisterDocument<'info> {
+    #[account(
+        init,
+        payer = registrant,
+        space = 8 + ipfs_docs::DocumentAnchor::INIT_SPACE,
+        seeds = [
+            b"document",
+            attestation.key().as_ref(),
+            cid.as_ref()
+        ],
+        bump
+    )]
+    pub document: Account<'info, ipfs_docs::DocumentAnchor>,
+    #[account(
+        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
+        bump,
+    )]
+    pub attestation: Account<'info, Attestation>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub registrant: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -971,6 +1093,49 @@ pub mod terra_registry {
     pub fn ping_shard(ctx: Context<PingShard>) -> Result<()> {
         vault::ping_shard(ctx)
     }
+
+    // -----------------------------------------------------------------------
+    // AuthorityRegistry v2 (progressive decentralization)
+    // -----------------------------------------------------------------------
+
+    pub fn create_registry(ctx: Context<CreateRegistry>) -> Result<()> {
+        authority_registry::create_registry(ctx)
+    }
+
+    pub fn add_validator_to_registry(
+        ctx: Context<AddValidator>,
+        validator: Pubkey,
+    ) -> Result<()> {
+        authority_registry::add_validator(ctx, validator)
+    }
+
+    pub fn remove_validator_from_registry(
+        ctx: Context<RemoveValidator>,
+        validator: Pubkey,
+    ) -> Result<()> {
+        authority_registry::remove_validator(ctx, validator)
+    }
+
+    pub fn endorse_validator_add(ctx: Context<EndorseValidatorAdd>) -> Result<()> {
+        authority_registry::endorse_validator_add(ctx)
+    }
+
+    pub fn flip_to_consensus(ctx: Context<FlipToConsensus>) -> Result<()> {
+        authority_registry::flip_to_consensus(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // IPFS document storage
+    // -----------------------------------------------------------------------
+
+    pub fn register_document(
+        ctx: Context<RegisterDocument>,
+        cid: String,
+        content_hash: [u8; 32],
+        category: String,
+    ) -> Result<()> {
+        ipfs_docs::register_document(ctx, cid, content_hash, category)
+    }
 }
 
 #[derive(Accounts)]
@@ -1408,6 +1573,62 @@ pub struct ShardPinged {
     pub vault: Pubkey,
     pub validator: Pubkey,
     pub pinged_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// AuthorityRegistry events (progressive decentralization)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct RegistryCreated {
+    pub registry: Pubkey,
+    pub admin: Pubkey,
+    pub mode: u8,
+}
+
+#[event]
+pub struct ValidatorAdded {
+    pub registry: Pubkey,
+    pub validator: Pubkey,
+    pub added_by: Pubkey,
+    pub mode: u8,
+}
+
+#[event]
+pub struct ValidatorRemoved {
+    pub registry: Pubkey,
+    pub validator: Pubkey,
+    pub mode: u8,
+}
+
+#[event]
+pub struct ValidatorEndorsed {
+    pub registry: Pubkey,
+    pub proposed: Pubkey,
+    pub endorser: Pubkey,
+    pub endorsements_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct ConsensusFlipped {
+    pub registry: Pubkey,
+    pub admin: Pubkey,
+    pub required_endorsements: u8,
+    pub validator_count: u8,
+}
+
+// ---------------------------------------------------------------------------
+// IPFS document storage events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct DocumentRegistered {
+    pub attestation: Pubkey,
+    pub cid: String,
+    pub content_hash: [u8; 32],
+    pub category: String,
+    pub registered_by: Pubkey,
 }
 
 #[error_code]
