@@ -1,6 +1,7 @@
 use axum::Router;
 
 pub mod attestations;
+pub mod disputes;
 pub mod fusion;
 pub mod geo;
 pub mod health;
@@ -16,6 +17,7 @@ pub fn router() -> Router<AppState> {
         .nest("/parcels", parcels::router())
         .nest("/identities", identities::router())
         .nest("/vaults", vaults::router())
+        .nest("/disputes", disputes::router())
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())

@@ -38,12 +38,12 @@ Legal tenure types, proof-of-ownership rules, and attesting-authority definition
         │ (tenure types, authorities)│
         └────────────┬───────────────┘
                       │
-        ┌─────────────▼──────────────┐
-        │ Layer 2 — Infrastructure   │  roads, zoning, access flags
+        ┌─────────────▼───────────────┐
+        │ Layer 2 — Infrastructure    │  roads, zoning, access flags
         ├─────────────────────────────┤
-        │ Layer 1 — Legal Volume     │  rights, air/mineral, subdivisions
+        │ Layer 1 — Legal Volume      │  rights, air/mineral, subdivisions
         ├─────────────────────────────┤
-        │ Layer 0 — Ground Parcel    │  surveyed boundary + owner
+        │ Layer 0 — Ground Parcel     │  surveyed boundary + owner
         └─────────────────────────────┘
 ```
 

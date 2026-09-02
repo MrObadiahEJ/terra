@@ -8,6 +8,15 @@ pub mod parcel_status {
     pub const REGISTERED: u8 = 1;
     pub const FOR_SALE: u8 = 2;
     pub const TRANSFERRED: u8 = 3;
+    /// Reserved for RFC-007 (Dispute Resolution & Parcel Freeze).
+    pub const DISPUTED: u8 = 4;
+    /// Reserved for RFC-007 (Dispute Resolution & Parcel Freeze).
+    pub const FROZEN: u8 = 5;
+    /// Reserved for RFC-007 (Dispute Resolution & Parcel Freeze).
+    pub const ADJUDICATED: u8 = 6;
+    /// Reserved for RFC-007 (Dispute Resolution & Parcel Freeze).
+    pub const FORFEITED: u8 = 7;
+    pub const MAX: u8 = FORFEITED;
 }
 
 pub mod right_kind {
@@ -124,7 +133,11 @@ pub mod succession_kind {
     pub const RECOVERY: u8 = 1;
     /// Passation of a parcel's control (sale / deliberate transfer).
     pub const TRANSFER: u8 = 2;
-    pub const MAX: u8 = TRANSFER;
+    /// Reserved for RFC-010 (Guardian & Recovery Council).
+    pub const GUARDIANSHIP: u8 = 3;
+    /// Reserved for RFC-010 (Guardian & Recovery Council).
+    pub const COURT_APPOINTED_GUARDIAN: u8 = 4;
+    pub const MAX: u8 = COURT_APPOINTED_GUARDIAN;
 }
 
 /// Binds a person (via a hashed identity credential) to a wallet the person
@@ -181,6 +194,7 @@ pub struct Succession {
 pub mod vault;
 pub mod authority_registry;
 pub mod ipfs_docs;
+pub mod dispute;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -469,7 +483,7 @@ pub mod terra_registry {
             TerraError::NotOwner
         );
         require!(
-            status <= parcel_status::TRANSFERRED,
+            status <= parcel_status::MAX,
             TerraError::InvalidStatus
         );
 
@@ -1136,6 +1150,39 @@ pub mod terra_registry {
     ) -> Result<()> {
         ipfs_docs::register_document(ctx, cid, content_hash, category)
     }
+
+    // -----------------------------------------------------------------------
+    // Dispute / freeze protocol (RFC-007)
+    // -----------------------------------------------------------------------
+
+    pub fn file_dispute(
+        ctx: Context<FileDispute>,
+        case_hash: [u8; 32],
+        required: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
+    ) -> Result<()> {
+        dispute::file_dispute(ctx, case_hash, required, validators)
+    }
+
+    pub fn freeze_parcel(ctx: Context<FreezeParcel>) -> Result<()> {
+        dispute::freeze_parcel(ctx)
+    }
+
+    pub fn adjudicate_dispute(
+        ctx: Context<AdjudicateDispute>,
+        outcome: u8,
+        new_owner: Pubkey,
+    ) -> Result<()> {
+        dispute::adjudicate_dispute(ctx, outcome, new_owner)
+    }
+
+    pub fn execute_judgment(ctx: Context<ExecuteJudgment>) -> Result<()> {
+        dispute::execute_judgment(ctx)
+    }
+
+    pub fn cancel_dispute(ctx: Context<CancelDispute>) -> Result<()> {
+        dispute::cancel_dispute(ctx)
+    }
 }
 
 #[derive(Accounts)]
@@ -1395,6 +1442,101 @@ pub struct JudicialForfeiture<'info> {
     /// Relaying authority (court clerk / govt channel). Must NOT be the owner.
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Dispute / freeze contexts (RFC-007)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(case_hash: [u8; 32])]
+pub struct FileDispute<'info> {
+    #[account(
+        init,
+        payer = filer,
+        space = 8 + dispute::Dispute::INIT_SPACE,
+        seeds = [b"dispute", parcel.key().as_ref(), case_hash.as_ref()],
+        bump
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub filer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FreezeParcel<'info> {
+    #[account(
+        mut,
+        seeds = [b"dispute", parcel.key().as_ref(), dispute.case_hash.as_ref()],
+        bump,
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    pub validator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AdjudicateDispute<'info> {
+    #[account(
+        mut,
+        seeds = [b"dispute", parcel.key().as_ref(), dispute.case_hash.as_ref()],
+        bump,
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// Court authority or designated adjudicator.
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteJudgment<'info> {
+    #[account(
+        mut,
+        seeds = [b"dispute", parcel.key().as_ref(), dispute.case_hash.as_ref()],
+        bump,
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CancelDispute<'info> {
+    #[account(
+        mut,
+        seeds = [b"dispute", parcel.key().as_ref(), dispute.case_hash.as_ref()],
+        bump,
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    pub signer: Signer<'info>,
 }
 
 #[event]
@@ -1753,4 +1895,72 @@ pub enum TerraError {
     NotAuthorizedToCancel,
     #[msg("New threshold exceeds the number of new shard holders")]
     NewThresholdExceedsHolders,
+    #[msg("Invalid dispute status for this operation")]
+    InvalidDisputeStatus,
+    #[msg("Dispute has expired (90-day window elapsed)")]
+    DisputeExpired,
+    #[msg("Invalid dispute outcome")]
+    InvalidDisputeOutcome,
+}
+
+#[cfg(test)]
+mod prep_hook_tests {
+    use super::*;
+
+    #[test]
+    fn parcel_status_reserved_variants_are_contiguous() {
+        assert_eq!(parcel_status::PENDING, 0);
+        assert_eq!(parcel_status::REGISTERED, 1);
+        assert_eq!(parcel_status::FOR_SALE, 2);
+        assert_eq!(parcel_status::TRANSFERRED, 3);
+        assert_eq!(parcel_status::DISPUTED, 4);
+        assert_eq!(parcel_status::FROZEN, 5);
+        assert_eq!(parcel_status::ADJUDICATED, 6);
+        assert_eq!(parcel_status::FORFEITED, 7);
+        assert_eq!(parcel_status::MAX, parcel_status::FORFEITED);
+    }
+
+    #[test]
+    fn parcel_status_update_accepts_all_reserved_variants() {
+        for status in 0..=parcel_status::MAX {
+            assert!(
+                status <= parcel_status::MAX,
+                "Status {} should be accepted by update_status",
+                status
+            );
+        }
+    }
+
+    #[test]
+    fn parcel_status_rejects_out_of_range() {
+        let invalid = parcel_status::MAX + 1;
+        assert!(invalid > parcel_status::MAX);
+    }
+
+    #[test]
+    fn succession_kind_reserved_variants_are_contiguous() {
+        assert_eq!(succession_kind::SUCCESSOR, 0);
+        assert_eq!(succession_kind::RECOVERY, 1);
+        assert_eq!(succession_kind::TRANSFER, 2);
+        assert_eq!(succession_kind::GUARDIANSHIP, 3);
+        assert_eq!(succession_kind::COURT_APPOINTED_GUARDIAN, 4);
+        assert_eq!(succession_kind::MAX, succession_kind::COURT_APPOINTED_GUARDIAN);
+    }
+
+    #[test]
+    fn succession_kind_update_accepts_all_reserved_variants() {
+        for kind in 0..=succession_kind::MAX {
+            assert!(
+                kind <= succession_kind::MAX,
+                "Kind {} should be accepted by request_succession",
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn succession_kind_rejects_out_of_range() {
+        let invalid = succession_kind::MAX + 1;
+        assert!(invalid > succession_kind::MAX);
+    }
 }

@@ -87,6 +87,43 @@
       ]
     },
     {
+      "name": "adjudicate_dispute",
+      "discriminator": [
+        0,
+        67,
+        102,
+        188,
+        15,
+        158,
+        179,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": "u8"
+        },
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "attach_parcel",
       "docs": [
         "Attach a parcel to an identity (the person behind its owner wallet).",
@@ -405,6 +442,34 @@
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "cancel_dispute",
+      "discriminator": [
+        23,
+        155,
+        220,
+        94,
+        76,
+        141,
+        231,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "signer": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "cancel_shard_rotation",
@@ -957,6 +1022,34 @@
       "args": []
     },
     {
+      "name": "execute_judgment",
+      "discriminator": [
+        78,
+        95,
+        78,
+        183,
+        3,
+        107,
+        42,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute_shard_rotation",
       "discriminator": [
         241,
@@ -990,6 +1083,85 @@
       "args": []
     },
     {
+      "name": "file_dispute",
+      "discriminator": [
+        210,
+        63,
+        221,
+        114,
+        212,
+        97,
+        195,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "case_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true
+        },
+        {
+          "name": "filer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "required",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "flip_to_consensus",
       "discriminator": [
         123,
@@ -1008,6 +1180,34 @@
         },
         {
           "name": "admin_signer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "freeze_parcel",
+      "discriminator": [
+        245,
+        48,
+        165,
+        183,
+        59,
+        143,
+        136,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "writable": true
+        },
+        {
+          "name": "validator",
           "signer": true
         }
       ],
@@ -2156,6 +2356,19 @@
         203,
         25
       ]
+    },
+    {
+      "name": "Dispute",
+      "discriminator": [
+        36,
+        49,
+        241,
+        67,
+        40,
+        36,
+        241,
+        74
+      ]
     }
   ],
   "events": [
@@ -2509,6 +2722,139 @@
         70,
         130
       ]
+    },
+    {
+      "name": "DisputeFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "filed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelFrozen",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeAdjudicated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "adjudicated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JudgmentExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "executed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
     }
   ],
   "errors": [
@@ -2811,6 +3157,21 @@
       "code": 6059,
       "name": "NewThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
+    },
+    {
+      "code": 6060,
+      "name": "InvalidDisputeStatus",
+      "msg": "Invalid dispute status for this operation"
+    },
+    {
+      "code": 6061,
+      "name": "DisputeExpired",
+      "msg": "Dispute has expired (90-day window elapsed)"
+    },
+    {
+      "code": 6062,
+      "name": "InvalidDisputeOutcome",
+      "msg": "Invalid dispute outcome"
     }
   ],
   "types": [
@@ -4121,6 +4482,72 @@
           {
             "name": "mode",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dispute",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "filed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "filed_at",
+            "type": "i64"
+          },
+          {
+            "name": "frozen_at",
+            "type": "i64"
+          },
+          {
+            "name": "adjudicated_at",
+            "type": "i64"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
           }
         ]
       }

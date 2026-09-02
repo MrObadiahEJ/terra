@@ -361,6 +361,39 @@ export interface RegisterDocumentAnchorInput {
   category: string
 }
 
+// ---- Off-chain API: /api/v1/disputes (RFC-007) ----------------------------
+
+export interface Dispute {
+  id: string
+  parcel_id: string
+  filed_by: string
+  case_hash: string
+  status: string
+  required: number
+  count: number
+  validators: string[]
+  filed_at: string
+  frozen_at: string | null
+  adjudicated_at: string | null
+  outcome: string | null
+  new_owner: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FileDisputeInput {
+  case_hash: string
+  required: number
+  validators: string[]
+  filer: string
+}
+
+export interface AdjudicateInput {
+  outcome: 'owner_wins' | 'owner_loses'
+  new_owner?: string
+  authority: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -572,6 +605,27 @@ export const api = {
     const q = attestationPubkey ? `?attestation=${attestationPubkey}` : ''
     return request<DocumentAnchor[]>(`/ipfs-docs${q}`)
   },
+
+  // ---- Dispute resolution (RFC-007) ----------------------------------------
+
+  listDisputes: () => request<Dispute[]>('/disputes'),
+  getDispute: (id: string) => request<Dispute>(`/disputes/${id}`),
+  fileDispute: (parcelId: string, input: FileDisputeInput) =>
+    request<Dispute>(`/parcels/${parcelId}/disputes`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  freezeDispute: (id: string) =>
+    request<Dispute>(`/disputes/${id}/freeze`, { method: 'POST' }),
+  adjudicateDispute: (id: string, input: AdjudicateInput) =>
+    request<Dispute>(`/disputes/${id}/adjudicate`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  executeJudgment: (id: string) =>
+    request<{ dispute_id: string; parcel_id: string; outcome: string; status: string }>(
+      `/disputes/${id}/execute`, { method: 'POST' },
+    ),
+  cancelDispute: (id: string) =>
+    request<void>(`/disputes/${id}`, { method: 'DELETE' }),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {
