@@ -4,17 +4,97 @@
  * Note that this is only a type helper and is not the actual IDL. The original
  * IDL can be found at `target/idl/terra_registry.json`.
  */
-export type TerraRegistry = {
+export type TerraRegistry = 
+{
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
   "metadata": {
-    "name": "terraRegistry",
+    "name": "terra_registry",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
   "instructions": [
     {
-      "name": "attachParcel",
+      "name": "add_validator_to_registry",
+      "discriminator": [
+        117,
+        200,
+        150,
+        251,
+        179,
+        39,
+        244,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "attach_parcel",
       "docs": [
         "Attach a parcel to an identity (the person behind its owner wallet).",
         "Only the parcel's owner may do this, and only for an identity whose",
@@ -50,7 +130,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -75,8 +155,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity.identityHash",
-                "account": "identity"
+                "path": "identity.identity_hash",
+                "account": "Identity"
               }
             ]
           }
@@ -129,7 +209,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -172,7 +252,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -187,7 +267,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "contentHash",
+          "name": "content_hash",
           "type": {
             "array": [
               "u8",
@@ -211,7 +291,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "authorizeVaultAccess",
+      "name": "authorize_vault_access",
       "discriminator": [
         241,
         177,
@@ -224,7 +304,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -236,7 +316,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -250,7 +330,7 @@ export type TerraRegistry = {
           "type": "i64"
         },
         {
-          "name": "offChainNonce",
+          "name": "off_chain_nonce",
           "type": {
             "array": [
               "u8",
@@ -261,7 +341,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "bindIdentity",
+      "name": "bind_identity",
       "docs": [
         "Bind a person (identified by a hashed credential) to a wallet the person",
         "holds. `recovery` is a second wallet the person controls, for recovering",
@@ -302,7 +382,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "identityHash"
+                "path": "identity_hash"
               }
             ]
           }
@@ -313,13 +393,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "identityHash",
+          "name": "identity_hash",
           "type": {
             "array": [
               "u8",
@@ -334,7 +414,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "cancelShardRotation",
+      "name": "cancel_shard_rotation",
       "discriminator": [
         41,
         160,
@@ -351,7 +431,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord"
+          "name": "vault_record"
         },
         {
           "name": "canceller",
@@ -359,14 +439,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "cancelSuccession",
+      "name": "cancel_succession",
       "docs": [
         "Cancel an in-flight succession. Only the current `owner` (or `recovery`",
         "for a recovery passation) may cancel, and only before it is effective."
@@ -402,8 +482,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity.identityHash",
-                "account": "identity"
+                "path": "identity.identity_hash",
+                "account": "Identity"
               }
             ]
           }
@@ -431,12 +511,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "succession"
+                "account": "Succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "succession"
+                "account": "Succession"
               }
             ]
           }
@@ -447,14 +527,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "claimSuccession",
+      "name": "claim_succession",
       "docs": [
         "Claim a passation once BOTH the grace period has elapsed AND the required",
         "number of validators have endorsed it. The `successor` becomes the",
@@ -492,8 +572,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity.identityHash",
-                "account": "identity"
+                "path": "identity.identity_hash",
+                "account": "Identity"
               }
             ]
           }
@@ -521,12 +601,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "succession"
+                "account": "Succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "succession"
+                "account": "Succession"
               }
             ]
           }
@@ -537,14 +617,70 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "createVault",
+      "name": "create_registry",
+      "discriminator": [
+        210,
+        219,
+        233,
+        49,
+        251,
+        19,
+        135,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_vault",
       "discriminator": [
         29,
         237,
@@ -557,7 +693,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -594,17 +730,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "ciphertextCid",
+          "name": "ciphertext_cid",
           "type": "string"
         },
         {
-          "name": "ciphertextHash",
+          "name": "ciphertext_hash",
           "type": {
             "array": [
               "u8",
@@ -613,17 +749,17 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "algorithmId",
+          "name": "algorithm_id",
           "type": "u8"
         },
         {
-          "name": "storageUris",
+          "name": "storage_uris",
           "type": {
             "vec": "string"
           }
         },
         {
-          "name": "shardHolders",
+          "name": "shard_holders",
           "type": {
             "vec": "pubkey"
           }
@@ -635,7 +771,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "endorseShardRotation",
+      "name": "endorse_shard_rotation",
       "discriminator": [
         132,
         217,
@@ -652,7 +788,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord"
+          "name": "vault_record"
         },
         {
           "name": "subject"
@@ -662,14 +798,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "endorseSuccession",
+      "name": "endorse_succession",
       "docs": [
         "Record one validator's endorsement of a pending succession. The signing",
         "validator must be in the succession's declared validator set; this bumps",
@@ -708,8 +844,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity.identityHash",
-                "account": "identity"
+                "path": "identity.identity_hash",
+                "account": "Identity"
               }
             ]
           }
@@ -737,12 +873,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "succession"
+                "account": "Succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "succession"
+                "account": "Succession"
               }
             ]
           }
@@ -755,14 +891,80 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "executeShardRotation",
+      "name": "endorse_validator_add",
+      "discriminator": [
+        42,
+        252,
+        185,
+        227,
+        148,
+        64,
+        141,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "endorsement.proposed",
+                "account": "ValidatorEndorsement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "endorser",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute_shard_rotation",
       "discriminator": [
         241,
         227,
@@ -779,7 +981,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -788,14 +990,38 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "grantRight",
+      "name": "flip_to_consensus",
+      "discriminator": [
+        123,
+        232,
+        56,
+        243,
+        82,
+        102,
+        120,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "grant_right",
       "docs": [
         "Grant a right on a parcel to `holder`. Owner-only.",
         "",
@@ -832,7 +1058,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -847,7 +1073,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -857,7 +1083,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "rightsKind",
+          "name": "rights_kind",
           "type": "u8"
         },
         {
@@ -865,7 +1091,7 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         },
         {
@@ -875,7 +1101,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "initiateShardRotation",
+      "name": "initiate_shard_rotation",
       "discriminator": [
         48,
         48,
@@ -919,17 +1145,17 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "vaultRecord"
+                "path": "vault_record"
               },
               {
                 "kind": "arg",
-                "path": "newCiphertextHash"
+                "path": "new_ciphertext_hash"
               }
             ]
           }
         },
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -938,13 +1164,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newCiphertextHash",
+          "name": "new_ciphertext_hash",
           "type": {
             "array": [
               "u8",
@@ -953,19 +1179,19 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newShardHolders",
+          "name": "new_shard_holders",
           "type": {
             "vec": "pubkey"
           }
         },
         {
-          "name": "newThreshold",
+          "name": "new_threshold",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "judicialForfeiture",
+      "name": "judicial_forfeiture",
       "docs": [
         "Force-transfer a parcel's ownership away from a non-compliant owner, per",
         "a court order. This is deliberately heavier than a normal transfer:",
@@ -974,7 +1200,7 @@ export type TerraRegistry = {
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -1007,7 +1233,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1020,13 +1246,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "caseHash",
+          "name": "case_hash",
           "type": {
             "array": [
               "u8",
@@ -1035,7 +1261,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newOwner",
+          "name": "new_owner",
           "type": "pubkey"
         },
         {
@@ -1054,7 +1280,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "pingShard",
+      "name": "ping_shard",
       "discriminator": [
         148,
         232,
@@ -1067,7 +1293,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -1075,14 +1301,141 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "registerParcel",
+      "name": "register_document",
+      "discriminator": [
+        108,
+        34,
+        153,
+        39,
+        82,
+        41,
+        133,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "document",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  99,
+                  117,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attestation"
+              },
+              {
+                "kind": "arg",
+                "path": "cid"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "category",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "register_parcel",
       "docs": [
         "Register a new parcel on-chain. The signer becomes its owner.",
         "",
@@ -1129,7 +1482,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1148,7 +1501,7 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "geometryHash",
+          "name": "geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -1159,11 +1512,85 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "requestSuccession",
+      "name": "remove_validator_from_registry",
+      "discriminator": [
+        62,
+        197,
+        103,
+        150,
+        26,
+        158,
+        116,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "signer": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "request_succession",
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
         "transfer). A Succession account is created and becomes effective only",
-        "after the grace period — within which the original owner can cancel.",
+        "after the grace period \u2014 within which the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
         "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
@@ -1171,7 +1598,7 @@ export type TerraRegistry = {
         "`grace_secs` lets the requester choose the window (0 => default 30d),",
         "clamped to [MIN, MAX]. `required_validations` is the number of declared",
         "local validators that must endorse the passation before it can be",
-        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
+        "claimed (>= 1) \u2014 so a stolen wallet can't seize land alone.",
         "`validators` declares the local-authority testifiers for this passation."
       ],
       "discriminator": [
@@ -1205,8 +1632,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "identity.identityHash",
-                "account": "identity"
+                "path": "identity.identity_hash",
+                "account": "Identity"
               }
             ]
           }
@@ -1248,7 +1675,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1262,11 +1689,11 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "graceSecs",
+          "name": "grace_secs",
           "type": "i64"
         },
         {
-          "name": "requiredValidations",
+          "name": "required_validations",
           "type": "u8"
         },
         {
@@ -1281,7 +1708,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "revokeRight",
+      "name": "revoke_right",
       "docs": [
         "Revoke a previously granted right. The parcel owner or the original",
         "granter may revoke. The account is closed and its lamports returned."
@@ -1316,7 +1743,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1331,19 +1758,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "nonce",
+          "name": "_nonce",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "rotateValidators",
+      "name": "rotate_validators",
       "docs": [
         "Replace the validator set on an attestation (the fix for dead/leaving",
         "validators). Only the parcel owner may rotate. Bumps `version` so a",
@@ -1379,7 +1806,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1412,7 +1839,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "attestation.specifier",
-                "account": "attestation"
+                "account": "Attestation"
               }
             ]
           }
@@ -1424,11 +1851,11 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "newRequired",
+          "name": "new_required",
           "type": "u8"
         },
         {
-          "name": "newValidators",
+          "name": "new_validators",
           "type": {
             "array": [
               "pubkey",
@@ -1439,7 +1866,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "transferParcel",
+      "name": "transfer_parcel",
       "docs": [
         "Transfer ownership of a parcel. Only the current owner can sign."
       ],
@@ -1473,7 +1900,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1483,13 +1910,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "newOwner"
+          "name": "new_owner"
         }
       ],
       "args": []
     },
     {
-      "name": "updateInfrastructure",
+      "name": "update_infrastructure",
       "docs": [
         "Set the parcel's infrastructure flag bitmask together with the canonical",
         "access digest produced by the off-chain validation engine. Owner-only.",
@@ -1527,7 +1954,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1543,7 +1970,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "accessHash",
+          "name": "access_hash",
           "type": {
             "array": [
               "u8",
@@ -1554,7 +1981,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "updateStatus",
+      "name": "update_status",
       "docs": [
         "Update a parcel's status (e.g. for-sale). Owner-only."
       ],
@@ -1588,7 +2015,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1608,7 +2035,7 @@ export type TerraRegistry = {
   ],
   "accounts": [
     {
-      "name": "attestation",
+      "name": "Attestation",
       "discriminator": [
         152,
         125,
@@ -1621,7 +2048,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "identity",
+      "name": "Identity",
       "discriminator": [
         58,
         132,
@@ -1634,7 +2061,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcel",
+      "name": "Parcel",
       "discriminator": [
         149,
         167,
@@ -1647,7 +2074,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rights",
+      "name": "Rights",
       "discriminator": [
         79,
         187,
@@ -1660,7 +2087,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "succession",
+      "name": "Succession",
       "discriminator": [
         51,
         87,
@@ -1673,7 +2100,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultRecord",
+      "name": "VaultRecord",
       "discriminator": [
         47,
         1,
@@ -1686,7 +2113,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultShardRotation",
+      "name": "VaultShardRotation",
       "discriminator": [
         33,
         187,
@@ -1697,11 +2124,50 @@ export type TerraRegistry = {
         44,
         139
       ]
+    },
+    {
+      "name": "AuthorityRegistry",
+      "discriminator": [
+        239,
+        214,
+        161,
+        141,
+        212,
+        86,
+        122,
+        109
+      ]
+    },
+    {
+      "name": "DocumentAnchor",
+      "discriminator": [
+        60,
+        3,
+        60,
+        133,
+        60,
+        201,
+        124,
+        184
+      ]
+    },
+    {
+      "name": "ValidatorEndorsement",
+      "discriminator": [
+        140,
+        204,
+        234,
+        117,
+        105,
+        8,
+        203,
+        25
+      ]
     }
   ],
   "events": [
     {
-      "name": "attested",
+      "name": "Attested",
       "discriminator": [
         184,
         102,
@@ -1714,7 +2180,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "identityBound",
+      "name": "IdentityBound",
       "discriminator": [
         183,
         169,
@@ -1727,7 +2193,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "infrastructureUpdated",
+      "name": "InfrastructureUpdated",
       "discriminator": [
         198,
         12,
@@ -1740,7 +2206,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelAttached",
+      "name": "ParcelAttached",
       "discriminator": [
         92,
         181,
@@ -1753,7 +2219,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelForfeited",
+      "name": "ParcelForfeited",
       "discriminator": [
         169,
         221,
@@ -1766,7 +2232,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelRegistered",
+      "name": "ParcelRegistered",
       "discriminator": [
         135,
         44,
@@ -1779,7 +2245,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelTransferred",
+      "name": "ParcelTransferred",
       "discriminator": [
         242,
         85,
@@ -1792,7 +2258,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightGranted",
+      "name": "RightGranted",
       "discriminator": [
         251,
         86,
@@ -1805,7 +2271,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightRevoked",
+      "name": "RightRevoked",
       "discriminator": [
         67,
         219,
@@ -1818,7 +2284,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rotationEndorsed",
+      "name": "RotationEndorsed",
       "discriminator": [
         238,
         193,
@@ -1831,7 +2297,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardPinged",
+      "name": "ShardPinged",
       "discriminator": [
         114,
         228,
@@ -1844,7 +2310,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationCancelled",
+      "name": "ShardRotationCancelled",
       "discriminator": [
         148,
         213,
@@ -1857,7 +2323,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationExecuted",
+      "name": "ShardRotationExecuted",
       "discriminator": [
         207,
         240,
@@ -1870,7 +2336,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationInitiated",
+      "name": "ShardRotationInitiated",
       "discriminator": [
         193,
         160,
@@ -1883,7 +2349,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "successionCancelled",
+      "name": "SuccessionCancelled",
       "discriminator": [
         67,
         67,
@@ -1896,7 +2362,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "successionClaimed",
+      "name": "SuccessionClaimed",
       "discriminator": [
         27,
         211,
@@ -1909,7 +2375,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "successionEndorsed",
+      "name": "SuccessionEndorsed",
       "discriminator": [
         207,
         163,
@@ -1922,7 +2388,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "successionRequested",
+      "name": "SuccessionRequested",
       "discriminator": [
         212,
         119,
@@ -1935,7 +2401,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorsRotated",
+      "name": "ValidatorsRotated",
       "discriminator": [
         80,
         217,
@@ -1948,7 +2414,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultAccessAuthorized",
+      "name": "VaultAccessAuthorized",
       "discriminator": [
         76,
         112,
@@ -1961,7 +2427,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultCreated",
+      "name": "VaultCreated",
       "discriminator": [
         117,
         25,
@@ -1972,319 +2438,397 @@ export type TerraRegistry = {
         78,
         115
       ]
+    },
+    {
+      "name": "ConsensusFlipped",
+      "discriminator": [
+        138,
+        151,
+        228,
+        234,
+        58,
+        84,
+        243,
+        252
+      ]
+    },
+    {
+      "name": "DocumentRegistered",
+      "discriminator": [
+        39,
+        98,
+        72,
+        173,
+        200,
+        16,
+        169,
+        166
+      ]
+    },
+    {
+      "name": "RegistryCreated",
+      "discriminator": [
+        155,
+        150,
+        75,
+        69,
+        222,
+        185,
+        234,
+        132
+      ]
+    },
+    {
+      "name": "ValidatorAdded",
+      "discriminator": [
+        67,
+        26,
+        43,
+        25,
+        58,
+        219,
+        99,
+        48
+      ]
+    },
+    {
+      "name": "ValidatorEndorsed",
+      "discriminator": [
+        117,
+        229,
+        82,
+        229,
+        85,
+        201,
+        73,
+        81
+      ]
+    },
+    {
+      "name": "ValidatorRemoved",
+      "discriminator": [
+        133,
+        140,
+        80,
+        83,
+        7,
+        209,
+        70,
+        130
+      ]
     }
   ],
   "errors": [
     {
       "code": 6000,
-      "name": "invalidId",
+      "name": "InvalidId",
       "msg": "Parcel id cannot be all zeros"
     },
     {
       "code": 6001,
-      "name": "emptyName",
+      "name": "EmptyName",
       "msg": "Parcel name cannot be empty"
     },
     {
       "code": 6002,
-      "name": "emptyGeometryHash",
+      "name": "EmptyGeometryHash",
       "msg": "Geometry hash is required"
     },
     {
       "code": 6003,
-      "name": "notOwner",
+      "name": "NotOwner",
       "msg": "Only the current owner can perform this action"
     },
     {
       "code": 6004,
-      "name": "invalidStatus",
+      "name": "InvalidStatus",
       "msg": "Invalid parcel status"
     },
     {
       "code": 6005,
-      "name": "invalidRightKind",
+      "name": "InvalidRightKind",
       "msg": "Invalid right kind"
     },
     {
       "code": 6006,
-      "name": "invalidNonce",
+      "name": "InvalidNonce",
       "msg": "Nonce does not match the parcel's rights_count"
     },
     {
       "code": 6007,
-      "name": "rightsLimitExceeded",
+      "name": "RightsLimitExceeded",
       "msg": "Rights limit reached"
     },
     {
       "code": 6008,
-      "name": "notesTooLong",
+      "name": "NotesTooLong",
       "msg": "Notes exceed the maximum length of 128"
     },
     {
       "code": 6009,
-      "name": "invalidExpiry",
+      "name": "InvalidExpiry",
       "msg": "Expiry must be in the future"
     },
     {
       "code": 6010,
-      "name": "notAuthorized",
+      "name": "NotAuthorized",
       "msg": "Not authorized to perform this action"
     },
     {
       "code": 6011,
-      "name": "invalidInfrastructureFlags",
+      "name": "InvalidInfrastructureFlags",
       "msg": "Invalid infrastructure flags"
     },
     {
       "code": 6012,
-      "name": "emptyAccessHash",
+      "name": "EmptyAccessHash",
       "msg": "Access hash is required"
     },
     {
       "code": 6013,
-      "name": "emptySpecifier",
+      "name": "EmptySpecifier",
       "msg": "Attestation specifier is required"
     },
     {
       "code": 6014,
-      "name": "emptyContentHash",
+      "name": "EmptyContentHash",
       "msg": "Content hash is required"
     },
     {
       "code": 6015,
-      "name": "noValidators",
+      "name": "NoValidators",
       "msg": "Attestation requires at least one validator"
     },
     {
       "code": 6016,
-      "name": "invalidThreshold",
+      "name": "InvalidThreshold",
       "msg": "Required threshold exceeds the number of validators"
     },
     {
       "code": 6017,
-      "name": "emptyIdentityHash",
+      "name": "EmptyIdentityHash",
       "msg": "Identity hash is required"
     },
     {
       "code": 6018,
-      "name": "emptyRecovery",
+      "name": "EmptyRecovery",
       "msg": "Recovery wallet is required"
     },
     {
       "code": 6019,
-      "name": "identityMismatch",
+      "name": "IdentityMismatch",
       "msg": "Identity owner does not match the parcel owner"
     },
     {
       "code": 6020,
-      "name": "emptySuccessor",
+      "name": "EmptySuccessor",
       "msg": "Successor wallet is required"
     },
     {
       "code": 6021,
-      "name": "invalidSuccessionKind",
+      "name": "InvalidSuccessionKind",
       "msg": "Invalid succession kind"
     },
     {
       "code": 6022,
-      "name": "successorIsOwner",
+      "name": "SuccessorIsOwner",
       "msg": "Successor must differ from the current owner"
     },
     {
       "code": 6023,
-      "name": "successionAlreadyEffective",
+      "name": "SuccessionAlreadyEffective",
       "msg": "Succession has already become effective"
     },
     {
       "code": 6024,
-      "name": "notSuccessor",
+      "name": "NotSuccessor",
       "msg": "Only the named successor may claim this succession"
     },
     {
       "code": 6025,
-      "name": "successionNotYetEffective",
+      "name": "SuccessionNotYetEffective",
       "msg": "Succession is not yet effective"
     },
     {
       "code": 6026,
-      "name": "attestationMismatch",
+      "name": "AttestationMismatch",
       "msg": "Attestation does not belong to this parcel"
     },
     {
       "code": 6027,
-      "name": "insufficientValidations",
+      "name": "InsufficientValidations",
       "msg": "Succession requires validator endorsements before it can be claimed"
     },
     {
       "code": 6028,
-      "name": "notValidator",
+      "name": "NotValidator",
       "msg": "Signing wallet is not a declared validator for this succession"
     },
     {
       "code": 6029,
-      "name": "validationLimitReached",
+      "name": "ValidationLimitReached",
       "msg": "No more validators may endorse this succession (limit reached)"
     },
     {
       "code": 6030,
-      "name": "emptyCaseHash",
+      "name": "EmptyCaseHash",
       "msg": "Court case hash is required"
     },
     {
       "code": 6031,
-      "name": "emptyNewOwner",
+      "name": "EmptyNewOwner",
       "msg": "New forfeiture owner is required"
     },
     {
       "code": 6032,
-      "name": "insufficientValidatorSigners",
+      "name": "InsufficientValidatorSigners",
       "msg": "Not enough validator signers to forfeit this parcel"
     },
     {
       "code": 6033,
-      "name": "ownerCannotSelfForfeit",
+      "name": "OwnerCannotSelfForfeit",
       "msg": "The current owner cannot self-forfeit their own parcel"
     },
     {
       "code": 6034,
-      "name": "validatorOwnsAsset",
+      "name": "ValidatorOwnsAsset",
       "msg": "A validator cannot be the owner of the asset being validated"
     },
     {
       "code": 6035,
-      "name": "vaultAlreadyExists",
+      "name": "VaultAlreadyExists",
       "msg": "Vault already exists for this subject"
     },
     {
       "code": 6036,
-      "name": "vaultNotFound",
+      "name": "VaultNotFound",
       "msg": "Vault not found"
     },
     {
       "code": 6037,
-      "name": "thresholdExceedsHolders",
+      "name": "ThresholdExceedsHolders",
       "msg": "Threshold exceeds the number of shard holders"
     },
     {
       "code": 6038,
-      "name": "notShardHolder",
+      "name": "NotShardHolder",
       "msg": "Signer is not a shard holder for this vault"
     },
     {
       "code": 6039,
-      "name": "notActiveValidator",
+      "name": "NotActiveValidator",
       "msg": "Signer is not an active validator in this vault"
     },
     {
       "code": 6040,
-      "name": "ciphertextHashRequired",
+      "name": "CiphertextHashRequired",
       "msg": "Ciphertext hash cannot be all zeros"
     },
     {
       "code": 6041,
-      "name": "cidRequired",
+      "name": "CidRequired",
       "msg": "Ciphertext CID cannot be empty"
     },
     {
       "code": 6042,
-      "name": "expiryTooFar",
+      "name": "ExpiryTooFar",
       "msg": "Expiry must be within 24 hours from now"
     },
     {
       "code": 6043,
-      "name": "expiryInPast",
+      "name": "ExpiryInPast",
       "msg": "Expiry must be in the future"
     },
     {
       "code": 6044,
-      "name": "nonceRequired",
+      "name": "NonceRequired",
       "msg": "Nonce cannot be all zeros"
     },
     {
       "code": 6045,
-      "name": "rotationNotFound",
+      "name": "RotationNotFound",
       "msg": "No pending rotation exists for this vault"
     },
     {
       "code": 6046,
-      "name": "rotationAlreadyFinalized",
+      "name": "RotationAlreadyFinalized",
       "msg": "Rotation has already been executed or cancelled"
     },
     {
       "code": 6047,
-      "name": "rotationNotYetEffective",
+      "name": "RotationNotYetEffective",
       "msg": "Rotation time lock has not yet expired"
     },
     {
       "code": 6048,
-      "name": "quorumNotMetForRotation",
+      "name": "QuorumNotMetForRotation",
       "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
     },
     {
       "code": 6049,
-      "name": "alreadyEndorsedRotation",
+      "name": "AlreadyEndorsedRotation",
       "msg": "Validator has already endorsed this rotation"
     },
     {
       "code": 6050,
-      "name": "selfEndorsementNotAllowed",
+      "name": "SelfEndorsementNotAllowed",
       "msg": "Initiator cannot endorse their own rotation"
     },
     {
       "code": 6051,
-      "name": "pendingRotationExists",
+      "name": "PendingRotationExists",
       "msg": "A pending rotation already exists for this vault"
     },
     {
       "code": 6052,
-      "name": "pingIntervalNotElapsed",
+      "name": "PingIntervalNotElapsed",
       "msg": "Ping interval has not yet elapsed"
     },
     {
       "code": 6053,
-      "name": "algorithmNotSupported",
+      "name": "AlgorithmNotSupported",
       "msg": "Encryption algorithm is not supported"
     },
     {
       "code": 6054,
-      "name": "tooManyStorageUris",
+      "name": "TooManyStorageUris",
       "msg": "Storage URIs exceed the maximum count"
     },
     {
       "code": 6055,
-      "name": "tooManyShardHolders",
+      "name": "TooManyShardHolders",
       "msg": "Shard holders exceed the maximum count"
     },
     {
       "code": 6056,
-      "name": "nonceAlreadyUsed",
+      "name": "NonceAlreadyUsed",
       "msg": "This nonce has already been used for this vault"
     },
     {
       "code": 6057,
-      "name": "notAuthorizedToCreate",
+      "name": "NotAuthorizedToCreate",
       "msg": "Only the registry admin or subject's recovery wallet can create a vault"
     },
     {
       "code": 6058,
-      "name": "notAuthorizedToCancel",
+      "name": "NotAuthorizedToCancel",
       "msg": "Only the admin or initiator can cancel a rotation"
     },
     {
       "code": 6059,
-      "name": "newThresholdExceedsHolders",
+      "name": "NewThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
     }
   ],
   "types": [
     {
-      "name": "attestation",
+      "name": "Attestation",
       "docs": [
         "An on-chain attestation that binds a set of off-chain documents/data to a",
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
-        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
+        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -2308,7 +2852,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "contentHash",
+            "name": "content_hash",
             "docs": [
               "sha-256 over the off-chain payload (documents, deed, survey, ...)."
             ],
@@ -2342,11 +2886,11 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           },
           {
@@ -2362,7 +2906,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "attested",
+      "name": "Attested",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2380,7 +2924,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "contentHash",
+            "name": "content_hash",
             "type": {
               "array": [
                 "u8",
@@ -2400,7 +2944,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "identity",
+      "name": "Identity",
       "docs": [
         "Binds a person (via a hashed identity credential) to a wallet the person",
         "actually holds, plus a recovery wallet. This is the resolvable on-chain link",
@@ -2413,7 +2957,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "docs": [
               "32-byte hash over the person's identity credential (e.g. national ID),",
               "so the credential itself never lives on-chain."
@@ -2441,25 +2985,25 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "parcelCount",
+            "name": "parcel_count",
             "docs": [
               "Number of parcels currently owned by this identity."
             ],
             "type": "u16"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "identityBound",
+      "name": "IdentityBound",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2468,7 +3012,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "type": {
               "array": [
                 "u8",
@@ -2488,7 +3032,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "infrastructureUpdated",
+      "name": "InfrastructureUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2501,7 +3045,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "accessHash",
+            "name": "access_hash",
             "type": {
               "array": [
                 "u8",
@@ -2513,7 +3057,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcel",
+      "name": "Parcel",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2535,7 +3079,7 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "geometryHash",
+            "name": "geometry_hash",
             "type": {
               "array": [
                 "u8",
@@ -2548,18 +3092,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "rightsCount",
+            "name": "rights_count",
             "docs": [
               "Monotonic nonce for the parcel's Rights PDAs. Never decremented."
             ],
             "type": "u8"
           },
           {
-            "name": "infrastructureFlags",
+            "name": "infrastructure_flags",
             "type": "u16"
           },
           {
-            "name": "accessHash",
+            "name": "access_hash",
             "docs": [
               "sha-256 canonical digest over the off-chain infra/access validation",
               "(parcel id, flags, reachability metrics). Tamper-evidence anchor."
@@ -2572,18 +3116,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "parcelAttached",
+      "name": "ParcelAttached",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2603,7 +3147,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelForfeited",
+      "name": "ParcelForfeited",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2612,7 +3156,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "type": {
               "array": [
                 "u8",
@@ -2640,7 +3184,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelRegistered",
+      "name": "ParcelRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2661,7 +3205,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelTransferred",
+      "name": "ParcelTransferred",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2686,7 +3230,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightGranted",
+      "name": "RightGranted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2695,7 +3239,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -2706,7 +3250,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightRevoked",
+      "name": "RightRevoked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2715,7 +3259,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -2726,7 +3270,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rights",
+      "name": "Rights",
       "docs": [
         "A right attached to a parcel (ownership, usage, easement, ...).",
         "",
@@ -2741,7 +3285,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -2759,11 +3303,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "Unix timestamp; 0 means no expiration."
             ],
@@ -2777,7 +3321,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rotationEndorsed",
+      "name": "RotationEndorsed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2786,7 +3330,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -2799,7 +3343,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "endorsementsCount",
+            "name": "endorsements_count",
             "type": "u8"
           },
           {
@@ -2810,7 +3354,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "shardPinged",
+      "name": "ShardPinged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2823,14 +3367,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "pingedAt",
+            "name": "pinged_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "shardRotationCancelled",
+      "name": "ShardRotationCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2839,7 +3383,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -2848,14 +3392,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "cancelledBy",
+            "name": "cancelled_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "shardRotationExecuted",
+      "name": "ShardRotationExecuted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2864,7 +3408,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -2873,18 +3417,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newVersion",
+            "name": "new_version",
             "type": "u32"
           },
           {
-            "name": "newThreshold",
+            "name": "new_threshold",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "shardRotationInitiated",
+      "name": "ShardRotationInitiated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2893,7 +3437,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldCiphertextHash",
+            "name": "old_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -2902,7 +3446,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -2911,18 +3455,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "succession",
+      "name": "Succession",
       "docs": [
         "An in-flight passation of wallet control, gated by BOTH a configurable grace",
         "period AND a minimum number of validator endorsements (so a stolen wallet",
@@ -2955,11 +3499,11 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "requestedAt",
+            "name": "requested_at",
             "type": "i64"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "docs": [
               "effective = requested_at + grace_secs. Claim only allowed after this",
               "AND validations_count >= required."
@@ -2967,7 +3511,7 @@ export type TerraRegistry = {
             "type": "i64"
           },
           {
-            "name": "graceSecs",
+            "name": "grace_secs",
             "docs": [
               "Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS)."
             ],
@@ -2981,7 +3525,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "validationsCount",
+            "name": "validations_count",
             "docs": [
               "Number of endorsements collected so far."
             ],
@@ -3003,7 +3547,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "successionCancelled",
+      "name": "SuccessionCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3023,7 +3567,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "successionClaimed",
+      "name": "SuccessionClaimed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3044,14 +3588,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "parcelsRepointed",
+            "name": "parcels_repointed",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "successionEndorsed",
+      "name": "SuccessionEndorsed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3068,7 +3612,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "validationsCount",
+            "name": "validations_count",
             "type": "u8"
           },
           {
@@ -3079,7 +3623,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "successionRequested",
+      "name": "SuccessionRequested",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3096,7 +3640,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "graceSecs",
+            "name": "grace_secs",
             "type": "i64"
           },
           {
@@ -3108,14 +3652,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorsRotated",
+      "name": "ValidatorsRotated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3148,7 +3692,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "vaultAccessAuthorized",
+      "name": "VaultAccessAuthorized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3171,7 +3715,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "offChainNonce",
+            "name": "off_chain_nonce",
             "type": {
               "array": [
                 "u8",
@@ -3184,14 +3728,14 @@ export type TerraRegistry = {
             "type": "i64"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "vaultCreated",
+      "name": "VaultCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3204,7 +3748,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "ciphertextHash",
+            "name": "ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -3213,7 +3757,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           },
           {
@@ -3221,14 +3765,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "holderCount",
+            "name": "holder_count",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "vaultRecord",
+      "name": "VaultRecord",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3237,11 +3781,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "ciphertextCid",
+            "name": "ciphertext_cid",
             "type": "string"
           },
           {
-            "name": "ciphertextHash",
+            "name": "ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -3250,17 +3794,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           },
           {
-            "name": "storageUris",
+            "name": "storage_uris",
             "type": {
               "vec": "string"
             }
           },
           {
-            "name": "shardHolders",
+            "name": "shard_holders",
             "type": {
               "vec": "pubkey"
             }
@@ -3274,18 +3818,18 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "lastPingAt",
+            "name": "last_ping_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "vaultShardRotation",
+      "name": "VaultShardRotation",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3294,7 +3838,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldCiphertextHash",
+            "name": "old_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -3303,7 +3847,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -3312,17 +3856,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newShardHolders",
+            "name": "new_shard_holders",
             "type": {
               "vec": "pubkey"
             }
           },
           {
-            "name": "newThreshold",
+            "name": "new_threshold",
             "type": "u8"
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           },
           {
@@ -3332,15 +3876,15 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requiredEndorsements",
+            "name": "required_endorsements",
             "type": "u8"
           },
           {
-            "name": "initiatedAt",
+            "name": "initiated_at",
             "type": "i64"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "type": "i64"
           },
           {
@@ -3349,6 +3893,245 @@ export type TerraRegistry = {
           }
         ]
       }
+    },
+    {
+      "name": "AuthorityRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConsensusFlipped",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "required_endorsements",
+            "type": "u8"
+          },
+          {
+            "name": "validator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentAnchor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RegistryCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorser",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEndorsement",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "added_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
     }
   ]
-};
+}
+;

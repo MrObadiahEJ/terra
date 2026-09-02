@@ -319,6 +319,48 @@ export interface PingShardInput {
   validator: string
 }
 
+// ---- AuthorityRegistry v2 (progressive decentralization) -------------------
+
+export interface AuthorityRegistry {
+  id: number
+  pubkey: string
+  admin: string
+  validators: string[]
+  mode: number // 0=bootstrap, 1=peer-consensus
+  created_at: string
+}
+
+export interface ValidatorEndorsement {
+  id: number
+  registry_pubkey: string
+  proposed: string
+  endorsers: string[]
+  added_at: string
+}
+
+export interface AddValidatorInput {
+  validator: string
+}
+
+// ---- IPFS document anchoring -----------------------------------------------
+
+export interface DocumentAnchor {
+  id: number
+  attestation_pubkey: string
+  cid: string
+  content_hash: string
+  category: string
+  registered_by: string
+  registered_at: string
+}
+
+export interface RegisterDocumentAnchorInput {
+  attestation_pubkey: string
+  cid: string
+  content_hash: string
+  category: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -501,6 +543,35 @@ export const api = {
 
   listAccessLogs: (vaultPubkey: string) =>
     request<VaultAccessLog[]>(`/vaults/${vaultPubkey}/access-logs`),
+
+  // ---- AuthorityRegistry v2 (progressive decentralization) ----------------
+
+  listRegistries: () => request<AuthorityRegistry[]>('/authority-registry'),
+  getRegistry: (pubkey: string) => request<AuthorityRegistry>(`/authority-registry/${pubkey}`),
+  addValidator: (pubkey: string, input: AddValidatorInput) =>
+    request<AuthorityRegistry>(`/authority-registry/${pubkey}/validators`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  removeValidator: (pubkey: string, validator: string) =>
+    request<AuthorityRegistry>(`/authority-registry/${pubkey}/validators/${validator}`, {
+      method: 'DELETE',
+    }),
+  endorseValidatorAdd: (pubkey: string, validator: string) =>
+    request<ValidatorEndorsement>(`/authority-registry/${pubkey}/endorsals`, {
+      method: 'POST', body: JSON.stringify({ validator }),
+    }),
+  flipToConsensus: (pubkey: string) =>
+    request<AuthorityRegistry>(`/authority-registry/${pubkey}/flip`, { method: 'POST' }),
+
+  // ---- IPFS document anchoring --------------------------------------------
+
+  registerDocumentAnchor: (input: RegisterDocumentAnchorInput) =>
+    request<DocumentAnchor>(`/ipfs-docs`, { method: 'POST', body: JSON.stringify(input) }),
+  getDocumentAnchor: (id: string) => request<DocumentAnchor>(`/ipfs-docs/${id}`),
+  listDocumentAnchors: (attestationPubkey?: string) => {
+    const q = attestationPubkey ? `?attestation=${attestationPubkey}` : ''
+    return request<DocumentAnchor[]>(`/ipfs-docs${q}`)
+  },
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

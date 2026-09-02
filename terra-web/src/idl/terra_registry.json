@@ -8,6 +8,85 @@
   },
   "instructions": [
     {
+      "name": "add_validator_to_registry",
+      "discriminator": [
+        117,
+        200,
+        150,
+        251,
+        179,
+        39,
+        244,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "attach_parcel",
       "docs": [
         "Attach a parcel to an identity (the person behind its owner wallet).",
@@ -538,6 +617,62 @@
       "args": []
     },
     {
+      "name": "create_registry",
+      "discriminator": [
+        210,
+        219,
+        233,
+        49,
+        251,
+        19,
+        135,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "create_vault",
       "discriminator": [
         29,
@@ -756,6 +891,72 @@
       "args": []
     },
     {
+      "name": "endorse_validator_add",
+      "discriminator": [
+        42,
+        252,
+        185,
+        227,
+        148,
+        64,
+        141,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "endorsement.proposed",
+                "account": "ValidatorEndorsement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "endorser",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute_shard_rotation",
       "discriminator": [
         241,
@@ -784,6 +985,30 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "flip_to_consensus",
+      "discriminator": [
+        123,
+        232,
+        56,
+        243,
+        82,
+        102,
+        120,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "signer": true
         }
       ],
       "args": []
@@ -968,7 +1193,7 @@
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -1076,6 +1301,133 @@
       "args": []
     },
     {
+      "name": "register_document",
+      "discriminator": [
+        108,
+        34,
+        153,
+        39,
+        82,
+        41,
+        133,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "document",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  99,
+                  117,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attestation"
+              },
+              {
+                "kind": "arg",
+                "path": "cid"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "category",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "register_parcel",
       "docs": [
         "Register a new parcel on-chain. The signer becomes its owner.",
@@ -1153,11 +1505,85 @@
       ]
     },
     {
+      "name": "remove_validator_from_registry",
+      "discriminator": [
+        62,
+        197,
+        103,
+        150,
+        26,
+        158,
+        116,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "signer": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "request_succession",
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
         "transfer). A Succession account is created and becomes effective only",
-        "after the grace period — within which the original owner can cancel.",
+        "after the grace period \u2014 within which the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
         "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
@@ -1165,7 +1591,7 @@
         "`grace_secs` lets the requester choose the window (0 => default 30d),",
         "clamped to [MIN, MAX]. `required_validations` is the number of declared",
         "local validators that must endorse the passation before it can be",
-        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
+        "claimed (>= 1) \u2014 so a stolen wallet can't seize land alone.",
         "`validators` declares the local-authority testifiers for this passation."
       ],
       "discriminator": [
@@ -1691,6 +2117,45 @@
         44,
         139
       ]
+    },
+    {
+      "name": "AuthorityRegistry",
+      "discriminator": [
+        239,
+        214,
+        161,
+        141,
+        212,
+        86,
+        122,
+        109
+      ]
+    },
+    {
+      "name": "DocumentAnchor",
+      "discriminator": [
+        60,
+        3,
+        60,
+        133,
+        60,
+        201,
+        124,
+        184
+      ]
+    },
+    {
+      "name": "ValidatorEndorsement",
+      "discriminator": [
+        140,
+        204,
+        234,
+        117,
+        105,
+        8,
+        203,
+        25
+      ]
     }
   ],
   "events": [
@@ -1965,6 +2430,84 @@
         236,
         78,
         115
+      ]
+    },
+    {
+      "name": "ConsensusFlipped",
+      "discriminator": [
+        138,
+        151,
+        228,
+        234,
+        58,
+        84,
+        243,
+        252
+      ]
+    },
+    {
+      "name": "DocumentRegistered",
+      "discriminator": [
+        39,
+        98,
+        72,
+        173,
+        200,
+        16,
+        169,
+        166
+      ]
+    },
+    {
+      "name": "RegistryCreated",
+      "discriminator": [
+        155,
+        150,
+        75,
+        69,
+        222,
+        185,
+        234,
+        132
+      ]
+    },
+    {
+      "name": "ValidatorAdded",
+      "discriminator": [
+        67,
+        26,
+        43,
+        25,
+        58,
+        219,
+        99,
+        48
+      ]
+    },
+    {
+      "name": "ValidatorEndorsed",
+      "discriminator": [
+        117,
+        229,
+        82,
+        229,
+        85,
+        201,
+        73,
+        81
+      ]
+    },
+    {
+      "name": "ValidatorRemoved",
+      "discriminator": [
+        133,
+        140,
+        80,
+        83,
+        7,
+        209,
+        70,
+        130
       ]
     }
   ],
@@ -2277,8 +2820,8 @@
         "An on-chain attestation that binds a set of off-chain documents/data to a",
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
-        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
+        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -3339,6 +3882,244 @@
           },
           {
             "name": "status",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConsensusFlipped",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "required_endorsements",
+            "type": "u8"
+          },
+          {
+            "name": "validator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentAnchor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RegistryCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorser",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEndorsement",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "added_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
             "type": "u8"
           }
         ]

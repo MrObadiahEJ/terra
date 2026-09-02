@@ -1,6 +1,8 @@
-[provider]
-cluster = "devnet"
-wallet = "~/.config/solana/id.json"
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
 
 [programs.devnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
@@ -8,9 +10,16 @@ terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
 [programs.localnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
 
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
 [workspace]
 members = ["programs/terra_registry"]
 
+[hooks]
+
 [test]
-cluster = "localnet"
 startup_wait = 10000
+shutdown_wait = 2000
+upgradeable = false
