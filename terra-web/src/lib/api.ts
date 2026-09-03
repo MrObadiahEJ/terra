@@ -394,6 +394,38 @@ export interface AdjudicateInput {
   authority: string
 }
 
+// ---- Escrow settlement (RFC-004) ----------------------------------------
+
+export interface Escrow {
+  id: string
+  parcel_id: string
+  seller: string
+  buyer: string
+  amount: number
+  deposit_amount: number
+  vault: string
+  status: 'created' | 'deposited' | 'accepted' | 'settled' | 'cancelled' | 'disputed'
+  created_at: string
+  deposited_at: string | null
+  accepted_at: string | null
+  settle_deadline: string | null
+  cancel_deadline: string
+  dispute_case_hash: string | null
+}
+
+export interface CreateEscrowInput {
+  parcel_id: string
+  seller: string
+  buyer: string
+  amount: number
+}
+
+export interface DepositEscrowInput {
+  escrow_id: string
+  buyer: string
+  deposit_amount: number
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -626,6 +658,37 @@ export const api = {
     ),
   cancelDispute: (id: string) =>
     request<void>(`/disputes/${id}`, { method: 'DELETE' }),
+
+  // ---- Escrow settlement (RFC-004) ----------------------------------------
+
+  listEscrows: () => request<Escrow[]>('/escrows'),
+  getEscrow: (id: string) => request<Escrow>(`/escrows/${id}`),
+  createEscrow: (input: CreateEscrowInput) =>
+    request<Escrow>('/escrows', { method: 'POST', body: JSON.stringify(input) }),
+  depositEscrow: (id: string, input: DepositEscrowInput) =>
+    request<Escrow>(`/escrows/${id}/deposit`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  acceptEscrow: (id: string, seller: string) =>
+    request<Escrow>(`/escrows/${id}/accept`, {
+      method: 'POST', body: JSON.stringify({ seller }),
+    }),
+  settleEscrow: (id: string, settler: string) =>
+    request<Escrow>(`/escrows/${id}/settle`, {
+      method: 'POST', body: JSON.stringify({ settler }),
+    }),
+  cancelEscrow: (id: string, canceller: string, buyer: string) =>
+    request<Escrow>(`/escrows/${id}/cancel`, {
+      method: 'POST', body: JSON.stringify({ canceller, buyer }),
+    }),
+  disputeEscrow: (id: string, input: FileDisputeInput) =>
+    request<Escrow>(`/escrows/${id}/dispute`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  expireEscrow: (id: string, caller: string) =>
+    request<Escrow>(`/escrows/${id}/expire`, {
+      method: 'POST', body: JSON.stringify({ caller }),
+    }),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

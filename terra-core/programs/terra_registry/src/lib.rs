@@ -195,6 +195,7 @@ pub mod vault;
 pub mod authority_registry;
 pub mod ipfs_docs;
 pub mod dispute;
+pub mod escrow;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -1183,6 +1184,50 @@ pub mod terra_registry {
     pub fn cancel_dispute(ctx: Context<CancelDispute>) -> Result<()> {
         dispute::cancel_dispute(ctx)
     }
+
+    // -----------------------------------------------------------------------
+    // Escrow settlement (RFC-004)
+    // -----------------------------------------------------------------------
+
+    pub fn create_escrow(
+        ctx: Context<CreateEscrow>,
+        amount: u64,
+        buyer: Pubkey,
+    ) -> Result<()> {
+        escrow::create_escrow(ctx, amount, buyer)
+    }
+
+    pub fn deposit_escrow(
+        ctx: Context<DepositEscrow>,
+        deposit_amount: u64,
+    ) -> Result<()> {
+        escrow::deposit_escrow(ctx, deposit_amount)
+    }
+
+    pub fn accept_escrow(ctx: Context<AcceptEscrow>) -> Result<()> {
+        escrow::accept_escrow(ctx)
+    }
+
+    pub fn settle_escrow(ctx: Context<SettleEscrow>) -> Result<()> {
+        escrow::settle_escrow(ctx)
+    }
+
+    pub fn cancel_escrow(ctx: Context<CancelEscrow>) -> Result<()> {
+        escrow::cancel_escrow(ctx)
+    }
+
+    pub fn dispute_escrow(
+        ctx: Context<DisputeEscrow>,
+        case_hash: [u8; 32],
+        required: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
+    ) -> Result<()> {
+        escrow::dispute_escrow(ctx, case_hash, required, validators)
+    }
+
+    pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
+        escrow::expire_escrow(ctx)
+    }
 }
 
 #[derive(Accounts)]
@@ -1537,6 +1582,189 @@ pub struct CancelDispute<'info> {
     )]
     pub parcel: Account<'info, Parcel>,
     pub signer: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Escrow settlement contexts (RFC-004)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(amount: u64, buyer: Pubkey)]
+pub struct CreateEscrow<'info> {
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + escrow::EscrowRecord::INIT_SPACE,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    /// CHECK: escrow vault PDA — holds deposited SOL.
+    #[account(
+        mut,
+        seeds = [b"escrow_vault", escrow_record.key().as_ref()],
+        bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub seller: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(deposit_amount: u64)]
+pub struct DepositEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    /// CHECK: escrow vault PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow_vault", escrow_record.key().as_ref()],
+        bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    pub seller: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SettleEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    /// CHECK: escrow vault PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow_vault", escrow_record.key().as_ref()],
+        bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// Seller receives SOL.
+    #[account(mut)]
+    /// CHECK: validated as escrow.seller in handler.
+    pub seller: UncheckedAccount<'info>,
+    /// Buyer receives excess deposit.
+    #[account(mut)]
+    /// CHECK: validated as escrow.buyer in handler.
+    pub buyer: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    /// CHECK: escrow vault PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow_vault", escrow_record.key().as_ref()],
+        bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    /// CHECK: validated as escrow.buyer in handler. Receives returned deposit.
+    #[account(mut)]
+    pub buyer: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(case_hash: [u8; 32])]
+pub struct DisputeEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = filer,
+        space = 8 + dispute::Dispute::INIT_SPACE,
+        seeds = [b"dispute", parcel.key().as_ref(), case_hash.as_ref()],
+        bump
+    )]
+    pub dispute: Account<'info, dispute::Dispute>,
+    #[account(mut)]
+    pub filer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ExpireEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub caller: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[event]
@@ -1901,6 +2129,40 @@ pub enum TerraError {
     DisputeExpired,
     #[msg("Invalid dispute outcome")]
     InvalidDisputeOutcome,
+    #[msg("Invalid escrow status for this operation")]
+    InvalidEscrowStatus,
+    #[msg("Escrow amount is outside the allowed range")]
+    InvalidEscrowAmount,
+    #[msg("Buyer wallet cannot be the same as the seller")]
+    SelfDealingNotAllowed,
+    #[msg("Signer is not the designated buyer for this escrow")]
+    NotDesignatedBuyer,
+    #[msg("Signer is not the designated seller for this escrow")]
+    NotDesignatedSeller,
+    #[msg("Deposit would exceed the escrow amount")]
+    DepositExceedsAmount,
+    #[msg("Full deposit not yet received — seller cannot accept")]
+    InsufficientDeposit,
+    #[msg("Settlement window has not yet expired")]
+    SettlementNotYetEffective,
+    #[msg("Seller no longer owns the parcel at settlement time")]
+    ParcelStillOwnedBySeller,
+    #[msg("Buyer grace period has expired — cannot cancel")]
+    CancelWindowExpired,
+    #[msg("Cancel window has not yet expired — escrow not stale")]
+    CancelWindowNotExpired,
+    #[msg("Cannot cancel: deposit already exists")]
+    DepositExists,
+    #[msg("Signer is not a party to this escrow")]
+    NotPartyToEscrow,
+    #[msg("Parcel is already in an escrow")]
+    ParcelAlreadyInEscrow,
+    #[msg("Minimum escrow amount is 0.1 SOL")]
+    EscrowAmountTooLow,
+    #[msg("Maximum escrow amount is 1,000,000 SOL")]
+    EscrowAmountTooHigh,
+    #[msg("Buyer wallet address is required")]
+    EmptyBuyer,
 }
 
 #[cfg(test)]
