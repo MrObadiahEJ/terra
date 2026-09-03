@@ -4,6 +4,17 @@
 
 ---
 
+## Branching Strategy
+
+| Branch | Purpose | Stability |
+|--------|---------|-----------|
+| **`main`** | Production-ready code. Only fully reviewed, tested, and approved protocols ship here. | Stable |
+| **`dev`** | Active development. New protocols, features, and experiments land here first. Merged to `main` after review. | Unstable |
+
+All work-in-progress (new RFCs, protocol implementations, breaking changes) goes to `dev`. When a feature is complete, reviewed, and all tests pass, it is merged into `main`. This keeps `main` deployable at all times.
+
+---
+
 ## 🌍 Vision
 
 Land is the oldest form of wealth and the most disputed form of trust. In much of the world — starting with Cameroon — land ownership records are paper-based, centralized, understaffed, and vulnerable to fraud, loss, or manipulation. Terra exists to give any person, in any country, a way to register, verify, and transfer land rights with cryptographic certainty — without requiring them to trust a single government office, company, or server.
