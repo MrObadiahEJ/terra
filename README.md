@@ -1,5 +1,7 @@
 # Terra — A Universal Land Registry for Humankind
 
+[![CI](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml/badge.svg)](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml)
+
 > A country-agnostic, blockchain-anchored land administration platform. Built first for Cameroon. Designed from day one to belong to the world.
 
 ---
