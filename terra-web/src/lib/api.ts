@@ -426,6 +426,41 @@ export interface DepositEscrowInput {
   deposit_amount: number
 }
 
+// ---- Time-bound credentials (RFC-009) -----------------------------------
+
+export interface Right {
+  id: string
+  parcel_id: string
+  rights_kind: string
+  holder: string
+  granter: string
+  created_at: string
+  expires_at: string | null
+  notes: string
+  status: 'active' | 'expiring' | 'expired' | 'grace' | 'renewed' | 'revoked'
+  grace_period_secs: number
+}
+
+export interface RenewRightInput {
+  nonce: number
+  new_expires_at: string
+  new_notes: string
+  holder: string
+  granter: string
+}
+
+export interface GrantConditionalRightInput {
+  parcel_id: string
+  nonce: number
+  rights_kind: string
+  holder: string
+  expires_at: string | null
+  condition_deadline: string
+  condition_desc: string
+  grace_period_secs: number
+  notes: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -688,6 +723,21 @@ export const api = {
   expireEscrow: (id: string, caller: string) =>
     request<Escrow>(`/escrows/${id}/expire`, {
       method: 'POST', body: JSON.stringify({ caller }),
+    }),
+
+  // ---- Time-bound credentials (RFC-009) -----------------------------------
+
+  renewRight: (parcelId: string, rightNonce: number, input: RenewRightInput) =>
+    request<Right>(`/parcels/${parcelId}/rights/${rightNonce}/renew`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  sweepExpiredRight: (parcelId: string, rightNonce: number, keeper: string) =>
+    request<Right>(`/parcels/${parcelId}/rights/${rightNonce}/sweep`, {
+      method: 'POST', body: JSON.stringify({ keeper }),
+    }),
+  grantConditionalRight: (input: GrantConditionalRightInput) =>
+    request<Right>('/rights/conditional', {
+      method: 'POST', body: JSON.stringify(input),
     }),
 }
 

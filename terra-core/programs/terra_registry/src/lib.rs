@@ -78,6 +78,20 @@ pub struct Rights {
     pub expires_at: i64,
     #[max_len(128)]
     pub notes: String,
+    /// Time-bound credential status (RFC-009): ACTIVE, EXPIRING, EXPIRED, GRACE, RENEWED, REVOKED.
+    pub status: u8,
+    /// Grace period in seconds after expiry (0 = no grace). Set at grant time.
+    pub grace_period_secs: i64,
+}
+
+pub mod right_status {
+    pub const ACTIVE: u8 = 0;
+    pub const EXPIRING: u8 = 1;
+    pub const EXPIRED: u8 = 2;
+    pub const GRACE: u8 = 3;
+    pub const RENEWED: u8 = 4;
+    pub const REVOKED: u8 = 5;
+    pub const MAX: u8 = REVOKED;
 }
 
 /// Maximum number of validators that can approve a single attestation.
@@ -196,6 +210,7 @@ pub mod authority_registry;
 pub mod ipfs_docs;
 pub mod dispute;
 pub mod escrow;
+pub mod time_bound;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -531,6 +546,8 @@ pub mod terra_registry {
         rights.created_at = now;
         rights.expires_at = expires_at;
         rights.notes = notes;
+        rights.status = right_status::ACTIVE;
+        rights.grace_period_secs = 0;
 
         parcel.rights_count += 1;
 
@@ -1228,6 +1245,43 @@ pub mod terra_registry {
     pub fn expire_escrow(ctx: Context<ExpireEscrow>) -> Result<()> {
         escrow::expire_escrow(ctx)
     }
+
+    // -----------------------------------------------------------------------
+    // Time-bound credentials (RFC-009)
+    // -----------------------------------------------------------------------
+
+    pub fn renew_right(
+        ctx: Context<RenewRight>,
+        nonce: u8,
+        new_expires_at: i64,
+        new_notes: String,
+    ) -> Result<()> {
+        time_bound::renew_right(ctx, nonce, new_expires_at, new_notes)
+    }
+
+    pub fn sweep_expired_rights(
+        ctx: Context<SweepExpiredRights>,
+        nonce: u8,
+    ) -> Result<()> {
+        time_bound::sweep_expired_rights(ctx, nonce)
+    }
+
+    pub fn grant_conditional_right(
+        ctx: Context<GrantConditionalRight>,
+        nonce: u8,
+        rights_kind: u8,
+        holder: Pubkey,
+        expires_at: i64,
+        condition_deadline: i64,
+        condition_desc: String,
+        grace_period_secs: i64,
+        notes: String,
+    ) -> Result<()> {
+        time_bound::grant_conditional_right(
+            ctx, nonce, rights_kind, holder, expires_at,
+            condition_deadline, condition_desc, grace_period_secs, notes,
+        )
+    }
 }
 
 #[derive(Accounts)]
@@ -1767,6 +1821,71 @@ pub struct ExpireEscrow<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Time-bound credential contexts (RFC-009)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(nonce: u8)]
+pub struct RenewRight<'info> {
+    #[account(
+        mut,
+        seeds = [b"rights".as_ref(), parcel.key().as_ref(), &[nonce]],
+        bump,
+    )]
+    pub rights: Account<'info, Rights>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// Holder must sign.
+    pub holder: Signer<'info>,
+    /// Granter must co-sign (original granter or current parcel owner).
+    pub granter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(nonce: u8)]
+pub struct SweepExpiredRights<'info> {
+    #[account(
+        mut,
+        seeds = [b"rights".as_ref(), parcel.key().as_ref(), &[nonce]],
+        bump,
+    )]
+    pub rights: Account<'info, Rights>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    pub keeper: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(nonce: u8, rights_kind: u8, holder: Pubkey, _expires_at: i64, _condition_deadline: i64, _condition_desc: String, _grace_period_secs: i64, _notes: String)]
+pub struct GrantConditionalRight<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Rights::INIT_SPACE,
+        seeds = [b"rights".as_ref(), parcel.key().as_ref(), &[nonce]],
+        bump
+    )]
+    pub rights: Account<'info, Rights>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -2163,6 +2282,20 @@ pub enum TerraError {
     EscrowAmountTooHigh,
     #[msg("Buyer wallet address is required")]
     EmptyBuyer,
+    #[msg("Cannot renew a revoked right")]
+    CannotRenewRevokedRight,
+    #[msg("Cannot renew an already-renewed right")]
+    CannotRenewAlreadyRenewed,
+    #[msg("Renewal must extend the expiry, not shorten it")]
+    RenewalMustExtendExpiry,
+    #[msg("Invalid right status for this operation")]
+    InvalidRightStatus,
+    #[msg("Permanent rights (expires_at=0) cannot be swept")]
+    PermanentRightNotSweepable,
+    #[msg("Condition deadline must be before the expiry")]
+    ConditionDeadlineAfterExpiry,
+    #[msg("Invalid grace period")]
+    InvalidGracePeriod,
 }
 
 #[cfg(test)]

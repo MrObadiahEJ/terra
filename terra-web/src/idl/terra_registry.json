@@ -1786,6 +1786,115 @@
       "args": []
     },
     {
+      "name": "grant_conditional_right",
+      "discriminator": [
+        203,
+        9,
+        162,
+        219,
+        52,
+        15,
+        55,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  105,
+                  103,
+                  104,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        },
+        {
+          "name": "holder",
+          "type": "pubkey"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "condition_deadline",
+          "type": "i64"
+        },
+        {
+          "name": "condition_desc",
+          "type": "string"
+        },
+        {
+          "name": "grace_period_secs",
+          "type": "i64"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "grant_right",
       "docs": [
         "Grant a right on a parcel to `holder`. Owner-only.",
@@ -2351,6 +2460,97 @@
       ]
     },
     {
+      "name": "renew_right",
+      "discriminator": [
+        244,
+        248,
+        169,
+        165,
+        181,
+        112,
+        121,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "rights",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  105,
+                  103,
+                  104,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder",
+          "signer": true
+        },
+        {
+          "name": "granter",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "new_expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "new_notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "request_succession",
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
@@ -2731,6 +2931,85 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "sweep_expired_rights",
+      "discriminator": [
+        174,
+        5,
+        49,
+        171,
+        174,
+        59,
+        28,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "rights",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  105,
+                  103,
+                  104,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keeper",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "transfer_parcel",
@@ -3427,6 +3706,19 @@
       ]
     },
     {
+      "name": "RightRenewed",
+      "discriminator": [
+        186,
+        128,
+        14,
+        167,
+        173,
+        10,
+        165,
+        153
+      ]
+    },
+    {
       "name": "RightRevoked",
       "discriminator": [
         67,
@@ -3437,6 +3729,19 @@
         34,
         65,
         52
+      ]
+    },
+    {
+      "name": "RightStatusTransition",
+      "discriminator": [
+        30,
+        111,
+        208,
+        91,
+        21,
+        227,
+        169,
+        171
       ]
     },
     {
@@ -3812,9 +4117,19 @@
       "msg": "Identity hash is required"
     },
     {
+      "code": 6017,
+      "name": "CannotRenewRevokedRight",
+      "msg": "Cannot renew a revoked right"
+    },
+    {
       "code": 6018,
       "name": "EmptyRecovery",
       "msg": "Recovery wallet is required"
+    },
+    {
+      "code": 6018,
+      "name": "CannotRenewAlreadyRenewed",
+      "msg": "Cannot renew an already-renewed right"
     },
     {
       "code": 6019,
@@ -3822,9 +4137,19 @@
       "msg": "Identity owner does not match the parcel owner"
     },
     {
+      "code": 6019,
+      "name": "RenewalMustExtendExpiry",
+      "msg": "Renewal must extend the expiry, not shorten it"
+    },
+    {
       "code": 6020,
       "name": "EmptySuccessor",
       "msg": "Successor wallet is required"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidRightStatus",
+      "msg": "Invalid right status for this operation"
     },
     {
       "code": 6021,
@@ -3832,14 +4157,29 @@
       "msg": "Invalid succession kind"
     },
     {
+      "code": 6021,
+      "name": "PermanentRightNotSweepable",
+      "msg": "Permanent rights (expires_at=0) cannot be swept"
+    },
+    {
       "code": 6022,
       "name": "SuccessorIsOwner",
       "msg": "Successor must differ from the current owner"
     },
     {
+      "code": 6022,
+      "name": "ConditionDeadlineAfterExpiry",
+      "msg": "Condition deadline must be before the expiry"
+    },
+    {
       "code": 6023,
       "name": "SuccessionAlreadyEffective",
       "msg": "Succession has already become effective"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidGracePeriod",
+      "msg": "Invalid grace period"
     },
     {
       "code": 6024,
