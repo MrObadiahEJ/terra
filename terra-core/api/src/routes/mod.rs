@@ -11,6 +11,7 @@ pub mod identities;
 pub mod parcels;
 pub mod pilot_zones;
 pub mod rights;
+pub mod subdivision;
 pub mod vaults;
 
 pub use crate::state::AppState;
@@ -24,6 +25,7 @@ pub fn router() -> Router<AppState> {
         .nest("/escrows", escrows::router())
         .nest("/rights", rights::router())
         .nest("/cross-border", cross_border::router())
+        .nest("/subdivision", subdivision::router())
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())

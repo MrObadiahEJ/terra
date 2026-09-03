@@ -531,6 +531,53 @@ export interface RebindInput {
   expires_at: string | null
 }
 
+// ---- Subdivision/Amalgamation (RFC-008) -----------------------------------
+
+export interface SubdivisionRecord {
+  id: string
+  original_parcel_id: string
+  sub_parcel_id: string
+  original_geometry_hash: string
+  new_geometry_hash: string
+  surveyor_attestation_id: string | null
+  rights_migrated: boolean
+  attestations_migrated: boolean
+  initiated_by: string
+  created_at: string
+  completed_at: string | null
+  status: string
+}
+
+export interface CreateSubdivisionInput {
+  original_parcel_id: string
+  sub_parcel_id: string
+  original_geometry_hash: string
+  new_geometry_hash: string
+  surveyor_attestation_id?: string | null
+  initiated_by: string
+}
+
+export interface AmalgamationRecord {
+  id: string
+  result_parcel_id: string
+  source_parcel_id: string
+  source_geometry_hash: string
+  result_geometry_hash: string
+  rights_merged: boolean
+  initiated_by: string
+  created_at: string
+  completed_at: string | null
+  status: string
+}
+
+export interface CreateAmalgamationInput {
+  result_parcel_id: string
+  source_parcel_id: string
+  source_geometry_hash: string
+  result_geometry_hash: string
+  initiated_by: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -839,6 +886,29 @@ export const api = {
   rebindIdentity: (id: string, input: RebindInput) =>
     request<CrossBorderBinding>(`/cross-border/bindings/${id}/rebind`, {
       method: 'POST', body: JSON.stringify(input),
+    }),
+
+  // ---- Subdivision/Amalgamation (RFC-008) -----------------------------------
+
+  listSubdivisions: () => request<SubdivisionRecord[]>('/subdivision/subdivisions'),
+  getSubdivision: (id: string) => request<SubdivisionRecord>(`/subdivision/subdivisions/${id}`),
+  createSubdivision: (input: CreateSubdivisionInput) =>
+    request<SubdivisionRecord>('/subdivision/subdivisions', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  updateSubdivision: (id: string, input: Partial<{ rights_migrated: boolean; attestations_migrated: boolean; status: string }>) =>
+    request<SubdivisionRecord>(`/subdivision/subdivisions/${id}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    }),
+  listAmalgamations: () => request<AmalgamationRecord[]>('/subdivision/amalgamations'),
+  getAmalgamation: (id: string) => request<AmalgamationRecord>(`/subdivision/amalgamations/${id}`),
+  createAmalgamation: (input: CreateAmalgamationInput) =>
+    request<AmalgamationRecord>('/subdivision/amalgamations', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  updateAmalgamation: (id: string, input: Partial<{ rights_merged: boolean; status: string }>) =>
+    request<AmalgamationRecord>(`/subdivision/amalgamations/${id}`, {
+      method: 'PATCH', body: JSON.stringify(input),
     }),
 }
 

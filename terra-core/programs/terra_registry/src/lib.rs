@@ -16,7 +16,11 @@ pub mod parcel_status {
     pub const ADJUDICATED: u8 = 6;
     /// Reserved for RFC-007 (Dispute Resolution & Parcel Freeze).
     pub const FORFEITED: u8 = 7;
-    pub const MAX: u8 = FORFEITED;
+    /// Reserved for RFC-008 (Subdivision/Amalgamation).
+    pub const SUBDIVIDED: u8 = 8;
+    /// Reserved for RFC-008 (Subdivision/Amalgamation).
+    pub const AMALGAMATED: u8 = 9;
+    pub const MAX: u8 = AMALGAMATED;
 }
 
 pub mod right_kind {
@@ -212,6 +216,7 @@ pub mod dispute;
 pub mod escrow;
 pub mod time_bound;
 pub mod cross_border;
+pub mod subdivision;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -2017,6 +2022,143 @@ pub struct RebindCrossBorderIdentity<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Subdivision/Amalgamation contexts (RFC-008)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(new_id: [u8; 32], _new_name: String, _new_geometry_hash: [u8; 32], specifier: [u8; 32])]
+pub struct SubdivideParcel<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), original_parcel.id.as_ref()],
+        bump,
+    )]
+    pub original_parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Parcel::INIT_SPACE,
+        seeds = [b"parcel".as_ref(), &new_id],
+        bump
+    )]
+    pub sub_parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + subdivision::SubdivisionRecord::INIT_SPACE,
+        seeds = [
+            b"subdivision".as_ref(),
+            original_parcel.key().as_ref(),
+            sub_parcel.key().as_ref()
+        ],
+        bump
+    )]
+    pub subdivision_record: Account<'info, subdivision::SubdivisionRecord>,
+    #[account(
+        seeds = [
+            b"attestation".as_ref(),
+            original_parcel.key().as_ref(),
+            &specifier,
+        ],
+        bump,
+    )]
+    pub surveyor_attestation: Account<'info, Attestation>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AmalgamateParcels<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), result_parcel.id.as_ref()],
+        bump,
+    )]
+    pub result_parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), source_parcel.id.as_ref()],
+        bump,
+    )]
+    pub source_parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + subdivision::AmalgamationRecord::INIT_SPACE,
+        seeds = [
+            b"amalgamation".as_ref(),
+            result_parcel.key().as_ref(),
+            source_parcel.key().as_ref()
+        ],
+        bump
+    )]
+    pub amalgamation_record: Account<'info, subdivision::AmalgamationRecord>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct MigrateRights<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), old_parcel.id.as_ref()],
+        bump,
+    )]
+    pub old_parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), new_parcel.id.as_ref()],
+        bump,
+    )]
+    pub new_parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(specifier: [u8; 32])]
+pub struct MigrateAttestations<'info> {
+    #[account(
+        seeds = [b"parcel".as_ref(), old_parcel.id.as_ref()],
+        bump,
+    )]
+    pub old_parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"parcel".as_ref(), new_parcel.id.as_ref()],
+        bump,
+    )]
+    pub new_parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [
+            b"attestation".as_ref(),
+            old_parcel.key().as_ref(),
+            &specifier,
+        ],
+        bump,
+    )]
+    pub old_attestation: Account<'info, Attestation>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Attestation::INIT_SPACE,
+        seeds = [
+            b"attestation".as_ref(),
+            new_parcel.key().as_ref(),
+            &specifier,
+        ],
+        bump
+    )]
+    pub new_attestation: Account<'info, Attestation>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -2441,6 +2583,20 @@ pub enum TerraError {
     BindingAlreadyRevoked,
     #[msg("Nullifier collision detected")]
     NullifierCollision,
+
+    // Subdivision/Amalgamation (RFC-008)
+    #[msg("Parcel is not in the correct status for this operation")]
+    InvalidParcelStatus,
+    #[msg("Parcel geometry hash is invalid")]
+    InvalidGeometryHash,
+    #[msg("Rights migration failed")]
+    RightsMigrationFailed,
+    #[msg("Attestation migration failed")]
+    AttestationMigrationFailed,
+    #[msg("Subdivision record already exists for this pair")]
+    SubdivisionRecordExists,
+    #[msg("Amalgamation record already exists for this pair")]
+    AmalgamationRecordExists,
 }
 
 #[cfg(test)]
@@ -2457,7 +2613,9 @@ mod prep_hook_tests {
         assert_eq!(parcel_status::FROZEN, 5);
         assert_eq!(parcel_status::ADJUDICATED, 6);
         assert_eq!(parcel_status::FORFEITED, 7);
-        assert_eq!(parcel_status::MAX, parcel_status::FORFEITED);
+        assert_eq!(parcel_status::SUBDIVIDED, 8);
+        assert_eq!(parcel_status::AMALGAMATED, 9);
+        assert_eq!(parcel_status::MAX, parcel_status::AMALGAMATED);
     }
 
     #[test]

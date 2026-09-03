@@ -700,6 +700,65 @@ export const IDL: TerraRegistry = {
         { name: "expires_at", type: "i64" },
       ],
     },
+    {
+      name: "subdivide_parcel",
+      discriminator: [179, 231, 244, 173, 88, 234, 211, 172],
+      accounts: [
+        { name: "original_parcel", writable: true },
+        { name: "sub_parcel", writable: true },
+        { name: "subdivision_record", writable: true },
+        { name: "surveyor_attestation" },
+        { name: "authority", writable: true, signer: true },
+        { name: "system_program", address: "11111111111111111111111111111111" },
+      ],
+      args: [
+        { name: "new_id", type: {"array": ["u8", 32]} },
+        { name: "new_name", type: "string" },
+        { name: "new_geometry_hash", type: {"array": ["u8", 32]} },
+        { name: "specifier", type: {"array": ["u8", 32]} },
+      ],
+    },
+    {
+      name: "amalgamate_parcels",
+      discriminator: [169, 18, 137, 101, 59, 136, 207, 162],
+      accounts: [
+        { name: "result_parcel", writable: true },
+        { name: "source_parcel", writable: true },
+        { name: "amalgamation_record", writable: true },
+        { name: "authority", writable: true, signer: true },
+        { name: "system_program", address: "11111111111111111111111111111111" },
+      ],
+      args: [
+        { name: "new_geometry_hash", type: {"array": ["u8", 32]} },
+      ],
+    },
+    {
+      name: "migrate_rights",
+      discriminator: [81, 152, 160, 134, 189, 248, 189, 215],
+      accounts: [
+        { name: "old_parcel", writable: true },
+        { name: "new_parcel", writable: true },
+        { name: "authority", writable: true, signer: true },
+        { name: "system_program", address: "11111111111111111111111111111111" },
+      ],
+      args: [
+      ],
+    },
+    {
+      name: "migrate_attestations",
+      discriminator: [61, 112, 164, 122, 70, 246, 49, 209],
+      accounts: [
+        { name: "old_parcel" },
+        { name: "new_parcel" },
+        { name: "old_attestation", writable: true },
+        { name: "new_attestation", writable: true },
+        { name: "authority", writable: true, signer: true },
+        { name: "system_program", address: "11111111111111111111111111111111" },
+      ],
+      args: [
+        { name: "specifier", type: {"array": ["u8", 32]} },
+      ],
+    },
   ],
   accounts: [
     { name: "Attestation", discriminator: [152, 125, 183, 86, 36, 146, 121, 73] },
@@ -716,6 +775,8 @@ export const IDL: TerraRegistry = {
     { name: "VaultShardRotation", discriminator: [33, 187, 116, 141, 215, 66, 44, 139] },
     { name: "Jurisdiction", discriminator: [74, 117, 114, 105, 115, 100, 105, 99] },
     { name: "JurisdictionBinding", discriminator: [74, 66, 105, 110, 100, 105, 110, 103] },
+    { name: "SubdivisionRecord", discriminator: [83, 117, 98, 100, 105, 118, 82, 101] },
+    { name: "AmalgamationRecord", discriminator: [65, 109, 97, 108, 103, 82, 101, 99] },
   ],
   events: [
     { name: "Attested", discriminator: [184, 102, 113, 199, 220, 197, 96, 50] },
@@ -854,6 +915,12 @@ export const IDL: TerraRegistry = {
     { code: 6027, name: "BindingExpired", msg: "Binding has expired" },
     { code: 6028, name: "BindingAlreadyRevoked", msg: "Binding is already revoked" },
     { code: 6029, name: "NullifierCollision", msg: "Nullifier collision detected" },
+    { code: 6030, name: "InvalidParcelStatus", msg: "Parcel is not in the correct status for this operation" },
+    { code: 6031, name: "InvalidGeometryHash", msg: "Parcel geometry hash is invalid" },
+    { code: 6032, name: "RightsMigrationFailed", msg: "Rights migration failed" },
+    { code: 6033, name: "AttestationMigrationFailed", msg: "Attestation migration failed" },
+    { code: 6034, name: "SubdivisionRecordExists", msg: "Subdivision record already exists for this pair" },
+    { code: 6035, name: "AmalgamationRecordExists", msg: "Amalgamation record already exists for this pair" },
   ],
   types: [
     { name: "Attestation", type: {"kind": "struct", "fields": [{"name": "parcel", "type": "pubkey"}, {"name": "specifier", "docs": ["32-byte specifier (e.g. sha256 over the artifact/signing-session id)."], "type": {"array": ["u8", 32]}}, {"name": "content_hash", "docs": ["sha-256 over the off-chain payload (documents, deed, survey, ...)."], "type": {"array": ["u8", 32]}}, {"name": "required", "docs": ["Required threshold of validator signatures to consider this validated."], "type": "u8"}, {"name": "count", "docs": ["Number of validator keys currently registered (<= MAX_VALIDATORS)."], "type": "u8"}, {"name": "version", "docs": ["Monotonic rotation counter. Each rotate_validators bumps it so a", "reconstituted validator set is provably newer than the previous one."], "type": "u8"}, {"name": "created_at", "type": "i64"}, {"name": "updated_at", "type": "i64"}, {"name": "validators", "type": {"array": ["pubkey", 8]}}]} },

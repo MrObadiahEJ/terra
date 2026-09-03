@@ -3540,6 +3540,207 @@
           "type": "i64"
         }
       ]
+    },
+    {
+      "name": "subdivide_parcel",
+      "discriminator": [
+        179,
+        231,
+        244,
+        173,
+        88,
+        234,
+        211,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "original_parcel",
+          "writable": true
+        },
+        {
+          "name": "sub_parcel",
+          "writable": true
+        },
+        {
+          "name": "subdivision_record",
+          "writable": true
+        },
+        {
+          "name": "surveyor_attestation"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_name",
+          "type": "string"
+        },
+        {
+          "name": "new_geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "specifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "amalgamate_parcels",
+      "discriminator": [
+        169,
+        18,
+        137,
+        101,
+        59,
+        136,
+        207,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "result_parcel",
+          "writable": true
+        },
+        {
+          "name": "source_parcel",
+          "writable": true
+        },
+        {
+          "name": "amalgamation_record",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "migrate_rights",
+      "discriminator": [
+        81,
+        152,
+        160,
+        134,
+        189,
+        248,
+        189,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "old_parcel",
+          "writable": true
+        },
+        {
+          "name": "new_parcel",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrate_attestations",
+      "discriminator": [
+        61,
+        112,
+        164,
+        122,
+        70,
+        246,
+        49,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "old_parcel"
+        },
+        {
+          "name": "new_parcel"
+        },
+        {
+          "name": "old_attestation",
+          "writable": true
+        },
+        {
+          "name": "new_attestation",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "specifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -3723,6 +3924,32 @@
         105,
         110,
         103
+      ]
+    },
+    {
+      "name": "SubdivisionRecord",
+      "discriminator": [
+        83,
+        117,
+        98,
+        100,
+        105,
+        118,
+        82,
+        101
+      ]
+    },
+    {
+      "name": "AmalgamationRecord",
+      "discriminator": [
+        65,
+        109,
+        97,
+        108,
+        103,
+        82,
+        101,
+        99
       ]
     }
   ],
@@ -4844,6 +5071,36 @@
       "code": 6029,
       "name": "NullifierCollision",
       "msg": "Nullifier collision detected"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidParcelStatus",
+      "msg": "Parcel is not in the correct status for this operation"
+    },
+    {
+      "code": 6031,
+      "name": "InvalidGeometryHash",
+      "msg": "Parcel geometry hash is invalid"
+    },
+    {
+      "code": 6032,
+      "name": "RightsMigrationFailed",
+      "msg": "Rights migration failed"
+    },
+    {
+      "code": 6033,
+      "name": "AttestationMigrationFailed",
+      "msg": "Attestation migration failed"
+    },
+    {
+      "code": 6034,
+      "name": "SubdivisionRecordExists",
+      "msg": "Subdivision record already exists for this pair"
+    },
+    {
+      "code": 6035,
+      "name": "AmalgamationRecordExists",
+      "msg": "Amalgamation record already exists for this pair"
     }
   ],
   "types": [
