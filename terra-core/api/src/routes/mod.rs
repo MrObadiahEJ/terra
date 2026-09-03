@@ -1,6 +1,7 @@
 use axum::Router;
 
 pub mod attestations;
+pub mod cross_border;
 pub mod disputes;
 pub mod escrows;
 pub mod fusion;
@@ -22,6 +23,7 @@ pub fn router() -> Router<AppState> {
         .nest("/disputes", disputes::router())
         .nest("/escrows", escrows::router())
         .nest("/rights", rights::router())
+        .nest("/cross-border", cross_border::router())
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())

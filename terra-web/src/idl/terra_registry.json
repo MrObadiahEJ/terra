@@ -3177,6 +3177,369 @@
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "register_jurisdiction",
+      "discriminator": [
+        6,
+        255,
+        84,
+        162,
+        130,
+        198,
+        135,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "jurisdiction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  117,
+                  114,
+                  105,
+                  115,
+                  100,
+                  95,
+                  99,
+                  111,
+                  100,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "country_code"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "jurisdiction_name",
+          "type": "string"
+        },
+        {
+          "name": "credential_schema_cid",
+          "type": "string"
+        },
+        {
+          "name": "revocation_registry",
+          "type": "pubkey"
+        },
+        {
+          "name": "verification_key_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "algorithm_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_jurisdiction",
+      "discriminator": [
+        172,
+        83,
+        224,
+        77,
+        240,
+        153,
+        228,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_verification_key_hash",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "new_revocation_registry",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "new_status",
+          "type": {
+            "option": "u8"
+          }
+        }
+      ]
+    },
+    {
+      "name": "bind_cross_border_identity",
+      "discriminator": [
+        221,
+        72,
+        207,
+        129,
+        248,
+        66,
+        1,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "credential_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof_data",
+          "type": {
+            "vec": "u8"
+          }
+        },
+        {
+          "name": "nullifier_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "verify_jurisdiction_membership",
+      "discriminator": [
+        130,
+        50,
+        171,
+        217,
+        217,
+        92,
+        207,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "jurisdiction"
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "off_chain_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_jurisdictional_identity",
+      "discriminator": [
+        196,
+        187,
+        133,
+        202,
+        68,
+        24,
+        149,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "jurisdiction"
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "rebind_cross_border_identity",
+      "discriminator": [
+        144,
+        28,
+        210,
+        61,
+        36,
+        94,
+        44,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "old_binding",
+          "writable": true
+        },
+        {
+          "name": "new_binding",
+          "writable": true
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "credential_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof_data",
+          "type": {
+            "vec": "u8"
+          }
+        },
+        {
+          "name": "nullifier_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -3335,6 +3698,32 @@
         44,
         139
       ]
+    },
+    {
+      "name": "Jurisdiction",
+      "discriminator": [
+        74,
+        117,
+        114,
+        105,
+        115,
+        100,
+        105,
+        99
+      ]
+    },
+    {
+      "name": "JurisdictionBinding",
+      "discriminator": [
+        74,
+        66,
+        105,
+        110,
+        100,
+        105,
+        110,
+        103
+      ]
     }
   ],
   "events": [
@@ -3390,7 +3779,17 @@
             "type": "i64"
           }
         ]
-      }
+      },
+      "discriminator": [
+        181,
+        107,
+        82,
+        172,
+        183,
+        3,
+        201,
+        187
+      ]
     },
     {
       "name": "DisputeCancelled",
@@ -3410,7 +3809,17 @@
             "type": "pubkey"
           }
         ]
-      }
+      },
+      "discriminator": [
+        38,
+        80,
+        189,
+        225,
+        112,
+        190,
+        156,
+        178
+      ]
     },
     {
       "name": "DisputeFiled",
@@ -3447,7 +3856,17 @@
             "type": "u8"
           }
         ]
-      }
+      },
+      "discriminator": [
+        201,
+        119,
+        206,
+        64,
+        219,
+        44,
+        249,
+        153
+      ]
     },
     {
       "name": "DocumentRegistered",
@@ -3605,7 +4024,17 @@
             "type": "i64"
           }
         ]
-      }
+      },
+      "discriminator": [
+        142,
+        230,
+        47,
+        185,
+        130,
+        105,
+        52,
+        48
+      ]
     },
     {
       "name": "ParcelAttached",
@@ -3651,7 +4080,17 @@
             "type": "i64"
           }
         ]
-      }
+      },
+      "discriminator": [
+        1,
+        224,
+        62,
+        2,
+        118,
+        17,
+        202,
+        217
+      ]
     },
     {
       "name": "ParcelRegistered",
@@ -4375,6 +4814,36 @@
       "code": 6062,
       "name": "InvalidDisputeOutcome",
       "msg": "Invalid dispute outcome"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidProofData",
+      "msg": "Invalid proof data"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidJurisdictionStatus",
+      "msg": "Jurisdiction is not active"
+    },
+    {
+      "code": 6026,
+      "name": "BindingRevoked",
+      "msg": "Binding has been revoked"
+    },
+    {
+      "code": 6027,
+      "name": "BindingExpired",
+      "msg": "Binding has expired"
+    },
+    {
+      "code": 6028,
+      "name": "BindingAlreadyRevoked",
+      "msg": "Binding is already revoked"
+    },
+    {
+      "code": 6029,
+      "name": "NullifierCollision",
+      "msg": "Nullifier collision detected"
     }
   ],
   "types": [

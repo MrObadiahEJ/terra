@@ -461,6 +461,76 @@ export interface GrantConditionalRightInput {
   notes: string
 }
 
+// ---- Cross-border identity (RFC-006) --------------------------------------
+
+export interface Jurisdiction {
+  id: string
+  country_code: string
+  authority: string
+  jurisdiction_name: string
+  credential_schema_cid: string
+  revocation_registry: string
+  verification_key_hash: string
+  algorithm_id: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RegisterJurisdictionInput {
+  country_code: string
+  authority: string
+  jurisdiction_name: string
+  credential_schema_cid: string
+  revocation_registry: string
+  verification_key_hash: string
+  algorithm_id: number
+}
+
+export interface UpdateJurisdictionInput {
+  verification_key_hash?: string
+  revocation_registry?: string
+  status?: string
+}
+
+export interface CrossBorderBinding {
+  id: string
+  jurisdiction_id: string
+  identity_hash: string
+  credential_commitment: string
+  nullifier: string
+  proof_data: string
+  proof_version: number
+  algorithm_id: number
+  revoked: boolean
+  revoked_at: string | null
+  revoked_by: string | null
+  bound_at: string
+  expires_at: string | null
+  version: number
+  country_code: string
+}
+
+export interface BindIdentityInput {
+  jurisdiction_id: string
+  identity_hash: string
+  credential_commitment: string
+  proof_data: string
+  nullifier_nonce: string
+  expires_at: string | null
+}
+
+export interface RevokeBindingInput {
+  reason: string
+}
+
+export interface RebindInput {
+  credential_commitment: string
+  proof_data: string
+  nullifier_nonce: string
+  expires_at: string | null
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -737,6 +807,37 @@ export const api = {
     }),
   grantConditionalRight: (input: GrantConditionalRightInput) =>
     request<Right>('/rights/conditional', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  // ---- Cross-border identity (RFC-006) -------------------------------------
+
+  listJurisdictions: () => request<Jurisdiction[]>('/cross-border/jurisdictions'),
+  getJurisdiction: (id: string) => request<Jurisdiction>(`/cross-border/jurisdictions/${id}`),
+  registerJurisdiction: (input: RegisterJurisdictionInput) =>
+    request<Jurisdiction>('/cross-border/jurisdictions', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  updateJurisdiction: (id: string, input: UpdateJurisdictionInput) =>
+    request<Jurisdiction>(`/cross-border/jurisdictions/${id}`, {
+      method: 'PATCH', body: JSON.stringify(input),
+    }),
+  listBindings: () => request<CrossBorderBinding[]>('/cross-border/bindings'),
+  getBinding: (id: string) => request<CrossBorderBinding>(`/cross-border/bindings/${id}`),
+  bindIdentity: (input: BindIdentityInput) =>
+    request<CrossBorderBinding>('/cross-border/bindings', {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  verifyMembership: (id: string) =>
+    request<CrossBorderBinding>(`/cross-border/bindings/${id}/verify`, {
+      method: 'POST',
+    }),
+  revokeBinding: (id: string, input: RevokeBindingInput) =>
+    request<CrossBorderBinding>(`/cross-border/bindings/${id}/revoke`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  rebindIdentity: (id: string, input: RebindInput) =>
+    request<CrossBorderBinding>(`/cross-border/bindings/${id}/rebind`, {
       method: 'POST', body: JSON.stringify(input),
     }),
 }

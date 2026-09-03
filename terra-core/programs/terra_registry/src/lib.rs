@@ -211,6 +211,7 @@ pub mod ipfs_docs;
 pub mod dispute;
 pub mod escrow;
 pub mod time_bound;
+pub mod cross_border;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -1886,6 +1887,136 @@ pub struct GrantConditionalRight<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Cross-border identity contexts (RFC-006)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(country_code: [u8; 16])]
+pub struct RegisterJurisdiction<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + cross_border::Jurisdiction::INIT_SPACE,
+        seeds = [b"jurisdiction".as_ref(), &country_code],
+        bump
+    )]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateJurisdiction<'info> {
+    #[account(mut)]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(credential_commitment: [u8; 32], proof_data: Vec<u8>, nullifier_nonce: [u8; 32], expires_at: i64)]
+pub struct BindCrossBorderIdentity<'info> {
+    #[account(
+        init,
+        payer = prover,
+        space = 8 + cross_border::JurisdictionBinding::INIT_SPACE,
+        seeds = [
+            b"cross_border_identity".as_ref(),
+            jurisdiction.key().as_ref(),
+            identity.identity_hash.as_ref()
+        ],
+        bump
+    )]
+    pub binding: Account<'info, cross_border::JurisdictionBinding>,
+    #[account(
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump,
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(mut)]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    #[account(mut)]
+    pub prover: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyJurisdictionMembership<'info> {
+    #[account(mut)]
+    pub binding: Account<'info, cross_border::JurisdictionBinding>,
+    #[account(
+        seeds = [b"jurisdiction".as_ref(), &binding.jurisdiction_key.to_bytes()],
+        bump,
+    )]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    #[account(
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump,
+    )]
+    pub identity: Account<'info, Identity>,
+    pub validator: Signer<'info>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RevokeJurisdictionalIdentity<'info> {
+    #[account(mut)]
+    pub binding: Account<'info, cross_border::JurisdictionBinding>,
+    #[account(
+        seeds = [b"jurisdiction".as_ref(), &binding.jurisdiction_key.to_bytes()],
+        bump,
+    )]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    #[account(
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump,
+    )]
+    pub identity: Account<'info, Identity>,
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(credential_commitment: [u8; 32], proof_data: Vec<u8>, nullifier_nonce: [u8; 32], expires_at: i64)]
+pub struct RebindCrossBorderIdentity<'info> {
+    #[account(mut)]
+    pub old_binding: Account<'info, cross_border::JurisdictionBinding>,
+    #[account(
+        init,
+        payer = prover,
+        space = 8 + cross_border::JurisdictionBinding::INIT_SPACE,
+        seeds = [
+            b"cross_border_identity".as_ref(),
+            jurisdiction.key().as_ref(),
+            old_binding.identity_hash.as_ref()
+        ],
+        bump
+    )]
+    pub new_binding: Account<'info, cross_border::JurisdictionBinding>,
+    #[account(
+        seeds = [b"identity".as_ref(), old_binding.identity_hash.as_ref()],
+        bump,
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(mut)]
+    pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
+    #[account(mut)]
+    pub prover: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -2296,6 +2427,20 @@ pub enum TerraError {
     ConditionDeadlineAfterExpiry,
     #[msg("Invalid grace period")]
     InvalidGracePeriod,
+
+    // Cross-border identity (RFC-006)
+    #[msg("Invalid proof data")]
+    InvalidProofData,
+    #[msg("Jurisdiction is not active")]
+    InvalidJurisdictionStatus,
+    #[msg("Binding has been revoked")]
+    BindingRevoked,
+    #[msg("Binding has expired")]
+    BindingExpired,
+    #[msg("Binding is already revoked")]
+    BindingAlreadyRevoked,
+    #[msg("Nullifier collision detected")]
+    NullifierCollision,
 }
 
 #[cfg(test)]
