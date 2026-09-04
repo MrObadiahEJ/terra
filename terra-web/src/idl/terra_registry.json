@@ -3741,6 +3741,955 @@
           }
         }
       ]
+    },
+    {
+      "name": "create_stake_pool",
+      "discriminator": [
+        198,
+        175,
+        88,
+        63,
+        128,
+        43,
+        8,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "signer": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reward_rate_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "deposit_stake",
+      "discriminator": [
+        160,
+        167,
+        9,
+        220,
+        74,
+        243,
+        228,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initiate_unbonding",
+      "discriminator": [
+        75,
+        33,
+        161,
+        251,
+        137,
+        112,
+        71,
+        37
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_stake",
+      "discriminator": [
+        153,
+        8,
+        22,
+        138,
+        105,
+        176,
+        87,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "report_equivocation",
+      "discriminator": [
+        140,
+        250,
+        136,
+        199,
+        9,
+        49,
+        41,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "offender_stake"
+        },
+        {
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "reporter"
+              },
+              {
+                "kind": "instruction",
+                "path": "evidence_hash",
+                "encoding": {
+                  "array": {
+                    "element": "u8",
+                    "length": 32
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": {
+              "element": "u8",
+              "length": 32
+            }
+          }
+        },
+        {
+          "name": "offense_details",
+          "type": {
+            "array": {
+              "element": "u8",
+              "length": 64
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "verify_and_slash",
+      "discriminator": [
+        247,
+        117,
+        243,
+        191,
+        71,
+        156,
+        117,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "slashing_report",
+          "writable": true
+        },
+        {
+          "name": "offender_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_rewards",
+      "discriminator": [
+        4,
+        144,
+        132,
+        71,
+        116,
+        23,
+        151,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "distribute_rewards",
+      "discriminator": [
+        97,
+        6,
+        227,
+        255,
+        124,
+        165,
+        3,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "dispute_slashing",
+      "discriminator": [
+        119,
+        42,
+        202,
+        53,
+        178,
+        248,
+        69,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "slashing_report",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "offender",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "appeal_reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "dismiss_report",
+      "discriminator": [
+        17,
+        115,
+        109,
+        189,
+        166,
+        8,
+        146,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "slashing_report",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -3950,6 +4899,45 @@
         82,
         101,
         99
+      ]
+    },
+    {
+      "name": "StakePool",
+      "discriminator": [
+        211,
+        213,
+        23,
+        123,
+        209,
+        203,
+        91,
+        148
+      ]
+    },
+    {
+      "name": "ValidatorStake",
+      "discriminator": [
+        77,
+        73,
+        111,
+        52,
+        172,
+        153,
+        22,
+        33
+      ]
+    },
+    {
+      "name": "SlashingReport",
+      "discriminator": [
+        100,
+        200,
+        29,
+        139,
+        225,
+        78,
+        17,
+        34
       ]
     }
   ],
@@ -4604,6 +5592,323 @@
         78,
         115
       ]
+    },
+    {
+      "name": "StakePoolCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_rate_bps",
+            "type": "u16"
+          }
+        ]
+      },
+      "discriminator": [
+        80,
+        44,
+        243,
+        249,
+        137,
+        72,
+        229,
+        122
+      ]
+    },
+    {
+      "name": "StakeDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      },
+      "discriminator": [
+        69,
+        152,
+        144,
+        109,
+        232,
+        34,
+        225,
+        19
+      ]
+    },
+    {
+      "name": "UnbondingInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      },
+      "discriminator": [
+        119,
+        120,
+        72,
+        229,
+        146,
+        100,
+        18,
+        106
+      ]
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      },
+      "discriminator": [
+        33,
+        120,
+        159,
+        58,
+        140,
+        255,
+        174,
+        79
+      ]
+    },
+    {
+      "name": "EquivocationReported",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      },
+      "discriminator": [
+        136,
+        91,
+        235,
+        5,
+        219,
+        141,
+        157,
+        248
+      ]
+    },
+    {
+      "name": "ValidatorSlashed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slash_bps",
+            "type": "u16"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          }
+        ]
+      },
+      "discriminator": [
+        1,
+        160,
+        99,
+        18,
+        25,
+        42,
+        5,
+        213
+      ]
+    },
+    {
+      "name": "RewardsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      },
+      "discriminator": [
+        75,
+        98,
+        88,
+        18,
+        219,
+        112,
+        88,
+        121
+      ]
+    },
+    {
+      "name": "RewardsDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "period_reward",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          }
+        ]
+      },
+      "discriminator": [
+        11,
+        43,
+        154,
+        0,
+        229,
+        9,
+        116,
+        85
+      ]
+    },
+    {
+      "name": "SlashingAppealed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "appeal_reason",
+            "type": "string"
+          }
+        ]
+      },
+      "discriminator": [
+        40,
+        35,
+        123,
+        102,
+        1,
+        153,
+        139,
+        77
+      ]
+    },
+    {
+      "name": "ReportDismissed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          }
+        ]
+      },
+      "discriminator": [
+        181,
+        63,
+        248,
+        138,
+        116,
+        100,
+        43,
+        164
+      ]
     }
   ],
   "errors": [
@@ -4613,19 +5918,9 @@
       "msg": "Parcel id cannot be all zeros"
     },
     {
-      "code": 6000,
-      "name": "InvalidEscrowStatus",
-      "msg": "Invalid escrow status for this operation"
-    },
-    {
       "code": 6001,
       "name": "EmptyName",
       "msg": "Parcel name cannot be empty"
-    },
-    {
-      "code": 6001,
-      "name": "InvalidEscrowAmount",
-      "msg": "Escrow amount is outside the allowed range"
     },
     {
       "code": 6002,
@@ -4633,19 +5928,9 @@
       "msg": "Geometry hash is required"
     },
     {
-      "code": 6002,
-      "name": "SelfDealingNotAllowed",
-      "msg": "Buyer wallet cannot be the same as the seller"
-    },
-    {
       "code": 6003,
       "name": "NotOwner",
       "msg": "Only the current owner can perform this action"
-    },
-    {
-      "code": 6003,
-      "name": "NotDesignatedBuyer",
-      "msg": "Signer is not the designated buyer for this escrow"
     },
     {
       "code": 6004,
@@ -4653,19 +5938,9 @@
       "msg": "Invalid parcel status"
     },
     {
-      "code": 6004,
-      "name": "NotDesignatedSeller",
-      "msg": "Signer is not the designated seller for this escrow"
-    },
-    {
       "code": 6005,
       "name": "InvalidRightKind",
       "msg": "Invalid right kind"
-    },
-    {
-      "code": 6005,
-      "name": "DepositExceedsAmount",
-      "msg": "Deposit would exceed the escrow amount"
     },
     {
       "code": 6006,
@@ -4673,19 +5948,9 @@
       "msg": "Nonce does not match the parcel's rights_count"
     },
     {
-      "code": 6006,
-      "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received - seller cannot accept"
-    },
-    {
       "code": 6007,
       "name": "RightsLimitExceeded",
       "msg": "Rights limit reached"
-    },
-    {
-      "code": 6007,
-      "name": "SettlementNotYetEffective",
-      "msg": "Settlement window has not yet expired"
     },
     {
       "code": 6008,
@@ -4693,19 +5958,9 @@
       "msg": "Notes exceed the maximum length of 128"
     },
     {
-      "code": 6008,
-      "name": "ParcelStillOwnedBySeller",
-      "msg": "Seller no longer owns the parcel at settlement time"
-    },
-    {
       "code": 6009,
       "name": "InvalidExpiry",
       "msg": "Expiry must be in the future"
-    },
-    {
-      "code": 6009,
-      "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired - cannot cancel"
     },
     {
       "code": 6010,
@@ -4713,19 +5968,9 @@
       "msg": "Not authorized to perform this action"
     },
     {
-      "code": 6010,
-      "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired - escrow not stale"
-    },
-    {
       "code": 6011,
       "name": "InvalidInfrastructureFlags",
       "msg": "Invalid infrastructure flags"
-    },
-    {
-      "code": 6011,
-      "name": "DepositExists",
-      "msg": "Cannot cancel: deposit already exists"
     },
     {
       "code": 6012,
@@ -4733,19 +5978,9 @@
       "msg": "Access hash is required"
     },
     {
-      "code": 6012,
-      "name": "NotPartyToEscrow",
-      "msg": "Signer is not a party to this escrow"
-    },
-    {
       "code": 6013,
       "name": "EmptySpecifier",
       "msg": "Attestation specifier is required"
-    },
-    {
-      "code": 6013,
-      "name": "ParcelAlreadyInEscrow",
-      "msg": "Parcel is already in an escrow"
     },
     {
       "code": 6014,
@@ -4753,19 +5988,9 @@
       "msg": "Content hash is required"
     },
     {
-      "code": 6014,
-      "name": "EscrowAmountTooLow",
-      "msg": "Minimum escrow amount is 0.1 SOL"
-    },
-    {
       "code": 6015,
       "name": "NoValidators",
       "msg": "Attestation requires at least one validator"
-    },
-    {
-      "code": 6015,
-      "name": "EscrowAmountTooHigh",
-      "msg": "Maximum escrow amount is 1,000,000 SOL"
     },
     {
       "code": 6016,
@@ -4773,19 +5998,9 @@
       "msg": "Required threshold exceeds the number of validators"
     },
     {
-      "code": 6016,
-      "name": "EmptyBuyer",
-      "msg": "Buyer wallet address is required"
-    },
-    {
       "code": 6017,
       "name": "EmptyIdentityHash",
       "msg": "Identity hash is required"
-    },
-    {
-      "code": 6017,
-      "name": "CannotRenewRevokedRight",
-      "msg": "Cannot renew a revoked right"
     },
     {
       "code": 6018,
@@ -4793,19 +6008,9 @@
       "msg": "Recovery wallet is required"
     },
     {
-      "code": 6018,
-      "name": "CannotRenewAlreadyRenewed",
-      "msg": "Cannot renew an already-renewed right"
-    },
-    {
       "code": 6019,
       "name": "IdentityMismatch",
       "msg": "Identity owner does not match the parcel owner"
-    },
-    {
-      "code": 6019,
-      "name": "RenewalMustExtendExpiry",
-      "msg": "Renewal must extend the expiry, not shorten it"
     },
     {
       "code": 6020,
@@ -4813,19 +6018,9 @@
       "msg": "Successor wallet is required"
     },
     {
-      "code": 6020,
-      "name": "InvalidRightStatus",
-      "msg": "Invalid right status for this operation"
-    },
-    {
       "code": 6021,
       "name": "InvalidSuccessionKind",
       "msg": "Invalid succession kind"
-    },
-    {
-      "code": 6021,
-      "name": "PermanentRightNotSweepable",
-      "msg": "Permanent rights (expires_at=0) cannot be swept"
     },
     {
       "code": 6022,
@@ -4833,19 +6028,9 @@
       "msg": "Successor must differ from the current owner"
     },
     {
-      "code": 6022,
-      "name": "ConditionDeadlineAfterExpiry",
-      "msg": "Condition deadline must be before the expiry"
-    },
-    {
       "code": 6023,
       "name": "SuccessionAlreadyEffective",
       "msg": "Succession has already become effective"
-    },
-    {
-      "code": 6023,
-      "name": "InvalidGracePeriod",
-      "msg": "Invalid grace period"
     },
     {
       "code": 6024,
@@ -5043,64 +6228,209 @@
       "msg": "Invalid dispute outcome"
     },
     {
-      "code": 6024,
+      "code": 6063,
+      "name": "InvalidEscrowStatus",
+      "msg": "Invalid escrow status for this operation"
+    },
+    {
+      "code": 6064,
+      "name": "InvalidEscrowAmount",
+      "msg": "Escrow amount is outside the allowed range"
+    },
+    {
+      "code": 6065,
+      "name": "SelfDealingNotAllowed",
+      "msg": "Buyer wallet cannot be the same as the seller"
+    },
+    {
+      "code": 6066,
+      "name": "NotDesignatedBuyer",
+      "msg": "Signer is not the designated buyer for this escrow"
+    },
+    {
+      "code": 6067,
+      "name": "NotDesignatedSeller",
+      "msg": "Signer is not the designated seller for this escrow"
+    },
+    {
+      "code": 6068,
+      "name": "DepositExceedsAmount",
+      "msg": "Deposit would exceed the escrow amount"
+    },
+    {
+      "code": 6069,
+      "name": "InsufficientDeposit",
+      "msg": "Full deposit not yet received \u2014 seller cannot accept"
+    },
+    {
+      "code": 6070,
+      "name": "SettlementNotYetEffective",
+      "msg": "Settlement window has not yet expired"
+    },
+    {
+      "code": 6071,
+      "name": "ParcelStillOwnedBySeller",
+      "msg": "Seller no longer owns the parcel at settlement time"
+    },
+    {
+      "code": 6072,
+      "name": "CancelWindowExpired",
+      "msg": "Buyer grace period has expired \u2014 cannot cancel"
+    },
+    {
+      "code": 6073,
+      "name": "CancelWindowNotExpired",
+      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
+    },
+    {
+      "code": 6074,
+      "name": "DepositExists",
+      "msg": "Cannot cancel: deposit already exists"
+    },
+    {
+      "code": 6075,
+      "name": "NotPartyToEscrow",
+      "msg": "Signer is not a party to this escrow"
+    },
+    {
+      "code": 6076,
+      "name": "ParcelAlreadyInEscrow",
+      "msg": "Parcel is already in an escrow"
+    },
+    {
+      "code": 6077,
+      "name": "EscrowAmountTooLow",
+      "msg": "Minimum escrow amount is 0.1 SOL"
+    },
+    {
+      "code": 6078,
+      "name": "EscrowAmountTooHigh",
+      "msg": "Maximum escrow amount is 1,000,000 SOL"
+    },
+    {
+      "code": 6079,
+      "name": "EmptyBuyer",
+      "msg": "Buyer wallet address is required"
+    },
+    {
+      "code": 6080,
+      "name": "CannotRenewRevokedRight",
+      "msg": "Cannot renew a revoked right"
+    },
+    {
+      "code": 6081,
+      "name": "CannotRenewAlreadyRenewed",
+      "msg": "Cannot renew an already-renewed right"
+    },
+    {
+      "code": 6082,
+      "name": "RenewalMustExtendExpiry",
+      "msg": "Renewal must extend the expiry, not shorten it"
+    },
+    {
+      "code": 6083,
+      "name": "InvalidRightStatus",
+      "msg": "Invalid right status for this operation"
+    },
+    {
+      "code": 6084,
+      "name": "PermanentRightNotSweepable",
+      "msg": "Permanent rights (expires_at=0) cannot be swept"
+    },
+    {
+      "code": 6085,
+      "name": "ConditionDeadlineAfterExpiry",
+      "msg": "Condition deadline must be before the expiry"
+    },
+    {
+      "code": 6086,
+      "name": "InvalidGracePeriod",
+      "msg": "Invalid grace period"
+    },
+    {
+      "code": 6087,
       "name": "InvalidProofData",
       "msg": "Invalid proof data"
     },
     {
-      "code": 6025,
+      "code": 6088,
       "name": "InvalidJurisdictionStatus",
       "msg": "Jurisdiction is not active"
     },
     {
-      "code": 6026,
+      "code": 6089,
       "name": "BindingRevoked",
       "msg": "Binding has been revoked"
     },
     {
-      "code": 6027,
+      "code": 6090,
       "name": "BindingExpired",
       "msg": "Binding has expired"
     },
     {
-      "code": 6028,
+      "code": 6091,
       "name": "BindingAlreadyRevoked",
       "msg": "Binding is already revoked"
     },
     {
-      "code": 6029,
+      "code": 6092,
       "name": "NullifierCollision",
       "msg": "Nullifier collision detected"
     },
     {
-      "code": 6030,
+      "code": 6093,
       "name": "InvalidParcelStatus",
       "msg": "Parcel is not in the correct status for this operation"
     },
     {
-      "code": 6031,
+      "code": 6094,
       "name": "InvalidGeometryHash",
       "msg": "Parcel geometry hash is invalid"
     },
     {
-      "code": 6032,
+      "code": 6095,
       "name": "RightsMigrationFailed",
       "msg": "Rights migration failed"
     },
     {
-      "code": 6033,
+      "code": 6096,
       "name": "AttestationMigrationFailed",
       "msg": "Attestation migration failed"
     },
     {
-      "code": 6034,
+      "code": 6097,
       "name": "SubdivisionRecordExists",
       "msg": "Subdivision record already exists for this pair"
     },
     {
-      "code": 6035,
+      "code": 6098,
       "name": "AmalgamationRecordExists",
       "msg": "Amalgamation record already exists for this pair"
+    },
+    {
+      "code": 6099,
+      "name": "InsufficientStake",
+      "msg": "Insufficient stake for this operation"
+    },
+    {
+      "code": 6100,
+      "name": "StakeAlreadyActive",
+      "msg": "Stake is already active \u2014 cannot deposit again"
+    },
+    {
+      "code": 6101,
+      "name": "UnbondingInProgress",
+      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
+    },
+    {
+      "code": 6102,
+      "name": "UnbondingNotComplete",
+      "msg": "Unbonding period has not yet completed"
+    },
+    {
+      "code": 6103,
+      "name": "SelfReportNotAllowed",
+      "msg": "Self-reporting is not allowed"
     }
   ],
   "types": [
@@ -6476,6 +7806,378 @@
           },
           {
             "name": "new_owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakePool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          },
+          {
+            "name": "reward_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "accumulated_rewards",
+            "type": "u64"
+          },
+          {
+            "name": "last_reward_distribution",
+            "type": "i64"
+          },
+          {
+            "name": "slash_count",
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorStake",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "staked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "unbonding_amount",
+            "type": "u64"
+          },
+          {
+            "name": "unbonding_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "rewards_accrued",
+            "type": "u64"
+          },
+          {
+            "name": "slash_history",
+            "type": "u8"
+          },
+          {
+            "name": "offenses",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashingReport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "offense_type",
+            "type": "u8"
+          },
+          {
+            "name": "offense_details",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "reporter_bond",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "filed_at",
+            "type": "i64"
+          },
+          {
+            "name": "appeal_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakePoolCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_rate_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnbondingInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EquivocationReported",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": {
+                "element": "u8",
+                "length": 32
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorSlashed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slash_bps",
+            "type": "u16"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardsDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "period_reward",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashingAppealed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "appeal_reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportDismissed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
             "type": "pubkey"
           }
         ]

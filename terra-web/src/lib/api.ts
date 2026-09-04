@@ -578,6 +578,73 @@ export interface CreateAmalgamationInput {
   initiated_by: string
 }
 
+// ---- Staking / Slashing (RFC-005) -----------------------------------------
+
+export interface StakePool {
+  stake_pool_address: string
+  region_registry_address: string
+  total_staked_lamports: number
+  reward_rate_bps: number
+  accumulated_rewards_lamports: number
+  last_reward_distribution: string
+  slash_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ValidatorStake {
+  validator_stake_address: string
+  stake_pool_address: string
+  validator_address: string
+  staked_lamports: number
+  unbonding_lamports: number
+  unbonding_starts_at: string
+  rewards_accrued_lamports: number
+  slash_history: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SlashingReport {
+  slashing_report_address: string
+  stake_pool_address: string
+  reporter_address: string
+  evidence_hash: string
+  offender_address: string
+  offense_type: number
+  offense_details: string
+  reporter_bond_lamports: number
+  status: number
+  filed_at: string
+  appeal_deadline: string
+  resolved_at: string
+  created_at: string
+}
+
+export interface CreateStakePoolInput {
+  stake_pool_address: string
+  region_registry_address: string
+  reward_rate_bps: number
+}
+
+export interface CreateValidatorStakeInput {
+  validator_stake_address: string
+  stake_pool_address: string
+  validator_address: string
+}
+
+export interface CreateSlashingReportInput {
+  slashing_report_address: string
+  stake_pool_address: string
+  reporter_address: string
+  evidence_hash: string
+  offender_address: string
+  offense_type: number
+  offense_details: string
+  reporter_bond_lamports: number
+  appeal_deadline: string
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -910,6 +977,29 @@ export const api = {
     request<AmalgamationRecord>(`/subdivision/amalgamations/${id}`, {
       method: 'PATCH', body: JSON.stringify(input),
     }),
+
+  // ---- Staking / Slashing (RFC-005) ----------------------------------------
+
+  listStakePools: () => request<StakePool[]>('/staking/pools'),
+  getStakePool: (address: string) => request<StakePool>(`/staking/pools/${address}`),
+  createStakePool: (input: CreateStakePoolInput) =>
+    request<StakePool>('/staking/pools', { method: 'POST', body: JSON.stringify(input) }),
+  updateStakePool: (address: string, input: Partial<StakePool>) =>
+    request<StakePool>(`/staking/pools/${address}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  listValidatorStakes: () => request<ValidatorStake[]>('/staking/stakes'),
+  getValidatorStake: (address: string) => request<ValidatorStake>(`/staking/stakes/${address}`),
+  createValidatorStake: (input: CreateValidatorStakeInput) =>
+    request<ValidatorStake>('/staking/stakes', { method: 'POST', body: JSON.stringify(input) }),
+  updateValidatorStake: (address: string, input: Partial<ValidatorStake>) =>
+    request<ValidatorStake>(`/staking/stakes/${address}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  listSlashingReports: () => request<SlashingReport[]>('/staking/reports'),
+  getSlashingReport: (address: string) => request<SlashingReport>(`/staking/reports/${address}`),
+  createSlashingReport: (input: CreateSlashingReportInput) =>
+    request<SlashingReport>('/staking/reports', { method: 'POST', body: JSON.stringify(input) }),
+  updateSlashingReport: (address: string, input: Partial<SlashingReport>) =>
+    request<SlashingReport>(`/staking/reports/${address}`, { method: 'PUT', body: JSON.stringify(input) }),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

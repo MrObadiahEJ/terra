@@ -217,6 +217,7 @@ pub mod escrow;
 pub mod time_bound;
 pub mod cross_border;
 pub mod subdivision;
+pub mod staking;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -1288,6 +1289,63 @@ pub mod terra_registry {
             condition_deadline, condition_desc, grace_period_secs, notes,
         )
     }
+
+    // -----------------------------------------------------------------------
+    // Staking / Slashing (RFC-005)
+    // -----------------------------------------------------------------------
+
+    pub fn create_stake_pool(
+        ctx: Context<CreateStakePool>,
+        reward_rate_bps: u16,
+    ) -> Result<()> {
+        staking::create_stake_pool(ctx, reward_rate_bps)
+    }
+
+    pub fn deposit_stake(
+        ctx: Context<DepositStake>,
+        amount: u64,
+    ) -> Result<()> {
+        staking::deposit_stake(ctx, amount)
+    }
+
+    pub fn initiate_unbonding(ctx: Context<InitiateUnbonding>) -> Result<()> {
+        staking::initiate_unbonding(ctx)
+    }
+
+    pub fn withdraw_stake(ctx: Context<WithdrawStake>) -> Result<()> {
+        staking::withdraw_stake(ctx)
+    }
+
+    pub fn report_equivocation(
+        ctx: Context<ReportEquivocation>,
+        evidence_hash: [u8; 32],
+        offense_details: [u8; 64],
+    ) -> Result<()> {
+        staking::report_equivocation(ctx, evidence_hash, offense_details)
+    }
+
+    pub fn verify_and_slash(ctx: Context<VerifyAndSlash>) -> Result<()> {
+        staking::verify_and_slash(ctx)
+    }
+
+    pub fn claim_rewards(ctx: Context<ClaimRewards>) -> Result<()> {
+        staking::claim_rewards(ctx)
+    }
+
+    pub fn distribute_rewards(ctx: Context<DistributeRewards>) -> Result<()> {
+        staking::distribute_rewards(ctx)
+    }
+
+    pub fn dispute_slashing(
+        ctx: Context<DisputeSlashing>,
+        appeal_reason: String,
+    ) -> Result<()> {
+        staking::dispute_slashing(ctx, appeal_reason)
+    }
+
+    pub fn dismiss_report(ctx: Context<DismissReport>) -> Result<()> {
+        staking::dismiss_report(ctx)
+    }
 }
 
 #[derive(Accounts)]
@@ -2159,6 +2217,301 @@ pub struct MigrateAttestations<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Staking / Slashing contexts (RFC-005)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(reward_rate_bps: u16)]
+pub struct CreateStakePool<'info> {
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + staking::StakePool::INIT_SPACE,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(amount: u64)]
+pub struct DepositStake<'info> {
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        mut,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        init_if_needed,
+        payer = validator,
+        space = 8 + staking::ValidatorStake::INIT_SPACE,
+        seeds = [b"validator_stake", stake_pool.key().as_ref(), validator.key().as_ref()],
+        bump,
+    )]
+    pub validator_stake: Account<'info, staking::ValidatorStake>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitiateUnbonding<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+        constraint = validator_stake.validator == validator.key() @ TerraError::NotValidator,
+    )]
+    pub validator_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub validator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawStake<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+        constraint = validator_stake.validator == validator.key() @ TerraError::NotValidator,
+    )]
+    pub validator_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        mut,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(evidence_hash: [u8; 32])]
+pub struct ReportEquivocation<'info> {
+    #[account(
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            offender_stake.validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub offender_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        init,
+        payer = reporter,
+        space = 8 + staking::SlashingReport::INIT_SPACE,
+        seeds = [
+            b"slashing_report",
+            stake_pool.key().as_ref(),
+            reporter.key().as_ref(),
+            evidence_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub slashing_report: Account<'info, staking::SlashingReport>,
+    #[account(mut)]
+    pub reporter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyAndSlash<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"slashing_report",
+            stake_pool.key().as_ref(),
+            slashing_report.reporter.as_ref(),
+            slashing_report.evidence_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub slashing_report: Account<'info, staking::SlashingReport>,
+    #[account(
+        mut,
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            offender_stake.validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub offender_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        mut,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        mut,
+        constraint = reporter.key() == slashing_report.reporter @ TerraError::NotValidator,
+    )]
+    /// CHECK: Reporter wallet — validated by constraint.
+    pub reporter: AccountInfo<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimRewards<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+        constraint = validator_stake.validator == validator.key() @ TerraError::NotValidator,
+    )]
+    pub validator_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        mut,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct DistributeRewards<'info> {
+    #[account(
+        mut,
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DisputeSlashing<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"slashing_report",
+            stake_pool.key().as_ref(),
+            slashing_report.reporter.as_ref(),
+            slashing_report.evidence_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub slashing_report: Account<'info, staking::SlashingReport>,
+    #[account(
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        constraint = slashing_report.offender == offender.key() @ TerraError::NotDesignatedBuyer,
+    )]
+    pub offender: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DismissReport<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"slashing_report",
+            stake_pool.key().as_ref(),
+            slashing_report.reporter.as_ref(),
+            slashing_report.evidence_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub slashing_report: Account<'info, staking::SlashingReport>,
+    #[account(
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    /// CHECK: Reporter wallet — validated by slashing_report PDA seeds.
+    pub reporter: AccountInfo<'info>,
+    pub authority: Signer<'info>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -2597,6 +2950,18 @@ pub enum TerraError {
     SubdivisionRecordExists,
     #[msg("Amalgamation record already exists for this pair")]
     AmalgamationRecordExists,
+
+    // Staking / Slashing (RFC-005)
+    #[msg("Insufficient stake for this operation")]
+    InsufficientStake,
+    #[msg("Stake is already active — cannot deposit again")]
+    StakeAlreadyActive,
+    #[msg("Unbonding is in progress — cannot deposit or withdraw")]
+    UnbondingInProgress,
+    #[msg("Unbonding period has not yet completed")]
+    UnbondingNotComplete,
+    #[msg("Self-reporting is not allowed")]
+    SelfReportNotAllowed,
 }
 
 #[cfg(test)]
