@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{parcel_status, MAX_VALIDATORS, TerraError};
+use crate::{parcel_status, TerraError, MAX_VALIDATORS};
 
 pub mod dispute_status {
     pub const FILED: u8 = 0;
@@ -78,7 +78,10 @@ pub fn file_dispute(
             continue;
         }
         // The filer cannot be their own validator (self-dealing).
-        require!(v != ctx.accounts.filer.key(), TerraError::ValidatorOwnsAsset);
+        require!(
+            v != ctx.accounts.filer.key(),
+            TerraError::ValidatorOwnsAsset
+        );
         // The parcel owner cannot be a dispute validator (self-dealing).
         require!(
             v != ctx.accounts.parcel.owner,

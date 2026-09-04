@@ -141,10 +141,7 @@ pub struct SlashingReport {
 // ---------------------------------------------------------------------------
 
 /// Initialize a stake pool for a region.
-pub fn create_stake_pool(
-    ctx: Context<super::CreateStakePool>,
-    reward_rate_bps: u16,
-) -> Result<()> {
+pub fn create_stake_pool(ctx: Context<super::CreateStakePool>, reward_rate_bps: u16) -> Result<()> {
     require!(
         reward_rate_bps > 0 && reward_rate_bps <= 2000,
         TerraError::InvalidStatus
@@ -176,10 +173,7 @@ pub fn create_stake_pool(
 }
 
 /// A validator deposits SOL as a bond.
-pub fn deposit_stake(
-    ctx: Context<super::DepositStake>,
-    amount: u64,
-) -> Result<()> {
+pub fn deposit_stake(ctx: Context<super::DepositStake>, amount: u64) -> Result<()> {
     require!(amount >= MIN_STAKE_LAMPORTS, TerraError::InsufficientStake);
 
     // Verify validator is in the registry.
@@ -192,10 +186,7 @@ pub fn deposit_stake(
 
     let stake = &mut ctx.accounts.validator_stake;
     require!(stake.staked_amount == 0, TerraError::StakeAlreadyActive);
-    require!(
-        stake.unbonding_amount == 0,
-        TerraError::UnbondingInProgress
-    );
+    require!(stake.unbonding_amount == 0, TerraError::UnbondingInProgress);
 
     // Transfer SOL from validator to stake pool.
     let ix = anchor_lang::solana_program::system_instruction::transfer(
@@ -234,10 +225,7 @@ pub fn deposit_stake(
 /// Validator begins the unbonding process.
 pub fn initiate_unbonding(ctx: Context<super::InitiateUnbonding>) -> Result<()> {
     let stake = &mut ctx.accounts.validator_stake;
-    require!(
-        stake.unbonding_amount == 0,
-        TerraError::UnbondingInProgress
-    );
+    require!(stake.unbonding_amount == 0, TerraError::UnbondingInProgress);
     require!(stake.staked_amount > 0, TerraError::InsufficientStake);
 
     let now = Clock::get()?.unix_timestamp;
@@ -258,10 +246,7 @@ pub fn initiate_unbonding(ctx: Context<super::InitiateUnbonding>) -> Result<()> 
 pub fn withdraw_stake(ctx: Context<super::WithdrawStake>) -> Result<()> {
     let stake = &ctx.accounts.validator_stake;
     require!(stake.unbonding_amount > 0, TerraError::InsufficientStake);
-    require!(
-        stake.staked_amount == 0,
-        TerraError::UnbondingInProgress
-    );
+    require!(stake.staked_amount == 0, TerraError::UnbondingInProgress);
 
     let now = Clock::get()?.unix_timestamp;
     require!(
@@ -503,10 +488,7 @@ pub fn distribute_rewards(ctx: Context<super::DistributeRewards>) -> Result<()> 
 }
 
 /// Validator disputes a slashing report during the appeal window.
-pub fn dispute_slashing(
-    ctx: Context<super::DisputeSlashing>,
-    appeal_reason: String,
-) -> Result<()> {
+pub fn dispute_slashing(ctx: Context<super::DisputeSlashing>, appeal_reason: String) -> Result<()> {
     require!(
         appeal_reason.len() <= MAX_APPEAL_REASON_LEN,
         TerraError::NotesTooLong
@@ -548,8 +530,7 @@ pub fn dismiss_report(ctx: Context<super::DismissReport>) -> Result<()> {
     {
         let report = &ctx.accounts.slashing_report;
         require!(
-            report.status == report_status::PENDING
-                || report.status == report_status::APPEALED,
+            report.status == report_status::PENDING || report.status == report_status::APPEALED,
             TerraError::InvalidDisputeStatus
         );
         reporter_bond = report.reporter_bond;

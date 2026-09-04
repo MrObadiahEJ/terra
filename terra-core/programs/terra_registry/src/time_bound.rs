@@ -147,7 +147,10 @@ pub fn sweep_expired_rights(ctx: Context<super::SweepExpiredRights>, _nonce: u8)
     let now = Clock::get()?.unix_timestamp;
 
     // Permanent rights are never swept.
-    require!(rights.expires_at != 0, TerraError::PermanentRightNotSweepable);
+    require!(
+        rights.expires_at != 0,
+        TerraError::PermanentRightNotSweepable
+    );
 
     // Not yet expired — no-op.
     if now < rights.expires_at {
@@ -193,7 +196,10 @@ pub fn grant_conditional_right(
         parcel.owner == ctx.accounts.owner.key(),
         TerraError::NotOwner
     );
-    require!(rights_kind <= crate::right_kind::MAX, TerraError::InvalidRightKind);
+    require!(
+        rights_kind <= crate::right_kind::MAX,
+        TerraError::InvalidRightKind
+    );
     require!(nonce == parcel.rights_count, TerraError::InvalidNonce);
     require!(
         (parcel.rights_count as u16) < u8::MAX as u16,

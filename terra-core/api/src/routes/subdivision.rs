@@ -104,10 +104,22 @@ pub struct UpdateAmalgamationRequest {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/subdivisions", get(list_subdivisions).post(create_subdivision))
-        .route("/subdivisions/{id}", get(get_subdivision).patch(update_subdivision))
-        .route("/amalgamations", get(list_amalgamations).post(create_amalgamation))
-        .route("/amalgamations/{id}", get(get_amalgamation).patch(update_amalgamation))
+        .route(
+            "/subdivisions",
+            get(list_subdivisions).post(create_subdivision),
+        )
+        .route(
+            "/subdivisions/{id}",
+            get(get_subdivision).patch(update_subdivision),
+        )
+        .route(
+            "/amalgamations",
+            get(list_amalgamations).post(create_amalgamation),
+        )
+        .route(
+            "/amalgamations/{id}",
+            get(get_amalgamation).patch(update_amalgamation),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -117,9 +129,7 @@ pub fn router() -> Router<AppState> {
 async fn list_subdivisions(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SubdivisionRecord>>, AppError> {
-    let rows: Vec<SubdivisionRecord> = sqlx::query_as(SUBDIV_SELECT)
-        .fetch_all(&state.pool)
-        .await?;
+    let rows: Vec<SubdivisionRecord> = sqlx::query_as(SUBDIV_SELECT).fetch_all(&state.pool).await?;
     Ok(Json(rows))
 }
 
@@ -177,15 +187,16 @@ async fn update_subdivision(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateSubdivisionRequest>,
 ) -> Result<Json<SubdivisionRecord>, AppError> {
-    let existing: SubdivisionRecord =
-        sqlx::query_as(&format!("{SUBDIV_SELECT} WHERE id = $1"))
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found("subdivision record"))?;
+    let existing: SubdivisionRecord = sqlx::query_as(&format!("{SUBDIV_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("subdivision record"))?;
 
     let rm = req.rights_migrated.unwrap_or(existing.rights_migrated);
-    let am = req.attestations_migrated.unwrap_or(existing.attestations_migrated);
+    let am = req
+        .attestations_migrated
+        .unwrap_or(existing.attestations_migrated);
     let st = req.status.unwrap_or(existing.status);
 
     let row: SubdivisionRecord = sqlx::query_as(
@@ -216,9 +227,7 @@ async fn update_subdivision(
 async fn list_amalgamations(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AmalgamationRecord>>, AppError> {
-    let rows: Vec<AmalgamationRecord> = sqlx::query_as(AMALG_SELECT)
-        .fetch_all(&state.pool)
-        .await?;
+    let rows: Vec<AmalgamationRecord> = sqlx::query_as(AMALG_SELECT).fetch_all(&state.pool).await?;
     Ok(Json(rows))
 }
 
@@ -274,12 +283,11 @@ async fn update_amalgamation(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateAmalgamationRequest>,
 ) -> Result<Json<AmalgamationRecord>, AppError> {
-    let existing: AmalgamationRecord =
-        sqlx::query_as(&format!("{AMALG_SELECT} WHERE id = $1"))
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found("amalgamation record"))?;
+    let existing: AmalgamationRecord = sqlx::query_as(&format!("{AMALG_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("amalgamation record"))?;
 
     let rm = req.rights_merged.unwrap_or(existing.rights_merged);
     let st = req.status.unwrap_or(existing.status);

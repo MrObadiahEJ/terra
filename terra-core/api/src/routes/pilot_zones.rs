@@ -9,14 +9,7 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::state::AppState;
 
-const ASSET_TYPES: &[&str] = &[
-    "orthophoto",
-    "point_cloud",
-    "dsm",
-    "dtm",
-    "mesh",
-    "other",
-];
+const ASSET_TYPES: &[&str] = &["orthophoto", "point_cloud", "dsm", "dtm", "mesh", "other"];
 
 #[derive(Debug, Deserialize)]
 pub struct NewPilotZone {

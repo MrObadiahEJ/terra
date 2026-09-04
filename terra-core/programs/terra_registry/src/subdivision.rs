@@ -81,10 +81,7 @@ fn verify_rights_account<'info>(
     program_id: &Pubkey,
     expected_parcel: &Pubkey,
 ) -> Result<()> {
-    require!(
-        account.owner == program_id,
-        TerraError::NotOwner
-    );
+    require!(account.owner == program_id, TerraError::NotOwner);
     let data = account.try_borrow_data()?;
     let disc: &[u8] = <crate::Rights as anchor_lang::Discriminator>::DISCRIMINATOR;
     require!(
@@ -95,10 +92,7 @@ fn verify_rights_account<'info>(
     let mut parcel_bytes = [0u8; 32];
     parcel_bytes.copy_from_slice(&data[8..40]);
     let parcel = Pubkey::new_from_array(parcel_bytes);
-    require!(
-        parcel == *expected_parcel,
-        TerraError::NotOwner
-    );
+    require!(parcel == *expected_parcel, TerraError::NotOwner);
     Ok(())
 }
 
@@ -116,10 +110,7 @@ pub fn subdivide_parcel(
     new_geometry_hash: [u8; 32],
     _specifier: [u8; 32],
 ) -> Result<()> {
-    require!(
-        !new_id.iter().all(|b| *b == 0),
-        TerraError::InvalidId
-    );
+    require!(!new_id.iter().all(|b| *b == 0), TerraError::InvalidId);
     require!(
         !new_geometry_hash.iter().all(|b| *b == 0),
         TerraError::EmptyGeometryHash
@@ -225,14 +216,8 @@ pub fn amalgamate_parcels(
     );
 
     let authority = &ctx.accounts.authority;
-    require!(
-        authority.key() == result.owner,
-        TerraError::NotOwner
-    );
-    require!(
-        authority.key() == source.owner,
-        TerraError::NotOwner
-    );
+    require!(authority.key() == result.owner, TerraError::NotOwner);
+    require!(authority.key() == source.owner, TerraError::NotOwner);
 
     let now = Clock::get()?.unix_timestamp;
 
@@ -336,7 +321,11 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
         // Close old account — return lamports to authority.
         let old_lamports = account.lamports();
         **account.try_borrow_mut_lamports()? = 0;
-        **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? += old_lamports;
+        **ctx
+            .accounts
+            .authority
+            .to_account_info()
+            .try_borrow_mut_lamports()? += old_lamports;
 
         drop(data);
 
@@ -346,10 +335,7 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
         // However, since the RFC says "close old, create new", we use
         // the raw account creation approach via system_program CPI.
         let new_nonce = new_parcel.rights_count;
-        require!(
-            new_nonce != u8::MAX,
-            TerraError::RightsLimitExceeded
-        );
+        require!(new_nonce != u8::MAX, TerraError::RightsLimitExceeded);
 
         emit!(RightsMigrated {
             old_parcel: old_parcel.key(),
@@ -396,10 +382,7 @@ pub fn migrate_attestations(
         old_att.count >= old_att.required,
         TerraError::InsufficientValidations
     );
-    require!(
-        old_att.specifier == specifier,
-        TerraError::EmptySpecifier
-    );
+    require!(old_att.specifier == specifier, TerraError::EmptySpecifier);
 
     // Create new attestation with copied data.
     let new_att = &mut ctx.accounts.new_attestation;
@@ -415,8 +398,16 @@ pub fn migrate_attestations(
 
     // Close old attestation — return lamports to authority.
     let old_lamports = ctx.accounts.old_attestation.to_account_info().lamports();
-    **ctx.accounts.old_attestation.to_account_info().try_borrow_mut_lamports()? = 0;
-    **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? += old_lamports;
+    **ctx
+        .accounts
+        .old_attestation
+        .to_account_info()
+        .try_borrow_mut_lamports()? = 0;
+    **ctx
+        .accounts
+        .authority
+        .to_account_info()
+        .try_borrow_mut_lamports()? += old_lamports;
 
     emit!(AttestationMigrated {
         old_parcel: old_parcel.key(),

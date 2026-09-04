@@ -167,9 +167,7 @@ pub struct UpdateSlashingReportRequest {
 // Handlers — stake pools
 // ---------------------------------------------------------------------------
 
-async fn list_stake_pools(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<StakePool>>, AppError> {
+async fn list_stake_pools(State(state): State<AppState>) -> Result<Json<Vec<StakePool>>, AppError> {
     let rows: Vec<StakePool> = sqlx::query_as(STAKE_POOL_SELECT)
         .fetch_all(&state.pool)
         .await?;
@@ -180,11 +178,13 @@ async fn get_stake_pool(
     State(state): State<AppState>,
     Path(address): Path<String>,
 ) -> Result<Json<StakePool>, AppError> {
-    let row: StakePool = sqlx::query_as(&format!("{STAKE_POOL_SELECT} WHERE stake_pool_address = $1"))
-        .bind(&address)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("stake pool {address}")))?;
+    let row: StakePool = sqlx::query_as(&format!(
+        "{STAKE_POOL_SELECT} WHERE stake_pool_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("stake pool {address}")))?;
     Ok(Json(row))
 }
 
@@ -229,11 +229,13 @@ async fn update_stake_pool(
     .execute(&state.pool)
     .await?;
 
-    let row: StakePool = sqlx::query_as(&format!("{STAKE_POOL_SELECT} WHERE stake_pool_address = $1"))
-        .bind(&address)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("stake pool {address}")))?;
+    let row: StakePool = sqlx::query_as(&format!(
+        "{STAKE_POOL_SELECT} WHERE stake_pool_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("stake pool {address}")))?;
     Ok(Json(row))
 }
 
@@ -254,12 +256,13 @@ async fn get_validator_stake(
     State(state): State<AppState>,
     Path(address): Path<String>,
 ) -> Result<Json<ValidatorStake>, AppError> {
-    let row: ValidatorStake =
-        sqlx::query_as(&format!("{VALIDATOR_STAKE_SELECT} WHERE validator_stake_address = $1"))
-            .bind(&address)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("validator stake {address}")))?;
+    let row: ValidatorStake = sqlx::query_as(&format!(
+        "{VALIDATOR_STAKE_SELECT} WHERE validator_stake_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("validator stake {address}")))?;
     Ok(Json(row))
 }
 
@@ -306,12 +309,13 @@ async fn update_validator_stake(
     .execute(&state.pool)
     .await?;
 
-    let row: ValidatorStake =
-        sqlx::query_as(&format!("{VALIDATOR_STAKE_SELECT} WHERE validator_stake_address = $1"))
-            .bind(&address)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("validator stake {address}")))?;
+    let row: ValidatorStake = sqlx::query_as(&format!(
+        "{VALIDATOR_STAKE_SELECT} WHERE validator_stake_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("validator stake {address}")))?;
     Ok(Json(row))
 }
 
@@ -332,12 +336,13 @@ async fn get_slashing_report(
     State(state): State<AppState>,
     Path(address): Path<String>,
 ) -> Result<Json<SlashingReport>, AppError> {
-    let row: SlashingReport =
-        sqlx::query_as(&format!("{SLASHING_REPORT_SELECT} WHERE slashing_report_address = $1"))
-            .bind(&address)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("slashing report {address}")))?;
+    let row: SlashingReport = sqlx::query_as(&format!(
+        "{SLASHING_REPORT_SELECT} WHERE slashing_report_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("slashing report {address}")))?;
     Ok(Json(row))
 }
 
@@ -389,12 +394,13 @@ async fn update_slashing_report(
     .execute(&state.pool)
     .await?;
 
-    let row: SlashingReport =
-        sqlx::query_as(&format!("{SLASHING_REPORT_SELECT} WHERE slashing_report_address = $1"))
-            .bind(&address)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("slashing report {address}")))?;
+    let row: SlashingReport = sqlx::query_as(&format!(
+        "{SLASHING_REPORT_SELECT} WHERE slashing_report_address = $1"
+    ))
+    .bind(&address)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found(format!("slashing report {address}")))?;
     Ok(Json(row))
 }
 
@@ -406,13 +412,28 @@ pub fn router() -> Router<AppState> {
     Router::new()
         // Stake pools
         .route("/pools", get(list_stake_pools).post(create_stake_pool))
-        .route("/pools/{address}", get(get_stake_pool).put(update_stake_pool))
+        .route(
+            "/pools/{address}",
+            get(get_stake_pool).put(update_stake_pool),
+        )
         // Validator stakes
-        .route("/stakes", get(list_validator_stakes).post(create_validator_stake))
-        .route("/stakes/{address}", get(get_validator_stake).put(update_validator_stake))
+        .route(
+            "/stakes",
+            get(list_validator_stakes).post(create_validator_stake),
+        )
+        .route(
+            "/stakes/{address}",
+            get(get_validator_stake).put(update_validator_stake),
+        )
         // Slashing reports
-        .route("/reports", get(list_slashing_reports).post(create_slashing_report))
-        .route("/reports/{address}", get(get_slashing_report).put(update_slashing_report))
+        .route(
+            "/reports",
+            get(list_slashing_reports).post(create_slashing_report),
+        )
+        .route(
+            "/reports/{address}",
+            get(get_slashing_report).put(update_slashing_report),
+        )
 }
 
 // ---------------------------------------------------------------------------

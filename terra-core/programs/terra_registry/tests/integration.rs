@@ -7,7 +7,7 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use terra_registry::{infra_flag, parcel_status, right_kind, ID as PROGRAM_ID, Parcel, Rights};
+use terra_registry::{infra_flag, parcel_status, right_kind, Parcel, Rights, ID as PROGRAM_ID};
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"parcel".as_ref(), id.as_ref()], &PROGRAM_ID)
@@ -121,7 +121,9 @@ async fn register_transfer_infrastructure() {
         ],
         data,
     };
-    process(&ctx, &payer, ix).await.expect("update infra failed");
+    process(&ctx, &payer, ix)
+        .await
+        .expect("update infra failed");
 
     let parcel = ctx
         .banks_client
@@ -233,7 +235,9 @@ async fn rights_lifecycle() {
         ],
         data,
     };
-    process(&ctx, &payer, ix).await.expect("revoke right failed");
+    process(&ctx, &payer, ix)
+        .await
+        .expect("revoke right failed");
     assert!(
         ctx.banks_client
             .get_account(rights_pk)

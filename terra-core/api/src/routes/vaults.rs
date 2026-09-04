@@ -13,10 +13,7 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_vault).get(list_vaults))
         .route("/{vault_pubkey}", get(get_vault))
         .route("/{vault_pubkey}/access", post(authorize_vault_access))
-        .route(
-            "/{vault_pubkey}/rotations",
-            post(initiate_shard_rotation),
-        )
+        .route("/{vault_pubkey}/rotations", post(initiate_shard_rotation))
         .route(
             "/{vault_pubkey}/rotations/{rotation_pubkey}/endorse",
             post(endorse_shard_rotation),
@@ -148,7 +145,9 @@ pub async fn create_vault(
         return Err(AppError::bad_request("shard_holders cannot exceed 8"));
     }
     if req.threshold as usize > req.shard_holders.len() {
-        return Err(AppError::bad_request("threshold exceeds shard holder count"));
+        return Err(AppError::bad_request(
+            "threshold exceeds shard holder count",
+        ));
     }
 
     let row = sqlx::query_as::<_, VaultRow>(
@@ -199,9 +198,7 @@ pub async fn get_vault(
 }
 
 /// List all vaults (paginated in future).
-pub async fn list_vaults(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<VaultRow>>, AppError> {
+pub async fn list_vaults(State(state): State<AppState>) -> Result<Json<Vec<VaultRow>>, AppError> {
     let rows = sqlx::query_as::<_, VaultRow>(
         "SELECT id, subject_pubkey, vault_pubkey, ciphertext_cid, ciphertext_hash,
                 algorithm_id, storage_uris, shard_holders, threshold, version,
@@ -269,7 +266,9 @@ pub async fn initiate_shard_rotation(
     .fetch_optional(&state.pool)
     .await?;
     if existing.is_some() {
-        return Err(AppError::conflict("a pending rotation already exists for this vault"));
+        return Err(AppError::conflict(
+            "a pending rotation already exists for this vault",
+        ));
     }
 
     let effective_at = chrono::Utc::now() + chrono::Duration::seconds(7 * 24 * 3600);
@@ -343,7 +342,9 @@ pub async fn execute_shard_rotation(
     .ok_or_else(|| AppError::not_found("no pending rotation found"))?;
 
     if chrono::Utc::now() < rot.effective_at {
-        return Err(AppError::bad_request("rotation time lock has not yet expired"));
+        return Err(AppError::bad_request(
+            "rotation time lock has not yet expired",
+        ));
     }
     let endorsement_count = rot.endorsements.len() as i16;
     if endorsement_count < rot.required_endorsements {
@@ -423,7 +424,9 @@ pub async fn ping_shard(
     .await?;
 
     if !row.shard_holders.iter().any(|h| h == &req.validator) {
-        return Err(AppError::bad_request("validator is not a shard holder for this vault"));
+        return Err(AppError::bad_request(
+            "validator is not a shard holder for this vault",
+        ));
     }
 
     Ok(Json(row))

@@ -112,10 +112,7 @@ pub fn register_jurisdiction(
     verification_key_hash: [u8; 32],
     algorithm_id: u8,
 ) -> Result<()> {
-    require!(
-        !country_code.iter().all(|b| *b == 0),
-        TerraError::InvalidId
-    );
+    require!(!country_code.iter().all(|b| *b == 0), TerraError::InvalidId);
     require!(
         !jurisdiction_name.is_empty() && jurisdiction_name.len() <= MAX_JURISDICTION_NAME_LEN,
         TerraError::NotesTooLong

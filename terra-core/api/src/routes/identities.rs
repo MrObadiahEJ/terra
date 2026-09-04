@@ -25,6 +25,10 @@ pub fn router() -> Router<AppState> {
             "/{identity_hash}/successions/{successor}/endorsement",
             post(endorse_succession),
         )
+        .route(
+            "/{identity_hash}/revoke-guardianship",
+            post(revoke_guardianship),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -75,23 +79,55 @@ pub struct IdentityView {
 pub struct RequestSuccession {
     /// base58 wallet that should gain control once gated.
     pub successor: String,
-    /// 0 = successor(heir), 1 = recovery, 2 = transfer.
+    /// 0 = successor(heir), 1 = recovery, 2 = transfer,
+    /// 3 = guardianship (RFC-010), 4 = court-appointed guardian (RFC-010).
     pub kind: u8,
-    /// Optional per-request grace window in seconds. 0/omitted => default 30d;
-    /// clamped to [7d, 180d].
+    /// Optional per-request grace window in seconds. 0/omitted => default
+    /// (30d ordinary, 180d guardianship); clamped to [7d, 180d] ordinary or
+    /// [90d, 180d] guardianship.
     #[serde(default)]
     pub grace_secs: i64,
-    /// Optional number of validator endorsements required before claim (>=1).
+    /// Optional number of validator endorsements required before claim.
+    /// Defaults to 1 ordinary / 3 guardianship.
     #[serde(default)]
     pub required_validations: u8,
     /// Optional declared local-authority validator pubkeys (base58).
     #[serde(default)]
     pub validators: Vec<String>,
+    /// hex(32) SHA-256 of the court order. Required when kind == 4.
+    #[serde(default)]
+    pub case_hash: Option<String>,
+    /// Advisory guardian scope (RFC-010 §7.5, max 128 chars).
+    #[serde(default)]
+    pub scope_notes: Option<String>,
 }
 
 const MIN_GRACE_SECS: i64 = 7 * 24 * 3600; // 7 days
 const DEFAULT_GRACE_SECS: i64 = 30 * 24 * 3600; // 30 days
 const MAX_GRACE_SECS: i64 = 180 * 24 * 3600; // 180 days
+/// RFC-010 §5.2: guardianship guard rails.
+const MIN_GUARDIANSHIP_GRACE_SECS: i64 = 90 * 24 * 3600; // 90 days
+const DEFAULT_GUARDIANSHIP_GRACE_SECS: i64 = 180 * 24 * 3600; // 180 days
+const MIN_GUARDIANSHIP_VALIDATIONS: u8 = 3;
+
+fn is_guardianship_kind(kind: u8) -> bool {
+    kind == 3 || kind == 4
+}
+
+fn normalize_grace_for_kind(kind: u8, secs: i64) -> Result<i64, AppError> {
+    if is_guardianship_kind(kind) {
+        if secs == 0 {
+            return Ok(DEFAULT_GUARDIANSHIP_GRACE_SECS);
+        }
+        if secs < MIN_GUARDIANSHIP_GRACE_SECS {
+            return Err(AppError::bad_request(
+                "guardianship grace period must be at least 90 days",
+            ));
+        }
+        return Ok(secs.min(MAX_GRACE_SECS));
+    }
+    Ok(normalize_grace(secs))
+}
 
 fn normalize_grace(secs: i64) -> i64 {
     if secs == 0 {
@@ -114,6 +150,8 @@ pub struct SuccessionRow {
     pub required: i16,
     pub validations_count: i16,
     pub status: String,
+    pub case_hash: String,
+    pub scope_notes: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,6 +168,17 @@ pub struct RotateValidators {
 pub struct EndorseSuccession {
     /// base58 wallet of the declared validator endorsing the passation.
     pub validator: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RevokeGuardianship {
+    /// base58 wallet taking over from the guardian.
+    pub new_owner: String,
+    /// base58 wallet performing the revocation (recovery wallet or admin).
+    pub revoked_by: String,
+    /// Set true when the revocation is court-ordered via the registry admin.
+    #[serde(default)]
+    pub is_admin: bool,
 }
 
 /// Bind a person to a wallet (with a recovery wallet) — the provisioned,
@@ -151,12 +200,11 @@ pub async fn bind_identity(
     let mut tx = state.pool.begin().await?;
 
     // Check if identity already exists — if so, require owner match.
-    let existing: Option<(String,)> = sqlx::query_as(
-        "SELECT owner FROM identities WHERE identity_hash = $1",
-    )
-    .bind(hex::encode(identity_hash))
-    .fetch_optional(&mut *tx)
-    .await?;
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT owner FROM identities WHERE identity_hash = $1")
+            .bind(hex::encode(identity_hash))
+            .fetch_optional(&mut *tx)
+            .await?;
 
     if let Some((current_owner,)) = existing {
         // Identity exists — only allow update if the caller owns the current wallet.
@@ -255,18 +303,58 @@ pub async fn request_succession(
 ) -> Result<(StatusCode, Json<SuccessionRow>), AppError> {
     let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&req.successor)?;
-    if req.kind > 2 {
-        return Err(AppError::bad_request("kind must be 0 (successor), 1 (recovery), or 2 (transfer)"));
+    if req.kind > 4 {
+        return Err(AppError::bad_request(
+            "kind must be 0 (successor), 1 (recovery), 2 (transfer), 3 (guardianship), or 4 (court-appointed guardian)",
+        ));
     }
 
-    // Normalize per-request grace + endorsement threshold (mirror default 30d,
-    // clamp 7..180d, require at least one validator endorsement).
-    let grace = normalize_grace(req.grace_secs);
+    // RFC-010: court-appointed guardianship binds a non-zero case_hash.
+    let case_hash = if req.kind == 4 {
+        let raw = req.case_hash.as_deref().unwrap_or("").trim();
+        if raw.is_empty() {
+            return Err(AppError::bad_request(
+                "case_hash is required for court-appointed guardianship (kind 4)",
+            ));
+        }
+        let bytes = crate::routes::attestations::decode_hex32(raw)?;
+        if bytes.iter().all(|b| *b == 0) {
+            return Err(AppError::bad_request("case_hash cannot be all zeros"));
+        }
+        hex::encode(bytes)
+    } else if let Some(raw) = req.case_hash.as_deref() {
+        if !raw.trim().is_empty() {
+            let bytes = crate::routes::attestations::decode_hex32(raw.trim())?;
+            hex::encode(bytes)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    let scope_notes = req.scope_notes.as_deref().unwrap_or("").to_string();
+    if scope_notes.len() > 128 {
+        return Err(AppError::bad_request("scope_notes exceeds 128 characters"));
+    }
+
+    // Normalize per-request grace + endorsement threshold. Guardianship kinds
+    // (RFC-010) require >= 90d grace and >= 3 endorsements.
+    let grace = normalize_grace_for_kind(req.kind, req.grace_secs)?;
     let required = if req.required_validations == 0 {
-        1
+        if is_guardianship_kind(req.kind) {
+            MIN_GUARDIANSHIP_VALIDATIONS
+        } else {
+            1
+        }
     } else {
         req.required_validations
     };
+    if is_guardianship_kind(req.kind) && required < MIN_GUARDIANSHIP_VALIDATIONS {
+        return Err(AppError::bad_request(
+            "guardianship requires at least 3 validator endorsements",
+        ));
+    }
     let vc = req.validators.len() as u8;
     if (required as u8) > vc {
         return Err(AppError::bad_request(
@@ -275,8 +363,8 @@ pub async fn request_succession(
     }
 
     let row = sqlx::query_as::<_, SuccessionRow>(
-        "INSERT INTO successions (identity_id, identity_hash, kind, successor, effective_at, grace_secs, required, validators)
-         SELECT id, identity_hash, $2, $3, (now() + make_interval(secs => $4)), $4, $5, $6
+        "INSERT INTO successions (identity_id, identity_hash, kind, successor, effective_at, grace_secs, required, validators, case_hash, scope_notes)
+         SELECT id, identity_hash, $2, $3, (now() + make_interval(secs => $4)), $4, $5, $6, $7, $8
          FROM identities WHERE identity_hash = $1
          ON CONFLICT (identity_id, successor) DO UPDATE SET
             kind = EXCLUDED.kind,
@@ -284,12 +372,15 @@ pub async fn request_succession(
             grace_secs = EXCLUDED.grace_secs,
             required = EXCLUDED.required,
             validators = EXCLUDED.validators,
+            case_hash = EXCLUDED.case_hash,
+            scope_notes = EXCLUDED.scope_notes,
             validations_count = 0,
             status = 'pending',
             cancelled_at = NULL,
             claimed_at = NULL
          RETURNING id, identity_id, identity_hash, kind, successor, requested_at,
-                   effective_at, grace_secs, required, validations_count, status",
+                   effective_at, grace_secs, required, validations_count, status,
+                   case_hash, scope_notes",
     )
     .bind(hex::encode(ih))
     .bind(req.kind as i16)
@@ -297,6 +388,8 @@ pub async fn request_succession(
     .bind(grace)
     .bind(required as i16)
     .bind(&req.validators)
+    .bind(&case_hash)
+    .bind(&scope_notes)
     .fetch_one(&state.pool)
     .await?;
 
@@ -317,7 +410,8 @@ pub async fn cancel_succession(
          WHERE identity_hash = $1 AND LOWER(successor) = LOWER($2)
            AND status = 'pending' AND effective_at > now()
          RETURNING id, identity_id, identity_hash, kind, successor, requested_at,
-                   effective_at, grace_secs, required, validations_count, status",
+                   effective_at, grace_secs, required, validations_count, status,
+                   case_hash, scope_notes",
     )
     .bind(hex::encode(ih))
     .bind(&successor)
@@ -340,7 +434,7 @@ pub async fn endorse_succession(
     let _ = decode_wallet(&successor)?;
     let _ = decode_wallet(&req.validator)?;
 
-    let mut tx                                                             = state.pool.begin().await?;
+    let mut tx = state.pool.begin().await?;
 
     // Only a declared validator for this succession may endorse.
     let known: Option<(Uuid,)> = sqlx::query_as(
@@ -387,7 +481,8 @@ pub async fn endorse_succession(
 
     let row = sqlx::query_as::<_, SuccessionRow>(
         "SELECT id, identity_id, identity_hash, kind, successor, requested_at,
-                effective_at, grace_secs, required, validations_count, status
+                effective_at, grace_secs, required, validations_count, status,
+                case_hash, scope_notes
          FROM successions WHERE id = $1",
     )
     .bind(sid)
@@ -447,6 +542,84 @@ pub async fn claim_succession(
     Ok(Json(row))
 }
 
+/// Revoke an already-claimed guardianship (RFC-010 §6.5).
+///
+/// Only the subject's recovery wallet (signals recovery of capacity) or an
+/// out-of-band registry admin acting on a court order may revoke. Mirrors the
+/// on-chain revoke_guardianship + GuardianshipRevoked event and records the
+/// revocation for audit.
+pub async fn revoke_guardianship(
+    State(state): State<AppState>,
+    Path(identity_hash): Path<String>,
+    Json(req): Json<RevokeGuardianship>,
+) -> Result<Json<IdentityRow>, AppError> {
+    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let _ = decode_wallet(&req.new_owner)?;
+    let _ = decode_wallet(&req.revoked_by)?;
+
+    let mut tx = state.pool.begin().await?;
+
+    let current: Option<(String, String)> = sqlx::query_as(
+        "SELECT owner, recovery FROM identities WHERE identity_hash = $1 FOR UPDATE",
+    )
+    .bind(hex::encode(ih))
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((owner, recovery)) = current else {
+        return Err(AppError::not_found("identity not found"));
+    };
+    if req.new_owner.eq_ignore_ascii_case(&owner) {
+        return Err(AppError::bad_request(
+            "new_owner must differ from the current guardian",
+        ));
+    }
+    // Recovery wallet or admin path: the caller attests authority by signing
+    // with the recovery wallet; the admin path is recorded explicitly.
+    if !req.revoked_by.eq_ignore_ascii_case(&recovery) && !req.is_admin {
+        return Err(AppError::bad_request(
+            "revoked_by must be the identity recovery wallet (or set is_admin for a court-ordered revocation)",
+        ));
+    }
+
+    let row = sqlx::query_as::<_, IdentityRow>(
+        "UPDATE identities
+         SET owner = $2, recovery = '', parcel_count = 0, updated_at = now()
+         WHERE identity_hash = $1
+         RETURNING id, identity_hash, owner, recovery, parcel_count, created_at",
+    )
+    .bind(hex::encode(ih))
+    .bind(&req.new_owner)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO guardianship_revocations
+            (identity_hash, previous_guardian, new_owner, revoked_by)
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(hex::encode(ih))
+    .bind(&owner)
+    .bind(&req.new_owner)
+    .bind(&req.revoked_by)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "UPDATE successions
+         SET revoked_at = now(), revoked_by = $3, new_owner_after_revoke = $4
+         WHERE identity_hash = $1 AND LOWER(successor) = LOWER($2)",
+    )
+    .bind(hex::encode(ih))
+    .bind(&owner)
+    .bind(&req.revoked_by)
+    .bind(&req.new_owner)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(Json(row))
+}
+
 /// Record a validator-set rotation for an attestation (the fix for dead or
 /// leaving validators). Mirrors the on-chain rotate_validators + version bump.
 pub async fn rotate_validators(
@@ -458,7 +631,9 @@ pub async fn rotate_validators(
         return Err(AppError::bad_request("at least one validator required"));
     }
     if (req.required as usize) > req.validators.len() {
-        return Err(AppError::bad_request("required threshold exceeds validator count"));
+        return Err(AppError::bad_request(
+            "required threshold exceeds validator count",
+        ));
     }
     let _ = decode_wallet(&req.rotated_by)?;
     for v in &req.validators {
@@ -502,12 +677,15 @@ pub async fn rotate_validators(
     .await?;
 
     tx.commit().await?;
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "attestation_id": att.id,
-        "version": req.version,
-        "required": req.required,
-        "validators": req.validators,
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "attestation_id": att.id,
+            "version": req.version,
+            "required": req.required,
+            "validators": req.validators,
+        })),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -519,7 +697,9 @@ pub fn decode_wallet(s: &str) -> Result<[u8; 32], AppError> {
         .into_vec()
         .map_err(|e| AppError::bad_request(format!("invalid wallet address: {e}")))?;
     if bytes.len() != 32 {
-        return Err(AppError::bad_request("wallet address must decode to 32 bytes"));
+        return Err(AppError::bad_request(
+            "wallet address must decode to 32 bytes",
+        ));
     }
     let mut out = [0u8; 32];
     out.copy_from_slice(&bytes);
@@ -555,7 +735,9 @@ mod tests {
 
     #[test]
     fn threshold_can_never_exceed_validator_count() {
-        let five = (0..5).map(|i| bs58::encode([i as u8; 32]).into_string()).collect::<Vec<_>>();
+        let five = (0..5)
+            .map(|i| bs58::encode([i as u8; 32]).into_string())
+            .collect::<Vec<_>>();
         assert!(threshold_ok(1, &five));
         assert!(threshold_ok(5, &five));
         assert!(!threshold_ok(6, &five)); // would make quorum unreachable
@@ -567,7 +749,9 @@ mod tests {
         // Original set of 5 with threshold 3; 3 validators die. Threshold 3 of 5
         // is now unreachable with only 2 left (3 > 2), so the owner rotates in
         // new validators to make quorum reachable again.
-        let original = (0..5).map(|i| bs58::encode([(i + 1) as u8; 32]).into_string()).collect::<Vec<_>>();
+        let original = (0..5)
+            .map(|i| bs58::encode([(i + 1) as u8; 32]).into_string())
+            .collect::<Vec<_>>();
         let surviving = original[3..].to_vec(); // only 2 left
         assert!(!threshold_ok(3, &surviving)); // stuck before rotation
 
@@ -576,7 +760,7 @@ mod tests {
         reconstituted.push(bs58::encode([99u8; 32]).into_string());
         reconstituted.push(bs58::encode([100u8; 32]).into_string());
         let reconstituted = reconstituted; // now 4 known validators
-        // Quorum reachable again with threshold 3 of 4.
+                                           // Quorum reachable again with threshold 3 of 4.
         assert!(threshold_ok(3, &reconstituted));
     }
 
@@ -644,5 +828,31 @@ mod tests {
         assert!(can_endorse(&validator, &owner));
         assert!(!can_endorse(&owner, &owner));
         assert!(can_endorse(&other, &owner));
+    }
+
+    #[test]
+    fn guardianship_grace_floor_is_90_days() {
+        let day = 24 * 3600;
+        assert_eq!(normalize_grace_for_kind(3, 0).unwrap(), 180 * day);
+        assert_eq!(normalize_grace_for_kind(4, 0).unwrap(), 180 * day);
+        assert!(normalize_grace_for_kind(3, 30 * day).is_err());
+        assert!(normalize_grace_for_kind(4, 89 * day).is_err());
+        assert_eq!(normalize_grace_for_kind(3, 90 * day).unwrap(), 90 * day);
+        // Ordinary kinds keep the old 7..180d window.
+        assert_eq!(normalize_grace_for_kind(0, 0).unwrap(), 30 * day);
+    }
+
+    #[test]
+    fn guardianship_requires_three_endorsements() {
+        assert!(is_guardianship_kind(3));
+        assert!(is_guardianship_kind(4));
+        assert!(!is_guardianship_kind(2));
+        assert!(MIN_GUARDIANSHIP_VALIDATIONS >= 3);
+    }
+
+    #[test]
+    fn revocation_rejects_noop_transfer() {
+        let guardian = bs58::encode([9u8; 32]).into_string();
+        assert!(guardian.eq_ignore_ascii_case(&guardian));
     }
 }

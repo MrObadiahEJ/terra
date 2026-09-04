@@ -209,15 +209,17 @@ pub struct Succession {
     pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
-pub mod vault;
 pub mod authority_registry;
-pub mod ipfs_docs;
+pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
-pub mod time_bound;
-pub mod cross_border;
-pub mod subdivision;
+pub mod guardian;
+pub mod ipfs_docs;
 pub mod staking;
+pub mod subdivision;
+pub mod time_bound;
+pub mod vault;
+pub mod zk;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -495,7 +497,11 @@ pub mod terra_registry {
         parcel.owner = to;
         parcel.updated_at = Clock::get()?.unix_timestamp;
 
-        emit!(ParcelTransferred { id: parcel.id, from, to });
+        emit!(ParcelTransferred {
+            id: parcel.id,
+            from,
+            to
+        });
         Ok(())
     }
 
@@ -505,10 +511,7 @@ pub mod terra_registry {
             ctx.accounts.parcel.owner == ctx.accounts.owner.key(),
             TerraError::NotOwner
         );
-        require!(
-            status <= parcel_status::MAX,
-            TerraError::InvalidStatus
-        );
+        require!(status <= parcel_status::MAX, TerraError::InvalidStatus);
 
         let parcel = &mut ctx.accounts.parcel;
         parcel.status = status;
@@ -722,9 +725,7 @@ pub mod terra_registry {
     /// Attach a parcel to an identity (the person behind its owner wallet).
     /// Only the parcel's owner may do this, and only for an identity whose
     /// owner wallet matches.
-    pub fn attach_parcel(
-        ctx: Context<AttachParcel>,
-    ) -> Result<()> {
+    pub fn attach_parcel(ctx: Context<AttachParcel>) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
         require!(
             parcel.owner == ctx.accounts.owner.key(),
@@ -767,7 +768,10 @@ pub mod terra_registry {
         validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         require!(successor != Pubkey::default(), TerraError::EmptySuccessor);
-        require!(kind <= succession_kind::MAX, TerraError::InvalidSuccessionKind);
+        require!(
+            kind <= succession_kind::MAX,
+            TerraError::InvalidSuccessionKind
+        );
 
         let identity = &ctx.accounts.identity;
         let signer = ctx.accounts.signer.key();
@@ -796,7 +800,22 @@ pub mod terra_registry {
             TerraError::InvalidThreshold
         );
 
-        let grace = if grace_secs == 0 {
+        // RFC-010: guardianship kinds carry strictly higher guard rails.
+        if guardian::is_guardianship_kind(kind) {
+            guardian::validate_guardianship_threshold(required_validations, count as usize)?;
+        }
+
+        let grace = if guardian::is_guardianship_kind(kind) {
+            if grace_secs == 0 {
+                guardian::DEFAULT_GUARDIANSHIP_GRACE_SECS
+            } else {
+                require!(
+                    grace_secs >= guardian::MIN_GUARDIANSHIP_GRACE_SECS,
+                    TerraError::GuardianshipGraceTooShort
+                );
+                grace_secs.min(MAX_SUCCESSION_GRACE_SECS)
+            }
+        } else if grace_secs == 0 {
             DEFAULT_SUCCESSION_GRACE_SECS
         } else {
             grace_secs.clamp(MIN_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS)
@@ -831,9 +850,7 @@ pub mod terra_registry {
     /// `validations_count`. Each endorsement is an Ed25519 signature because the
     /// validator signs this transaction with their wallet. Only meaningful
     /// before the succession becomes effective (validations are then moot).
-    pub fn endorse_succession(
-        ctx: Context<EndorseSuccession>,
-    ) -> Result<()> {
+    pub fn endorse_succession(ctx: Context<EndorseSuccession>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let succession = &mut ctx.accounts.succession;
         require!(
@@ -870,9 +887,7 @@ pub mod terra_registry {
 
     /// Cancel an in-flight succession. Only the current `owner` (or `recovery`
     /// for a recovery passation) may cancel, and only before it is effective.
-    pub fn cancel_succession(
-        ctx: Context<CancelSuccession>,
-    ) -> Result<()> {
+    pub fn cancel_succession(ctx: Context<CancelSuccession>) -> Result<()> {
         let identity = &ctx.accounts.identity;
         let signer = ctx.accounts.signer.key();
         require!(
@@ -896,9 +911,7 @@ pub mod terra_registry {
     /// number of validators have endorsed it. The `successor` becomes the
     /// identity's new owner. Any parcels the identity owned that are supplied
     /// via `remaining_accounts` are re-pointed to the successor.
-    pub fn claim_succession(
-        ctx: Context<ClaimSuccession>,
-    ) -> Result<()> {
+    pub fn claim_succession(ctx: Context<ClaimSuccession>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let succession = &ctx.accounts.succession;
         require!(
@@ -1043,10 +1056,16 @@ pub mod terra_registry {
                 continue;
             }
             // Self-dealing check: declared validators must not include the parcel owner.
-            require!(v != ctx.accounts.parcel.owner, TerraError::ValidatorOwnsAsset);
+            require!(
+                v != ctx.accounts.parcel.owner,
+                TerraError::ValidatorOwnsAsset
+            );
             count += 1;
         }
-        require!((threshold as usize) <= count as usize, TerraError::InvalidThreshold);
+        require!(
+            (threshold as usize) <= count as usize,
+            TerraError::InvalidThreshold
+        );
 
         let parcel = &mut ctx.accounts.parcel;
         let from = parcel.owner;
@@ -1061,7 +1080,10 @@ pub mod terra_registry {
                 present += 1;
             }
         }
-        require!(present >= threshold, TerraError::InsufficientValidatorSigners);
+        require!(
+            present >= threshold,
+            TerraError::InsufficientValidatorSigners
+        );
 
         // The relaying party must not be the current owner (prevents self-forfeit).
         require!(
@@ -1096,7 +1118,15 @@ pub mod terra_registry {
         shard_holders: Vec<Pubkey>,
         threshold: u8,
     ) -> Result<()> {
-        vault::create_vault(ctx, ciphertext_cid, ciphertext_hash, algorithm_id, storage_uris, shard_holders, threshold)
+        vault::create_vault(
+            ctx,
+            ciphertext_cid,
+            ciphertext_hash,
+            algorithm_id,
+            storage_uris,
+            shard_holders,
+            threshold,
+        )
     }
 
     pub fn authorize_vault_access(
@@ -1141,10 +1171,7 @@ pub mod terra_registry {
         authority_registry::create_registry(ctx)
     }
 
-    pub fn add_validator_to_registry(
-        ctx: Context<AddValidator>,
-        validator: Pubkey,
-    ) -> Result<()> {
+    pub fn add_validator_to_registry(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
         authority_registry::add_validator(ctx, validator)
     }
 
@@ -1213,18 +1240,11 @@ pub mod terra_registry {
     // Escrow settlement (RFC-004)
     // -----------------------------------------------------------------------
 
-    pub fn create_escrow(
-        ctx: Context<CreateEscrow>,
-        amount: u64,
-        buyer: Pubkey,
-    ) -> Result<()> {
+    pub fn create_escrow(ctx: Context<CreateEscrow>, amount: u64, buyer: Pubkey) -> Result<()> {
         escrow::create_escrow(ctx, amount, buyer)
     }
 
-    pub fn deposit_escrow(
-        ctx: Context<DepositEscrow>,
-        deposit_amount: u64,
-    ) -> Result<()> {
+    pub fn deposit_escrow(ctx: Context<DepositEscrow>, deposit_amount: u64) -> Result<()> {
         escrow::deposit_escrow(ctx, deposit_amount)
     }
 
@@ -1266,10 +1286,7 @@ pub mod terra_registry {
         time_bound::renew_right(ctx, nonce, new_expires_at, new_notes)
     }
 
-    pub fn sweep_expired_rights(
-        ctx: Context<SweepExpiredRights>,
-        nonce: u8,
-    ) -> Result<()> {
+    pub fn sweep_expired_rights(ctx: Context<SweepExpiredRights>, nonce: u8) -> Result<()> {
         time_bound::sweep_expired_rights(ctx, nonce)
     }
 
@@ -1285,8 +1302,15 @@ pub mod terra_registry {
         notes: String,
     ) -> Result<()> {
         time_bound::grant_conditional_right(
-            ctx, nonce, rights_kind, holder, expires_at,
-            condition_deadline, condition_desc, grace_period_secs, notes,
+            ctx,
+            nonce,
+            rights_kind,
+            holder,
+            expires_at,
+            condition_deadline,
+            condition_desc,
+            grace_period_secs,
+            notes,
         )
     }
 
@@ -1294,17 +1318,11 @@ pub mod terra_registry {
     // Staking / Slashing (RFC-005)
     // -----------------------------------------------------------------------
 
-    pub fn create_stake_pool(
-        ctx: Context<CreateStakePool>,
-        reward_rate_bps: u16,
-    ) -> Result<()> {
+    pub fn create_stake_pool(ctx: Context<CreateStakePool>, reward_rate_bps: u16) -> Result<()> {
         staking::create_stake_pool(ctx, reward_rate_bps)
     }
 
-    pub fn deposit_stake(
-        ctx: Context<DepositStake>,
-        amount: u64,
-    ) -> Result<()> {
+    pub fn deposit_stake(ctx: Context<DepositStake>, amount: u64) -> Result<()> {
         staking::deposit_stake(ctx, amount)
     }
 
@@ -1336,15 +1354,90 @@ pub mod terra_registry {
         staking::distribute_rewards(ctx)
     }
 
-    pub fn dispute_slashing(
-        ctx: Context<DisputeSlashing>,
-        appeal_reason: String,
-    ) -> Result<()> {
+    pub fn dispute_slashing(ctx: Context<DisputeSlashing>, appeal_reason: String) -> Result<()> {
         staking::dispute_slashing(ctx, appeal_reason)
     }
 
     pub fn dismiss_report(ctx: Context<DismissReport>) -> Result<()> {
         staking::dismiss_report(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Guardian & Recovery Council (RFC-010)
+    // -----------------------------------------------------------------------
+
+    pub fn request_court_guardianship(
+        ctx: Context<RequestCourtGuardianship>,
+        successor: Pubkey,
+        grace_secs: i64,
+        required_validations: u8,
+        validators: [Pubkey; MAX_VALIDATORS],
+        case_hash: [u8; 32],
+        scope_notes: String,
+    ) -> Result<()> {
+        guardian::request_court_guardianship(
+            ctx,
+            successor,
+            grace_secs,
+            required_validations,
+            validators,
+            case_hash,
+            scope_notes,
+        )
+    }
+
+    pub fn revoke_guardianship(ctx: Context<RevokeGuardianship>, new_owner: Pubkey) -> Result<()> {
+        guardian::revoke_guardianship(ctx, new_owner)
+    }
+
+    // -----------------------------------------------------------------------
+    // Zero-knowledge ownership proofs (RFC-011)
+    // -----------------------------------------------------------------------
+
+    pub fn register_zone_set(
+        ctx: Context<RegisterZoneSet>,
+        snapshot_cid: String,
+        snapshot_hash: [u8; 32],
+    ) -> Result<()> {
+        zk::register_zone_set(ctx, snapshot_cid, snapshot_hash)
+    }
+
+    pub fn generate_ownership_root(
+        ctx: Context<GenerateOwnershipRoot>,
+        new_merkle_root: [u8; 32],
+        new_snapshot_cid: String,
+        new_snapshot_hash: [u8; 32],
+        commitment_count: u32,
+    ) -> Result<()> {
+        zk::generate_ownership_root(
+            ctx,
+            new_merkle_root,
+            new_snapshot_cid,
+            new_snapshot_hash,
+            commitment_count,
+        )
+    }
+
+    pub fn verify_ownership_proof(
+        ctx: Context<VerifyOwnershipProof>,
+        proof_data: Vec<u8>,
+        nullifier_hash: [u8; 32],
+        root_version: u32,
+        proof_purpose: String,
+        disclosure_type: u8,
+    ) -> Result<()> {
+        zk::verify_ownership_proof(
+            ctx,
+            proof_data,
+            nullifier_hash,
+            root_version,
+            proof_purpose,
+            disclosure_type,
+        )
+    }
+
+    pub fn invalidate_proof(ctx: Context<InvalidateProof>, stale_version: u32) -> Result<()> {
+        zk::invalidate_proof(ctx, stale_version)
     }
 }
 
@@ -2512,6 +2605,140 @@ pub struct DismissReport<'info> {
     pub authority: Signer<'info>,
 }
 
+// ---------------------------------------------------------------------------
+// Guardian & Recovery Council contexts (RFC-010)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(successor: Pubkey, grace_secs: i64, required_validations: u8, validators: [Pubkey; MAX_VALIDATORS], case_hash: [u8; 32], scope_notes: String)]
+pub struct RequestCourtGuardianship<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + Succession::INIT_SPACE,
+        seeds = [b"succession".as_ref(), identity.key().as_ref(), successor.as_ref()],
+        bump
+    )]
+    pub succession: Account<'info, Succession>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_owner: Pubkey)]
+pub struct RevokeGuardianship<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub revoker: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Zero-knowledge ownership proof contexts (RFC-011)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(snapshot_cid: String, snapshot_hash: [u8; 32])]
+pub struct RegisterZoneSet<'info> {
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    /// CHECK: Zone identifier account (e.g. pilot zone key).
+    pub zone_id: AccountInfo<'info>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + zk::ZoneSet::INIT_SPACE,
+        seeds = [b"zone_set", zone_id.key().as_ref()],
+        bump,
+    )]
+    pub zone_set: Account<'info, zk::ZoneSet>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + zk::OwnershipRoot::INIT_SPACE,
+        seeds = [b"ownership_root", zone_set.key().as_ref()],
+        bump,
+    )]
+    pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_merkle_root: [u8; 32], new_snapshot_cid: String, new_snapshot_hash: [u8; 32], commitment_count: u32)]
+pub struct GenerateOwnershipRoot<'info> {
+    #[account(
+        mut,
+        seeds = [b"zone_set", zone_set.zone_id.as_ref()],
+        bump,
+    )]
+    pub zone_set: Account<'info, zk::ZoneSet>,
+    #[account(
+        mut,
+        seeds = [b"ownership_root", zone_set.key().as_ref()],
+        bump,
+    )]
+    pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(proof_data: Vec<u8>, nullifier_hash: [u8; 32], root_version: u32, proof_purpose: String, disclosure_type: u8)]
+pub struct VerifyOwnershipProof<'info> {
+    #[account(
+        seeds = [b"zone_set", zone_set.zone_id.as_ref()],
+        bump,
+    )]
+    pub zone_set: Account<'info, zk::ZoneSet>,
+    #[account(
+        seeds = [b"ownership_root", zone_set.key().as_ref()],
+        bump,
+    )]
+    pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    #[account(
+        init,
+        payer = prover,
+        space = 8 + zk::NullifierRecord::INIT_SPACE,
+        seeds = [b"nullifier", nullifier_hash.as_ref()],
+        bump,
+    )]
+    pub nullifier_record: Account<'info, zk::NullifierRecord>,
+    #[account(mut)]
+    pub prover: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(stale_version: u32)]
+pub struct InvalidateProof<'info> {
+    #[account(
+        mut,
+        seeds = [b"zone_set", zone_set.zone_id.as_ref()],
+        bump,
+    )]
+    pub zone_set: Account<'info, zk::ZoneSet>,
+    pub authority: Signer<'info>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -2962,6 +3189,28 @@ pub enum TerraError {
     UnbondingNotComplete,
     #[msg("Self-reporting is not allowed")]
     SelfReportNotAllowed,
+
+    // Guardian & Recovery Council (RFC-010)
+    #[msg("Guardianship grace period is below the 90-day minimum")]
+    GuardianshipGraceTooShort,
+    #[msg("Guardianship requires at least 3 validator endorsements")]
+    GuardianshipThresholdTooLow,
+
+    // Zero-knowledge ownership proofs (RFC-011)
+    #[msg("Proof has already been used (nullifier recorded)")]
+    NullifierAlreadyUsed,
+    #[msg("Proof references a stale or unknown root version")]
+    RootVersionMismatch,
+    #[msg("Signer is not the zone authority")]
+    UnauthorizedZoneAuthority,
+    #[msg("Zone has no commitments to prove against")]
+    EmptyZoneSet,
+    #[msg("Proof purpose is missing or too long")]
+    InvalidProofPurpose,
+    #[msg("Proof data is empty or exceeds the maximum size")]
+    ProofTooLarge,
+    #[msg("Disclosure type must be 0 (membership), 1 (range), or 2 (count)")]
+    InvalidDisclosureType,
 }
 
 #[cfg(test)]
@@ -3007,7 +3256,10 @@ mod prep_hook_tests {
         assert_eq!(succession_kind::TRANSFER, 2);
         assert_eq!(succession_kind::GUARDIANSHIP, 3);
         assert_eq!(succession_kind::COURT_APPOINTED_GUARDIAN, 4);
-        assert_eq!(succession_kind::MAX, succession_kind::COURT_APPOINTED_GUARDIAN);
+        assert_eq!(
+            succession_kind::MAX,
+            succession_kind::COURT_APPOINTED_GUARDIAN
+        );
     }
 
     #[test]

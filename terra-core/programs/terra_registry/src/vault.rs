@@ -152,7 +152,10 @@ pub fn authorize_vault_access(
         vault.shard_holders.contains(&ctx.accounts.authority.key()),
         super::TerraError::NotShardHolder
     );
-    require!(expiry > clock.unix_timestamp, super::TerraError::ExpiryInPast);
+    require!(
+        expiry > clock.unix_timestamp,
+        super::TerraError::ExpiryInPast
+    );
     require!(
         expiry <= clock.unix_timestamp + MAX_ACCESS_EXPIRY_SECS,
         super::TerraError::ExpiryTooFar
@@ -178,7 +181,9 @@ pub fn authorize_vault_access(
         subject: ctx.accounts.subject.key(),
         vault: vault.key(),
         purpose,
-        validators: ctx.remaining_accounts.iter()
+        validators: ctx
+            .remaining_accounts
+            .iter()
             .filter(|s| s.is_signer && vault.shard_holders.contains(&s.key()))
             .map(|s| s.key())
             .collect(),

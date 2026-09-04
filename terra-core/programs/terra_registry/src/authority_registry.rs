@@ -75,11 +75,11 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
 /// Peer-consensus mode: requires ceil(2n/3) endorsements from existing
 /// validators. Use `endorse_validator_add` to collect endorsements first,
 /// then call this with the completed endorsement account.
-pub fn add_validator(
-    ctx: Context<super::AddValidator>,
-    validator: Pubkey,
-) -> Result<()> {
-    require!(validator != Pubkey::default(), super::TerraError::EmptySuccessor);
+pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Result<()> {
+    require!(
+        validator != Pubkey::default(),
+        super::TerraError::EmptySuccessor
+    );
 
     let registry = &mut ctx.accounts.registry;
     require!(
@@ -144,10 +144,7 @@ pub fn add_validator(
 ///
 /// Admin can remove unilaterally in any mode. In peer-consensus mode,
 /// existing validators can also propose removals (requires quorum).
-pub fn remove_validator(
-    ctx: Context<super::RemoveValidator>,
-    validator: Pubkey,
-) -> Result<()> {
+pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey) -> Result<()> {
     let registry = &mut ctx.accounts.registry;
     let pos = registry
         .validators
@@ -186,9 +183,7 @@ pub fn remove_validator(
 }
 
 /// Endorse adding a validator in peer-consensus mode.
-pub fn endorse_validator_add(
-    ctx: Context<super::EndorseValidatorAdd>,
-) -> Result<()> {
+pub fn endorse_validator_add(ctx: Context<super::EndorseValidatorAdd>) -> Result<()> {
     let endorsement = &mut ctx.accounts.endorsement;
     let endorser = ctx.accounts.endorser.key();
 

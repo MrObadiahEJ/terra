@@ -102,14 +102,10 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/expire", post(expire_escrow))
 }
 
-async fn list_escrows(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Escrow>>, AppError> {
-    let escrows = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} ORDER BY created_at DESC"
-    ))
-    .fetch_all(&state.pool)
-    .await?;
+async fn list_escrows(State(state): State<AppState>) -> Result<Json<Vec<Escrow>>, AppError> {
+    let escrows = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} ORDER BY created_at DESC"))
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(escrows))
 }
 
@@ -117,12 +113,10 @@ async fn get_escrow(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Escrow>, AppError> {
-    let escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
     Ok(Json(escrow))
 }
 
@@ -130,8 +124,8 @@ async fn create_escrow(
     State(state): State<AppState>,
     Json(req): Json<CreateEscrowRequest>,
 ) -> Result<(StatusCode, Json<Escrow>), AppError> {
-    let parcel_id = Uuid::parse_str(&req.parcel_id)
-        .map_err(|_| AppError::bad_request("invalid parcel_id"))?;
+    let parcel_id =
+        Uuid::parse_str(&req.parcel_id).map_err(|_| AppError::bad_request("invalid parcel_id"))?;
     crate::routes::identities::decode_wallet(&req.seller)?;
     crate::routes::identities::decode_wallet(&req.buyer)?;
 
@@ -139,7 +133,9 @@ async fn create_escrow(
         return Err(AppError::bad_request("minimum escrow amount is 0.1 SOL"));
     }
     if req.amount > 1_000_000_000_000 {
-        return Err(AppError::bad_request("maximum escrow amount is 1,000,000 SOL"));
+        return Err(AppError::bad_request(
+            "maximum escrow amount is 1,000,000 SOL",
+        ));
     }
     if req.seller == req.buyer {
         return Err(AppError::bad_request("seller and buyer must differ"));
@@ -157,18 +153,21 @@ async fn create_escrow(
         return Err(AppError::not_found("parcel not found"));
     };
     if owner != req.seller {
-        return Err(AppError::bad_request("only the parcel owner can create an escrow"));
+        return Err(AppError::bad_request(
+            "only the parcel owner can create an escrow",
+        ));
     }
     if status != "for_sale" {
         return Err(AppError::bad_request("parcel must be in for_sale status"));
     }
 
     // Ensure no existing active escrow for this parcel.
-    let existing: Option<(Uuid,)> =
-        sqlx::query_as("SELECT id FROM escrows WHERE parcel_id = $1 AND status NOT IN ('settled', 'cancelled')")
-            .bind(parcel_id)
-            .fetch_optional(&mut *tx)
-            .await?;
+    let existing: Option<(Uuid,)> = sqlx::query_as(
+        "SELECT id FROM escrows WHERE parcel_id = $1 AND status NOT IN ('settled', 'cancelled')",
+    )
+    .bind(parcel_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     if existing.is_some() {
         return Err(AppError::conflict("parcel already has an active escrow"));
     }
@@ -209,13 +208,11 @@ async fn deposit_escrow(
 
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     if escrow.status != "created" {
         return Err(AppError::bad_request("escrow is not in created status"));
@@ -261,13 +258,11 @@ async fn accept_escrow(
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     if escrow.status != "deposited" {
         return Err(AppError::bad_request("escrow is not in deposited status"));
@@ -307,23 +302,23 @@ async fn settle_escrow(
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     if escrow.status != "accepted" {
         return Err(AppError::bad_request("escrow is not in accepted status"));
     }
     let now = Utc::now();
-    let deadline = escrow.settle_deadline.ok_or_else(|| {
-        AppError::bad_request("settle_deadline is missing")
-    })?;
+    let deadline = escrow
+        .settle_deadline
+        .ok_or_else(|| AppError::bad_request("settle_deadline is missing"))?;
     if now < deadline {
-        return Err(AppError::bad_request("settlement window has not yet expired"));
+        return Err(AppError::bad_request(
+            "settlement window has not yet expired",
+        ));
     }
     if escrow.deposit_amount < escrow.amount {
         return Err(AppError::bad_request("insufficient deposit for settlement"));
@@ -332,12 +327,14 @@ async fn settle_escrow(
     let mut tx2 = state.pool.begin().await?;
 
     // Transfer parcel ownership.
-    sqlx::query("UPDATE parcels SET owner = $2, status = 'transferred', updated_at = $3 WHERE id = $1")
-        .bind(escrow.parcel_id)
-        .bind(&escrow.buyer)
-        .bind(now)
-        .execute(&mut *tx2)
-        .await?;
+    sqlx::query(
+        "UPDATE parcels SET owner = $2, status = 'transferred', updated_at = $3 WHERE id = $1",
+    )
+    .bind(escrow.parcel_id)
+    .bind(&escrow.buyer)
+    .bind(now)
+    .execute(&mut *tx2)
+    .await?;
 
     // Mark escrow settled.
     let updated = sqlx::query_as::<_, Escrow>(
@@ -364,20 +361,20 @@ async fn cancel_escrow(
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     let now = Utc::now();
 
     match escrow.status.as_str() {
         "created" => {
             if escrow.seller != req.canceller {
-                return Err(AppError::bad_request("only the seller can cancel before deposit"));
+                return Err(AppError::bad_request(
+                    "only the seller can cancel before deposit",
+                ));
             }
             if escrow.deposit_amount != 0 {
                 return Err(AppError::bad_request("cannot cancel after deposit"));
@@ -385,13 +382,19 @@ async fn cancel_escrow(
         }
         "deposited" => {
             if escrow.buyer != req.canceller {
-                return Err(AppError::bad_request("only the buyer can cancel within grace period"));
+                return Err(AppError::bad_request(
+                    "only the buyer can cancel within grace period",
+                ));
             }
             if now >= escrow.cancel_deadline {
                 return Err(AppError::bad_request("buyer grace period has expired"));
             }
         }
-        _ => return Err(AppError::bad_request("cannot cancel escrow in current status")),
+        _ => {
+            return Err(AppError::bad_request(
+                "cannot cancel escrow in current status",
+            ))
+        }
     }
 
     // Reset parcel status.
@@ -423,8 +426,8 @@ async fn dispute_escrow(
     Path(id): Path<Uuid>,
     Json(req): Json<DisputeEscrowRequest>,
 ) -> Result<Json<Escrow>, AppError> {
-    let case_hash = hex::decode(&req.case_hash)
-        .map_err(|_| AppError::bad_request("invalid case_hash hex"))?;
+    let case_hash =
+        hex::decode(&req.case_hash).map_err(|_| AppError::bad_request("invalid case_hash hex"))?;
     if case_hash.len() != 32 {
         return Err(AppError::bad_request("case_hash must be 32 bytes"));
     }
@@ -437,16 +440,16 @@ async fn dispute_escrow(
 
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     if !matches!(escrow.status.as_str(), "created" | "deposited" | "accepted") {
-        return Err(AppError::bad_request("cannot dispute escrow in current status"));
+        return Err(AppError::bad_request(
+            "cannot dispute escrow in current status",
+        ));
     }
     if escrow.seller != req.filer && escrow.buyer != req.filer {
         return Err(AppError::bad_request("filer is not a party to this escrow"));
@@ -483,13 +486,11 @@ async fn expire_escrow(
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!(
-        "{ESCROW_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("escrow not found"))?;
+    let escrow: Escrow = sqlx::query_as::<_, Escrow>(&format!("{ESCROW_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("escrow not found"))?;
 
     if escrow.status != "created" {
         return Err(AppError::bad_request("only created escrows can be expired"));

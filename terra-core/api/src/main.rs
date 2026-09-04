@@ -62,9 +62,8 @@ async fn load_geo(path: Option<&Path>) -> Result<Option<Arc<GeoData>>> {
     let path = path.to_path_buf();
     tracing::info!(path = %path.display(), "loading OSM road network");
     let (data, graph) = tokio::task::spawn_blocking(move || {
-        let data = terra_geo::read_osm_pbf(&path).with_context(|| {
-            format!("failed to parse OSM data from {}", path.display())
-        })?;
+        let data = terra_geo::read_osm_pbf(&path)
+            .with_context(|| format!("failed to parse OSM data from {}", path.display()))?;
         let graph = terra_geo::build_graph(&data);
         tracing::info!(
             nodes = data.nodes.len(),

@@ -156,8 +156,8 @@ pub async fn get_attestation(
 
     let mut validations = Vec::with_capacity(rows.len());
     for (validator, signature, created_at) in rows {
-        let valid = verify_ed25519(&validator, &content_hash, &onchain_id, &signature)
-            .unwrap_or(false);
+        let valid =
+            verify_ed25519(&validator, &content_hash, &onchain_id, &signature).unwrap_or(false);
         validations.push(ValidationView {
             validator,
             signature,
@@ -199,7 +199,9 @@ pub async fn submit_validation(
     let onchain_id = decode_hex32(&att.onchain_id)?;
     let req_hash = decode_hex32(&req.content_hash)?;
     if req_hash != content_hash {
-        return Err(AppError::bad_request("content_hash does not match the attestation"));
+        return Err(AppError::bad_request(
+            "content_hash does not match the attestation",
+        ));
     }
     // The signer's wallet must be one of the anchored validators.
     if !att
@@ -207,7 +209,9 @@ pub async fn submit_validation(
         .iter()
         .any(|v| v.eq_ignore_ascii_case(&req.validator))
     {
-        return Err(AppError::bad_request("validator is not in the attestation set"));
+        return Err(AppError::bad_request(
+            "validator is not in the attestation set",
+        ));
     }
 
     let valid = verify_ed25519(&req.validator, &content_hash, &onchain_id, &req.signature)?;
@@ -228,12 +232,15 @@ pub async fn submit_validation(
     .fetch_one(&state.pool)
     .await?;
 
-    Ok((StatusCode::OK, Json(ValidationView {
-        validator: req.validator,
-        signature: req.signature,
-        valid,
-        created_at,
-    })))
+    Ok((
+        StatusCode::OK,
+        Json(ValidationView {
+            validator: req.validator,
+            signature: req.signature,
+            valid,
+            created_at,
+        }),
+    ))
 }
 
 /// Bind an off-chain document to a parcel under an owner wallet.
@@ -301,7 +308,9 @@ fn verify_ed25519(
         .into_vec()
         .map_err(|e| AppError::bad_request(format!("invalid validator address: {e}")))?;
     if vk_bytes.len() != 32 {
-        return Err(AppError::bad_request("validator address must decode to 32 bytes"));
+        return Err(AppError::bad_request(
+            "validator address must decode to 32 bytes",
+        ));
     }
     let mut vk_arr = [0u8; 32];
     vk_arr.copy_from_slice(&vk_bytes);
@@ -377,7 +386,9 @@ mod tests {
         let wallet = bs58::encode(vk_bytes).into_string();
         let mut sig_bytes = hex::decode(sign(&sk, &ch, &oid)).expect("valid hex");
         sig_bytes[0] ^= 0xff; // flip a byte in the actual 64-byte signature
-        assert!(!verify_ed25519(&wallet, &ch, &oid, &hex::encode(sig_bytes)).expect("should not error"));
+        assert!(
+            !verify_ed25519(&wallet, &ch, &oid, &hex::encode(sig_bytes)).expect("should not error")
+        );
     }
 
     #[test]

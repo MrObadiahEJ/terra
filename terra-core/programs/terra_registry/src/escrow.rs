@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{parcel_status, MAX_VALIDATORS, TerraError};
+use crate::{parcel_status, TerraError, MAX_VALIDATORS};
 
 pub mod escrow_status {
     pub const CREATED: u8 = 0;
@@ -56,11 +56,7 @@ pub struct EscrowRecord {
 // ---------------------------------------------------------------------------
 
 /// Seller initiates an escrow for a parcel marked FOR_SALE.
-pub fn create_escrow(
-    ctx: Context<super::CreateEscrow>,
-    amount: u64,
-    buyer: Pubkey,
-) -> Result<()> {
+pub fn create_escrow(ctx: Context<super::CreateEscrow>, amount: u64, buyer: Pubkey) -> Result<()> {
     require!(
         ctx.accounts.parcel.status == parcel_status::FOR_SALE,
         TerraError::InvalidStatus
@@ -70,7 +66,10 @@ pub fn create_escrow(
         TerraError::NotOwner
     );
     require!(buyer != Pubkey::default(), TerraError::EmptySuccessor);
-    require!(buyer != ctx.accounts.seller.key(), TerraError::SelfDealingNotAllowed);
+    require!(
+        buyer != ctx.accounts.seller.key(),
+        TerraError::SelfDealingNotAllowed
+    );
     require!(
         amount >= MIN_ESCROW_AMOUNT && amount <= MAX_ESCROW_AMOUNT,
         TerraError::InvalidEscrowAmount
@@ -104,10 +103,7 @@ pub fn create_escrow(
 }
 
 /// Buyer deposits SOL into the escrow vault. Can be partial (earnest money) or full.
-pub fn deposit_escrow(
-    ctx: Context<super::DepositEscrow>,
-    deposit_amount: u64,
-) -> Result<()> {
+pub fn deposit_escrow(ctx: Context<super::DepositEscrow>, deposit_amount: u64) -> Result<()> {
     let escrow = &mut ctx.accounts.escrow_record;
     require!(
         escrow.status == escrow_status::CREATED,
@@ -291,10 +287,7 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
                 ctx.accounts.signer.key() == buyer_key,
                 TerraError::NotDesignatedBuyer
             );
-            require!(
-                now < cancel_deadline,
-                TerraError::CancelWindowExpired
-            );
+            require!(now < cancel_deadline, TerraError::CancelWindowExpired);
         }
         _ => return Err(TerraError::InvalidEscrowStatus.into()),
     }
@@ -318,7 +311,11 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
     let escrow_info = ctx.accounts.escrow_record.to_account_info();
     let escrow_lamports = escrow_info.lamports();
     **escrow_info.try_borrow_mut_lamports()? = 0;
-    **ctx.accounts.signer.to_account_info().try_borrow_mut_lamports()? += escrow_lamports;
+    **ctx
+        .accounts
+        .signer
+        .to_account_info()
+        .try_borrow_mut_lamports()? += escrow_lamports;
 
     let cancelled_by = ctx.accounts.signer.key();
 
@@ -438,7 +435,11 @@ pub fn expire_escrow(ctx: Context<super::ExpireEscrow>) -> Result<()> {
     let escrow_info = ctx.accounts.escrow_record.to_account_info();
     let escrow_lamports = escrow_info.lamports();
     **escrow_info.try_borrow_mut_lamports()? = 0;
-    **ctx.accounts.caller.to_account_info().try_borrow_mut_lamports()? += escrow_lamports;
+    **ctx
+        .accounts
+        .caller
+        .to_account_info()
+        .try_borrow_mut_lamports()? += escrow_lamports;
 
     let parcel_key = escrow.parcel;
 

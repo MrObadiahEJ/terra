@@ -94,14 +94,11 @@ pub fn router() -> Router<AppState> {
         .route("/{id}", delete(cancel_dispute))
 }
 
-async fn list_disputes(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Dispute>>, AppError> {
-    let disputes = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} ORDER BY created_at DESC"
-    ))
-    .fetch_all(&state.pool)
-    .await?;
+async fn list_disputes(State(state): State<AppState>) -> Result<Json<Vec<Dispute>>, AppError> {
+    let disputes =
+        sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} ORDER BY created_at DESC"))
+            .fetch_all(&state.pool)
+            .await?;
     Ok(Json(disputes))
 }
 
@@ -109,12 +106,10 @@ async fn get_dispute(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Dispute>, AppError> {
-    let dispute = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let dispute = sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
     Ok(Json(dispute))
 }
 
@@ -184,18 +179,21 @@ async fn freeze_parcel(
 ) -> Result<Json<Dispute>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let dispute: Dispute = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"
-    ))
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let dispute: Dispute =
+        sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if dispute.status != "filed" {
-        return Err(AppError::bad_request("dispute must be in 'filed' status to freeze"));
+        return Err(AppError::bad_request(
+            "dispute must be in 'filed' status to freeze",
+        ));
     }
     if dispute.count < dispute.required {
-        return Err(AppError::bad_request("insufficient validator endorsements to freeze"));
+        return Err(AppError::bad_request(
+            "insufficient validator endorsements to freeze",
+        ));
     }
 
     sqlx::query("UPDATE disputes SET status = 'frozen', frozen_at = now(), updated_at = now() WHERE id = $1")
@@ -210,12 +208,10 @@ async fn freeze_parcel(
 
     tx.commit().await?;
 
-    let updated = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let updated = sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
 
     Ok(Json(updated))
 }
@@ -226,10 +222,14 @@ async fn adjudicate_dispute(
     Json(req): Json<AdjudicateRequest>,
 ) -> Result<Json<Dispute>, AppError> {
     if req.outcome != "owner_wins" && req.outcome != "owner_loses" {
-        return Err(AppError::bad_request("outcome must be 'owner_wins' or 'owner_loses'"));
+        return Err(AppError::bad_request(
+            "outcome must be 'owner_wins' or 'owner_loses'",
+        ));
     }
     if req.outcome == "owner_loses" && req.new_owner.is_none() {
-        return Err(AppError::bad_request("new_owner is required when owner loses"));
+        return Err(AppError::bad_request(
+            "new_owner is required when owner loses",
+        ));
     }
     identities::decode_wallet(&req.authority)?;
     if let Some(ref owner) = req.new_owner {
@@ -238,15 +238,16 @@ async fn adjudicate_dispute(
 
     let mut tx = state.pool.begin().await?;
 
-    let dispute: Dispute = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"
-    ))
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let dispute: Dispute =
+        sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if dispute.status != "frozen" {
-        return Err(AppError::bad_request("dispute must be in 'frozen' status to adjudicate"));
+        return Err(AppError::bad_request(
+            "dispute must be in 'frozen' status to adjudicate",
+        ));
     }
 
     sqlx::query(
@@ -271,12 +272,10 @@ async fn adjudicate_dispute(
 
     tx.commit().await?;
 
-    let updated = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let updated = sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
 
     Ok(Json(updated))
 }
@@ -287,15 +286,16 @@ async fn execute_judgment(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let dispute: Dispute = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"
-    ))
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let dispute: Dispute =
+        sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if dispute.status != "adjudicated" {
-        return Err(AppError::bad_request("dispute must be in 'adjudicated' status to execute"));
+        return Err(AppError::bad_request(
+            "dispute must be in 'adjudicated' status to execute",
+        ));
     }
 
     let outcome = dispute.outcome.as_deref().unwrap_or("owner_wins");
@@ -309,11 +309,13 @@ async fn execute_judgment(
         let new_owner = dispute.new_owner.as_ref().ok_or_else(|| {
             AppError::bad_request("new_owner is required for owner_loses outcome")
         })?;
-        sqlx::query("UPDATE parcels SET owner = $2, status = 'forfeited', updated_at = now() WHERE id = $1")
-            .bind(dispute.parcel_id)
-            .bind(new_owner)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "UPDATE parcels SET owner = $2, status = 'forfeited', updated_at = now() WHERE id = $1",
+        )
+        .bind(dispute.parcel_id)
+        .bind(new_owner)
+        .execute(&mut *tx)
+        .await?;
     }
 
     sqlx::query("UPDATE disputes SET status = 'executed', updated_at = now() WHERE id = $1")
@@ -337,15 +339,16 @@ async fn cancel_dispute(
 ) -> Result<StatusCode, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let dispute: Dispute = sqlx::query_as::<_, Dispute>(&format!(
-        "{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"
-    ))
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let dispute: Dispute =
+        sqlx::query_as::<_, Dispute>(&format!("{DISPUTE_SELECT} WHERE id = $1 FOR UPDATE"))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
 
     if dispute.status != "filed" {
-        return Err(AppError::bad_request("only filed disputes can be cancelled"));
+        return Err(AppError::bad_request(
+            "only filed disputes can be cancelled",
+        ));
     }
 
     sqlx::query("UPDATE disputes SET status = 'cancelled', updated_at = now() WHERE id = $1")

@@ -119,8 +119,14 @@ pub struct RebindRequest {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/jurisdictions", get(list_jurisdictions).post(register_jurisdiction))
-        .route("/jurisdictions/{id}", get(get_jurisdiction).patch(update_jurisdiction))
+        .route(
+            "/jurisdictions",
+            get(list_jurisdictions).post(register_jurisdiction),
+        )
+        .route(
+            "/jurisdictions/{id}",
+            get(get_jurisdiction).patch(update_jurisdiction),
+        )
         .route("/bindings", get(list_bindings).post(bind_identity))
         .route("/bindings/{id}", get(get_binding))
         .route("/bindings/{id}/verify", post(verify_membership))
@@ -198,12 +204,11 @@ async fn update_jurisdiction(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateJurisdictionRequest>,
 ) -> Result<Json<Jurisdiction>, AppError> {
-    let existing: Jurisdiction =
-        sqlx::query_as(&format!("{JURISDICTION_SELECT} WHERE id = $1"))
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found("jurisdiction"))?;
+    let existing: Jurisdiction = sqlx::query_as(&format!("{JURISDICTION_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("jurisdiction"))?;
 
     let vk = req
         .verification_key_hash
@@ -236,9 +241,7 @@ async fn update_jurisdiction(
 // Handlers — Bindings
 // ---------------------------------------------------------------------------
 
-async fn list_bindings(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Binding>>, AppError> {
+async fn list_bindings(State(state): State<AppState>) -> Result<Json<Vec<Binding>>, AppError> {
     let rows: Vec<Binding> = sqlx::query_as(BINDING_SELECT)
         .fetch_all(&state.pool)
         .await?;
@@ -314,12 +317,10 @@ async fn verify_membership(
         }
     }
 
-    sqlx::query(
-        r#"UPDATE cross_border_bindings SET version = version + 1 WHERE id = $1"#,
-    )
-    .bind(id)
-    .execute(&state.pool)
-    .await?;
+    sqlx::query(r#"UPDATE cross_border_bindings SET version = version + 1 WHERE id = $1"#)
+        .bind(id)
+        .execute(&state.pool)
+        .await?;
 
     let updated: Binding = sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
         .bind(id)
@@ -337,12 +338,11 @@ async fn revoke_binding(
         return Err(AppError::bad_request("reason is required"));
     }
 
-    let existing: Binding =
-        sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found("binding"))?;
+    let existing: Binding = sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("binding"))?;
 
     if existing.revoked {
         return Err(AppError::bad_request("binding is already revoked"));
@@ -371,12 +371,11 @@ async fn rebind_identity(
     Path(id): Path<Uuid>,
     Json(req): Json<RebindRequest>,
 ) -> Result<(StatusCode, Json<Binding>), AppError> {
-    let existing: Binding =
-        sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| AppError::not_found("binding"))?;
+    let existing: Binding = sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("binding"))?;
 
     if existing.revoked {
         return Err(AppError::bad_request("revoked bindings cannot be rebound"));

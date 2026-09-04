@@ -70,8 +70,14 @@ pub fn router() -> Router<AppState> {
         .route("/{id}", get(get_by_id))
         .route("/{id}/reconcile", post(reconcile))
         .route("/{id}", delete(delete_parcel))
-        .route("/{id}/attestations", post(attestations::register_attestation))
-        .route("/{id}/attestations/{specifier}", get(attestations::get_attestation))
+        .route(
+            "/{id}/attestations",
+            post(attestations::register_attestation),
+        )
+        .route(
+            "/{id}/attestations/{specifier}",
+            get(attestations::get_attestation),
+        )
         .route(
             "/{id}/attestations/{specifier}/validations",
             post(attestations::submit_validation),
@@ -85,29 +91,32 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/forfeiture", post(judicial_forfeiture))
 }
 
-
 async fn list(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
 ) -> Result<Json<Vec<Parcel>>, AppError> {
     let parcels = match (params.minx, params.miny, params.maxx, params.maxy) {
-        (Some(minx), Some(miny), Some(maxx), Some(maxy)) => sqlx::query_as::<_, Parcel>(&format!(
-            "{PARCEL_SELECT}
+        (Some(minx), Some(miny), Some(maxx), Some(maxy)) => {
+            sqlx::query_as::<_, Parcel>(&format!(
+                "{PARCEL_SELECT}
              WHERE ST_Intersects(geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
              ORDER BY created_at DESC"
-        ))
-        .bind(minx)
-        .bind(miny)
-        .bind(maxx)
-        .bind(maxy)
-        .fetch_all(&state.pool)
-        .await?,
-        _ => sqlx::query_as::<_, Parcel>(&format!(
-            "{PARCEL_SELECT}
+            ))
+            .bind(minx)
+            .bind(miny)
+            .bind(maxx)
+            .bind(maxy)
+            .fetch_all(&state.pool)
+            .await?
+        }
+        _ => {
+            sqlx::query_as::<_, Parcel>(&format!(
+                "{PARCEL_SELECT}
              ORDER BY created_at DESC"
-        ))
-        .fetch_all(&state.pool)
-        .await?,
+            ))
+            .fetch_all(&state.pool)
+            .await?
+        }
     };
     Ok(Json(parcels))
 }
@@ -218,12 +227,11 @@ async fn reconcile(
     let access_hash = decode_hex32(&req.access_hash)?;
 
     // Fetch the stored geometry so we can independently re-derive the digest.
-    let geometry_json: String = sqlx::query_scalar(
-        "SELECT ST_AsGeoJSON(geometry)::text FROM parcels WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let geometry_json: String =
+        sqlx::query_scalar("SELECT ST_AsGeoJSON(geometry)::text FROM parcels WHERE id = $1")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await?;
     let geometry: serde_json::Value =
         serde_json::from_str(&geometry_json).map_err(|e| AppError::bad_request(e.to_string()))?;
     let polygon = geojson_polygon(&geometry)?;
@@ -420,9 +428,7 @@ mod tests {
     /// the number of validator signers presented. This makes forfeiture
     /// deliberately heavier than a normal owner-authorized transfer.
     fn forfeiture_ok(threshold: u16, present: usize) -> bool {
-        threshold >= MIN_FORFEIT_VALIDATORS
-            && (threshold as usize) <= present
-            && present > 0
+        threshold >= MIN_FORFEIT_VALIDATORS && (threshold as usize) <= present && present > 0
     }
 
     #[test]

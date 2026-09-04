@@ -42,7 +42,10 @@ impl IntoResponse for AppError {
             AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
             AppError::Database(e) => {
                 tracing::error!(error = %e, "database error");
-                (StatusCode::INTERNAL_SERVER_ERROR, format!("database error: {e}"))
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("database error: {e}"),
+                )
             }
         };
         (status, Json(json!({ "error": message }))).into_response()

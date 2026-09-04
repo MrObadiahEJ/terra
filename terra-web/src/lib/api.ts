@@ -645,6 +645,151 @@ export interface CreateSlashingReportInput {
   appeal_deadline: string
 }
 
+// ---- Guardian & Recovery Council (RFC-010) ----------------------------------
+
+export interface GuardianshipSuccession {
+  id: string
+  identity_id: string
+  identity_hash: string
+  kind: number // 3 = guardianship, 4 = court-appointed guardian
+  successor: string
+  requested_at: string
+  effective_at: string
+  grace_secs: number
+  required: number
+  validations_count: number
+  status: string
+  case_hash: string
+  scope_notes: string
+}
+
+export interface RequestGuardianshipInput {
+  successor: string
+  kind: 3 | 4
+  grace_secs?: number
+  required_validations?: number
+  validators: string[]
+  case_hash?: string
+  scope_notes?: string
+}
+
+export interface RevokeGuardianshipInput {
+  new_owner: string
+  revoked_by: string
+  is_admin?: boolean
+}
+
+export interface GuardianshipRevocation {
+  id: string
+  identity_hash: string
+  previous_guardian: string
+  new_owner: string
+  revoked_by: string
+  block_time: string
+  created_at: string
+}
+
+// ---- Zero-knowledge ownership proofs (RFC-011) -------------------------------
+
+export interface ZoneSet {
+  id: string
+  zone_set_address: string
+  zone_id: string
+  authority: string
+  parcel_count: number
+  current_root_version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface OwnershipRoot {
+  id: string
+  zone_set_id: string
+  root_address: string
+  merkle_root: string
+  version: number
+  commitment_count: number
+  algorithm_id: number
+  snapshot_cid: string
+  snapshot_hash: string
+  authority_signature: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NullifierRecord {
+  id: string
+  nullifier_hash: string
+  zone_set_id: string
+  root_version: number
+  prover: string
+  proof_purpose: string
+  disclosure_type: number
+  block_time: string
+  created_at: string
+}
+
+export interface RegisterZoneSetInput {
+  zone_set_address: string
+  zone_id: string
+  authority: string
+  snapshot_cid: string
+  snapshot_hash: string
+  root_address: string
+  merkle_root: string
+}
+
+export interface GenerateRootInput {
+  root_address: string
+  merkle_root: string
+  snapshot_cid: string
+  snapshot_hash: string
+  commitment_count: number
+  authority_signature?: string
+}
+
+export interface VerifyProofInput {
+  nullifier_hash: string
+  root_version: number
+  prover: string
+  proof_purpose: string
+  disclosure_type: number
+}
+
+// ---- PostGIS spatial architecture --------------------------------------------
+
+export interface ParcelSpatialStats {
+  id: string
+  name: string
+  owner: string
+  status: string
+  onchain_id: string | null
+  area_m2: number | null
+  geometry: string | null
+  centroid: string | null
+  minx: number | null
+  miny: number | null
+  maxx: number | null
+  maxy: number | null
+}
+
+export interface NearParcel {
+  id: string
+  name: string
+  owner: string
+  status: string
+  area_m2: number | null
+  distance_m: number | null
+  centroid: string | null
+}
+
+export interface ZoneParcelCount {
+  zone_id: string
+  zone_name: string
+  parcel_count: number
+  total_area_m2: number
+}
+
 // ---- client ---------------------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -1000,6 +1145,40 @@ export const api = {
     request<SlashingReport>('/staking/reports', { method: 'POST', body: JSON.stringify(input) }),
   updateSlashingReport: (address: string, input: Partial<SlashingReport>) =>
     request<SlashingReport>(`/staking/reports/${address}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  // ---- Guardian & Recovery Council (RFC-010) --------------------------------
+
+  requestGuardianship: (identityHash: string, input: RequestGuardianshipInput) =>
+    request<GuardianshipSuccession>(`/identities/${identityHash}/successions`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+  revokeGuardianship: (identityHash: string, input: RevokeGuardianshipInput) =>
+    request<GuardianshipSuccession & { owner?: string }>(`/identities/${identityHash}/revoke-guardianship`, {
+      method: 'POST', body: JSON.stringify(input),
+    }),
+
+  // ---- Zero-knowledge ownership proofs (RFC-011) -----------------------------
+
+  listZoneSets: () => request<ZoneSet[]>('/zk'),
+  getZoneSet: (id: string) => request<ZoneSet>(`/zk/${id}`),
+  registerZoneSet: (input: RegisterZoneSetInput) =>
+    request<ZoneSet>('/zk', { method: 'POST', body: JSON.stringify(input) }),
+  listOwnershipRoots: (zoneId: string) => request<OwnershipRoot[]>(`/zk/${zoneId}/roots`),
+  generateOwnershipRoot: (zoneId: string, input: GenerateRootInput) =>
+    request<OwnershipRoot>(`/zk/${zoneId}/roots`, { method: 'POST', body: JSON.stringify(input) }),
+  verifyOwnershipProof: (zoneId: string, input: VerifyProofInput) =>
+    request<NullifierRecord>(`/zk/${zoneId}/proofs`, { method: 'POST', body: JSON.stringify(input) }),
+  listNullifiers: (zoneId: string) => request<NullifierRecord[]>(`/zk/${zoneId}/proofs`),
+  invalidateProofVersion: (zoneId: string, version: number) =>
+    request<ZoneSet>(`/zk/${zoneId}/invalidate/${version}`, { method: 'POST' }),
+
+  // ---- PostGIS spatial architecture ------------------------------------------
+
+  parcelsNear: (lon: number, lat: number, radius_m = 1000, limit = 20) =>
+    request<NearParcel[]>(`/spatial/parcels/near?lon=${lon}&lat=${lat}&radius_m=${radius_m}&limit=${limit}`),
+  parcelSpatialStats: (id: string) => request<ParcelSpatialStats>(`/spatial/parcels/${id}/stats`),
+  zoneSpatialStats: () => request<ZoneParcelCount[]>('/spatial/zones/stats'),
+  parcelsWithinZone: (zoneId: string) => request<ParcelSpatialStats[]>(`/spatial/zones/${zoneId}/parcels`),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

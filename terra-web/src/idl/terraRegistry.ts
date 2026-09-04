@@ -4693,6 +4693,619 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "request_court_guardianship",
+      "discriminator": [
+        161,
+        23,
+        136,
+        8,
+        139,
+        232,
+        131,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity"
+              },
+              {
+                "kind": "account",
+                "path": "successor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "successor",
+          "type": "pubkey"
+        },
+        {
+          "name": "grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "required_validations",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        },
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "scope_notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "revoke_guardianship",
+      "discriminator": [
+        168,
+        87,
+        239,
+        39,
+        65,
+        0,
+        155,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "revoker",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "register_zone_set",
+      "discriminator": [
+        161,
+        121,
+        72,
+        36,
+        152,
+        206,
+        45,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "zone_id"
+        },
+        {
+          "name": "zone_set",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership_root",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112,
+                  95,
+                  114,
+                  111,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "snapshot_cid",
+          "type": "string"
+        },
+        {
+          "name": "snapshot_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "generate_ownership_root",
+      "discriminator": [
+        111,
+        202,
+        252,
+        133,
+        234,
+        141,
+        84,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "zone_set",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership_root",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112,
+                  95,
+                  114,
+                  111,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_snapshot_cid",
+          "type": "string"
+        },
+        {
+          "name": "new_snapshot_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "commitment_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "verify_ownership_proof",
+      "discriminator": [
+        114,
+        247,
+        217,
+        148,
+        112,
+        164,
+        251,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "zone_set",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership_root",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112,
+                  95,
+                  114,
+                  111,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proof_data",
+          "type": "bytes"
+        },
+        {
+          "name": "nullifier_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root_version",
+          "type": "u32"
+        },
+        {
+          "name": "proof_purpose",
+          "type": "string"
+        },
+        {
+          "name": "disclosure_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "invalidate_proof",
+      "discriminator": [
+        122,
+        166,
+        31,
+        119,
+        225,
+        47,
+        26,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "zone_set",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "stale_version",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -4941,6 +5554,45 @@ export const terraRegistry: Idl = {
         78,
         17,
         34
+      ]
+    },
+    {
+      "name": "ZoneSet",
+      "discriminator": [
+        57,
+        110,
+        98,
+        208,
+        4,
+        53,
+        98,
+        77
+      ]
+    },
+    {
+      "name": "OwnershipRoot",
+      "discriminator": [
+        130,
+        74,
+        117,
+        24,
+        60,
+        232,
+        70,
+        225
+      ]
+    },
+    {
+      "name": "NullifierRecord",
+      "discriminator": [
+        56,
+        18,
+        57,
+        175,
+        69,
+        202,
+        189,
+        70
       ]
     }
   ],
@@ -5912,6 +6564,84 @@ export const terraRegistry: Idl = {
         43,
         164
       ]
+    },
+    {
+      "name": "CourtGuardianshipRequested",
+      "discriminator": [
+        140,
+        90,
+        60,
+        187,
+        33,
+        145,
+        99,
+        93
+      ]
+    },
+    {
+      "name": "GuardianshipRevoked",
+      "discriminator": [
+        128,
+        41,
+        40,
+        28,
+        37,
+        45,
+        126,
+        221
+      ]
+    },
+    {
+      "name": "ZoneSetRegistered",
+      "discriminator": [
+        83,
+        7,
+        29,
+        172,
+        101,
+        159,
+        212,
+        6
+      ]
+    },
+    {
+      "name": "OwnershipRootUpdated",
+      "discriminator": [
+        194,
+        16,
+        79,
+        126,
+        75,
+        137,
+        150,
+        54
+      ]
+    },
+    {
+      "name": "OwnershipProofVerified",
+      "discriminator": [
+        133,
+        80,
+        213,
+        132,
+        28,
+        110,
+        139,
+        191
+      ]
+    },
+    {
+      "name": "ProofVersionInvalidated",
+      "discriminator": [
+        218,
+        103,
+        154,
+        148,
+        120,
+        25,
+        121,
+        128
+      ]
     }
   ],
   "errors": [
@@ -6434,6 +7164,51 @@ export const terraRegistry: Idl = {
       "code": 6103,
       "name": "SelfReportNotAllowed",
       "msg": "Self-reporting is not allowed"
+    },
+    {
+      "code": 6104,
+      "name": "GuardianshipGraceTooShort",
+      "msg": "Guardianship grace period is below the 90-day minimum"
+    },
+    {
+      "code": 6105,
+      "name": "GuardianshipThresholdTooLow",
+      "msg": "Guardianship requires at least 3 validator endorsements"
+    },
+    {
+      "code": 6106,
+      "name": "NullifierAlreadyUsed",
+      "msg": "Proof has already been used (nullifier recorded)"
+    },
+    {
+      "code": 6107,
+      "name": "RootVersionMismatch",
+      "msg": "Proof references a stale or unknown root version"
+    },
+    {
+      "code": 6108,
+      "name": "UnauthorizedZoneAuthority",
+      "msg": "Signer is not the zone authority"
+    },
+    {
+      "code": 6109,
+      "name": "EmptyZoneSet",
+      "msg": "Zone has no commitments to prove against"
+    },
+    {
+      "code": 6110,
+      "name": "InvalidProofPurpose",
+      "msg": "Proof purpose is missing or too long"
+    },
+    {
+      "code": 6111,
+      "name": "ProofTooLarge",
+      "msg": "Proof data is empty or exceeds the maximum size"
+    },
+    {
+      "code": 6112,
+      "name": "InvalidDisclosureType",
+      "msg": "Disclosure type must be 0 (membership), 1 (range), or 2 (count)"
     }
   ],
   "types": [
@@ -8182,6 +8957,341 @@ export const terraRegistry: Idl = {
           {
             "name": "offender",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZoneSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel_count",
+            "type": "u32"
+          },
+          {
+            "name": "current_root_version",
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipRoot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "commitment_count",
+            "type": "u32"
+          },
+          {
+            "name": "algorithm_id",
+            "type": "u8"
+          },
+          {
+            "name": "snapshot_cid",
+            "type": "string"
+          },
+          {
+            "name": "snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority_signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NullifierRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "root_version",
+            "type": "u32"
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "proof_purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CourtGuardianshipRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "scope_notes",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianshipRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "revoked_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ZoneSetRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "zone_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "snapshot_cid",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipRootUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "commitment_count",
+            "type": "u32"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipProofVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "root_version",
+            "type": "u32"
+          },
+          {
+            "name": "proof_purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofVersionInvalidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "stale_version",
+            "type": "u32"
+          },
+          {
+            "name": "current_version",
+            "type": "u32"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
           }
         ]
       }

@@ -179,49 +179,45 @@ async fn list_roads(
     State(state): State<AppState>,
     Query(params): Query<BboxParams>,
 ) -> Result<Json<Vec<RoadRow>>, AppError> {
-    let (sql, rows): (String, Vec<RoadRow>) = match (
-        params.minx,
-        params.miny,
-        params.maxx,
-        params.maxy,
-    ) {
-        (Some(minx), Some(miny), Some(maxx), Some(maxy)) => (
-            "SELECT id, name, highway, oneway, length_m,
+    let (sql, rows): (String, Vec<RoadRow>) =
+        match (params.minx, params.miny, params.maxx, params.maxy) {
+            (Some(minx), Some(miny), Some(maxx), Some(maxy)) => (
+                "SELECT id, name, highway, oneway, length_m,
                     ST_AsGeoJSON(geometry)::text AS geometry, ingested_at
              FROM roads
              WHERE ST_Intersects(geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
              ORDER BY length_m DESC"
-                .to_string(),
-            sqlx::query_as::<_, RoadRow>(
-                "SELECT id, name, highway, oneway, length_m,
+                    .to_string(),
+                sqlx::query_as::<_, RoadRow>(
+                    "SELECT id, name, highway, oneway, length_m,
                         ST_AsGeoJSON(geometry)::text AS geometry, ingested_at
                  FROM roads
                  WHERE ST_Intersects(geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
                  ORDER BY length_m DESC",
-            )
-            .bind(minx)
-            .bind(miny)
-            .bind(maxx)
-            .bind(maxy)
-            .fetch_all(&state.pool)
-            .await?,
-        ),
-        _ => (
-            "SELECT id, name, highway, oneway, length_m,
+                )
+                .bind(minx)
+                .bind(miny)
+                .bind(maxx)
+                .bind(maxy)
+                .fetch_all(&state.pool)
+                .await?,
+            ),
+            _ => (
+                "SELECT id, name, highway, oneway, length_m,
                     ST_AsGeoJSON(geometry)::text AS geometry, ingested_at
              FROM roads
              ORDER BY length_m DESC"
-                .to_string(),
-            sqlx::query_as::<_, RoadRow>(
-                "SELECT id, name, highway, oneway, length_m,
+                    .to_string(),
+                sqlx::query_as::<_, RoadRow>(
+                    "SELECT id, name, highway, oneway, length_m,
                         ST_AsGeoJSON(geometry)::text AS geometry, ingested_at
                  FROM roads
                  ORDER BY length_m DESC",
-            )
-            .fetch_all(&state.pool)
-            .await?,
-        ),
-    };
+                )
+                .fetch_all(&state.pool)
+                .await?,
+            ),
+        };
     let _ = sql;
     Ok(Json(rows))
 }

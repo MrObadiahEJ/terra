@@ -75,14 +75,10 @@ pub fn router() -> Router<AppState> {
         .route("/{parcel_id}/{nonce}/sweep", post(sweep_expired_right))
 }
 
-async fn list_rights(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Right>>, AppError> {
-    let rights = sqlx::query_as::<_, Right>(&format!(
-        "{RIGHT_SELECT} ORDER BY created_at DESC"
-    ))
-    .fetch_all(&state.pool)
-    .await?;
+async fn list_rights(State(state): State<AppState>) -> Result<Json<Vec<Right>>, AppError> {
+    let rights = sqlx::query_as::<_, Right>(&format!("{RIGHT_SELECT} ORDER BY created_at DESC"))
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(rights))
 }
 
@@ -90,12 +86,10 @@ async fn get_right(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Right>, AppError> {
-    let right = sqlx::query_as::<_, Right>(&format!(
-        "{RIGHT_SELECT} WHERE id = $1"
-    ))
-    .bind(id)
-    .fetch_one(&state.pool)
-    .await?;
+    let right = sqlx::query_as::<_, Right>(&format!("{RIGHT_SELECT} WHERE id = $1"))
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
     Ok(Json(right))
 }
 
@@ -117,10 +111,14 @@ async fn renew_right(
     Path((parcel_id, nonce)): Path<(Uuid, u16)>,
     Json(req): Json<RenewRightRequest>,
 ) -> Result<Json<Right>, AppError> {
-    let new_expires_at: DateTime<Utc> = req.new_expires_at.parse()
+    let new_expires_at: DateTime<Utc> = req
+        .new_expires_at
+        .parse()
         .map_err(|_| AppError::bad_request("invalid new_expires_at timestamp"))?;
     if new_expires_at <= Utc::now() {
-        return Err(AppError::bad_request("new_expires_at must be in the future"));
+        return Err(AppError::bad_request(
+            "new_expires_at must be in the future",
+        ));
     }
 
     let mut tx = state.pool.begin().await?;
@@ -135,9 +133,15 @@ async fn renew_right(
     .ok_or_else(|| AppError::not_found("right not found"))?;
 
     if right.status == "revoked" || right.status == "renewed" {
-        return Err(AppError::bad_request("cannot renew a revoked or already-renewed right"));
+        return Err(AppError::bad_request(
+            "cannot renew a revoked or already-renewed right",
+        ));
     }
-    if right.expires_at.map(|e| new_expires_at <= e).unwrap_or(false) {
+    if right
+        .expires_at
+        .map(|e| new_expires_at <= e)
+        .unwrap_or(false)
+    {
         return Err(AppError::bad_request("renewal must extend the expiry"));
     }
 
@@ -166,13 +170,12 @@ async fn sweep_expired_right(
 ) -> Result<Json<Right>, AppError> {
     let mut tx = state.pool.begin().await?;
 
-    let right: Right = sqlx::query_as::<_, Right>(&format!(
-        "{RIGHT_SELECT} WHERE parcel_id = $1 LIMIT 1"
-    ))
-    .bind(parcel_id)
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| AppError::not_found("right not found"))?;
+    let right: Right =
+        sqlx::query_as::<_, Right>(&format!("{RIGHT_SELECT} WHERE parcel_id = $1 LIMIT 1"))
+            .bind(parcel_id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::not_found("right not found"))?;
 
     if right.status != "active" && right.status != "expiring" {
         return Err(AppError::bad_request("right is not in a sweepable status"));
@@ -216,8 +219,8 @@ async fn grant_conditional_right(
     State(state): State<AppState>,
     Json(req): Json<GrantConditionalRightRequest>,
 ) -> Result<(StatusCode, Json<Right>), AppError> {
-    let parcel_id = Uuid::parse_str(&req.parcel_id)
-        .map_err(|_| AppError::bad_request("invalid parcel_id"))?;
+    let parcel_id =
+        Uuid::parse_str(&req.parcel_id).map_err(|_| AppError::bad_request("invalid parcel_id"))?;
 
     let mut tx = state.pool.begin().await?;
 
