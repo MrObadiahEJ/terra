@@ -598,7 +598,7 @@ export interface ValidatorStake {
   validator_address: string
   staked_lamports: number
   unbonding_lamports: number
-  unbonding_starts_at: string
+  unbonding_starts_at: number // epoch seconds; 0 = not unbonding
   rewards_accrued_lamports: number
   slash_history: number
   created_at: string
@@ -617,7 +617,7 @@ export interface SlashingReport {
   status: number
   filed_at: string
   appeal_deadline: string
-  resolved_at: string
+  resolved_at: number // epoch seconds; 0 = unresolved
   created_at: string
 }
 
@@ -986,7 +986,7 @@ export const api = {
       method: 'DELETE',
     }),
   endorseValidatorAdd: (pubkey: string, validator: string) =>
-    request<ValidatorEndorsement>(`/authority-registry/${pubkey}/endorsals`, {
+    request<ValidatorEndorsement>(`/authority-registry/${pubkey}/endorsements`, {
       method: 'POST', body: JSON.stringify({ validator }),
     }),
   flipToConsensus: (pubkey: string) =>

@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::geoutil::geojson_polygon;
-use crate::routes::{attestations, identities};
+use crate::routes::{attestations, disputes, identities, rights};
 use crate::state::AppState;
 
 fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
@@ -89,6 +89,12 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/documents", post(attestations::register_document))
         .route("/{id}/documents", get(attestations::list_documents))
         .route("/{id}/forfeiture", post(judicial_forfeiture))
+        .route("/{id}/disputes", post(disputes::file_dispute))
+        .route("/{id}/rights/{nonce}/renew", post(rights::renew_right))
+        .route(
+            "/{id}/rights/{nonce}/sweep",
+            post(rights::sweep_expired_right),
+        )
 }
 
 async fn list(

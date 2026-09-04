@@ -263,6 +263,7 @@ async fn bind_identity(
     }
 
     let binding_id = Uuid::new_v4();
+    let expires_at = parse_expires_at(req.expires_at.as_deref())?;
     sqlx::query(
         r#"INSERT INTO cross_border_bindings (
             id, jurisdiction_id, identity_hash, credential_commitment,
@@ -275,7 +276,7 @@ async fn bind_identity(
     .bind(&req.credential_commitment)
     .bind(&req.nullifier_nonce)
     .bind(&req.proof_data)
-    .bind(req.expires_at.as_deref())
+    .bind(expires_at)
     .execute(&state.pool)
     .await?;
 
@@ -391,6 +392,7 @@ async fn rebind_identity(
 
     // Insert new binding.
     let new_id = Uuid::new_v4();
+    let expires_at = parse_expires_at(req.expires_at.as_deref())?;
     sqlx::query(
         r#"INSERT INTO cross_border_bindings (
             id, jurisdiction_id, identity_hash, credential_commitment,
@@ -403,7 +405,7 @@ async fn rebind_identity(
     .bind(&req.credential_commitment)
     .bind(&req.nullifier_nonce)
     .bind(&req.proof_data)
-    .bind(req.expires_at.as_deref())
+    .bind(expires_at)
     .execute(&state.pool)
     .await?;
 
@@ -412,6 +414,19 @@ async fn rebind_identity(
         .fetch_one(&state.pool)
         .await?;
     Ok((StatusCode::CREATED, Json(row)))
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Parse the optional RFC-3339 expiry into a TIMESTAMPTZ bind value.
+fn parse_expires_at(raw: Option<&str>) -> Result<Option<DateTime<Utc>>, AppError> {
+    raw.map(|s| {
+        s.parse::<DateTime<Utc>>()
+            .map_err(|_| AppError::bad_request("invalid expires_at timestamp"))
+    })
+    .transpose()
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +450,15 @@ mod tests {
         };
         assert_eq!(req.country_code, "KE");
         assert_eq!(req.algorithm_id, 0);
+    }
+
+    #[test]
+    fn expires_at_parser() {
+        assert!(parse_expires_at(None).unwrap().is_none());
+        assert!(parse_expires_at(Some("2030-01-01T00:00:00Z"))
+            .unwrap()
+            .is_some());
+        assert!(parse_expires_at(Some("not-a-date")).is_err());
     }
 
     #[test]

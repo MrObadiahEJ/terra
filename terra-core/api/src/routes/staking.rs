@@ -80,7 +80,8 @@ pub struct ValidatorStake {
     pub validator_address: String,
     pub staked_lamports: i64,
     pub unbonding_lamports: i64,
-    pub unbonding_starts_at: DateTime<Utc>,
+    /// Epoch seconds; 0 = not unbonding (mirrors the on-chain sentinel).
+    pub unbonding_starts_at: i64,
     pub rewards_accrued_lamports: i64,
     pub slash_history: i16,
     pub created_at: DateTime<Utc>,
@@ -138,7 +139,8 @@ pub struct SlashingReport {
     pub status: i16,
     pub filed_at: DateTime<Utc>,
     pub appeal_deadline: DateTime<Utc>,
-    pub resolved_at: DateTime<Utc>,
+    /// Epoch seconds; 0 = unresolved (mirrors the on-chain sentinel).
+    pub resolved_at: i64,
     pub created_at: DateTime<Utc>,
 }
 
@@ -191,13 +193,13 @@ async fn create_stake_pool(
     State(state): State<AppState>,
     Json(req): Json<CreateStakePoolRequest>,
 ) -> Result<(StatusCode, Json<StakePool>), AppError> {
-    let row: StakePool = sqlx::query_as(&format!(
-        "{STAKE_POOL_SELECT} WHERE stake_pool_address = (
-            INSERT INTO stake_pools (stake_pool_address, region_registry_address, reward_rate_bps)
-            VALUES ($1, $2, $3)
-            RETURNING stake_pool_address
-        )"
-    ))
+    let row: StakePool = sqlx::query_as(
+        "INSERT INTO stake_pools (stake_pool_address, region_registry_address, reward_rate_bps)
+         VALUES ($1, $2, $3)
+         RETURNING stake_pool_address, region_registry_address, total_staked_lamports,
+                   reward_rate_bps, accumulated_rewards_lamports, last_reward_distribution,
+                   slash_count, created_at, updated_at",
+    )
     .bind(&req.stake_pool_address)
     .bind(&req.region_registry_address)
     .bind(req.reward_rate_bps)
@@ -269,13 +271,13 @@ async fn create_validator_stake(
     State(state): State<AppState>,
     Json(req): Json<CreateValidatorStakeRequest>,
 ) -> Result<(StatusCode, Json<ValidatorStake>), AppError> {
-    let row: ValidatorStake = sqlx::query_as(&format!(
-        "{VALIDATOR_STAKE_SELECT} WHERE validator_stake_address = (
-            INSERT INTO validator_stakes (validator_stake_address, stake_pool_address, validator_address)
-            VALUES ($1, $2, $3)
-            RETURNING validator_stake_address
-        )"
-    ))
+    let row: ValidatorStake = sqlx::query_as(
+        "INSERT INTO validator_stakes (validator_stake_address, stake_pool_address, validator_address)
+         VALUES ($1, $2, $3)
+         RETURNING validator_stake_address, stake_pool_address, validator_address,
+                   staked_lamports, unbonding_lamports, unbonding_starts_at,
+                   rewards_accrued_lamports, slash_history, created_at, updated_at",
+    )
     .bind(&req.validator_stake_address)
     .bind(&req.stake_pool_address)
     .bind(&req.validator_address)
@@ -302,7 +304,7 @@ async fn update_validator_stake(
     .bind(&address)
     .bind(req.staked_lamports)
     .bind(req.unbonding_lamports)
-    .bind(req.unbonding_starts_at)
+    .bind(req.unbonding_starts_at.map(|d| d.timestamp()))
     .bind(req.rewards_accrued_lamports)
     .bind(req.slash_history)
     .execute(&state.pool)
@@ -349,17 +351,19 @@ async fn create_slashing_report(
     State(state): State<AppState>,
     Json(req): Json<CreateSlashingReportRequest>,
 ) -> Result<(StatusCode, Json<SlashingReport>), AppError> {
-    let row: SlashingReport = sqlx::query_as(&format!(
-        "{SLASHING_REPORT_SELECT} WHERE slashing_report_address = (
-            INSERT INTO slashing_reports (
-                slashing_report_address, stake_pool_address, reporter_address,
-                evidence_hash, offender_address, offense_type, offense_details,
-                reporter_bond_lamports, appeal_deadline
-            )
-            VALUES ($1, $2, $3, decode($4, 'hex'), $5, $6, decode($7, 'hex'), $8, $9)
-            RETURNING slashing_report_address
-        )"
-    ))
+    let row: SlashingReport = sqlx::query_as(
+        "INSERT INTO slashing_reports (
+            slashing_report_address, stake_pool_address, reporter_address,
+            evidence_hash, offender_address, offense_type, offense_details,
+            reporter_bond_lamports, appeal_deadline
+        )
+        VALUES ($1, $2, $3, decode($4, 'hex'), $5, $6, decode($7, 'hex'), $8, $9)
+        RETURNING slashing_report_address, stake_pool_address, reporter_address,
+                  encode(evidence_hash, 'hex') AS evidence_hash, offender_address,
+                  offense_type, encode(offense_details, 'hex') AS offense_details,
+                  reporter_bond_lamports, status, filed_at, appeal_deadline,
+                  resolved_at, created_at",
+    )
     .bind(&req.slashing_report_address)
     .bind(&req.stake_pool_address)
     .bind(&req.reporter_address)
@@ -388,7 +392,7 @@ async fn update_slashing_report(
     )
     .bind(&address)
     .bind(req.status)
-    .bind(req.resolved_at)
+    .bind(req.resolved_at.map(|d| d.timestamp()))
     .bind(req.reporter_bond_lamports)
     .execute(&state.pool)
     .await?;

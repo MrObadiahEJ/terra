@@ -1446,6 +1446,122 @@ pub mod terra_registry {
     pub fn invalidate_proof(ctx: Context<InvalidateProof>, stale_version: u32) -> Result<()> {
         zk::invalidate_proof(ctx, stale_version)
     }
+
+    // -----------------------------------------------------------------------
+    // Cross-border identity bridge (RFC-006)
+    // -----------------------------------------------------------------------
+
+    pub fn register_jurisdiction(
+        ctx: Context<RegisterJurisdiction>,
+        country_code: [u8; 16],
+        jurisdiction_name: String,
+        credential_schema_cid: String,
+        revocation_registry: Pubkey,
+        verification_key_hash: [u8; 32],
+        algorithm_id: u8,
+    ) -> Result<()> {
+        cross_border::register_jurisdiction(
+            ctx,
+            country_code,
+            jurisdiction_name,
+            credential_schema_cid,
+            revocation_registry,
+            verification_key_hash,
+            algorithm_id,
+        )
+    }
+
+    pub fn update_jurisdiction(
+        ctx: Context<UpdateJurisdiction>,
+        new_verification_key_hash: Option<[u8; 32]>,
+        new_revocation_registry: Option<Pubkey>,
+        new_status: Option<u8>,
+    ) -> Result<()> {
+        cross_border::update_jurisdiction(
+            ctx,
+            new_verification_key_hash,
+            new_revocation_registry,
+            new_status,
+        )
+    }
+
+    pub fn bind_cross_border_identity(
+        ctx: Context<BindCrossBorderIdentity>,
+        credential_commitment: [u8; 32],
+        proof_data: Vec<u8>,
+        nullifier_nonce: [u8; 32],
+        expires_at: i64,
+    ) -> Result<()> {
+        cross_border::bind_cross_border_identity(
+            ctx,
+            credential_commitment,
+            proof_data,
+            nullifier_nonce,
+            expires_at,
+        )
+    }
+
+    pub fn verify_jurisdiction_membership(
+        ctx: Context<VerifyJurisdictionMembership>,
+        off_chain_nonce: [u8; 32],
+    ) -> Result<()> {
+        cross_border::verify_jurisdiction_membership(ctx, off_chain_nonce)
+    }
+
+    pub fn revoke_jurisdictional_identity(
+        ctx: Context<RevokeJurisdictionalIdentity>,
+        reason: String,
+    ) -> Result<()> {
+        cross_border::revoke_jurisdictional_identity(ctx, reason)
+    }
+
+    pub fn rebind_cross_border_identity(
+        ctx: Context<RebindCrossBorderIdentity>,
+        credential_commitment: [u8; 32],
+        proof_data: Vec<u8>,
+        nullifier_nonce: [u8; 32],
+        expires_at: i64,
+    ) -> Result<()> {
+        cross_border::rebind_cross_border_identity(
+            ctx,
+            credential_commitment,
+            proof_data,
+            nullifier_nonce,
+            expires_at,
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Parcel subdivision & amalgamation (RFC-008)
+    // -----------------------------------------------------------------------
+
+    pub fn subdivide_parcel(
+        ctx: Context<SubdivideParcel>,
+        new_id: [u8; 32],
+        new_name: String,
+        new_geometry_hash: [u8; 32],
+        specifier: [u8; 32],
+    ) -> Result<()> {
+        subdivision::subdivide_parcel(ctx, new_id, new_name, new_geometry_hash, specifier)
+    }
+
+    pub fn amalgamate_parcels(
+        ctx: Context<AmalgamateParcels>,
+        new_geometry_hash: [u8; 32],
+    ) -> Result<()> {
+        subdivision::amalgamate_parcels(ctx, new_geometry_hash)
+    }
+
+    pub fn migrate_rights(ctx: Context<MigrateRights>) -> Result<()> {
+        subdivision::migrate_rights(ctx)
+    }
+
+    pub fn migrate_attestations(
+        ctx: Context<MigrateAttestations>,
+        specifier: [u8; 32],
+    ) -> Result<()> {
+        subdivision::migrate_attestations(ctx, specifier)
+    }
 }
 
 #[derive(Accounts)]

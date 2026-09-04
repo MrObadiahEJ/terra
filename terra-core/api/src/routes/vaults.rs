@@ -164,13 +164,13 @@ pub async fn create_vault(
             threshold        = EXCLUDED.threshold,
             updated_at       = now()
          RETURNING id, subject_pubkey, vault_pubkey, ciphertext_cid,
-                   ciphertext_hash, algorithm_id, storage_uris, shard_holders,
+                   encode(ciphertext_hash, 'hex') AS ciphertext_hash, algorithm_id, storage_uris, shard_holders,
                    threshold, version, last_ping_at, created_at, updated_at",
     )
     .bind(&req.subject_pubkey)
     .bind(&req.subject_pubkey) // vault_pubkey mirror — set from on-chain in prod
     .bind(&req.ciphertext_cid)
-    .bind(hex::encode(&ciphertext_hash))
+    .bind(&ciphertext_hash)
     .bind(req.algorithm_id as i16)
     .bind(&req.storage_uris)
     .bind(&req.shard_holders)
@@ -186,7 +186,7 @@ pub async fn get_vault(
     Path(vault_pubkey): Path<String>,
 ) -> Result<Json<VaultRow>, AppError> {
     let row = sqlx::query_as::<_, VaultRow>(
-        "SELECT id, subject_pubkey, vault_pubkey, ciphertext_cid, ciphertext_hash,
+        "SELECT id, subject_pubkey, vault_pubkey, ciphertext_cid, encode(ciphertext_hash, 'hex') AS ciphertext_hash,
                 algorithm_id, storage_uris, shard_holders, threshold, version,
                 last_ping_at, created_at, updated_at
          FROM vaults WHERE vault_pubkey = $1",
@@ -200,7 +200,7 @@ pub async fn get_vault(
 /// List all vaults (paginated in future).
 pub async fn list_vaults(State(state): State<AppState>) -> Result<Json<Vec<VaultRow>>, AppError> {
     let rows = sqlx::query_as::<_, VaultRow>(
-        "SELECT id, subject_pubkey, vault_pubkey, ciphertext_cid, ciphertext_hash,
+        "SELECT id, subject_pubkey, vault_pubkey, ciphertext_cid, encode(ciphertext_hash, 'hex') AS ciphertext_hash,
                 algorithm_id, storage_uris, shard_holders, threshold, version,
                 last_ping_at, created_at, updated_at
          FROM vaults ORDER BY created_at DESC LIMIT 100",
@@ -230,13 +230,13 @@ pub async fn authorize_vault_access(
          SELECT $1, subject_pubkey, $2, $3, $4, $5
          FROM vaults WHERE vault_pubkey = $1
          RETURNING id, vault_pubkey, subject_pubkey, authority, purpose,
-                   expiry, nonce, block_time",
+                   expiry, encode(nonce, 'hex') AS nonce, block_time",
     )
     .bind(&vault_pubkey)
     .bind(&req.authority)
     .bind(&req.purpose)
     .bind(req.expiry)
-    .bind(hex::encode(&nonce))
+    .bind(&nonce)
     .fetch_one(&state.pool)
     .await?;
     Ok((StatusCode::CREATED, Json(row)))
@@ -278,15 +278,15 @@ pub async fn initiate_shard_rotation(
              new_shard_holders, new_threshold, initiated_by, required_endorsements,
              effective_at, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0)
-         RETURNING id, rotation_pubkey, vault_pubkey, old_ciphertext_hash,
-                   new_ciphertext_hash, new_shard_holders, new_threshold,
+         RETURNING id, rotation_pubkey, vault_pubkey, encode(old_ciphertext_hash, 'hex') AS old_ciphertext_hash,
+                   encode(new_ciphertext_hash, 'hex') AS new_ciphertext_hash, new_shard_holders, new_threshold,
                    initiated_by, endorsements, required_endorsements,
                    initiated_at, effective_at, status, created_at",
     )
     .bind(format!("rot_{uuid}", uuid = Uuid::new_v4()))
     .bind(&vault_pubkey)
-    .bind(hex::encode(&old_hash))
-    .bind(hex::encode(&new_hash))
+    .bind(&old_hash)
+    .bind(&new_hash)
     .bind(&req.new_shard_holders)
     .bind(req.new_threshold as i16)
     .bind(&req.initiator)
@@ -308,8 +308,8 @@ pub async fn endorse_shard_rotation(
          SET endorsements = array_append(endorsements, $3)
          WHERE rotation_pubkey = $2 AND vault_pubkey = $1 AND status = 0
            AND NOT ($3 = ANY(endorsements))
-         RETURNING id, rotation_pubkey, vault_pubkey, old_ciphertext_hash,
-                   new_ciphertext_hash, new_shard_holders, new_threshold,
+         RETURNING id, rotation_pubkey, vault_pubkey, encode(old_ciphertext_hash, 'hex') AS old_ciphertext_hash,
+                   encode(new_ciphertext_hash, 'hex') AS new_ciphertext_hash, new_shard_holders, new_threshold,
                    initiated_by, endorsements, required_endorsements,
                    initiated_at, effective_at, status, created_at",
     )
@@ -328,8 +328,8 @@ pub async fn execute_shard_rotation(
 ) -> Result<Json<VaultRow>, AppError> {
     // Verify the rotation is pending and effective.
     let rot = sqlx::query_as::<_, RotationRow>(
-        "SELECT id, rotation_pubkey, vault_pubkey, old_ciphertext_hash,
-                new_ciphertext_hash, new_shard_holders, new_threshold,
+        "SELECT id, rotation_pubkey, vault_pubkey, encode(old_ciphertext_hash, 'hex') AS old_ciphertext_hash,
+                encode(new_ciphertext_hash, 'hex') AS new_ciphertext_hash, new_shard_holders, new_threshold,
                 initiated_by, endorsements, required_endorsements,
                 initiated_at, effective_at, status, created_at
          FROM vault_shard_rotations
@@ -355,6 +355,8 @@ pub async fn execute_shard_rotation(
     }
 
     // Update the vault with the new state.
+    let old_bytes = decode_hex64(&rot.old_ciphertext_hash)?;
+    let new_bytes = decode_hex64(&rot.new_ciphertext_hash)?;
     let row = sqlx::query_as::<_, VaultRow>(
         "UPDATE vaults
          SET ciphertext_hash = $3,
@@ -364,12 +366,12 @@ pub async fn execute_shard_rotation(
              updated_at       = now()
          WHERE vault_pubkey = $1 AND ciphertext_hash = $2
          RETURNING id, subject_pubkey, vault_pubkey, ciphertext_cid,
-                   ciphertext_hash, algorithm_id, storage_uris, shard_holders,
+                   encode(ciphertext_hash, 'hex') AS ciphertext_hash, algorithm_id, storage_uris, shard_holders,
                    threshold, version, last_ping_at, created_at, updated_at",
     )
     .bind(&vault_pubkey)
-    .bind(&rot.old_ciphertext_hash)
-    .bind(&rot.new_ciphertext_hash)
+    .bind(&old_bytes)
+    .bind(&new_bytes)
     .bind(&rot.new_shard_holders)
     .bind(rot.new_threshold)
     .fetch_one(&state.pool)
@@ -393,8 +395,8 @@ pub async fn cancel_shard_rotation(
         "UPDATE vault_shard_rotations
          SET status = 2
          WHERE rotation_pubkey = $1 AND vault_pubkey = $2 AND status = 0
-         RETURNING id, rotation_pubkey, vault_pubkey, old_ciphertext_hash,
-                   new_ciphertext_hash, new_shard_holders, new_threshold,
+         RETURNING id, rotation_pubkey, vault_pubkey, encode(old_ciphertext_hash, 'hex') AS old_ciphertext_hash,
+                   encode(new_ciphertext_hash, 'hex') AS new_ciphertext_hash, new_shard_holders, new_threshold,
                    initiated_by, endorsements, required_endorsements,
                    initiated_at, effective_at, status, created_at",
     )
@@ -416,7 +418,7 @@ pub async fn ping_shard(
          SET last_ping_at = now(), updated_at = now()
          WHERE vault_pubkey = $1
          RETURNING id, subject_pubkey, vault_pubkey, ciphertext_cid,
-                   ciphertext_hash, algorithm_id, storage_uris, shard_holders,
+                   encode(ciphertext_hash, 'hex') AS ciphertext_hash, algorithm_id, storage_uris, shard_holders,
                    threshold, version, last_ping_at, created_at, updated_at",
     )
     .bind(&vault_pubkey)
@@ -439,7 +441,7 @@ pub async fn list_access_logs(
 ) -> Result<Json<Vec<AccessLogRow>>, AppError> {
     let rows = sqlx::query_as::<_, AccessLogRow>(
         "SELECT id, vault_pubkey, subject_pubkey, authority, purpose,
-                expiry, nonce, block_time
+                expiry, encode(nonce, 'hex') AS nonce, block_time
          FROM vault_access_logs
          WHERE vault_pubkey = $1
          ORDER BY block_time DESC

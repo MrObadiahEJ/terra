@@ -4,7 +4,27 @@
 
 > A country-agnostic, blockchain-anchored land administration platform. Built first for Cameroon. Designed from day one to belong to the world.
 
+**Program ID:** `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` (devnet / localnet)
+
 ---
+
+## Status
+
+All protocol modules (RFC-003 → RFC-011) are implemented end-to-end: on-chain
+Anchor program + PostGIS mirror + REST API + frontend client + IDL, with CI
+green on `dev` (fmt, `clippy -D warnings`, 54 lib unit tests, 47 API unit
+tests incl. live-PostGIS migration run, `tsc --noEmit`).
+
+Beyond CI, every protocol is verified by **BPF integration tests** (real
+program execution via `solana-program-test`, 9/9 passing) and a **76-check API
+smoke suite** against live PostGIS covering happy paths and guard rails
+(double-proof replay, early claims, stale roots, forged signatures, …).
+
+Known limits before `main`: no devnet deployment yet (see
+[Devnet checklist](#devnet-checklist)); ZK circuits are structural
+(proof bytes opaque, no on-chain Groth16 verification — needs audit);
+time-locked paths (7-day unbonding withdraw) are guard-verified, not
+time-executed, in the harness.
 
 ## Branching Strategy
 
@@ -13,328 +33,187 @@
 | **`main`** | Production-ready code. Only fully reviewed, tested, and approved protocols ship here. | Stable |
 | **`dev`** | Active development. New protocols, features, and experiments land here first. Merged to `main` after review. | Unstable |
 
-All work-in-progress (new RFCs, protocol implementations, breaking changes) goes to `dev`. When a feature is complete, reviewed, and all tests pass, it is merged into `main`. This keeps `main` deployable at all times.
+---
+
+## Protocol Catalog
+
+One-line principle: **the blockchain records who authorized what. It never
+records how to do it, and it never touches key material.**
+
+| RFC | Protocol | On-chain module | Instructions |
+|-----|----------|-----------------|--------------|
+| RFC-003 | Vault shard protocol (Shamir-shared encrypted recovery vaults) | `vault.rs` | create/authorize/rotate/endorse/execute/cancel/ping |
+| RFC-004 | Escrow settlement (native-SOL vault, seller/buyer guards) | `escrow.rs` | create/deposit/accept/settle/cancel/dispute/expire |
+| RFC-005 | Validator staking & slashing (graduated 10%/100% slash, 7-day unbonding + appeal) | `staking.rs` | pool/deposit/unbond/withdraw/report/slash/claim/distribute/dispute/dismiss |
+| RFC-006 | Cross-border identity bridge (jurisdictions, ZK bindings, nullifiers) | `cross_border.rs` | register/update/bind/verify/revoke/rebind |
+| RFC-007 | Dispute resolution & parcel freeze | `dispute.rs` | file/freeze/adjudicate/execute/cancel |
+| RFC-008 | Parcel subdivision & amalgamation (lineage records) | `subdivision.rs` | subdivide/amalgamate/migrate-rights/migrate-attestations |
+| RFC-009 | Time-bound credentials (expiry, grace, renewal, sweep) | `time_bound.rs` | renew/sweep/conditional-grant |
+| RFC-010 | Guardian & Recovery Council (policy layer on Succession: ≥3 validators, ≥90-day grace, court `case_hash`, revocation) | `guardian.rs` | request-court-guardianship/revoke-guardianship |
+| RFC-011 | Zero-knowledge ownership proofs (zone Merkle roots, nullifier first-use) | `zk.rs` | register-zone/generate-root/verify-proof/invalidate |
+
+Supporting modules: `authority_registry.rs` (validator registry, bootstrap →
+peer-consensus), `ipfs_docs.rs` (document anchors). Full specs live in
+[`docs/`](docs/) as `rfc-003…rfc-011`.
+
+69 instructions · 22 accounts · 57 events · 113 errors — see
+[`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json).
 
 ---
 
-## 🌍 Vision
+## Architecture Overview
 
-Land is the oldest form of wealth and the most disputed form of trust. In much of the world — starting with Cameroon — land ownership records are paper-based, centralized, understaffed, and vulnerable to fraud, loss, or manipulation. Terra exists to give any person, in any country, a way to register, verify, and transfer land rights with cryptographic certainty — without requiring them to trust a single government office, company, or server.
+Three layers, organized around **ISO 19152 (LADM)** concepts:
 
-Terra is **not** built to replace national law. It is built to make land records **verifiable, portable, and resilient** — a public infrastructure layer that governments, communities, and individuals can build on top of, regardless of legal tradition (civil law, common law, or customary/communal tenure).
-
-**Guiding principle:** the core protocol is universal. Country-specific rules are configuration, not code.
-
----
-
-## 🏗️ Architecture Overview
-
-Terra is organized around three conceptual layers, based on **ISO 19152 (LADM — Land Administration Domain Model)**, the international standard for cadastral and land administration systems.
-
-### Layer 0 — Ground Parcel (2D)
-The base cadastral unit: a surveyed polygon representing a single plot of land, its identifier, and its registered party (owner/rights-holder).
-
-### Layer 1 — Legal Volume (3D rights)
-The same parcel extended vertically — mineral rights below, air rights above, multi-story unit subdivisions. Represented as boundary faces/volumes rather than flat 2D shapes once a project reaches this maturity stage.
-
-### Layer 2 — Infrastructure & Plan Layer
-Roads, zoning, utilities, and the **road-access / infrastructure-validity flag** — an advisory (non-blocking) layer that detects whether a parcel has legitimate physical access to public infrastructure, without preventing any transaction.
-
-Each layer is its own data structure, cross-referenced by a shared spatial reference frame — never hard-merged into a single schema. This is what allows Terra to stay valid whether the parcel is in Soa (Cameroon), Libreville (Gabon), or Lagos (Nigeria), even though the *legal meaning* of a boundary differs by jurisdiction.
-
-### Country Layer (added last, by design)
-Legal tenure types, proof-of-ownership rules, and attesting-authority definitions live in a **configuration layer**, not in program logic. Cameroon, Gabon, Nigeria, and Ghana can each define their own `TenureType`, `AttestingAuthority`, and `ProofStandard` records without requiring a rewrite of the core protocol.
+- **On-chain (Solana/Anchor)** — `terra-core/programs/terra_registry`: parcel
+  identity, ownership, rights, and **hashes** of off-chain validation. Minimal
+  state, quorum primitives reused everywhere, region-scoped trust.
+- **Off-chain mirror (PostGIS + Axum)** — `terra-core/api`: every on-chain
+  account has a mirror table (migrations `0001…0019`), plus the spatial engine:
+  maintained parcel centroids, geometry write-guards, `parcel_spatial_stats`
+  and `zone_parcel_counts` views, `/spatial/*` radius/zone endpoints.
+- **Geo engine** — `terra-core/geo-engine` (`terra-geo`): pure-Rust OSM road
+  graph + Dijkstra/BFS reachability + SHA-256 canonical digests anchored
+  on-chain as `Parcel::access_hash`.
+- **Frontend** — `terra-web`: React 19 + Vite + CesiumJS globe, pnpm, typed
+  API client (`src/lib/api.ts`) covering every backend route.
 
 ```
-        ┌────────────────────────────┐
-        │   Country Config Layer     │  ← added last, per-nation
-        │ (tenure types, authorities)│
-        └────────────┬───────────────┘
-                      │
-        ┌─────────────▼───────────────┐
-        │ Layer 2 — Infrastructure    │  roads, zoning, access flags
-        ├─────────────────────────────┤
-        │ Layer 1 — Legal Volume      │  rights, air/mineral, subdivisions
-        ├─────────────────────────────┤
-        │ Layer 0 — Ground Parcel     │  surveyed boundary + owner
-        └─────────────────────────────┘
+browser ──▶ terra-web ──▶ terra-core/api ──┬──▶ PostGIS (mirror + spatial)
+                                            └──▶ Solana (source of truth)
 ```
 
 ---
 
-## 🧱 Technology Stack
-
-### Frontend — `terra-web`
-- **React 19** + **Vite 8** (es2022 target), styled with custom design-system CSS utilities
-- **CesiumJS 3D globe** for global 3D city rendering (parcel polygons, roads, POIs, draw-mode cadastral capture)
-- **pnpm** for dependencies (shared store — deliberate for constrained storage)
-- **@solana/web3.js 1.98 + @coral-xyz/anchor 0.32** for on-chain interaction
-- **@solana/wallet-adapter + Wallet Standard** for hardened browser wallet signing, with **Ed25519 signature verification** before any transaction is sent
-- **Zustand** for lightweight state management
-
-### Backend — `terra-core` (Rust workspace)
-- **Anchor** framework — Solana smart contract (program): parcels, rights, transfers, infra flags, and **multi-validator attestations**
-- **PostGIS** (PostgreSQL + spatial extension) — off-chain geospatial fusion database for parcels, roads, and terrain
-- **Axum 0.8 + sqlx** — REST/API service layer between the frontend and both PostGIS + Solana
-- **`terra-geo` (geo-engine)** — pure-Rust OSM road graph + Dijkstra/BFS reachability + SHA-256 canonical digests
-- **ed25519-dalek + bs58** — off-chain verification of validator signatures against wallet public keys
-- **Solana Devnet → Mainnet** — blockchain layer for immutable ownership records, content-hash anchors, and validation signatures
-
-### Data & Validation Layer
-- Off-chain geometry computation (road-access reachability, boundary validation) — never run expensive geometry directly on-chain
-- On-chain storage limited to: parcel identity, ownership, rights, and **hashes** of off-chain-computed validation results (auditable, tamper-evident, cheap)
-
----
-
-## 🗺️ Data Resources
-
-| Resource | Provides | License / Cost | Risk Level |
-|---|---|---|---|
-| **OpenStreetMap (OSM)** | Road network graph, points of interest | Free, ODbL license, bulk downloadable | ✅ Low — primary source for road-access algorithm |
-| **Copernicus Sentinel-2** | Optical satellite imagery (10m resolution) | Free, open, no usage restriction (EU law) | ✅ Low — attribution required on redistribution |
-| **Copernicus DEM / SRTM** | Global elevation data | Free, global coverage | ✅ Low — terrain/drainage/slope base layer |
-| **Drone photogrammetry (self-captured)** | Centimeter-to-decimeter precision parcel boundaries | Hardware cost only (~$500–1000 drone) + free software (OpenDroneMap/WebODM) | ✅ Low — best precision-to-cost ratio for pilot zones |
-| **Google Photorealistic 3D Tiles** | Rendered 3D city visualization | Free tier + paid per-tile beyond quota | ⚠️ Medium — visualization only, not a data export, do not use as source-of-truth geometry |
-| **Commercial high-res satellite (Maxar, Planet Labs)** | 30cm–3m resolution imagery | Paid, per km² | ⚠️ Medium — check licensing terms before long-term reliance |
-| **MINDCAF cadastral records (Cameroon)** | Authoritative legal ownership records | No public API; requires institutional relationship | 🔴 High uncertainty — future partnership target, not a current resource |
-| **MINHDU urban master plans (Cameroon)** | Zoning / road planning documents | Paper/PDF only, no structured geodata | 🔴 High uncertainty — requires manual digitization |
-| **National cadastre API (any country)** | — | Does not currently exist for Cameroon or most pilot-target nations | 🔴 Non-existent — do not assume availability |
-
-**Legal note:** Copernicus data is governed by EU law and is free and open for global use — including commercial use, reproduction, and derivative works — with no nationality restriction. This is distinct from sanctions law, which targets specific transactions, not open scientific/earth-observation data. Always attribute per the [Copernicus Sentinel Data Legal Notice](https://sentinels.copernicus.eu/documents/247904/690755/Sentinel_Data_Legal_Notice).
-
----
-
-## 🚩 Road-Access Validation (Infrastructure Flag)
-
-A non-blocking advisory layer that flags — but never prevents — a land transaction:
-
-- **Reachability check**: Dijkstra over the parcel-adjacent road graph (min-heap), plus a BFS connected-component labeling to measure how much sealed (paved/main) network a parcel can actually reach.
-- **Frontage check**: distance from parcel boundary to the nearest road edge (with a `ROAD_ACCESS_THRESHOLD_M` of 50 m).
-- Result is reduced to a **canonical SHA-256 digest** — `access_digest(parcel_id || flags || metrics)` — that is anchored on-chain in `Parcel::access_hash`. Geometry itself stays off-chain in PostGIS; only the auditable digest and the derived flag bitmask go on Solana. The API independently recomputes this digest during reconciliation and rejects an inconsistent anchor.
-
----
-
-## 🧾 On-Chain Attestation & Multi-Validator Validation
-
-Heavy off-chain data (deeds, surveys, contracts, notarizations) is bonded to the on-chain record by a content-hash anchor and **wallet-bound cryptographic signatures** — so a document can be traced to its owning wallet, and each validator can be verified by what they actually signed.
-
-- **On-chain `Attestation` account** (PDA `["attestation", parcel, specifier]`) anchors:
-  - `content_hash` — SHA-256 over the off-chain payload (documents/signing artifact)
-  - the set of **validator wallets** (up to 8) and a **required threshold** — i.e. *who* must sign off, useful when several parties validate a land purchase
-- **Per-validator signatures** are stored off-chain (`validations`) and cryptographically verified with Ed25519 against the wallet's public key over the fixed canonical message `content_hash || onchain_id`.
-- An endpoint recomputes each signature's validity and exposes `has_quorum` (valid signatures ≥ threshold), so anyone can confirm from a validator's wallet exactly what they signed and validated.
-- **Documents** are bound to a parcel + owner wallet off-chain (`documents` table) with a content hash and storage reference.
-
-This gives non-repudiation (a validator can't deny what they signed) and multi-party approval tracking without bloating the chain with heavy payloads.
-
----
-
-## 🧑‍⚖️ Identity & Wallet Passation (the failure-modes layer)
-
-Land registries fail when a person isn't in the database, when an owner/heir has
-never appeared on the platform, or when a validator/owner dies. Terra handles
-these three cases with an on-chain **Identity** account and a time-boxed
-**Succession (wallet passation)** mechanism, plus collective validator seizure
-for judicial forfeiture.
-
-### Person → wallet binding (even when the system creates the wallet)
-
-Everything ultimately resolves to a **wallet**, because only a wallet can sign.
-To bind a *person* to that wallet, an `Identity` account (PDA `["identity",
-identity_hash]`) stores a **hash of the person's identity credential** (e.g.
-national ID) plus their `owner` wallet and a separate `recovery` wallet.
-
-- The system can **provision** a wallet for a person who has none — but the
-  private key is **exported to the person** (seed/paper/biometric). The server
-  never holds it, preserving the "security can't be traded" principle.
-- The identity **hash** (never the raw credential) is what appears on-chain, so
-  the person isn't exposed but the binding is cryptographically resolvable.
-- A `validator` and a `classic owner` are the **same wallet primitive** — their
-  difference is a *role in state* (`Attestation.validators` vs `Parcel.owner`),
-  enforced by program logic, not a different key type.
-
-### Wallet passation (`Succession`) — heirs, recovery, transfer of control
-
-A `Succession` account (PDA `["succession", identity, successor]`) queues a
-control transfer that becomes effective only after **two independent gates** are
-met: a **configurable grace window** AND a **minimum number of validator
-endorsements** (so a stolen wallet can't seize land alone):
-
-- `request_succession` — the owner (or the recovery wallet, for key-loss) names
-  a successor: kind `0`=heir, `1`=recovery, `2`=transfer. The requester picks a
-  per-request grace window (default 30 days, clamped to [7d, 180d]) and a
-  `required_validations` threshold (>= 1) of declared local validators.
-- `endorse_succession` — each declared local validator signs the endorsement tx
-  with their wallet; each endorsement bumps `validations_count` and is
-  immutably recorded in `succession_endorsements` (one endorsement per validator
-  per succession).
-- `claim_succession` — **only after** `validations_count >= required` **AND**
-  `effective_at <= now()` the successor takes over the identity; any owned
-  parcels are **re-pointed** to their wallet in the same instruction
-  (`remaining_accounts`).
-- The **original owner can `cancel`** within the window (no theft).
-
-This two-gate mechanism means:
-- a stolen wallet can't claim without the local validators testifying;
-- even a colluding thief who knows the successor still needs the full
-  validator set to endorse; and
-- legitimate heirs far from a local validator get a configurable grace window
-  instead of a rigid 7-day cutoff.
-
-### Dead / leaving validators — `rotate_validators`
-
-If validators die and quorum becomes unreachable, the **parcel owner** calls
-`rotate_validators` to replace the validator set on the `Attestation` (with a
-monotonic `version` bump so a reconstituted set is auditable). Combined with
-thresholds below `count`, this means:
-- threshold already survives some deaths (`required` < `count`);
-- when deaths exceed the slack, **rotation** restores reachability instead of a
-  permanent deadlock; and
-- if the *owner* is gone too, **succession** passes control to an heir first,
-  then the heir rotates the validators.
-
-### Judicial forfeiture (`judicial_forfeiture`) — collective validator seizure
-
-For cases where an owner refuses to release land despite a court order (e.g.
-repossession by government, or a court ruling that title passed to another
-person), Terra provides a **deliberately heavier** collective forfeiture
-mechanism:
-
-- The relaying authority (court/govt channel) calls `judicial_forfeiture` with
-  a `case_hash` (SHA-256 of the court order document), `new_owner` (the wallet
-  receiving control), a `threshold` (>= 2 validators), and a `validators` list.
-- At least `threshold` of the declared validators must **sign the same
-  transaction** as `Signer` accounts in `remaining_accounts`, making each
-  endorsement cryptographically undeniable (each validator's ed25519 wallet
-  signs the tx).
-- When the threshold is met, the program transfers `Parcel.owner` to `new_owner`
-  and emits a `ParcelForfeited` event with the case hash, from/to, and the
-  threshold/present counts for auditability.
-- The relaying authority **cannot** be the current owner (prevents self-forfeit
-  abuse).
-- This is recorded in the `forfeitures` DB table with a `court_relay` fail-safe
-  column for off-chain reconciliation.
-
-This makes forfeiture deliberately heavier than a normal transfer: at least 2
-validator signers are required, and each signs the actual transaction (not an
-off-chain signature), so the collective validator consent is cryptographically
-unimpeachable.
-
-These four mechanisms (`Identity`, `Succession` with validator endorsement,
-`rotate_validators`, `judicial_forfeiture`) are the recovery layer that makes
-the registry resilient to disconnected people, unknown/absent owners, mortality,
-and judicial seizure.
-
----
-
-## 📚 Key References
-
-- ISO 19152 — Land Administration Domain Model (LADM), Parts 1, 2, and 5 (spatial plan / 3D-4D urban integration)
-- *Land Administration for Sustainable Development* — Williamson, Enemark, Wallace & Rajabifard
-- *Fit-for-Purpose Land Administration* — World Bank / FIG / GLTN
-- *The Mystery of Capital* — Hernando de Soto
-- Comparable open-source references: `gujarat-landchain`, `SkyTradeLinks/solana-land`, `Auguron/solana-deed-metadata-program`
-
----
-
-## 🎯 Roadmap & Milestones
-
-- [x] Architecture research — LADM standard, comparable Solana land-registry repos, data-source legal review
-- [x] Country-agnostic core data model designed (Parcel / Rights / Owner / InfrastructureFlag)
-- [x] **Phase 1 — Devnet MVP**: flat parcel registry, Anchor program, ownership transfer, rights, Cesium globe
-- [x] **Phase 2 — Pilot data layer**: PostGIS fusion database, OSM road-graph ingestion, geo-engine
-- [x] **Phase 3 — Road-access validation**: off-chain Dijkstra/BFS reachability, on-chain flag + digest hashing
-- [x] **Phase 4 — Attestation + recovery**: on-chain content-hash anchor, multi-validator Ed25519 validation, Identity binding, validator-endorsed wallet passation (configurable grace), validator rotation, and judicial forfeiture
-- [ ] **Phase 5 — Legal 3D/air-rights layer**: legal volume extension (LADM Part 1 extension)
-- [ ] **Phase 6 — Country config layer**: tenure-type abstraction, multi-authority attestation workflows
-- [ ] **Phase 7 — Regional expansion**: Central Africa -> Africa -> World
-- [ ] **Phase 8 — Global platform**: smart-city digital twin integration, cross-border interoperability
-
----
-
-## 📁 Monorepo Structure
+## Monorepo Structure
 
 ```
 terra/
-├── terra-web/                   # React 19 + Vite + CesiumJS frontend
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── map/             # TerraGlobe (Cesium viewer, drawing)
-│   │   │   ├── panels/          # register / parcel / list panels
-│   │   │   └── layout/          # navbar (wallet buttons)
-│   │   ├── pages/               # GlobePage
-│   │   ├── idl/                 # generated IDL + typed Anchor client
-│   │   ├── store/               # zustand app store
-│   │   └── lib/                 # api, program, wallet, codec, constants
-│   └── package.json             # pnpm
-├── terra-core/                  # Rust + Anchor workspace
-│   ├── programs/terra_registry/ # Anchor on-chain program (parcel/rights/attest)
-│   ├── api/                     # Axum 0.8 + sqlx/PostGIS service
-│   │   ├── src/routes/          # parcels, geo, fusion, pilot-zones, attestations
-│   │   └── migrations/          # 0001..0005 PostGIS schema
-│   └── geo-engine/              # OSM graph + reachability + digest (terra-geo)
-├── data/
-│   └── *.osm.pbf                # OSM extracts for the geo-engine
-└── README.md
+├── terra-web/                        # React 19 + Vite + CesiumJS frontend (pnpm)
+│   ├── src/idl/                      # terra_registry.json + terraRegistry.ts
+│   └── src/lib/api.ts                # typed client for all ~118 API routes
+├── terra-core/                       # Rust workspace (terra-registry, terra-api, terra-geo)
+│   ├── programs/terra_registry/src/  # lib.rs + 11 protocol modules + tests/
+│   ├── api/src/routes/               # 18 route modules (parcels, staking, zk_proofs, spatial, …)
+│   ├── api/migrations/               # 0001…0019 (PostGIS schema + mirrors)
+│   └── geo-engine/                   # OSM graph + reachability (terra-geo)
+├── docs/                             # rfc-003 … rfc-011
+└── .github/workflows/ci.yml          # fmt, clippy, lib/api tests (PostGIS svc), tsc
 ```
 
 ---
 
-## ⚙️ Running Locally
+## Running Locally
 
-> Frontend and backend are separate workspaces inside one monorepo.
+Prerequisites: Rust stable, Node 22 + pnpm 10, PostgreSQL 16 + PostGIS 3,
+Solana CLI (for `solana-test-validator`), `cargo-build-sbf` + platform tools
+for BPF builds.
 
-### 1. Database (PostGIS)
+### 1. Database
+
+Any PostgreSQL 16 with PostGIS works — a scratch instance needs no root:
 
 ```bash
-docker run --name terra-postgis \
-  -e POSTGRES_PASSWORD=terra -e POSTGRES_DB=terra_dev \
-  -p 5432:5432 -d postgis/postgis:16-3.4
+export PATH=/usr/lib/postgresql/16/bin:$PATH
+initdb -D /tmp/pgdata -U terra --auth=trust
+pg_ctl -D /tmp/pgdata -o "-p 5433" -l /tmp/pg.log start
+createdb -h localhost -p 5433 -U terra terra_dev
 ```
 
-### 2. Backend (`terra-core`)
+(The API auto-applies migrations on boot via `sqlx::migrate!()`.)
+
+### 2. Backend
 
 ```bash
 cd terra-core
-# configuration lives in api/.env (see api/.env.example)
-cargo check --workspace        # confirm everything compiles
-cargo test -p terra-geo --lib  # road-access + digest unit tests
-cargo run -p terra-api         # serves API on :8080 (migrations auto-applied)
+cargo check -p terra-registry            # on-chain program (native)
+cargo test -p terra-registry --lib       # 54 unit tests
+cargo test -p terra-api                  # 51 API unit tests
+DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
+  cargo run -p terra-api                 # serves /api/v1 (migrations auto-applied)
 ```
 
-The Anchor program:
+### 3. On-chain program (BPF) + integration tests
+
+`anchor build` is not used (manifest parsing is broken in this environment);
+build the BPF program directly:
+
 ```bash
-anchor build                   # compiles the program + regenerates terra-web/src/idl/*
+cd terra-core/programs/terra_registry
+cargo build-sbf                          # → ../../target/deploy/terra_registry.so
+cd ../..
+BPF_OUT_DIR=$PWD/target/deploy cargo test -p terra-registry --test integration
 ```
 
-### 3. Frontend (`terra-web`)
+`BPF_OUT_DIR` is required so `solana-program-test` finds the `.so`. (A
+`terra-core/.cargo/config.toml` setting this permanently is on the todo list.)
+
+### 4. Frontend
 
 ```bash
 cd terra-web
-pnpm install
-pnpm dev                       # Vite dev server (proxies /api to :8080)
+pnpm install --frozen-lockfile
+pnpm exec tsc --noEmit
+pnpm dev
 ```
 
-### 4. Verification
+---
 
-```bash
-cd terra-web && npx tsc -b && ./node_modules/.bin/eslint . && pnpm build
-```
+## Verification
 
-> **Note (storage):** the repo uses **pnpm** for the frontend and gitignores
-> `node_modules`, `dist`, and `public/cesium` (Cesium's 7.8 MB static assets are
-> copied at build/dev time). The Rust `target/` dir is also untracked.
+| Layer | How | Status |
+|-------|-----|--------|
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 54/54 |
+| Unit (API validation logic) | `cargo test -p terra-api` | 51/51 |
+| BPF execution (9 scenarios incl. negative guards, replay, time-guard code) | `cargo test --test integration` + `BPF_OUT_DIR` | 9/9 |
+| API end-to-end vs live PostGIS (76 checks, happy + guard paths) | smoke suite over `/api/v1` | 76/76 |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 19/19 apply |
+| Frontend↔API contract (112 calls vs 118 routes, method+path) | static cross-check | 100% match |
+| IDL vs program (instructions/args/errors/accounts) | static cross-check | match |
+| Frontend types | `tsc --noEmit` | clean |
+| Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
+
+### Devnet checklist
+
+- [ ] `solana-test-validator` run with program deployed (loads the audited `.so`)
+- [ ] Withdraw-after-7d-unbonding executed against real clock time
+- [ ] `anchor build` manifest issue resolved or build pipeline pinned to `cargo build-sbf`
+- [ ] Permanent `BPF_OUT_DIR` config for integration tests
+- [ ] Frontend wallet signing wired to deployed program ID
+- [ ] ZK circuit choice (Groth16/PLONK) + external audit (RFC-006/011)
+- [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one)
+
+---
+
+## Roadmap
+
+- [x] Architecture research — LADM, comparable repos, data-source legal review
+- [x] Country-agnostic core model (Parcel / Rights / Owner / infra flags)
+- [x] Phase 1 — parcel registry, transfers, rights, Cesium globe
+- [x] Phase 2 — PostGIS fusion, OSM ingestion, geo-engine
+- [x] Phase 3 — road-access validation + on-chain digest anchor
+- [x] Phase 4 — attestations, Identity, Succession, rotation, forfeiture
+- [x] RFC-003…RFC-009 protocol suite (vault, escrow, staking, cross-border, disputes, subdivision, time-bound)
+- [x] RFC-010 guardianship + RFC-011 ZK proofs + PostGIS spatial architecture
+- [x] Full verification (BPF execution, live-DB smoke, contract cross-checks)
+- [ ] Devnet deployment (see checklist above)
+- [ ] Phase 5 — legal 3D/air-rights layer
+- [ ] Phase 6 — country config layer (tenure types, multi-authority)
+- [ ] Phase 7/8 — regional expansion → global platform
 
 ---
 
 ## 🤝 Contributing
 
-This project is intended to remain open-source and community-governed as it grows beyond its country of origin. Contribution guidelines, code of conduct, and governance structure will be published as the project moves past the Devnet pilot phase.
+Open-source and community-governed as it grows. Contribution guidelines and
+governance will be published past the devnet pilot.
 
 ## 📜 License
 
-*(To be finalized — recommend a permissive open-source license such as Apache-2.0 or MIT to maximize adoption across jurisdictions, given the multi-country ambition of this project.)*
+*(To be finalized — Apache-2.0 or MIT recommended, given the multi-country ambition.)*
 
 ## ⚠️ Disclaimer
 
-Terra is a technical infrastructure project and does not itself confer legal title to land. Legal ownership remains governed by the applicable national law of the jurisdiction in which a parcel is located. Terra's role is to make locally-recognized rights more verifiable, portable, and fraud-resistant.
+Terra is technical infrastructure and does not itself confer legal title.
+Ownership remains governed by applicable national law; Terra makes
+locally-recognized rights more verifiable, portable, and fraud-resistant.

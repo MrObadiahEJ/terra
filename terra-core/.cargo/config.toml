@@ -1,0 +1,5 @@
+# Points solana-program-test at the BPF program output so
+# `cargo test -p terra-registry --test integration` works without any
+# environment setup. Path is relative to this file (workspace root).
+[env]
+BPF_OUT_DIR = { value = "target/deploy", relative = true }

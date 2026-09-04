@@ -115,7 +115,7 @@ async fn list_rights_for_parcel(
     Ok(Json(rights))
 }
 
-async fn renew_right(
+pub async fn renew_right(
     State(state): State<AppState>,
     Path((parcel_id, _nonce)): Path<(Uuid, u16)>,
     Json(req): Json<RenewRightRequest>,
@@ -172,7 +172,7 @@ async fn renew_right(
     Ok(Json(updated))
 }
 
-async fn sweep_expired_right(
+pub async fn sweep_expired_right(
     State(state): State<AppState>,
     Path((parcel_id, _nonce)): Path<(Uuid, u16)>,
     Json(_req): Json<SweepRightRequest>,

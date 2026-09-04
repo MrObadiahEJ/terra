@@ -154,17 +154,16 @@ async fn register_zone_set(
     crate::routes::identities::decode_wallet(&req.authority)?;
 
     let mut tx = state.pool.begin().await?;
-    let row: ZoneSet = sqlx::query_as(&format!(
-        "{ZONE_SET_SELECT} WHERE id = (
-            INSERT INTO zone_sets (zone_set_address, zone_id, authority)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (zone_set_address) DO UPDATE SET
-                zone_id = EXCLUDED.zone_id,
-                authority = EXCLUDED.authority,
-                updated_at = now()
-            RETURNING id
-        )"
-    ))
+    let row: ZoneSet = sqlx::query_as(
+        "INSERT INTO zone_sets (zone_set_address, zone_id, authority)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (zone_set_address) DO UPDATE SET
+            zone_id = EXCLUDED.zone_id,
+            authority = EXCLUDED.authority,
+            updated_at = now()
+         RETURNING id, zone_set_address, zone_id, authority,
+                   parcel_count, current_root_version, created_at, updated_at",
+    )
     .bind(&req.zone_set_address)
     .bind(&req.zone_id)
     .bind(&req.authority)
@@ -245,15 +244,15 @@ async fn generate_root(
     .execute(&mut *tx)
     .await?;
 
-    let row: OwnershipRoot = sqlx::query_as(&format!(
-        "{ROOT_SELECT} WHERE id = (
-            INSERT INTO ownership_roots
-                (zone_set_id, root_address, merkle_root, version, commitment_count,
-                 algorithm_id, snapshot_cid, snapshot_hash, authority_signature)
-            VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)
-            RETURNING id
-        )"
-    ))
+    let row: OwnershipRoot = sqlx::query_as(
+        "INSERT INTO ownership_roots
+            (zone_set_id, root_address, merkle_root, version, commitment_count,
+             algorithm_id, snapshot_cid, snapshot_hash, authority_signature)
+         VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)
+         RETURNING id, zone_set_id, root_address, merkle_root, version,
+                   commitment_count, algorithm_id, snapshot_cid, snapshot_hash,
+                   authority_signature, created_at, updated_at",
+    )
     .bind(id)
     .bind(&req.root_address)
     .bind(&req.merkle_root)
@@ -302,14 +301,13 @@ async fn verify_proof(
         ));
     }
 
-    let row: NullifierRecord = sqlx::query_as(&format!(
-        "{NULLIFIER_SELECT} WHERE id = (
-            INSERT INTO nullifier_records
-                (nullifier_hash, zone_set_id, root_version, prover, proof_purpose, disclosure_type)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id
-        )"
-    ))
+    let row: NullifierRecord = sqlx::query_as(
+        "INSERT INTO nullifier_records
+            (nullifier_hash, zone_set_id, root_version, prover, proof_purpose, disclosure_type)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, nullifier_hash, zone_set_id, root_version,
+                   prover, proof_purpose, disclosure_type, block_time, created_at",
+    )
     .bind(&req.nullifier_hash)
     .bind(id)
     .bind(req.root_version)

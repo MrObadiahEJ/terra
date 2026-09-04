@@ -86,7 +86,6 @@ const MIN_DISPUTE_VALIDATORS: u16 = 2;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_disputes))
-        .route("/", post(file_dispute))
         .route("/{id}", get(get_dispute))
         .route("/{id}/freeze", post(freeze_parcel))
         .route("/{id}/adjudicate", post(adjudicate_dispute))
@@ -113,7 +112,7 @@ async fn get_dispute(
     Ok(Json(dispute))
 }
 
-async fn file_dispute(
+pub async fn file_dispute(
     State(state): State<AppState>,
     Path(parcel_id): Path<Uuid>,
     Json(req): Json<FileDisputeRequest>,
