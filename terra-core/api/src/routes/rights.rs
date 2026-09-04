@@ -39,6 +39,9 @@ pub struct Right {
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: some fields are reserved for on-chain reconciliation and
+// not yet consumed by the mirror handlers.
+#[allow(dead_code)]
 pub struct RenewRightRequest {
     pub nonce: u16,
     pub new_expires_at: String,
@@ -48,11 +51,17 @@ pub struct RenewRightRequest {
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: keeper authorizes the sweep call; the mirror derives the
+// target right from the path.
+#[allow(dead_code)]
 pub struct SweepRightRequest {
     pub keeper: String,
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: mirrors the on-chain grant_conditional_right args; the
+// mirror currently persists a subset.
+#[allow(dead_code)]
 pub struct GrantConditionalRightRequest {
     pub parcel_id: String,
     pub nonce: u16,
@@ -108,7 +117,7 @@ async fn list_rights_for_parcel(
 
 async fn renew_right(
     State(state): State<AppState>,
-    Path((parcel_id, nonce)): Path<(Uuid, u16)>,
+    Path((parcel_id, _nonce)): Path<(Uuid, u16)>,
     Json(req): Json<RenewRightRequest>,
 ) -> Result<Json<Right>, AppError> {
     let new_expires_at: DateTime<Utc> = req
@@ -166,7 +175,7 @@ async fn renew_right(
 async fn sweep_expired_right(
     State(state): State<AppState>,
     Path((parcel_id, _nonce)): Path<(Uuid, u16)>,
-    Json(req): Json<SweepRightRequest>,
+    Json(_req): Json<SweepRightRequest>,
 ) -> Result<Json<Right>, AppError> {
     let mut tx = state.pool.begin().await?;
 
@@ -233,8 +242,6 @@ async fn grant_conditional_right(
     let Some((_owner,)) = current else {
         return Err(AppError::not_found("parcel not found"));
     };
-
-    let now = Utc::now();
 
     let right = sqlx::query_as::<_, Right>(
         "INSERT INTO rights (parcel_id, rights_kind, holder, granter, expires_at, notes, status, grace_period_secs)

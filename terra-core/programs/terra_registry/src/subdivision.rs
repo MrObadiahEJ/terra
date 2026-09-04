@@ -78,10 +78,10 @@ pub struct AmalgamationRecord {
 /// belonging to the given parcel. Returns the borsh-serialized data if valid.
 fn verify_rights_account<'info>(
     account: &AccountInfo<'info>,
-    program_id: &Pubkey,
-    expected_parcel: &Pubkey,
+    program_id: Pubkey,
+    expected_parcel: Pubkey,
 ) -> Result<()> {
-    require!(account.owner == program_id, TerraError::NotOwner);
+    require!(*account.owner == program_id, TerraError::NotOwner);
     let data = account.try_borrow_data()?;
     let disc: &[u8] = <crate::Rights as anchor_lang::Discriminator>::DISCRIMINATOR;
     require!(
@@ -92,7 +92,7 @@ fn verify_rights_account<'info>(
     let mut parcel_bytes = [0u8; 32];
     parcel_bytes.copy_from_slice(&data[8..40]);
     let parcel = Pubkey::new_from_array(parcel_bytes);
-    require!(parcel == *expected_parcel, TerraError::NotOwner);
+    require!(parcel == expected_parcel, TerraError::NotOwner);
     Ok(())
 }
 
@@ -273,11 +273,13 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
     let mut migrated: u8 = 0;
 
     for account in ctx.remaining_accounts.iter() {
-        verify_rights_account(account, &ctx.program_id, &old_parcel.key())?;
+        verify_rights_account(account, *ctx.program_id, old_parcel.key())?;
 
         let data = account.try_borrow_data()?;
 
-        // Read Rights fields from raw data.
+        // Read Rights fields from raw data. Only rights_kind + holder are
+        // re-emitted (the event carries what the caller needs to recreate);
+        // the rest are parsed for layout validation and intentionally unused.
         // Layout after 8-byte discriminator:
         //   8..40   parcel (Pubkey)
         //   40..41  rights_kind (u8)
@@ -295,10 +297,10 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
         granter.copy_from_slice(&data[73..105]);
         let mut created_at = [0u8; 8];
         created_at.copy_from_slice(&data[105..113]);
-        let created_at = i64::from_le_bytes(created_at);
+        let _created_at = i64::from_le_bytes(created_at);
         let mut expires_at = [0u8; 8];
         expires_at.copy_from_slice(&data[113..121]);
-        let expires_at = i64::from_le_bytes(expires_at);
+        let _expires_at = i64::from_le_bytes(expires_at);
 
         // Read notes string.
         let notes_start = 121;
@@ -309,14 +311,14 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
             data[notes_start + 3],
         ]) as usize;
         let notes_bytes = &data[notes_start + 4..notes_start + 4 + notes_len];
-        let notes = String::from_utf8_lossy(notes_bytes).to_string();
+        let _notes = String::from_utf8_lossy(notes_bytes).to_string();
 
         // Read status and grace_period_secs.
         let status_start = notes_start + 4 + notes_len;
-        let status = data[status_start];
+        let _status = data[status_start];
         let mut grace_period_secs = [0u8; 8];
         grace_period_secs.copy_from_slice(&data[status_start + 1..status_start + 9]);
-        let grace_period_secs = i64::from_le_bytes(grace_period_secs);
+        let _grace_period_secs = i64::from_le_bytes(grace_period_secs);
 
         // Close old account — return lamports to authority.
         let old_lamports = account.lamports();

@@ -29,7 +29,11 @@ fn run(args: &[String]) -> Result<()> {
             let path = args.get(2).context("missing <file.pbf>")?;
             let lon: f64 = args.get(3).context("missing <lon>")?.parse()?;
             let lat: f64 = args.get(4).context("missing <lat>")?.parse()?;
-            let radius: f64 = args.get(5).map(|r| r.parse()).transpose()?.unwrap_or(1000.0);
+            let radius: f64 = args
+                .get(5)
+                .map(|r| r.parse())
+                .transpose()?
+                .unwrap_or(1000.0);
             query(path, lon, lat, radius)
         }
         _ => Err(anyhow::anyhow!("unknown command")),

@@ -229,12 +229,7 @@ pub fn flip_to_consensus(ctx: Context<super::FlipToConsensus>) -> Result<()> {
     );
 
     let n = registry.validators.len() as u8;
-    let required = (n * CONSENSUS_FRACTION_NUM / CONSENSUS_FRACTION_DEN)
-        + if (n * CONSENSUS_FRACTION_NUM) % CONSENSUS_FRACTION_DEN != 0 {
-            1
-        } else {
-            0
-        };
+    let required = (n * CONSENSUS_FRACTION_NUM).div_ceil(CONSENSUS_FRACTION_DEN);
 
     registry.mode = registry_mode::PEER_CONSENSUS;
     registry.required_endorsements = required;

@@ -66,17 +66,26 @@ pub struct AcceptEscrowRequest {
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: settler authorizes settlement; the mirror derives the
+// escrow from the path.
+#[allow(dead_code)]
 pub struct SettleEscrowRequest {
     pub settler: String,
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: mirrors the on-chain cancel args; buyer is re-checked
+// against the escrow row at a later milestone.
+#[allow(dead_code)]
 pub struct CancelEscrowRequest {
     pub canceller: String,
     pub buyer: String,
 }
 
 #[derive(Debug, Deserialize)]
+// API contract type: caller authorizes expiry; the mirror derives the escrow
+// from the path.
+#[allow(dead_code)]
 pub struct ExpireEscrowRequest {
     pub caller: String,
 }
@@ -298,7 +307,7 @@ async fn accept_escrow(
 async fn settle_escrow(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(req): Json<SettleEscrowRequest>,
+    Json(_req): Json<SettleEscrowRequest>,
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 
@@ -482,7 +491,7 @@ async fn dispute_escrow(
 async fn expire_escrow(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Json(req): Json<ExpireEscrowRequest>,
+    Json(_req): Json<ExpireEscrowRequest>,
 ) -> Result<Json<Escrow>, AppError> {
     let mut tx = state.pool.begin().await?;
 

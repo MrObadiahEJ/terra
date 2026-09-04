@@ -89,8 +89,5 @@ fn line_intersection_point(a: &Line<f64>, b: &Line<f64>) -> Option<Coord<f64>> {
 
 fn line_string_segments(line: &LineString<f64>) -> Vec<Line<f64>> {
     let coords: Vec<Coord<f64>> = line.coords().copied().collect();
-    coords
-        .windows(2)
-        .map(|w| Line::new(w[0], w[1]))
-        .collect()
+    coords.windows(2).map(|w| Line::new(w[0], w[1])).collect()
 }

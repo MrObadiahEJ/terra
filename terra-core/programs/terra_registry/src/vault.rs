@@ -232,7 +232,7 @@ pub fn initiate_shard_rotation(
     let vault_key = ctx.accounts.vault_record.key();
     let clock = Clock::get()?;
     let n = ctx.accounts.vault_record.shard_holders.len() as u8;
-    let required = (n * 2 / 3) + if n % 3 != 0 { 1 } else { 0 };
+    let required = (n * 2).div_ceil(3);
 
     let rotation = &mut ctx.accounts.rotation;
     rotation.vault = vault_key;

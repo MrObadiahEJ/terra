@@ -1,3 +1,8 @@
+// Anchor's #[program] macro expands to custom cfg flags (custom-heap,
+// custom-panic, target_os solana) that rustc's unexpected_cfgs lint does not
+// know about. Silence it at the crate root; our own cfgs are unaffected.
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 
@@ -143,7 +148,6 @@ pub const MIN_SUCCESSION_VALIDATIONS: u8 = 1;
 pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
 
 /// The account struct (below) uses these — bump the account size accordingly.
-
 pub mod succession_kind {
     /// Wallet passation to an heir/beneficiary (estate / inheritance).
     pub const SUCCESSOR: u8 = 0;
@@ -1290,6 +1294,9 @@ pub mod terra_registry {
         time_bound::sweep_expired_rights(ctx, nonce)
     }
 
+    // Instruction args mirror the on-chain Right + condition fields; the
+    // arity is inherent to the instruction, not a design smell.
+    #[allow(clippy::too_many_arguments)]
     pub fn grant_conditional_right(
         ctx: Context<GrantConditionalRight>,
         nonce: u8,
@@ -2496,7 +2503,7 @@ pub struct VerifyAndSlash<'info> {
         constraint = reporter.key() == slashing_report.reporter @ TerraError::NotValidator,
     )]
     /// CHECK: Reporter wallet — validated by constraint.
-    pub reporter: AccountInfo<'info>,
+    pub reporter: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
 }
@@ -2601,7 +2608,7 @@ pub struct DismissReport<'info> {
     pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
     #[account(mut)]
     /// CHECK: Reporter wallet — validated by slashing_report PDA seeds.
-    pub reporter: AccountInfo<'info>,
+    pub reporter: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
 }
 
@@ -2661,7 +2668,7 @@ pub struct RegisterZoneSet<'info> {
     )]
     pub registry: Account<'info, authority_registry::AuthorityRegistry>,
     /// CHECK: Zone identifier account (e.g. pilot zone key).
-    pub zone_id: AccountInfo<'info>,
+    pub zone_id: UncheckedAccount<'info>,
     #[account(
         init,
         payer = authority,

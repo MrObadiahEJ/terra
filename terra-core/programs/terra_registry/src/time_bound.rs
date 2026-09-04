@@ -180,6 +180,7 @@ pub fn sweep_expired_rights(ctx: Context<super::SweepExpiredRights>, _nonce: u8)
 }
 
 /// Grant a right with an additional time-bound condition.
+#[allow(clippy::too_many_arguments)]
 pub fn grant_conditional_right(
     ctx: Context<super::GrantConditionalRight>,
     nonce: u8,
@@ -218,7 +219,7 @@ pub fn grant_conditional_right(
         TerraError::ConditionDeadlineAfterExpiry
     );
     require!(
-        grace_period_secs >= 0 && grace_period_secs <= MAX_GRACE_PERIOD_SECS,
+        (0..=MAX_GRACE_PERIOD_SECS).contains(&grace_period_secs),
         TerraError::InvalidGracePeriod
     );
 

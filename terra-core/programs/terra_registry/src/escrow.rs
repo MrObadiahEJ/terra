@@ -71,7 +71,7 @@ pub fn create_escrow(ctx: Context<super::CreateEscrow>, amount: u64, buyer: Pubk
         TerraError::SelfDealingNotAllowed
     );
     require!(
-        amount >= MIN_ESCROW_AMOUNT && amount <= MAX_ESCROW_AMOUNT,
+        (MIN_ESCROW_AMOUNT..=MAX_ESCROW_AMOUNT).contains(&amount),
         TerraError::InvalidEscrowAmount
     );
 

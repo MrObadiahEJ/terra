@@ -3,11 +3,13 @@ use geo::{Coord, Distance, Haversine, Point};
 use crate::osm::{OsmData, Poi};
 
 /// All POIs within `radius_m` of `center`.
-pub fn pois_within<'a>(data: &'a OsmData, center: Coord<f64>, radius_m: f64) -> Vec<&'a Poi> {
+pub fn pois_within(data: &OsmData, center: Coord<f64>, radius_m: f64) -> Vec<&Poi> {
     let center_pt = Point::new(center.x, center.y);
     data.pois
         .iter()
-        .filter(|poi| Haversine::distance(Point::new(poi.coord.x, poi.coord.y), center_pt) <= radius_m)
+        .filter(|poi| {
+            Haversine::distance(Point::new(poi.coord.x, poi.coord.y), center_pt) <= radius_m
+        })
         .collect()
 }
 

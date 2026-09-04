@@ -356,7 +356,7 @@ pub async fn request_succession(
         ));
     }
     let vc = req.validators.len() as u8;
-    if (required as u8) > vc {
+    if required > vc {
         return Err(AppError::bad_request(
             "required_validations cannot exceed the number of declared validators",
         ));

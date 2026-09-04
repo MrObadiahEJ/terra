@@ -146,12 +146,12 @@ async fn create_parcel(
         params.status
     };
 
-    let parcel = sqlx::query_as::<_, Parcel>(&format!(
+    let parcel = sqlx::query_as::<_, Parcel>(
         "INSERT INTO parcels (name, owner, status, geometry)
          VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4))
          RETURNING id, name, owner, status, ST_AsGeoJSON(geometry)::text AS geometry,
-                   ST_Area(geometry::geography)::float8 AS area_m2, created_at, updated_at"
-    ))
+                   ST_Area(geometry::geography)::float8 AS area_m2, created_at, updated_at",
+    )
     .bind(&params.name)
     .bind(&params.owner)
     .bind(&status)

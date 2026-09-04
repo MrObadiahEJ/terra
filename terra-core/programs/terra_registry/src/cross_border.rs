@@ -213,7 +213,7 @@ pub fn bind_cross_border_identity(
     expires_at: i64,
 ) -> Result<()> {
     require!(
-        proof_data.len() > 0 && proof_data.len() <= MAX_PROOF_LEN,
+        !proof_data.is_empty() && proof_data.len() <= MAX_PROOF_LEN,
         TerraError::InvalidProofData
     );
     require!(
@@ -329,7 +329,7 @@ pub fn rebind_cross_border_identity(
     expires_at: i64,
 ) -> Result<()> {
     require!(
-        proof_data.len() > 0 && proof_data.len() <= MAX_PROOF_LEN,
+        !proof_data.is_empty() && proof_data.len() <= MAX_PROOF_LEN,
         TerraError::InvalidProofData
     );
     require!(

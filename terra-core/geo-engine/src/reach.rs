@@ -4,8 +4,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use geo::{Centroid as _, Coord, Distance, Haversine, Point};
 use sha2::{Digest, Sha256};
 
-use crate::graph::RoadGraph;
 use crate::access::AccessPoint;
+use crate::graph::RoadGraph;
 
 /// Road classes considered "sealed" (connect to the wider paved network).
 pub fn is_sealed_highway(highway: &str) -> bool {
@@ -176,13 +176,13 @@ pub fn analyze(
     let metrics = encode_metrics(&report);
     let access_hash = access_digest(parcel_id, flags, &metrics);
 
-    ReachabilityReport { access_hash, ..report }
+    ReachabilityReport {
+        access_hash,
+        ..report
+    }
 }
 
-fn access_points_on_boundary(
-    graph: &RoadGraph,
-    parcel: &geo::Polygon<f64>,
-) -> Vec<AccessPoint> {
+fn access_points_on_boundary(graph: &RoadGraph, parcel: &geo::Polygon<f64>) -> Vec<AccessPoint> {
     crate::access::road_access_along_boundary(graph, parcel, 16)
 }
 
@@ -204,8 +204,7 @@ fn nearest_segment_for(graph: &RoadGraph, hit: &AccessPoint) -> Option<usize> {
     for (i, seg) in graph.segments.iter().enumerate() {
         // Prefer an exact highway/name match when possible.
         let same_highway = seg.highway == hit.highway
-            && (hit.road_name.is_none()
-                || seg.name.as_ref() == hit.road_name.as_ref());
+            && (hit.road_name.is_none() || seg.name.as_ref() == hit.road_name.as_ref());
         if !same_highway {
             continue;
         }
@@ -220,9 +219,7 @@ fn nearest_segment_for(graph: &RoadGraph, hit: &AccessPoint) -> Option<usize> {
 fn point_to_linestring_m(p: &geo::Point<f64>, line: &geo::LineString<f64>) -> f64 {
     use geo::ClosestPoint as _;
     match line.closest_point(p) {
-        geo::Closest::SinglePoint(q) | geo::Closest::Intersection(q) => {
-            Haversine::distance(*p, q)
-        }
+        geo::Closest::SinglePoint(q) | geo::Closest::Intersection(q) => Haversine::distance(*p, q),
         geo::Closest::Indeterminate => f64::INFINITY,
     }
 }
@@ -417,7 +414,10 @@ mod tests {
         let report = analyze(&network, &graph, &parcel, &[7u8; 32]);
         assert!(report.boundary_accesses >= 1);
         assert!(report.flags & FLAG_ROAD_ACCESS != 0);
-        assert!(report.sealed_reachable, "track is attached to a sealed road");
+        assert!(
+            report.sealed_reachable,
+            "track is attached to a sealed road"
+        );
         assert!(report.sealed_network_m.is_some());
         assert_eq!(report.access_hash.len(), 32);
     }
@@ -454,7 +454,10 @@ mod tests {
         let b = analyze(&network, &graph, &parcel, &[1u8; 32]);
         let c = analyze(&network, &graph, &parcel, &[2u8; 32]);
         assert_eq!(a.access_hash, b.access_hash);
-        assert_ne!(a.access_hash, c.access_hash, "parcel id must change the digest");
+        assert_ne!(
+            a.access_hash, c.access_hash,
+            "parcel id must change the digest"
+        );
     }
 
     /// Cross-layer contract: the digest a client anchors on-chain
