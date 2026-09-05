@@ -14,6 +14,9 @@ pub const DEFAULT_GUARDIANSHIP_GRACE_SECS: i64 = 180 * 24 * 3600;
 pub const MIN_GUARDIANSHIP_VALIDATIONS: u8 = 3;
 /// Maximum scope-notes length (mirrors the 128-byte Rights notes bound).
 pub const MAX_SCOPE_NOTES_LEN: usize = 128;
+/// Timelock before a recovery wallet's revocation request can be executed.
+/// 48 hours — enough for the owner to react, short enough for emergency use.
+pub const GUARDIANSHIP_REVOKE_TIMELOCK_SECS: i64 = 48 * 3600;
 
 /// Returns true for the two guardianship succession kinds (3, 4).
 pub fn is_guardianship_kind(kind: u8) -> bool {
@@ -124,17 +127,17 @@ pub fn request_court_guardianship(
     Ok(())
 }
 
-/// Revoke an already-claimed guardianship (RFC-010 §6.5).
+/// Request revocation of an active guardianship (RFC-010 §6.5).
 ///
-/// Only the subject's recovery wallet (signals recovery of capacity) or the
-/// registry admin (acting on a court order) may revoke. The caller names the
-/// wallet that takes over — the subject's new active wallet or a new guardian.
+/// Only the subject's recovery wallet or registry admin may call this.
+/// Instead of immediately transferring ownership, this sets a 48-hour
+/// timelock. After the timelock expires, `execute_revoke_guardianship`
+/// completes the transfer. This prevents the recovery wallet from
+/// unilaterally seizing land without giving the current owner time to react.
 ///
-/// Trust model (explicit): recovery and admin are emergency-brake roles with
-/// unilateral power by design — identical in kind to key-recovery in any
-/// social-recovery wallet. Revocation requires no validator quorum because
-/// the recovery wallet IS the subject's voice; every revocation is fully
-/// described by the GuardianshipRevoked event for off-chain audit.
+/// Admin-initiated revocations (court orders) are also subject to the
+/// timelock — the admin can expedite by calling `execute_revoke_guardianship`
+/// after the timelock expires.
 pub fn revoke_guardianship(
     ctx: Context<super::RevokeGuardianship>,
     new_owner: Pubkey,
@@ -150,17 +153,71 @@ pub fn revoke_guardianship(
     let is_admin = revoker == ctx.accounts.registry.admin;
     require!(is_recovery || is_admin, TerraError::NotAuthorized);
 
+    // Require that the target is a registered validator or the recovery wallet
+    // itself — prevents the revoker from redirecting to an arbitrary key.
+    let registry = &ctx.accounts.registry;
+    let target_is_validator = registry.validators.contains(&new_owner);
+    let target_is_revoker = new_owner == revoker;
+    require!(
+        target_is_validator || target_is_revoker,
+        TerraError::NotValidator
+    );
+
     let now = Clock::get()?.unix_timestamp;
     let identity = &mut ctx.accounts.identity;
-    identity.owner = new_owner;
-    identity.recovery = Pubkey::default();
+    // Prevent overlapping revocation requests.
+    require!(
+        !identity.pending_revocation,
+        TerraError::GuardianshipAlreadyActive
+    );
+    identity.pending_revocation = true;
+    identity.revoke_after = now.saturating_add(GUARDIANSHIP_REVOKE_TIMELOCK_SECS);
     identity.updated_at = now;
 
-    emit!(GuardianshipRevoked {
+    emit!(GuardianshipRevocationRequested {
         identity: identity.key(),
         previous_guardian: previous,
         new_owner,
-        revoked_by: revoker,
+        requested_by: revoker,
+        revoke_after: identity.revoke_after,
+        block_time: now,
+    });
+    Ok(())
+}
+
+/// Execute a previously requested guardianship revocation after the timelock
+/// has expired. Anyone may call this (permissionless enforcement) — the
+/// timelock is the security guarantee, not caller identity.
+pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship>) -> Result<()> {
+    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
+
+    let now = Clock::get()?.unix_timestamp;
+    let identity = &ctx.accounts.identity;
+    require!(identity.pending_revocation, TerraError::NoProposalFound);
+    require!(
+        now >= identity.revoke_after,
+        TerraError::SettlementNotYetEffective // reuse: timelock not expired
+    );
+
+    let new_owner = ctx.accounts.new_owner.key();
+    require!(new_owner != Pubkey::default(), TerraError::EmptySuccessor);
+    require!(new_owner != identity.owner, TerraError::SuccessorIsOwner);
+
+    let identity_key = identity.key();
+    let previous_guardian = identity.owner;
+
+    let identity = &mut ctx.accounts.identity;
+    identity.owner = new_owner;
+    identity.recovery = Pubkey::default();
+    identity.pending_revocation = false;
+    identity.revoke_after = 0;
+    identity.updated_at = now;
+
+    emit!(GuardianshipRevoked {
+        identity: identity_key,
+        previous_guardian,
+        new_owner,
+        revoked_by: identity.owner,
         block_time: now,
     });
     Ok(())
@@ -188,6 +245,16 @@ pub struct GuardianshipRevoked {
     pub previous_guardian: Pubkey,
     pub new_owner: Pubkey,
     pub revoked_by: Pubkey,
+    pub block_time: i64,
+}
+
+#[event]
+pub struct GuardianshipRevocationRequested {
+    pub identity: Pubkey,
+    pub previous_guardian: Pubkey,
+    pub new_owner: Pubkey,
+    pub requested_by: Pubkey,
+    pub revoke_after: i64,
     pub block_time: i64,
 }
 
@@ -242,5 +309,10 @@ mod tests {
         assert!(validate_guardianship_threshold(3, 3).is_ok());
         assert!(validate_guardianship_threshold(2, 3).is_err());
         assert!(validate_guardianship_threshold(4, 3).is_err());
+    }
+
+    #[test]
+    fn revoke_timelock_is_48_hours() {
+        assert_eq!(GUARDIANSHIP_REVOKE_TIMELOCK_SECS, 48 * 3600);
     }
 }

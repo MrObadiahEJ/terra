@@ -620,8 +620,11 @@ async fn guardianship_guards_and_revocation() {
     assert_eq!(succ.required, 3);
     assert_eq!(succ.grace_secs, guardian::DEFAULT_GUARDIANSHIP_GRACE_SECS);
 
-    // Revocation by the recovery wallet swaps ownership back.
-    let new_owner = Keypair::new().pubkey();
+    // Revocation by the recovery wallet now sets a timelock (two-phase).
+    // The target must be a registered validator or the revoker itself (but not
+    // the current owner). Register vals[0] as a validator, then use it.
+    add_validator_ok(&mut ctx, &payer, &vals[0]).await;
+    let new_owner = vals[0];
     let mut data = discriminator("global", "revoke_guardianship").to_vec();
     data.extend_from_slice(&borsh_ser(&new_owner));
     process(
@@ -633,6 +636,7 @@ async fn guardianship_guards_and_revocation() {
                 AccountMeta::new(identity, false),
                 AccountMeta::new_readonly(registry_pda().0, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new_readonly(new_owner, false),
             ],
             data,
         },
@@ -640,8 +644,13 @@ async fn guardianship_guards_and_revocation() {
     .await
     .expect("revoke_guardianship failed");
 
+    // Owner must NOT have changed yet (timelock pending).
     let ident: Identity = read_account(&ctx, identity).await;
-    assert_eq!(ident.owner, new_owner);
+    assert!(ident.pending_revocation, "revocation should be pending");
+    assert_ne!(
+        ident.owner, new_owner,
+        "owner must not change before timelock"
+    );
 }
 
 #[tokio::test]

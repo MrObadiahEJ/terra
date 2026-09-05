@@ -148,7 +148,12 @@ pub fn create_stake_pool(ctx: Context<super::CreateStakePool>, reward_rate_bps: 
         TerraError::InvalidStatus
     );
 
+    // Only the registry admin may create a stake pool — prevents spam.
     let registry = &ctx.accounts.region_registry;
+    require!(
+        ctx.accounts.payer.key() == registry.admin,
+        TerraError::NotAuthorized
+    );
     require!(
         registry.validators.iter().any(|v| *v != Pubkey::default()),
         TerraError::NoValidators

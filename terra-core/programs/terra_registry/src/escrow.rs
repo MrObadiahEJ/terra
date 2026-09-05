@@ -304,15 +304,8 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
     parcel.status = parcel_status::FOR_SALE;
     parcel.updated_at = now;
 
-    // Close escrow record (lamports → canceller).
-    let escrow_info = ctx.accounts.escrow_record.to_account_info();
-    let escrow_lamports = escrow_info.lamports();
-    **escrow_info.try_borrow_mut_lamports()? = 0;
-    **ctx
-        .accounts
-        .signer
-        .to_account_info()
-        .try_borrow_mut_lamports()? += escrow_lamports;
+    // Escrow record is closed by the `close = signer` constraint: rent
+    // lamports are returned to the canceller; no manual zeroing needed.
 
     let cancelled_by = ctx.accounts.signer.key();
 
@@ -428,15 +421,8 @@ pub fn expire_escrow(ctx: Context<super::ExpireEscrow>) -> Result<()> {
     parcel.status = parcel_status::FOR_SALE;
     parcel.updated_at = now;
 
-    // Close escrow record (lamports → caller).
-    let escrow_info = ctx.accounts.escrow_record.to_account_info();
-    let escrow_lamports = escrow_info.lamports();
-    **escrow_info.try_borrow_mut_lamports()? = 0;
-    **ctx
-        .accounts
-        .caller
-        .to_account_info()
-        .try_borrow_mut_lamports()? += escrow_lamports;
+    // Escrow record is closed by the `close = caller` constraint: rent
+    // lamports are returned to the caller; no manual zeroing needed.
 
     let parcel_key = escrow.parcel;
 

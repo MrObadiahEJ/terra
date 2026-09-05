@@ -2077,7 +2077,7 @@ export const terraRegistry: Idl = {
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
+        "belongs to someone who refuses to release it — e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -2558,7 +2558,7 @@ export const terraRegistry: Idl = {
       "docs": [
         "Request a wallet passation (succession, recovery, or deliberate control",
         "transfer). A Succession account is created and becomes effective only",
-        "after the grace period \u2014 within which the original owner can cancel.",
+        "after the grace period — within which the original owner can cancel.",
         "",
         "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
         "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
@@ -2566,7 +2566,7 @@ export const terraRegistry: Idl = {
         "`grace_secs` lets the requester choose the window (0 => default 30d),",
         "clamped to [MIN, MAX]. `required_validations` is the number of declared",
         "local validators that must endorse the passation before it can be",
-        "claimed (>= 1) \u2014 so a stolen wallet can't seize land alone.",
+        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
         "`validators` declares the local-authority testifiers for this passation."
       ],
       "discriminator": [
@@ -5923,6 +5923,19 @@ export const terraRegistry: Idl = {
         189,
         70
       ]
+    },
+    {
+      "name": "execute_revoke_guardianship",
+      "discriminator": [
+        119,
+        219,
+        6,
+        116,
+        49,
+        3,
+        167,
+        203
+      ]
     }
   ],
   "events": [
@@ -6921,6 +6934,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "GuardianshipRevocationRequested",
+      "discriminator": [
+        78,
+        209,
+        237,
+        197,
+        250,
+        152,
+        126,
+        7
+      ]
+    },
+    {
       "name": "ZoneSetRegistered",
       "discriminator": [
         83,
@@ -7322,7 +7348,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6069,
       "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received \u2014 seller cannot accept"
+      "msg": "Full deposit not yet received — seller cannot accept"
     },
     {
       "code": 6070,
@@ -7337,12 +7363,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6072,
       "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired \u2014 cannot cancel"
+      "msg": "Buyer grace period has expired — cannot cancel"
     },
     {
       "code": 6073,
       "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
+      "msg": "Cancel window has not yet expired — escrow not stale"
     },
     {
       "code": 6074,
@@ -7477,12 +7503,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6100,
       "name": "StakeAlreadyActive",
-      "msg": "Stake is already active \u2014 cannot deposit again"
+      "msg": "Stake is already active — cannot deposit again"
     },
     {
       "code": 6101,
       "name": "UnbondingInProgress",
-      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
+      "msg": "Unbonding is in progress — cannot deposit or withdraw"
     },
     {
       "code": 6102,
@@ -7557,7 +7583,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6115,
       "name": "ProgramPaused",
-      "msg": "Program is paused \u2014 state-changing operations are frozen"
+      "msg": "Program is paused — state-changing operations are frozen"
     },
     {
       "code": 6116,
@@ -7568,6 +7594,11 @@ export const terraRegistry: Idl = {
       "code": 6117,
       "name": "ProgramAlreadyPaused",
       "msg": "Program is already paused"
+    },
+    {
+      "code": 6118,
+      "name": "GuardianshipAlreadyActive",
+      "msg": "A revocation request is already pending for this identity"
     }
   ],
   "types": [
@@ -7577,8 +7608,8 @@ export const terraRegistry: Idl = {
         "An on-chain attestation that binds a set of off-chain documents/data to a",
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
-        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
+        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -7751,6 +7782,21 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "pending_revocation",
+            "docs": [
+              "When true, a recovery wallet has requested revocation but the timelock",
+              "has not yet expired."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "revoke_after",
+            "docs": [
+              "Unix timestamp after which a pending revocation may be executed."
+            ],
             "type": "i64"
           }
         ]
@@ -9686,4 +9732,4 @@ export const terraRegistry: Idl = {
       }
     }
   ]
-} as const;
+};

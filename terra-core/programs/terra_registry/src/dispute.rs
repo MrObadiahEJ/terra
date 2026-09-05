@@ -77,6 +77,14 @@ pub fn file_dispute(
         TerraError::InvalidThreshold
     );
 
+    // Anti-grief: only the parcel owner or a registered validator may file.
+    // This prevents random wallets from griefing any registered parcel.
+    let filer_key = ctx.accounts.filer.key();
+    let is_owner = filer_key == ctx.accounts.parcel.owner;
+    let registry = &ctx.accounts.registry;
+    let is_validator = registry.validators.contains(&filer_key);
+    require!(is_owner || is_validator, TerraError::NotAuthorized);
+
     // Count declared validators and enforce self-dealing checks.
     let mut count: u8 = 0;
     for &v in validators.iter() {
@@ -262,6 +270,15 @@ pub fn execute_judgment(ctx: Context<super::ExecuteJudgment>) -> Result<()> {
         dispute.status == dispute_status::ADJUDICATED,
         TerraError::InvalidDisputeStatus
     );
+
+    // Only the registry admin or a registered validator may execute a judgment.
+    // This prevents any arbitrary signer from forcibly transferring parcel
+    // ownership via the dispute pipeline.
+    let authority_key = ctx.accounts.authority.key();
+    let registry = &ctx.accounts.registry;
+    let is_admin = authority_key == registry.admin;
+    let is_validator = registry.validators.contains(&authority_key);
+    require!(is_admin || is_validator, TerraError::NotAuthorized);
 
     let now = Clock::get()?.unix_timestamp;
     let parcel = &mut ctx.accounts.parcel;

@@ -5917,12 +5917,25 @@
         175,
         69,
         202,
-        189,
-        70
-      ]
-    }
-  ],
-  "events": [
+         189,
+         70
+       ]
+     },
+     {
+       "name": "execute_revoke_guardianship",
+       "discriminator": [
+         119,
+         219,
+         6,
+         116,
+         49,
+         3,
+         167,
+         203
+       ]
+     }
+   ],
+   "events": [
     {
       "name": "Attested",
       "discriminator": [
@@ -6918,6 +6931,19 @@
       ]
     },
     {
+      "name": "GuardianshipRevocationRequested",
+      "discriminator": [
+        78,
+        209,
+        237,
+        197,
+        250,
+        152,
+        126,
+        7
+      ]
+    },
+    {
       "name": "ZoneSetRegistered",
       "discriminator": [
         83,
@@ -7565,6 +7591,11 @@
       "code": 6117,
       "name": "ProgramAlreadyPaused",
       "msg": "Program is already paused"
+    },
+    {
+      "code": 6118,
+      "name": "GuardianshipAlreadyActive",
+      "msg": "A revocation request is already pending for this identity"
     }
   ],
   "types": [
@@ -7748,6 +7779,21 @@
           },
           {
             "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "pending_revocation",
+            "docs": [
+              "When true, a recovery wallet has requested revocation but the timelock",
+              "has not yet expired."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "revoke_after",
+            "docs": [
+              "Unix timestamp after which a pending revocation may be executed."
+            ],
             "type": "i64"
           }
         ]

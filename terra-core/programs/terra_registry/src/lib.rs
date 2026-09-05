@@ -190,6 +190,15 @@ pub struct Identity {
     pub parcel_count: u16,
     pub created_at: i64,
     pub updated_at: i64,
+    /// When true, a recovery wallet has requested revocation but the timelock
+    /// has not yet expired. The pending new_owner is stored in `revoke_after`
+    /// for the indexer; on-chain the actual transfer only completes via
+    /// `execute_revoke_guardianship` after the timelock.
+    pub pending_revocation: bool,
+    /// Unix timestamp after which a pending revocation may be executed.
+    /// Set by `revoke_guardianship` (which becomes a request-only call).
+    /// Zero means no pending revocation.
+    pub revoke_after: i64,
 }
 
 /// An in-flight passation of wallet control, gated by BOTH a configurable grace
@@ -811,8 +820,11 @@ pub mod terra_registry {
     /// transfer). A Succession account is created and becomes effective only
     /// after the grace period — within which the original owner can cancel.
     ///
-    /// Authorized by the current `owner` for kind TRANSFER, or by the `owner`
-    /// OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.
+    /// Authorized by the current `owner` or the `recovery` wallet for any
+    /// succession kind (TRANSFER, RECOVERY, SUCCESSOR, GUARDIANSHIP,
+    /// COURT_APPOINTED_GUARDIAN). Both roles are treated as equal intent
+    /// signalers — the grace period and validator endorsements provide the
+    /// actual security gate.
     ///
     /// `grace_secs` lets the requester choose the window (0 => default 30d),
     /// clamped to [MIN, MAX]. `required_validations` is the number of declared
@@ -1474,6 +1486,10 @@ pub mod terra_registry {
         guardian::revoke_guardianship(ctx, new_owner)
     }
 
+    pub fn execute_revoke_guardianship(ctx: Context<ExecuteRevokeGuardianship>) -> Result<()> {
+        guardian::execute_revoke_guardianship(ctx)
+    }
+
     // -----------------------------------------------------------------------
     // Zero-knowledge ownership proofs (RFC-011)
     // -----------------------------------------------------------------------
@@ -1928,6 +1944,11 @@ pub struct FileDispute<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
     #[account(mut)]
     pub filer: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -1982,6 +2003,11 @@ pub struct ExecuteJudgment<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
     pub authority: Signer<'info>,
 }
 
@@ -2116,6 +2142,7 @@ pub struct CancelEscrow<'info> {
         mut,
         seeds = [b"escrow", parcel.key().as_ref()],
         bump,
+        close = signer,
     )]
     pub escrow_record: Account<'info, escrow::EscrowRecord>,
     /// CHECK: escrow vault PDA.
@@ -2173,6 +2200,7 @@ pub struct ExpireEscrow<'info> {
         mut,
         seeds = [b"escrow", parcel.key().as_ref()],
         bump,
+        close = caller,
     )]
     pub escrow_record: Account<'info, escrow::EscrowRecord>,
     #[account(
@@ -2914,6 +2942,25 @@ pub struct RevokeGuardianship<'info> {
     )]
     pub registry: Account<'info, authority_registry::AuthorityRegistry>,
     pub revoker: Signer<'info>,
+    /// CHECK: the target new owner — validated as validator or revoker in handler.
+    pub new_owner: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteRevokeGuardianship<'info> {
+    #[account(
+        mut,
+        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
+        bump
+    )]
+    pub identity: Account<'info, Identity>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    /// CHECK: validated as the pending new_owner in handler.
+    pub new_owner: Signer<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -3532,6 +3579,10 @@ pub enum TerraError {
     ProgramNotPaused,
     #[msg("Program is already paused")]
     ProgramAlreadyPaused,
+
+    // Guardian revocation timelock
+    #[msg("A revocation request is already pending for this identity")]
+    GuardianshipAlreadyActive,
 }
 
 #[cfg(test)]

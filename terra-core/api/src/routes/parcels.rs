@@ -245,6 +245,8 @@ async fn reconcile(
     // Independent digest: only possible when OSM data is loaded. When the
     // caller reports a non-zero (already anchored) access_hash, it must match
     // what we derive from the stored geometry — otherwise refuse the update.
+    // When geo-engine is unavailable, reject non-zero access_hash to prevent
+    // unvalidated data from being written to the mirror.
     if let Some(geo) = state.geo.as_ref() {
         let network = terra_geo::NetworkGraph::build(&geo.graph);
         let report = terra_geo::analyze(&network, &geo.graph, &polygon, &onchain_id);
@@ -255,6 +257,10 @@ async fn reconcile(
                 "access_hash is inconsistent with stored geometry: derived {derived}, reported {reported}"
             )));
         }
+    } else if !access_hash.iter().all(|b| *b == 0) {
+        return Err(AppError::bad_request(
+            "geo-engine unavailable: cannot validate non-zero access_hash; use zero or load OSM data",
+        ));
     }
 
     // Idempotently reconcile the mirror columns.
