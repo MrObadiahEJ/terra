@@ -129,6 +129,12 @@ pub fn request_court_guardianship(
 /// Only the subject's recovery wallet (signals recovery of capacity) or the
 /// registry admin (acting on a court order) may revoke. The caller names the
 /// wallet that takes over — the subject's new active wallet or a new guardian.
+///
+/// Trust model (explicit): recovery and admin are emergency-brake roles with
+/// unilateral power by design — identical in kind to key-recovery in any
+/// social-recovery wallet. Revocation requires no validator quorum because
+/// the recovery wallet IS the subject's voice; every revocation is fully
+/// described by the GuardianshipRevoked event for off-chain audit.
 pub fn revoke_guardianship(
     ctx: Context<super::RevokeGuardianship>,
     new_owner: Pubkey,

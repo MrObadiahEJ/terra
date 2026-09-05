@@ -3,6 +3,8 @@ use anchor_lang::prelude::*;
 pub const MAX_SHARD_HOLDERS: usize = 8;
 pub const MAX_STORAGE_URIS: usize = 4;
 pub const PING_INTERVAL_SECS: i64 = 7 * 24 * 3600;
+/// Reserved for keeper-driven auto-rotation governance (not yet wired:
+/// rotation today is manual via initiate_shard_rotation; see roadmap).
 pub const MISSED_PINGS_BEFORE_ROTATION: u8 = 3;
 pub const ROTATION_TIMELOCK_SECS: i64 = 7 * 24 * 3600;
 pub const EMERGENCY_RECOVERY_FRACTION_BPS: u16 = 7500;
@@ -129,6 +131,10 @@ pub fn create_vault(
 }
 
 /// Authorize temporary access to the vault's encrypted data.
+///
+/// The grant itself is ephemeral and recorded as an event; durable audit
+/// lives in the API mirror (`vault_access_logs`). Callers needing durable
+/// on-chain proof must also anchor via a document attestation.
 ///
 /// Guards:
 /// - subject must match the vault's subject

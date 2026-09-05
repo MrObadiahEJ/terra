@@ -129,6 +129,9 @@ pub struct Attestation {
     /// Monotonic rotation counter. Each rotate_validators bumps it so a
     /// reconstituted validator set is provably newer than the previous one.
     pub version: u8,
+    /// Number of IPFS documents anchored to this attestation (capped by
+    /// MAX_DOCUMENTS_PER_ATTESTATION in register_document).
+    pub document_count: u8,
     pub created_at: i64,
     pub updated_at: i64,
     pub validators: [Pubkey; MAX_VALIDATORS],
@@ -180,6 +183,10 @@ pub struct Identity {
     /// request a recovery passation if the main key is lost.
     pub recovery: Pubkey,
     /// Number of parcels currently owned by this identity.
+    ///
+    /// Maintained by attach/claim flows only: direct wallet-to-wallet
+    /// transfers cannot resolve identity linkage on-chain, so this counter
+    /// is advisory. Indexers must derive authoritative counts off-chain.
     pub parcel_count: u16,
     pub created_at: i64,
     pub updated_at: i64,
@@ -356,6 +363,11 @@ pub struct AddValidator<'info> {
     /// (the endorsement account carries authority instead).
     #[account(mut)]
     pub admin_signer: Signer<'info>,
+    // NOTE: init_if_needed only funds the PDA shell in bootstrap mode
+    // (where it is unused). In peer-consensus mode the endorsement MUST have
+    // been created by `propose_validator` first: a fresh zeroed record fails
+    // the proposed != default check in the handler (NoProposalFound) instead
+    // of silently passing a zero quorum.
     #[account(
         init_if_needed,
         payer = admin_signer,
@@ -370,6 +382,29 @@ pub struct AddValidator<'info> {
     pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
     /// CHECK: validated as a non-zero pubkey in handler.
     pub validator: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ProposeValidator<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        init,
+        payer = proposer,
+        space = 8 + authority_registry::ValidatorEndorsement::INIT_SPACE,
+        seeds = [
+            b"validator_endorsement",
+            registry.key().as_ref(),
+            validator.key().as_ref()
+        ],
+        bump
+    )]
+    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    /// CHECK: validated as a non-zero pubkey in handler.
+    pub validator: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub proposer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -435,6 +470,7 @@ pub struct RegisterDocument<'info> {
     )]
     pub document: Account<'info, ipfs_docs::DocumentAnchor>,
     #[account(
+        mut,
         seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
         bump,
     )]
@@ -575,6 +611,8 @@ pub mod terra_registry {
 
     /// Revoke a previously granted right. The parcel owner or the original
     /// granter may revoke. The account is closed and its lamports returned.
+    /// The parcel's rights counter is decremented so the freed nonce can be
+    /// reused by a future grant (safe: the old account no longer exists).
     pub fn revoke_right(ctx: Context<RevokeRight>, _nonce: u8) -> Result<()> {
         let rights = &ctx.accounts.rights;
         require!(
@@ -588,6 +626,9 @@ pub mod terra_registry {
             rights_kind: rights.rights_kind,
             holder: rights.holder,
         });
+
+        let parcel = &mut ctx.accounts.parcel;
+        parcel.rights_count = parcel.rights_count.saturating_sub(1);
         Ok(())
     }
 
@@ -677,6 +718,7 @@ pub mod terra_registry {
         attestation.content_hash = content_hash;
         attestation.required = required;
         attestation.count = count;
+        attestation.document_count = 0;
         attestation.created_at = now;
         attestation.validators = validators;
 
@@ -947,25 +989,25 @@ pub mod terra_registry {
         identity.updated_at = now;
 
         // Re-point every supplied parcel owned by this identity to the
-        // successor's wallet. The Parcel `owner` field sits at a fixed borsh
-        // offset (8-byte discriminator + 32-byte id = 40..72), so we patch it
-        // directly rather than re-serializing the whole account.
+        // successor's wallet. Accounts are deserialized as Parcels (never
+        // raw-offset patched) so struct layout changes cannot corrupt data;
+        // non-parcel or foreign-owner accounts are skipped.
         let mut successions_applied: u16 = 0;
         for account in ctx.remaining_accounts.iter() {
-            if account.owner == ctx.program_id {
-                let mut data = account.try_borrow_mut_data()?;
-                let pdisc: &[u8] = <Parcel as anchor_lang::Discriminator>::DISCRIMINATOR;
-                if data.len() < 72 || &data[0..8] != pdisc {
-                    continue;
-                }
-                let mut current_owner = [0u8; 32];
-                current_owner.copy_from_slice(&data[40..72]);
-                let current_owner = Pubkey::from(current_owner);
-                if current_owner == previous {
-                    data[40..72].copy_from_slice(&successor.to_bytes());
-                    successions_applied += 1;
-                }
+            if account.owner != ctx.program_id {
+                continue;
             }
+            let mut parcel = match Account::<Parcel>::try_from(account) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            if parcel.owner != previous {
+                continue;
+            }
+            parcel.owner = successor;
+            parcel.updated_at = now;
+            parcel.exit(ctx.program_id)?;
+            successions_applied += 1;
         }
         identity.parcel_count = identity.parcel_count.saturating_sub(successions_applied);
 
@@ -1179,6 +1221,10 @@ pub mod terra_registry {
         authority_registry::add_validator(ctx, validator)
     }
 
+    pub fn propose_validator(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
+        authority_registry::propose_validator(ctx, validator)
+    }
+
     pub fn remove_validator_from_registry(
         ctx: Context<RemoveValidator>,
         validator: Pubkey,
@@ -1347,6 +1393,15 @@ pub mod terra_registry {
         offense_details: [u8; 64],
     ) -> Result<()> {
         staking::report_equivocation(ctx, evidence_hash, offense_details)
+    }
+
+    pub fn report_validator_offense(
+        ctx: Context<ReportOffense>,
+        offense_kind: u8,
+        evidence_hash: [u8; 32],
+        offense_details: [u8; 64],
+    ) -> Result<()> {
+        staking::report_validator_offense(ctx, offense_kind, evidence_hash, offense_details)
     }
 
     pub fn verify_and_slash(ctx: Context<VerifyAndSlash>) -> Result<()> {
@@ -1552,7 +1607,7 @@ pub mod terra_registry {
         subdivision::amalgamate_parcels(ctx, new_geometry_hash)
     }
 
-    pub fn migrate_rights(ctx: Context<MigrateRights>) -> Result<()> {
+    pub fn migrate_rights<'a>(ctx: Context<'a, MigrateRights<'a>>) -> Result<()> {
         subdivision::migrate_rights(ctx)
     }
 
@@ -1999,6 +2054,7 @@ pub struct SettleEscrow<'info> {
         mut,
         seeds = [b"escrow", parcel.key().as_ref()],
         bump,
+        close = seller,
     )]
     pub escrow_record: Account<'info, escrow::EscrowRecord>,
     /// CHECK: escrow vault PDA.
@@ -2270,7 +2326,9 @@ pub struct RevokeJurisdictionalIdentity<'info> {
 #[derive(Accounts)]
 #[instruction(credential_commitment: [u8; 32], proof_data: Vec<u8>, nullifier_nonce: [u8; 32], expires_at: i64)]
 pub struct RebindCrossBorderIdentity<'info> {
-    #[account(mut)]
+    // The superseded binding is closed (rent → prover) so two bindings for
+    // the same identity can never be live simultaneously.
+    #[account(mut, close = prover)]
     pub old_binding: Account<'info, cross_border::JurisdictionBinding>,
     #[account(
         init,
@@ -2581,6 +2639,47 @@ pub struct ReportEquivocation<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(offense_kind: u8, evidence_hash: [u8; 32])]
+pub struct ReportOffense<'info> {
+    #[account(
+        seeds = [b"stake_pool", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub stake_pool: Account<'info, staking::StakePool>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        mut,
+        seeds = [
+            b"validator_stake",
+            stake_pool.key().as_ref(),
+            offender_stake.validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub offender_stake: Account<'info, staking::ValidatorStake>,
+    #[account(
+        init,
+        payer = reporter,
+        space = 8 + staking::SlashingReport::INIT_SPACE,
+        seeds = [
+            b"slashing_report",
+            stake_pool.key().as_ref(),
+            reporter.key().as_ref(),
+            evidence_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub slashing_report: Account<'info, staking::SlashingReport>,
+    #[account(mut)]
+    pub reporter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct VerifyAndSlash<'info> {
     #[account(
         mut,
@@ -2620,7 +2719,14 @@ pub struct VerifyAndSlash<'info> {
     )]
     /// CHECK: Reporter wallet — validated by constraint.
     pub reporter: UncheckedAccount<'info>,
+    /// CHECK: Treasury wallet receiving slashed lamports. Caller-specified;
+    /// every movement is described by the ValidatorSlashed event.
     #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = payer.key() == region_registry.admin @ TerraError::NotAuthorized,
+    )]
     pub payer: Signer<'info>,
 }
 
@@ -2666,8 +2772,15 @@ pub struct DistributeRewards<'info> {
         bump,
     )]
     pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = authority.key() == region_registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
+    /// CHECK: Admin-funded treasury wallet backing reward payouts.
+    #[account(mut)]
+    pub treasury: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -2725,6 +2838,9 @@ pub struct DismissReport<'info> {
     #[account(mut)]
     /// CHECK: Reporter wallet — validated by slashing_report PDA seeds.
     pub reporter: UncheckedAccount<'info>,
+    #[account(
+        constraint = authority.key() == region_registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
 }
 
@@ -2847,6 +2963,9 @@ pub struct VerifyOwnershipProof<'info> {
     pub nullifier_record: Account<'info, zk::NullifierRecord>,
     #[account(mut)]
     pub prover: Signer<'info>,
+    /// Zone authority co-sign: every accepted proof is explicitly attested.
+    /// (Circuit-level verification is deferred to audit; see RFC-011.)
+    pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -3334,6 +3453,14 @@ pub enum TerraError {
     ProofTooLarge,
     #[msg("Disclosure type must be 0 (membership), 1 (range), or 2 (count)")]
     InvalidDisclosureType,
+
+    // Audit follow-ups (append-only: existing codes never shift)
+    #[msg("Offense type must be 0 (equivocation), 1 (liveness), or 2 (collusion)")]
+    InvalidOffenseType,
+    #[msg("Registry is not in the required mode for this operation")]
+    InvalidRegistryMode,
+    #[msg("No validator endorsement proposal exists for this candidate")]
+    NoProposalFound,
 }
 
 #[cfg(test)]

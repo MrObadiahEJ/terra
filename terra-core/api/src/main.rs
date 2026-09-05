@@ -9,9 +9,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use axum::http::{HeaderValue, Method};
 use axum::routing::get;
 use axum::Router;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -34,10 +35,30 @@ async fn main() -> Result<()> {
 
     let geo = load_geo(config.osm_pbf_path.as_deref()).await?;
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // CORS locked to configured origins (default: local Vite dev server).
+    // The mirror API is unauthenticated by design for pilot deployments
+    // behind a gateway; exposing it cross-origin to the whole web would let
+    // any site drive state-changing endpoints from a visitor's browser.
+    let cors = if config.cors_allowed_origins.iter().any(|o| o == "*") {
+        tracing::warn!("CORS wide open (*) — only for local development");
+        CorsLayer::permissive()
+    } else {
+        let origins: Vec<HeaderValue> = config
+            .cors_allowed_origins
+            .iter()
+            .filter_map(|o| o.parse().ok())
+            .collect();
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::PATCH,
+                Method::DELETE,
+            ])
+            .allow_headers([axum::http::header::CONTENT_TYPE])
+    };
 
     let app: Router = Router::new()
         .route("/health", get(routes::health::health))

@@ -172,7 +172,8 @@ pub fn create_stake_pool(ctx: Context<super::CreateStakePool>, reward_rate_bps: 
     Ok(())
 }
 
-/// A validator deposits SOL as a bond.
+/// A validator deposits SOL as a bond. Top-ups are allowed while no
+/// unbonding is in progress; a fresh record is initialized on first deposit.
 pub fn deposit_stake(ctx: Context<super::DepositStake>, amount: u64) -> Result<()> {
     require!(amount >= MIN_STAKE_LAMPORTS, TerraError::InsufficientStake);
 
@@ -185,7 +186,6 @@ pub fn deposit_stake(ctx: Context<super::DepositStake>, amount: u64) -> Result<(
     );
 
     let stake = &mut ctx.accounts.validator_stake;
-    require!(stake.staked_amount == 0, TerraError::StakeAlreadyActive);
     require!(stake.unbonding_amount == 0, TerraError::UnbondingInProgress);
 
     // Transfer SOL from validator to stake pool.
@@ -204,10 +204,12 @@ pub fn deposit_stake(ctx: Context<super::DepositStake>, amount: u64) -> Result<(
     )?;
 
     let now = Clock::get()?.unix_timestamp;
-    stake.stake_pool = ctx.accounts.stake_pool.key();
-    stake.validator = validator_key;
-    stake.staked_amount = amount;
-    stake.created_at = now;
+    if stake.created_at == 0 {
+        stake.stake_pool = ctx.accounts.stake_pool.key();
+        stake.validator = validator_key;
+        stake.created_at = now;
+    }
+    stake.staked_amount = stake.staked_amount.saturating_add(amount);
     stake.updated_at = now;
 
     let pool = &mut ctx.accounts.stake_pool;
@@ -243,18 +245,24 @@ pub fn initiate_unbonding(ctx: Context<super::InitiateUnbonding>) -> Result<()> 
 }
 
 /// Validator withdraws stake after the unbonding period has elapsed.
+/// Single-use: the unbonding record is zeroed so one unbonding can only be
+/// withdrawn once.
 pub fn withdraw_stake(ctx: Context<super::WithdrawStake>) -> Result<()> {
-    let stake = &ctx.accounts.validator_stake;
-    require!(stake.unbonding_amount > 0, TerraError::InsufficientStake);
-    require!(stake.staked_amount == 0, TerraError::UnbondingInProgress);
+    let (amount, validator_key, pool_key);
+    {
+        let stake = &ctx.accounts.validator_stake;
+        require!(stake.unbonding_amount > 0, TerraError::InsufficientStake);
+        require!(stake.staked_amount == 0, TerraError::UnbondingInProgress);
 
-    let now = Clock::get()?.unix_timestamp;
-    require!(
-        now >= stake.unbonding_starts_at + UNBONDING_PERIOD_SECS,
-        TerraError::UnbondingNotComplete
-    );
-
-    let amount = stake.unbonding_amount;
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            now >= stake.unbonding_starts_at + UNBONDING_PERIOD_SECS,
+            TerraError::UnbondingNotComplete
+        );
+        amount = stake.unbonding_amount;
+        validator_key = stake.validator;
+        pool_key = stake.stake_pool;
+    }
 
     // Transfer SOL from stake pool to validator.
     **ctx
@@ -268,13 +276,20 @@ pub fn withdraw_stake(ctx: Context<super::WithdrawStake>) -> Result<()> {
         .to_account_info()
         .try_borrow_mut_lamports()? += amount;
 
+    {
+        let stake = &mut ctx.accounts.validator_stake;
+        stake.unbonding_amount = 0;
+        stake.unbonding_starts_at = 0;
+        stake.updated_at = Clock::get()?.unix_timestamp;
+    }
+
     let pool = &mut ctx.accounts.stake_pool;
     pool.total_staked = pool.total_staked.saturating_sub(amount);
-    pool.updated_at = now;
+    pool.updated_at = Clock::get()?.unix_timestamp;
 
     emit!(StakeWithdrawn {
-        stake_pool: pool.key(),
-        validator: stake.validator,
+        stake_pool: pool_key,
+        validator: validator_key,
         amount,
     });
     Ok(())
@@ -311,6 +326,24 @@ pub fn report_equivocation(
         .checked_div(10000)
         .ok_or(TerraError::RightsLimitExceeded)?;
 
+    // Collect the reporter bond up front: the bond lives in the report PDA
+    // (which the reporter funds here) and is returned on slash/dismiss.
+    if required_bond > 0 {
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &reporter_key,
+            &ctx.accounts.slashing_report.key(),
+            required_bond,
+        );
+        anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.reporter.to_account_info(),
+                ctx.accounts.slashing_report.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+    }
+
     let now = Clock::get()?.unix_timestamp;
 
     let report = &mut ctx.accounts.slashing_report;
@@ -319,6 +352,93 @@ pub fn report_equivocation(
     report.evidence_hash = evidence_hash;
     report.offender = offender_stake.validator;
     report.offense_type = offense_type::EQUIVOCATION;
+    report.offense_details = offense_details;
+    report.reporter_bond = required_bond;
+    report.status = report_status::PENDING;
+    report.filed_at = now;
+    report.appeal_deadline = now + APPEAL_WINDOW_SECS;
+    report.resolved_at = 0;
+
+    emit!(EquivocationReported {
+        stake_pool: report.stake_pool,
+        reporter: reporter_key,
+        offender: report.offender,
+        evidence_hash,
+    });
+    Ok(())
+}
+
+/// Report a validator for liveness or collusion offenses (or equivocation
+/// with explicit typing). Mirrors `report_equivocation` but takes the
+/// offense type as an argument and flags it on the offender's record.
+pub fn report_validator_offense(
+    ctx: Context<super::ReportOffense>,
+    offense_kind: u8,
+    evidence_hash: [u8; 32],
+    offense_details: [u8; 64],
+) -> Result<()> {
+    require!(
+        offense_kind <= offense_type::COLLUSION,
+        TerraError::InvalidOffenseType
+    );
+    require!(
+        !evidence_hash.iter().all(|b| *b == 0),
+        TerraError::EmptyGeometryHash
+    );
+
+    let reporter_key = ctx.accounts.reporter.key();
+    let offender_key;
+    let required_bond;
+    {
+        let offender_stake = &ctx.accounts.offender_stake;
+        require!(
+            offender_stake.staked_amount > 0,
+            TerraError::InsufficientStake
+        );
+        require!(
+            reporter_key != offender_stake.validator,
+            TerraError::SelfReportNotAllowed
+        );
+        offender_key = offender_stake.validator;
+        required_bond = offender_stake
+            .staked_amount
+            .checked_mul(REPORTER_BOND_BPS as u64)
+            .ok_or(TerraError::RightsLimitExceeded)?
+            .checked_div(10000)
+            .ok_or(TerraError::RightsLimitExceeded)?;
+    }
+
+    if required_bond > 0 {
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &reporter_key,
+            &ctx.accounts.slashing_report.key(),
+            required_bond,
+        );
+        anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.reporter.to_account_info(),
+                ctx.accounts.slashing_report.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+    }
+
+    let now = Clock::get()?.unix_timestamp;
+
+    {
+        let offender_stake = &mut ctx.accounts.offender_stake;
+        offender_stake.offenses[offense_kind as usize] =
+            offender_stake.offenses[offense_kind as usize].saturating_add(1);
+        offender_stake.updated_at = now;
+    }
+
+    let report = &mut ctx.accounts.slashing_report;
+    report.stake_pool = ctx.accounts.stake_pool.key();
+    report.reporter = reporter_key;
+    report.evidence_hash = evidence_hash;
+    report.offender = offender_key;
+    report.offense_type = offense_kind;
     report.offense_details = offense_details;
     report.reporter_bond = required_bond;
     report.status = report_status::PENDING;
@@ -383,6 +503,21 @@ pub fn verify_and_slash(ctx: Context<super::VerifyAndSlash>) -> Result<()> {
     pool.total_staked = pool.total_staked.saturating_sub(slash_amount);
     stake.slash_history = stake.slash_history.saturating_add(1);
     pool.slash_count = pool.slash_count.saturating_add(1);
+
+    // Move slashed lamports out of the pool into the treasury so bookkeeping
+    // and real balances cannot diverge ("zombie lamports").
+    if slash_amount > 0 {
+        **ctx
+            .accounts
+            .stake_pool
+            .to_account_info()
+            .try_borrow_mut_lamports()? -= slash_amount;
+        **ctx
+            .accounts
+            .treasury
+            .to_account_info()
+            .try_borrow_mut_lamports()? += slash_amount;
+    }
 
     // Update report status.
     {
@@ -473,6 +608,22 @@ pub fn distribute_rewards(ctx: Context<super::DistributeRewards>) -> Result<()> 
         .ok_or(TerraError::RightsLimitExceeded)?
         .checked_div((365 * 24 * 3600) as u128)
         .ok_or(TerraError::RightsLimitExceeded)? as u64;
+
+    // Rewards are backed by real SOL: the treasury (admin-funded) pays the
+    // period reward into the pool. Without this, claims would be paid out of
+    // other validators' deposits.
+    if period_reward > 0 {
+        **ctx
+            .accounts
+            .treasury
+            .to_account_info()
+            .try_borrow_mut_lamports()? -= period_reward;
+        **ctx
+            .accounts
+            .stake_pool
+            .to_account_info()
+            .try_borrow_mut_lamports()? += period_reward;
+    }
 
     let pool = &mut ctx.accounts.stake_pool;
     pool.accumulated_rewards = pool.accumulated_rewards.saturating_add(period_reward);

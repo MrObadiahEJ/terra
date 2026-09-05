@@ -37,7 +37,9 @@ pub struct NetworkGraph {
     adjacency: Vec<Vec<(usize, f64)>>,
     /// Global vertex ids belonging to each road segment.
     segment_vertices: Vec<Vec<usize>>,
-    sealed_segment: Vec<bool>,
+    /// Precomputed set of vertices touching at least one sealed segment.
+    /// Built once so per-vertex sealed checks during Dijkstra are O(1).
+    sealed_vertices: HashSet<usize>,
 }
 
 impl NetworkGraph {
@@ -83,10 +85,17 @@ impl NetworkGraph {
             }
         }
 
+        let mut sealed_vertices = HashSet::new();
+        for (si, sealed) in sealed_segment.iter().enumerate() {
+            if *sealed {
+                sealed_vertices.extend(segment_vertices[si].iter().copied());
+            }
+        }
+
         NetworkGraph {
             adjacency,
             segment_vertices,
-            sealed_segment,
+            sealed_vertices,
         }
     }
 }
@@ -306,11 +315,7 @@ fn reachability_within_component(
 }
 
 fn is_sealed_vertex(network: &NetworkGraph, v: usize) -> bool {
-    network
-        .sealed_segment
-        .iter()
-        .enumerate()
-        .any(|(si, sealed)| *sealed && network.segment_vertices[si].contains(&v))
+    network.sealed_vertices.contains(&v)
 }
 
 struct HeapEntry {

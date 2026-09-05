@@ -43,6 +43,12 @@ pub struct Dispute {
     pub declared_count: u8,
     /// Declared validator set for this dispute.
     pub validators: [Pubkey; MAX_VALIDATORS],
+    /// Validators that actually co-signed (recorded at freeze/adjudicate).
+    /// Unlike `validators` (declared at filing), this is on-chain proof of
+    /// who testified — events alone are not reliably indexable.
+    pub present_validators: [Pubkey; MAX_VALIDATORS],
+    /// How many entries of `present_validators` are populated.
+    pub present_count: u8,
     pub filed_at: i64,
     pub frozen_at: i64,
     pub adjudicated_at: i64,
@@ -110,6 +116,8 @@ pub fn file_dispute(
     dispute.required = required;
     dispute.declared_count = count;
     dispute.validators = validators;
+    dispute.present_validators = [Pubkey::default(); MAX_VALIDATORS];
+    dispute.present_count = 0;
     dispute.filed_at = now;
 
     // Update parcel status to DISPUTED.
@@ -150,9 +158,13 @@ pub fn freeze_parcel(ctx: Context<super::FreezeParcel>) -> Result<()> {
 
     // Count actual signer validators via remaining_accounts.
     let mut present: u8 = 0;
+    let mut present_validators = [Pubkey::default(); MAX_VALIDATORS];
     for signer in ctx.remaining_accounts.iter() {
         if signer.is_signer && dispute.validators.contains(&signer.key()) {
-            present += 1;
+            if (present as usize) < MAX_VALIDATORS {
+                present_validators[present as usize] = signer.key();
+            }
+            present = present.saturating_add(1);
         }
     }
     require!(
@@ -163,6 +175,8 @@ pub fn freeze_parcel(ctx: Context<super::FreezeParcel>) -> Result<()> {
     let dispute = &mut ctx.accounts.dispute;
     dispute.status = dispute_status::FROZEN;
     dispute.frozen_at = now;
+    dispute.present_validators = present_validators;
+    dispute.present_count = present.min(MAX_VALIDATORS as u8);
 
     let parcel = &mut ctx.accounts.parcel;
     parcel.status = parcel_status::FROZEN;
@@ -201,9 +215,13 @@ pub fn adjudicate_dispute(
 
     // Count actual signer validators via remaining_accounts.
     let mut present: u8 = 0;
+    let mut present_validators = [Pubkey::default(); MAX_VALIDATORS];
     for signer in ctx.remaining_accounts.iter() {
         if signer.is_signer && dispute.validators.contains(&signer.key()) {
-            present += 1;
+            if (present as usize) < MAX_VALIDATORS {
+                present_validators[present as usize] = signer.key();
+            }
+            present = present.saturating_add(1);
         }
     }
     require!(
@@ -221,6 +239,8 @@ pub fn adjudicate_dispute(
     dispute.adjudicated_at = now;
     dispute.outcome = outcome;
     dispute.new_owner = new_owner;
+    dispute.present_validators = present_validators;
+    dispute.present_count = present.min(MAX_VALIDATORS as u8);
 
     let parcel = &mut ctx.accounts.parcel;
     parcel.status = parcel_status::ADJUDICATED;

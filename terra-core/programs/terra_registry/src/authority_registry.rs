@@ -69,12 +69,55 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
     Ok(())
 }
 
+/// Propose a validator for peer-consensus admission.
+///
+/// Creates the endorsement record that `endorse_validator_add` collects
+/// signatures into. No quorum is checked here — proposal is intent
+/// recording (the proposer pays the rent); admission happens in
+/// `add_validator` once quorum is met.
+pub fn propose_validator(ctx: Context<super::ProposeValidator>, validator: Pubkey) -> Result<()> {
+    require!(
+        validator != Pubkey::default(),
+        super::TerraError::EmptySuccessor
+    );
+
+    let registry = &ctx.accounts.registry;
+    require!(
+        registry.mode == registry_mode::PEER_CONSENSUS,
+        super::TerraError::InvalidRegistryMode
+    );
+    require!(
+        !registry.validators.contains(&validator),
+        super::TerraError::AlreadyEndorsedRotation // reuse: already registered
+    );
+    require!(
+        registry.required_endorsements > 0,
+        super::TerraError::InvalidThreshold
+    );
+
+    let clock = Clock::get()?;
+    let endorsement = &mut ctx.accounts.endorsement;
+    endorsement.registry = registry.key();
+    endorsement.proposed = validator;
+    endorsement.endorsers = Vec::new();
+    endorsement.required = registry.required_endorsements;
+    endorsement.created_at = clock.unix_timestamp;
+
+    emit!(super::ValidatorEndorsed {
+        registry: registry.key(),
+        proposed: validator,
+        endorser: ctx.accounts.proposer.key(),
+        endorsements_count: 0,
+        required: endorsement.required,
+    });
+    Ok(())
+}
+
 /// Add a validator to the registry.
 ///
 /// Bootstrap mode: admin can add unilaterally.
-/// Peer-consensus mode: requires ceil(2n/3) endorsements from existing
-/// validators. Use `endorse_validator_add` to collect endorsements first,
-/// then call this with the completed endorsement account.
+/// Peer-consensus mode: requires a proposed endorsement (see
+/// `propose_validator`) whose collected endorsements meet quorum.
 pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Result<()> {
     require!(
         validator != Pubkey::default(),
@@ -110,8 +153,16 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
             mode: registry.mode,
         });
     } else {
-        // Peer-consensus: endorsement account must be valid and quorum met.
+        // Peer-consensus: a proposed endorsement (created by
+        // `propose_validator`) must exist and have met quorum. A fresh
+        // zeroed record (init_if_needed shell with no proposal) is rejected
+        // explicitly — otherwise `required == 0` would let any quorum check
+        // pass trivially.
         let endorsement = &ctx.accounts.endorsement;
+        require!(
+            endorsement.proposed != Pubkey::default(),
+            super::TerraError::NoProposalFound
+        );
         require!(
             endorsement.registry == registry.key(),
             super::TerraError::AttestationMismatch
@@ -119,6 +170,10 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
         require!(
             endorsement.proposed == validator,
             super::TerraError::NotValidator
+        );
+        require!(
+            endorsement.required > 0,
+            super::TerraError::InvalidThreshold
         );
         require!(
             endorsement.endorsers.len() as u8 >= endorsement.required,
@@ -158,11 +213,17 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
         // Admin removal — no endorsement needed.
         registry.validators.remove(pos);
     } else {
-        // Peer removal — endorsement quorum required.
+        // Peer removal — endorsement quorum required. The required > 0
+        // guard closes the same zero-quorum bypass as the add path: an
+        // uninitialized or misconfigured endorsement can never authorize.
         let endorsement = &ctx.accounts.endorsement;
         require!(
             endorsement.registry == registry.key(),
             super::TerraError::AttestationMismatch
+        );
+        require!(
+            endorsement.required > 0,
+            super::TerraError::InvalidThreshold
         );
         require!(
             endorsement.endorsers.len() as u8 >= endorsement.required,
@@ -186,6 +247,13 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
 pub fn endorse_validator_add(ctx: Context<super::EndorseValidatorAdd>) -> Result<()> {
     let endorsement = &mut ctx.accounts.endorsement;
     let endorser = ctx.accounts.endorser.key();
+
+    // The endorsement must have been initialized by an add_validator call
+    // (proposed != default); endorsements for the zero pubkey are meaningless.
+    require!(
+        endorsement.proposed != Pubkey::default(),
+        super::TerraError::NoProposalFound
+    );
 
     // Endorser must be in the registry.
     let registry = &ctx.accounts.registry;

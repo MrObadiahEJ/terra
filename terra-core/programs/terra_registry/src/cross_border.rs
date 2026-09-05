@@ -94,6 +94,12 @@ pub struct JurisdictionBinding {
     pub bound_at: i64,
     /// Optional expiry (0 = no expiry).
     pub expires_at: i64,
+    /// Whether a validator has attested this binding's proof off-chain.
+    /// Binding is a permissionless *claim*; only verified bindings should be
+    /// relied upon (circuit verification is deferred to audit; see RFC-006).
+    pub verified: bool,
+    /// Validator that last verified this binding.
+    pub verified_by: Pubkey,
     /// Monotonic counter, bumped on re-verification.
     pub version: u32,
 }
@@ -256,6 +262,10 @@ pub fn bind_cross_border_identity(
     binding.revoked_at = 0;
     binding.bound_at = now;
     binding.expires_at = expires_at;
+    // Fresh claims are unverified until a validator attests via
+    // verify_jurisdiction_membership.
+    binding.verified = false;
+    binding.verified_by = Pubkey::default();
     binding.version = 0;
 
     emit!(CrossBorderIdentityBound {
@@ -281,6 +291,8 @@ pub fn verify_jurisdiction_membership(
     }
 
     binding.version = binding.version.saturating_add(1);
+    binding.verified = true;
+    binding.verified_by = ctx.accounts.validator.key();
 
     emit!(JurisdictionMembershipVerified {
         binding: binding.key(),
@@ -374,6 +386,10 @@ pub fn rebind_cross_border_identity(
     new_binding.revoked_at = 0;
     new_binding.bound_at = now;
     new_binding.expires_at = expires_at;
+    // Fresh claims are unverified until a validator attests via
+    // verify_jurisdiction_membership.
+    new_binding.verified = false;
+    new_binding.verified_by = Pubkey::default();
     new_binding.version = 0;
 
     emit!(CrossBorderIdentityRebound {

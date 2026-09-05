@@ -8,6 +8,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use terra_registry::{
+    authority_registry::{registry_mode, AuthorityRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
     guardian, infra_flag, parcel_status, right_kind, staking,
     subdivision::SubdivisionRecord,
@@ -166,6 +167,32 @@ async fn process(
         ctx.last_blockhash,
     );
     ctx.banks_client.process_transaction(tx).await.map(|_| ())
+}
+
+async fn process_with(
+    ctx: &mut ProgramTestContext,
+    fee_payer: &Keypair,
+    signers: &[&Keypair],
+    ix: Instruction,
+) -> Result<(), solana_program_test::BanksClientError> {
+    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fee_payer.pubkey()),
+        signers,
+        ctx.last_blockhash,
+    );
+    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+}
+
+fn fund_ix(from: &Pubkey, to: &Pubkey, lamports: u64) -> Instruction {
+    let mut data = vec![2u8, 0, 0, 0];
+    data.extend_from_slice(&lamports.to_le_bytes());
+    Instruction {
+        program_id: system_program_id(),
+        accounts: vec![AccountMeta::new(*from, true), AccountMeta::new(*to, false)],
+        data,
+    }
 }
 
 #[tokio::test]
@@ -698,6 +725,7 @@ async fn zk_register_generate_verify_double_use() {
                 AccountMeta::new_readonly(root, false),
                 AccountMeta::new(nullifier_rec, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data,
@@ -747,6 +775,7 @@ async fn zk_register_generate_verify_double_use() {
                 AccountMeta::new_readonly(root, false),
                 AccountMeta::new(other_rec, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data,
@@ -992,4 +1021,389 @@ async fn subdivision_creates_child_and_record() {
     // Attestation type is exercised so the import cannot go stale.
     let att: Attestation = read_account(&ctx, att_pk).await;
     assert_eq!(att.specifier, specifier);
+}
+
+#[tokio::test]
+async fn peer_consensus_endorsement_flow() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let v2 = Keypair::new();
+    let v3 = Keypair::new().pubkey();
+
+    // Bootstrap: admin adds two validators unilaterally.
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
+
+    // Flip to peer-consensus (n = 2, required = ceil(4/3) = 2).
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "flip_to_consensus").to_vec(),
+        },
+    )
+    .await
+    .expect("flip_to_consensus failed");
+    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    assert_eq!(reg.mode, registry_mode::PEER_CONSENSUS);
+    assert_eq!(reg.required_endorsements, 2);
+
+    // Propose V3: creates the endorsement record (no quorum yet).
+    let (endorsement, _) = endorsement_pda(&registry, &v3);
+    let mut data = discriminator("global", "propose_validator").to_vec();
+    data.extend_from_slice(&borsh_ser(&v3));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(v3, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose_validator failed");
+
+    // Admission before quorum must fail.
+    let mut data = discriminator("global", "add_validator_to_registry").to_vec();
+    data.extend_from_slice(&borsh_ser(&v3));
+    let admit_ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(endorsement, false),
+            AccountMeta::new_readonly(v3, false),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    };
+    process(&mut ctx, &payer, admit_ix.clone())
+        .await
+        .expect_err("peer add without quorum should fail");
+
+    // Two endorsements meet quorum; proposing again succeeds.
+    // V2 must sign its own endorsement, so it is funded first.
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund endorser failed");
+    // Endorse as V1 (payer).
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "endorse_validator_add").to_vec(),
+        },
+    )
+    .await
+    .expect("v1 endorse failed");
+    // Endorse as V2 (own signature).
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v2],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(v2.pubkey(), true),
+            ],
+            data: discriminator("global", "endorse_validator_add").to_vec(),
+        },
+    )
+    .await
+    .expect("v2 endorse failed");
+
+    process(&mut ctx, &payer, admit_ix)
+        .await
+        .expect("peer add with quorum failed");
+    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    assert!(reg.validators.contains(&v3));
+}
+
+fn assert_custom_error(
+    res: Result<(), solana_program_test::BanksClientError>,
+    code: u32,
+    what: &str,
+) {
+    let err = res.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            solana_program_test::BanksClientError::TransactionError(
+                solana_sdk::transaction::TransactionError::InstructionError(
+                    0,
+                    solana_sdk::instruction::InstructionError::Custom(c)
+                )
+            ) if c == code
+        ),
+        "{what}: expected Custom({code}), got {err:?}"
+    );
+}
+
+#[tokio::test]
+async fn slash_and_dismiss_require_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    // Offender V2: registered, funded, self-staked.
+    let offender = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &offender.pubkey()).await;
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &offender.pubkey(), 5_000_000_000),
+    )
+    .await
+    .expect("fund offender failed");
+
+    let (pool, _) = stake_pool_pda(&registry);
+    let mut data = discriminator("global", "create_stake_pool").to_vec();
+    data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_stake_pool failed");
+
+    // Deposit 2 SOL as the offender (own signature + funds).
+    let (off_stake, _) = validator_stake_pda(&pool, &offender.pubkey());
+    let mut data = discriminator("global", "deposit_stake").to_vec();
+    data.extend_from_slice(&borsh_ser(&2_000_000_000u64));
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &offender],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(off_stake, false),
+                AccountMeta::new(offender.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("offender deposit failed");
+
+    // Reporter (payer) files against the offender; bond is really moved.
+    let evidence = [61u8; 32];
+    let (report, _) = {
+        let r = Pubkey::find_program_address(
+            &[
+                b"slashing_report".as_ref(),
+                pool.as_ref(),
+                payer.pubkey().as_ref(),
+                evidence.as_ref(),
+            ],
+            &PROGRAM_ID,
+        );
+        r
+    };
+    let reporter_before = ctx.banks_client.get_balance(payer.pubkey()).await.unwrap();
+    let mut data = discriminator("global", "report_equivocation").to_vec();
+    data.extend_from_slice(&evidence);
+    data.extend_from_slice(&[62u8; 64]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(off_stake, false),
+                AccountMeta::new(report, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("report failed");
+    let reporter_after = ctx.banks_client.get_balance(payer.pubkey()).await.unwrap();
+    // 1% bond on 2 SOL = 20M lamports (+fees/rent) really left the reporter.
+    assert!(
+        reporter_before > reporter_after + 20_000_000,
+        "reporter bond was not collected"
+    );
+
+    // Intruder (non-admin) can neither slash nor dismiss: 6010 NotAuthorized.
+    let intruder = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund intruder failed");
+    let slash_ix = |signer: &Pubkey| Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(report, false),
+            AccountMeta::new(off_stake, false),
+            AccountMeta::new(pool, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new(Pubkey::new_unique(), false),
+            AccountMeta::new(*signer, true),
+        ],
+        data: discriminator("global", "verify_and_slash").to_vec(),
+    };
+    let res = process_with(
+        &mut ctx,
+        &intruder,
+        &[&intruder],
+        slash_ix(&intruder.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6010, "intruder slash");
+    let dismiss_ix = |signer: &Pubkey| Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(report, false),
+            AccountMeta::new_readonly(pool, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(*signer, true),
+        ],
+        data: discriminator("global", "dismiss_report").to_vec(),
+    };
+    let res = process_with(
+        &mut ctx,
+        &intruder,
+        &[&intruder],
+        dismiss_ix(&intruder.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6010, "intruder dismiss");
+
+    // Admin dismiss succeeds and resolves the report.
+    process(&mut ctx, &payer, dismiss_ix(&payer.pubkey()))
+        .await
+        .expect("admin dismiss failed");
+    let rep: staking::SlashingReport = read_account(&ctx, report).await;
+    assert_eq!(rep.status, staking::report_status::DISMISSED);
+    assert!(rep.resolved_at > 0);
+}
+
+#[tokio::test]
+async fn migrate_rights_recreates_on_new_parcel() {
+    let (mut ctx, payer) = setup().await;
+    let old_id: [u8; 32] = [71u8; 32];
+    let (old_pk, _) = parcel_pda(&old_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&old_id, "Old parcel", &[72u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register old failed");
+
+    // Grant one right on the old parcel (nonce 0).
+    let holder = Keypair::new().pubkey();
+    let (old_rights, _) = rights_pda(&old_pk, 0);
+    let mut data = discriminator("global", "grant_right").to_vec();
+    data.extend_from_slice(&borsh_ser(&0u8));
+    data.extend_from_slice(&borsh_ser(&right_kind::USAGE));
+    data.extend_from_slice(&borsh_ser(&holder));
+    data.extend_from_slice(&borsh_ser(&0i64));
+    data.extend_from_slice(&borsh_ser(&"grazing".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(old_pk, false),
+                AccountMeta::new(old_rights, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("grant failed");
+
+    // Fresh parcel as migration target.
+    let new_id: [u8; 32] = [73u8; 32];
+    let (new_pk, _) = parcel_pda(&new_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&new_id, "New parcel", &[74u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register new failed");
+
+    // Migrate with an (old, new_target) pair. The target must be the
+    // canonical uninitialized Rights PDA (the program creates it via CPI).
+    let (expect_new, _) =
+        Pubkey::find_program_address(&[b"rights".as_ref(), new_pk.as_ref(), &[0u8]], &PROGRAM_ID);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(old_pk, false),
+                AccountMeta::new(new_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new(old_rights, false),
+                AccountMeta::new(expect_new, false),
+            ],
+            data: discriminator("global", "migrate_rights").to_vec(),
+        },
+    )
+    .await
+    .expect("migrate_rights failed");
+
+    // Old record destroyed: either purged entirely or drained to zero
+    // lamports (both prove closure; banks may drop dead accounts).
+    match ctx.banks_client.get_account(old_rights).await.unwrap() {
+        None => {}
+        Some(old_acc) => assert_eq!(old_acc.lamports, 0),
+    }
+    let recreated: Rights = read_account(&ctx, expect_new).await;
+    assert_eq!(recreated.parcel, new_pk);
+    assert_eq!(recreated.holder, holder);
+    assert_eq!(recreated.rights_kind, right_kind::USAGE);
 }

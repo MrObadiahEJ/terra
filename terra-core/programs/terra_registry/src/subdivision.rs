@@ -252,34 +252,55 @@ pub fn amalgamate_parcels(
     Ok(())
 }
 
-/// Migrate rights from an old parcel to a new parcel. Reuses the
-/// `remaining_accounts` pattern from succession: each account in
-/// `remaining_accounts` is a Rights PDA that gets closed and re-created
-/// with the new parcel key.
-pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
+/// Migrate rights from an old parcel to a new parcel.
+///
+/// `remaining_accounts` carries (old, new_target) PAIRS: each old Rights PDA
+/// is verified, closed (rent → authority), and re-created on the new parcel
+/// via a signed system-program CPI so no rights record is ever lost.
+///
+/// NOTE: explicit unified lifetime — the CPI account array mixes
+/// ctx-derived and remaining-accounts-derived AccountInfos, and Signer's
+/// invariance rejects the default elided (independent) lifetimes.
+pub fn migrate_rights<'a>(ctx: Context<'a, super::MigrateRights<'a>>) -> Result<()> {
+    // NOTE: Signer::to_account_info() results are used inline (never bound
+    // to locals): Signer is invariant over its lifetime, and a let-bound
+    // AccountInfo used across loop iterations fails region inference.
+    let program_id = *ctx.program_id;
+    let authority_key = ctx.accounts.authority.key();
+
     let old_parcel = &ctx.accounts.old_parcel;
     let new_parcel = &mut ctx.accounts.new_parcel;
 
-    require!(
-        ctx.accounts.authority.key() == old_parcel.owner,
-        TerraError::NotOwner
-    );
+    require!(authority_key == old_parcel.owner, TerraError::NotAuthorized);
     require!(
         old_parcel.key() != new_parcel.key(),
         TerraError::SelfDealingNotAllowed
     );
 
+    require!(
+        ctx.remaining_accounts.len().is_multiple_of(2),
+        TerraError::RightsMigrationFailed
+    );
+
+    let old_parcel_key = old_parcel.key();
+
     let now = Clock::get()?.unix_timestamp;
     let mut migrated: u8 = 0;
+    let new_parcel_key = new_parcel.key();
+    let space = 8 + crate::Rights::INIT_SPACE;
+    let rent_lamports = Rent::get()?.minimum_balance(space);
 
-    for account in ctx.remaining_accounts.iter() {
-        verify_rights_account(account, *ctx.program_id, old_parcel.key())?;
+    for pair in ctx.remaining_accounts.chunks(2) {
+        let old_rights_info = &pair[0];
+        let new_target = &pair[1];
+        verify_rights_account(old_rights_info, program_id, old_parcel_key)?;
 
-        let data = account.try_borrow_data()?;
+        let data = old_rights_info.try_borrow_data()?;
 
-        // Read Rights fields from raw data. Only rights_kind + holder are
-        // re-emitted (the event carries what the caller needs to recreate);
-        // the rest are parsed for layout validation and intentionally unused.
+        // Fixed-offset region must exist before any indexed read.
+        require!(data.len() >= 121, TerraError::RightsMigrationFailed);
+
+        // Read Rights fields from raw data.
         // Layout after 8-byte discriminator:
         //   8..40   parcel (Pubkey)
         //   40..41  rights_kind (u8)
@@ -297,13 +318,18 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
         granter.copy_from_slice(&data[73..105]);
         let mut created_at = [0u8; 8];
         created_at.copy_from_slice(&data[105..113]);
-        let _created_at = i64::from_le_bytes(created_at);
+        let created_at = i64::from_le_bytes(created_at);
         let mut expires_at = [0u8; 8];
         expires_at.copy_from_slice(&data[113..121]);
-        let _expires_at = i64::from_le_bytes(expires_at);
+        let expires_at = i64::from_le_bytes(expires_at);
 
-        // Read notes string.
+        // Read notes string (bounds-checked: malformed accounts fail
+        // closed instead of panicking).
         let notes_start = 121;
+        require!(
+            data.len() >= notes_start + 4,
+            TerraError::RightsMigrationFailed
+        );
         let notes_len = u32::from_le_bytes([
             data[notes_start],
             data[notes_start + 1],
@@ -311,37 +337,91 @@ pub fn migrate_rights(ctx: Context<super::MigrateRights>) -> Result<()> {
             data[notes_start + 3],
         ]) as usize;
         let notes_bytes = &data[notes_start + 4..notes_start + 4 + notes_len];
-        let _notes = String::from_utf8_lossy(notes_bytes).to_string();
+        let notes = String::from_utf8_lossy(notes_bytes).to_string();
 
         // Read status and grace_period_secs.
         let status_start = notes_start + 4 + notes_len;
-        let _status = data[status_start];
+        require!(
+            data.len() >= status_start + 9,
+            TerraError::RightsMigrationFailed
+        );
+        let status = data[status_start];
         let mut grace_period_secs = [0u8; 8];
         grace_period_secs.copy_from_slice(&data[status_start + 1..status_start + 9]);
-        let _grace_period_secs = i64::from_le_bytes(grace_period_secs);
+        let grace_period_secs = i64::from_le_bytes(grace_period_secs);
+        drop(data);
+
+        let new_nonce = new_parcel.rights_count;
+        require!(new_nonce != u8::MAX, TerraError::RightsLimitExceeded);
+
+        // The target must be the canonical uninitialized Rights PDA.
+        let (expected_new, bump) = Pubkey::find_program_address(
+            &[b"rights".as_ref(), new_parcel_key.as_ref(), &[new_nonce]],
+            &program_id,
+        );
+        require!(expected_new == *new_target.key, TerraError::InvalidNonce);
+        require!(
+            new_target.lamports() == 0,
+            TerraError::RightsMigrationFailed
+        );
+
+        // Create the new Rights account via signed CPI (program is the signer).
+        let bump_seed = [bump];
+        let signer_seeds: &[&[u8]] = &[
+            b"rights".as_ref(),
+            new_parcel_key.as_ref(),
+            &[new_nonce],
+            &bump_seed,
+        ];
+        let create_ix = anchor_lang::solana_program::system_instruction::create_account(
+            &authority_key,
+            new_target.key,
+            rent_lamports,
+            space as u64,
+            &program_id,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &create_ix,
+            &[
+                ctx.accounts.authority.to_account_info(),
+                new_target.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
+
+        // Write the migrated record (discriminator + borsh body).
+        let migrated_rights = crate::Rights {
+            parcel: new_parcel_key,
+            rights_kind,
+            holder: Pubkey::new_from_array(holder),
+            granter: Pubkey::new_from_array(granter),
+            created_at,
+            expires_at,
+            notes,
+            status,
+            grace_period_secs,
+        };
+        {
+            let mut target_data = new_target.try_borrow_mut_data()?;
+            <crate::Rights as anchor_lang::AccountSerialize>::try_serialize(
+                &migrated_rights,
+                &mut &mut target_data[..],
+            )?;
+        }
 
         // Close old account — return lamports to authority.
-        let old_lamports = account.lamports();
-        **account.try_borrow_mut_lamports()? = 0;
+        let old_lamports = old_rights_info.lamports();
+        **old_rights_info.try_borrow_mut_lamports()? = 0;
         **ctx
             .accounts
             .authority
             .to_account_info()
             .try_borrow_mut_lamports()? += old_lamports;
 
-        drop(data);
-
-        // We can't init new accounts inside the loop (Anchor requires
-        // separate #[account(init)] structs). Instead we emit an event
-        // with the data so the caller can recreate off-chain or via CPI.
-        // However, since the RFC says "close old, create new", we use
-        // the raw account creation approach via system_program CPI.
-        let new_nonce = new_parcel.rights_count;
-        require!(new_nonce != u8::MAX, TerraError::RightsLimitExceeded);
-
         emit!(RightsMigrated {
             old_parcel: old_parcel.key(),
-            new_parcel: new_parcel.key(),
+            new_parcel: new_parcel_key,
             rights_kind,
             holder: Pubkey::new_from_array(holder),
             nonce: new_nonce,

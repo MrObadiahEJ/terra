@@ -78,6 +78,9 @@ pub fn renew_right(
     require!(new_notes.len() <= 128, TerraError::NotesTooLong);
 
     let rights = &mut ctx.accounts.rights;
+    // Refresh lazy status first so all guards below see current time.
+    let rights_key = rights.key();
+    update_right_status(rights, rights_key)?;
     require!(
         rights.status != right_status::REVOKED,
         TerraError::CannotRenewRevokedRight
@@ -144,38 +147,16 @@ pub fn sweep_expired_rights(ctx: Context<super::SweepExpiredRights>, _nonce: u8)
         TerraError::InvalidRightStatus
     );
 
-    let now = Clock::get()?.unix_timestamp;
-
     // Permanent rights are never swept.
     require!(
         rights.expires_at != 0,
         TerraError::PermanentRightNotSweepable
     );
 
-    // Not yet expired — no-op.
-    if now < rights.expires_at {
-        return Ok(());
-    }
-
-    let old_status = rights.status;
+    // The shared helper performs (and emits) the transition; sweep enforces
+    // the keeper preconditions above.
     let rights_key = rights.key();
-
-    if rights.grace_period_secs > 0 && now < rights.expires_at + rights.grace_period_secs {
-        rights.status = right_status::GRACE;
-    } else {
-        rights.status = right_status::EXPIRED;
-    }
-
-    emit!(RightStatusTransition {
-        parcel: rights.parcel,
-        rights: rights_key,
-        holder: rights.holder,
-        old_status,
-        new_status: rights.status,
-        expires_at: rights.expires_at,
-        block_time: now,
-    });
-
+    update_right_status(rights, rights_key)?;
     Ok(())
 }
 

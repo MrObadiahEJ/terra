@@ -244,11 +244,8 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
     let buyer = escrow.buyer;
     let amount = escrow.amount;
 
-    // Close escrow record (lamports → seller).
-    let escrow_info = ctx.accounts.escrow_record.to_account_info();
-    let escrow_lamports = escrow_info.lamports();
-    **escrow_info.try_borrow_mut_lamports()? = 0;
-    **seller_info.try_borrow_mut_lamports()? += escrow_lamports;
+    // The escrow record is closed by the `close = seller` constraint (rent
+    // lamports → seller); no manual zeroing, so no stale account data lingers.
 
     emit!(EscrowSettled {
         escrow: escrow_key,

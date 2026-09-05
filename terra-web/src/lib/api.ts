@@ -507,6 +507,8 @@ export interface CrossBorderBinding {
   revoked_by: string | null
   bound_at: string
   expires_at: string | null
+  verified: boolean
+  verified_by: string | null
   version: number
   country_code: string
 }
@@ -792,23 +794,41 @@ export interface ZoneParcelCount {
 
 // ---- client ---------------------------------------------------------------
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
-  if (!res.ok) {
-    let detail = res.statusText
-    try {
-      const body = await res.json()
-      detail = body?.message ?? body?.error ?? detail
-    } catch {
-      /* ignore */
+async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...init,
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      let detail = res.statusText
+      try {
+        const body = await res.json()
+        detail = body?.message ?? body?.error ?? detail
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`${res.status}: ${detail}`)
     }
-    throw new Error(`${res.status}: ${detail}`)
+    if (res.status === 204) return undefined as T
+    return (await res.json()) as T
+  } catch (err) {
+    // Retry once on network-level failures (offline / flaky links); HTTP
+    // error statuses above already threw and are not retried.
+    const networkFailure =
+      err instanceof DOMException && err.name === 'AbortError'
+      || err instanceof TypeError
+    if (retries > 0 && networkFailure) {
+      await new Promise((r) => setTimeout(r, 1000))
+      return request<T>(path, init, retries - 1)
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
-  if (res.status === 204) return undefined as T
-  return (await res.json()) as T
 }
 
 export const api = {
@@ -1087,9 +1107,9 @@ export const api = {
     request<CrossBorderBinding>('/cross-border/bindings', {
       method: 'POST', body: JSON.stringify(input),
     }),
-  verifyMembership: (id: string) =>
+  verifyMembership: (id: string, validator: string) =>
     request<CrossBorderBinding>(`/cross-border/bindings/${id}/verify`, {
-      method: 'POST',
+      method: 'POST', body: JSON.stringify({ validator }),
     }),
   revokeBinding: (id: string, input: RevokeBindingInput) =>
     request<CrossBorderBinding>(`/cross-border/bindings/${id}/revoke`, {

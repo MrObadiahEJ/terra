@@ -4354,6 +4354,10 @@ export const terraRegistry: Idl = {
           "writable": true
         },
         {
+          "name": "treasury",
+          "writable": true
+        },
+        {
           "name": "payer",
           "writable": true,
           "signer": true
@@ -4521,6 +4525,15 @@ export const terraRegistry: Idl = {
           "name": "authority",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -5224,6 +5237,10 @@ export const terraRegistry: Idl = {
           "signer": true
         },
         {
+          "name": "authority",
+          "signer": true
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -5304,6 +5321,233 @@ export const terraRegistry: Idl = {
         {
           "name": "stale_version",
           "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "report_validator_offense",
+      "discriminator": [
+        26,
+        28,
+        132,
+        175,
+        77,
+        1,
+        72,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "offender_stake",
+          "writable": true
+        },
+        {
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "reporter"
+              },
+              {
+                "kind": "arg",
+                "path": "evidence_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "offense_kind",
+          "type": "u8"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "offense_details",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "propose_validator",
+      "discriminator": [
+        177,
+        134,
+        171,
+        144,
+        175,
+        45,
+        190,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
         }
       ]
     }
@@ -7209,6 +7453,21 @@ export const terraRegistry: Idl = {
       "code": 6112,
       "name": "InvalidDisclosureType",
       "msg": "Disclosure type must be 0 (membership), 1 (range), or 2 (count)"
+    },
+    {
+      "code": 6113,
+      "name": "InvalidOffenseType",
+      "msg": "Offense type must be 0 (equivocation), 1 (liveness), or 2 (collusion)"
+    },
+    {
+      "code": 6114,
+      "name": "InvalidRegistryMode",
+      "msg": "Registry is not in the required mode for this operation"
+    },
+    {
+      "code": 6115,
+      "name": "NoProposalFound",
+      "msg": "No validator endorsement proposal exists for this candidate"
     }
   ],
   "types": [
@@ -7292,6 +7551,10 @@ export const terraRegistry: Idl = {
                 8
               ]
             }
+          },
+          {
+            "name": "document_count",
+            "type": "u8"
           }
         ]
       }
@@ -8585,6 +8848,19 @@ export const terraRegistry: Idl = {
           {
             "name": "new_owner",
             "type": "pubkey"
+          },
+          {
+            "name": "present_validators",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "present_count",
+            "type": "u8"
           }
         ]
       }

@@ -210,10 +210,13 @@ pub fn generate_ownership_root(
 
 /// Verify a ZK ownership proof and record its nullifier (first-use wins).
 ///
-/// Structural on-chain checks only: the Groth16/PLONK circuit verification
-/// itself happens in the client + verifier precompile and is attested by the
-/// zone authority's signed root; on-chain we enforce nullifier uniqueness,
-/// root-version currency, proof size, purpose, and disclosure-type bounds.
+/// Trust model (honest scoping): the ZK circuit itself is NOT verified
+/// on-chain — no pairing check exists in this program. What this instruction
+/// enforces is an *authority attestation*: the zone authority must co-sign
+/// every accepted proof, binding it to the current Merkle root. Combined
+/// with nullifier uniqueness and root-version currency, a nullifier record
+/// means "the zone authority attested this proof against this root" — full
+/// circuit verification is deferred to audit (see RFC-011 section 12).
 pub fn verify_ownership_proof(
     ctx: Context<super::VerifyOwnershipProof>,
     proof_data: Vec<u8>,
@@ -222,6 +225,10 @@ pub fn verify_ownership_proof(
     proof_purpose: String,
     disclosure_type: u8,
 ) -> Result<()> {
+    require!(
+        ctx.accounts.authority.key() == ctx.accounts.zone_set.authority,
+        TerraError::UnauthorizedZoneAuthority
+    );
     require!(
         !nullifier_hash.iter().all(|b| *b == 0),
         TerraError::EmptyGeometryHash

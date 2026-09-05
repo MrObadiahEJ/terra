@@ -65,7 +65,7 @@ const BINDING_SELECT: &str = r#"
         b.credential_commitment, b.nullifier,
         b.proof_data, b.proof_version, b.algorithm_id,
         b.revoked, b.revoked_at, b.revoked_by,
-        b.bound_at, b.expires_at, b.version,
+        b.bound_at, b.expires_at, b.verified, b.verified_by, b.version,
         j.country_code
     FROM cross_border_bindings b
     JOIN jurisdictions j ON j.id = b.jurisdiction_id
@@ -86,6 +86,8 @@ pub struct Binding {
     pub revoked_by: Option<String>,
     pub bound_at: DateTime<Utc>,
     pub expires_at: Option<DateTime<Utc>>,
+    pub verified: bool,
+    pub verified_by: Option<String>,
     pub version: i64,
     pub country_code: String,
 }
@@ -299,10 +301,18 @@ async fn get_binding(
     Ok(Json(row))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VerifyMembershipRequest {
+    /// base58 wallet of the validator attesting the binding's proof.
+    pub validator: String,
+}
+
 async fn verify_membership(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    Json(req): Json<VerifyMembershipRequest>,
 ) -> Result<Json<Binding>, AppError> {
+    crate::routes::identities::decode_wallet(&req.validator)?;
     let row: Binding = sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
         .bind(id)
         .fetch_optional(&state.pool)
@@ -318,15 +328,25 @@ async fn verify_membership(
         }
     }
 
-    sqlx::query(r#"UPDATE cross_border_bindings SET version = version + 1 WHERE id = $1"#)
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
-
-    let updated: Binding = sqlx::query_as(&format!("{BINDING_SELECT} WHERE b.id = $1"))
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await?;
+    // Single-statement UPDATE...RETURNING (with join) so the returned row
+    // carries the new verified flag — a CTE outer SELECT would read the
+    // pre-update snapshot instead.
+    let updated: Binding = sqlx::query_as(
+        "UPDATE cross_border_bindings AS b
+         SET version = version + 1, verified = true, verified_by = $2
+         FROM jurisdictions AS j
+         WHERE b.id = $1 AND j.id = b.jurisdiction_id
+         RETURNING b.id, b.jurisdiction_id, b.identity_hash,
+                   b.credential_commitment, b.nullifier,
+                   b.proof_data, b.proof_version, b.algorithm_id,
+                   b.revoked, b.revoked_at, b.revoked_by,
+                   b.bound_at, b.expires_at, b.verified, b.verified_by, b.version,
+                   j.country_code",
+    )
+    .bind(id)
+    .bind(&req.validator)
+    .fetch_one(&state.pool)
+    .await?;
     Ok(Json(updated))
 }
 

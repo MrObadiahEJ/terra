@@ -34,6 +34,14 @@ pub fn register_document(
     );
     require!(!category.is_empty(), super::TerraError::EmptyName);
 
+    // Enforce the per-attestation document cap.
+    let attestation = &mut ctx.accounts.attestation;
+    require!(
+        attestation.document_count < MAX_DOCUMENTS_PER_ATTESTATION as u8,
+        super::TerraError::TooManyStorageUris
+    );
+    attestation.document_count = attestation.document_count.saturating_add(1);
+
     let clock = Clock::get()?;
     let doc = &mut ctx.accounts.document;
     doc.attestation = ctx.accounts.attestation.key();
