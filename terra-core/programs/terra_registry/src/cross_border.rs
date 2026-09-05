@@ -118,6 +118,7 @@ pub fn register_jurisdiction(
     verification_key_hash: [u8; 32],
     algorithm_id: u8,
 ) -> Result<()> {
+    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
     require!(!country_code.iter().all(|b| *b == 0), TerraError::InvalidId);
     require!(
         !jurisdiction_name.is_empty() && jurisdiction_name.len() <= MAX_JURISDICTION_NAME_LEN,
@@ -282,6 +283,7 @@ pub fn verify_jurisdiction_membership(
     ctx: Context<super::VerifyJurisdictionMembership>,
     _off_chain_nonce: [u8; 32],
 ) -> Result<()> {
+    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
     let binding = &mut ctx.accounts.binding;
     require!(!binding.revoked, TerraError::BindingRevoked);
 

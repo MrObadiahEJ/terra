@@ -25,6 +25,12 @@ pub struct AuthorityRegistry {
     pub required_endorsements: u8,
     /// 0 = bootstrap (admin has unilateral power), 1 = peer-consensus.
     pub mode: u8,
+    /// Emergency pause flag. When true, all pausable subsystem instructions
+    /// (staking, cross-border, guardian, zk, escrow, dispute) reject
+    /// state-changing calls. Core parcel/identity operations authorized by
+    /// individual owners are unaffected — the admin stops processing via
+    /// off-chain policy.
+    pub paused: bool,
     /// Monotonic counter bumped on each change.
     pub version: u32,
     pub created_at: i64,
@@ -57,6 +63,7 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
     registry.validators = Vec::new();
     registry.required_endorsements = 0;
     registry.mode = registry_mode::BOOTSTRAP;
+    registry.paused = false;
     registry.version = 0;
     registry.created_at = clock.unix_timestamp;
     registry.updated_at = clock.unix_timestamp;
@@ -66,6 +73,58 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
         admin: registry.admin,
         mode: registry.mode,
     });
+    Ok(())
+}
+
+/// Emergency pause. Admin-only. Freezes all pausable subsystem instructions
+/// (staking, cross-border, guardian, zk, escrow, dispute) until unpaused.
+/// Core parcel/identity operations continue — admin stops processing via
+/// off-chain policy.
+pub fn pause_program(ctx: Context<super::PauseProgram>) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        ctx.accounts.admin.key() == registry.admin,
+        super::TerraError::NotAuthorized
+    );
+    require!(!registry.paused, super::TerraError::ProgramAlreadyPaused);
+
+    registry.paused = true;
+    registry.version = registry.version.saturating_add(1);
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::ProgramPaused {
+        registry: registry.key(),
+        admin: ctx.accounts.admin.key(),
+        paused_at: registry.updated_at,
+    });
+    Ok(())
+}
+
+/// Unpause. Admin-only. Restores all pausable subsystem instructions.
+pub fn unpause_program(ctx: Context<super::UnpauseProgram>) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        ctx.accounts.admin.key() == registry.admin,
+        super::TerraError::NotAuthorized
+    );
+    require!(registry.paused, super::TerraError::ProgramNotPaused);
+
+    registry.paused = false;
+    registry.version = registry.version.saturating_add(1);
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::ProgramUnpaused {
+        registry: registry.key(),
+        admin: ctx.accounts.admin.key(),
+        unpaused_at: registry.updated_at,
+    });
+    Ok(())
+}
+
+/// Guard: reject if the registry is paused. Call at the top of every
+/// pausable instruction handler.
+pub fn require_not_paused(registry: &AuthorityRegistry) -> Result<()> {
+    require!(!registry.paused, super::TerraError::ProgramPaused);
     Ok(())
 }
 

@@ -139,6 +139,7 @@ pub fn revoke_guardianship(
     ctx: Context<super::RevokeGuardianship>,
     new_owner: Pubkey,
 ) -> Result<()> {
+    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
     require!(new_owner != Pubkey::default(), TerraError::EmptySuccessor);
 
     let revoker = ctx.accounts.revoker.key();

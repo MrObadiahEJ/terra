@@ -5550,6 +5550,91 @@ export const terraRegistry: Idl = {
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "pause_program",
+      "discriminator": [
+        91,
+        86,
+        253,
+        175,
+        66,
+        236,
+        172,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unpause_program",
+      "discriminator": [
+        43,
+        162,
+        233,
+        92,
+        254,
+        62,
+        69,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_verification_key_hash",
+      "discriminator": [
+        139,
+        196,
+        35,
+        133,
+        144,
+        163,
+        88,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "zone_set"
+        },
+        {
+          "name": "ownership_root",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_verification_key_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -7468,6 +7553,21 @@ export const terraRegistry: Idl = {
       "code": 6115,
       "name": "NoProposalFound",
       "msg": "No validator endorsement proposal exists for this candidate"
+    },
+    {
+      "code": 6115,
+      "name": "ProgramPaused",
+      "msg": "Program is paused \u2014 state-changing operations are frozen"
+    },
+    {
+      "code": 6116,
+      "name": "ProgramNotPaused",
+      "msg": "Program is not paused"
+    },
+    {
+      "code": 6117,
+      "name": "ProgramAlreadyPaused",
+      "msg": "Program is already paused"
     }
   ],
   "types": [
@@ -8568,6 +8668,10 @@ export const terraRegistry: Idl = {
             "type": "u8"
           },
           {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
             "name": "created_at",
             "type": "i64"
           }
@@ -9318,6 +9422,15 @@ export const terraRegistry: Idl = {
               "array": [
                 "u8",
                 64
+              ]
+            }
+          },
+          {
+            "name": "verification_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
               ]
             }
           },

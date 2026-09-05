@@ -73,6 +73,11 @@ pub struct OwnershipRoot {
     pub snapshot_hash: [u8; 32],
     /// Ed25519 signature of (merkle_root || version) by the zone authority.
     pub authority_signature: [u8; 64],
+    /// SHA-256 hash of the compiled Groth16 verification key for this zone.
+    /// Stored on-chain so that when on-chain pairing verification is
+    /// implemented post-audit, the VK is pre-registered and auditable.
+    /// Zero means "no VK registered yet" (authority-attestation mode).
+    pub verification_key_hash: [u8; 32],
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -110,6 +115,7 @@ pub fn register_zone_set(
     snapshot_cid: String,
     snapshot_hash: [u8; 32],
 ) -> Result<()> {
+    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
     require!(
         !snapshot_cid.is_empty() && snapshot_cid.len() <= MAX_SNAPSHOT_CID_LEN,
         TerraError::CidRequired
@@ -144,6 +150,7 @@ pub fn register_zone_set(
     root.snapshot_cid = snapshot_cid.clone();
     root.snapshot_hash = snapshot_hash;
     root.authority_signature = [0u8; 64];
+    root.verification_key_hash = [0u8; 32];
     root.created_at = now;
     root.updated_at = now;
 
@@ -300,6 +307,45 @@ pub fn invalidate_proof(ctx: Context<super::InvalidateProof>, stale_version: u32
     Ok(())
 }
 
+/// Register or update the Groth16 verification key hash for a zone.
+///
+/// When a ZK circuit is compiled, its verification key is a fixed artifact
+/// whose SHA-256 is stored on-chain here. Future on-chain pairing checks
+/// will hash the supplied proof's VK and compare against this value.
+///
+/// Trust model: until pairing verification is implemented, proofs are
+/// accepted on authority attestation alone (see verify_ownership_proof).
+/// Storing the hash now creates an auditable commitment that constrains
+/// the VK that can be used post-audit.
+pub fn update_verification_key_hash(
+    ctx: Context<super::UpdateVerificationKeyHash>,
+    new_verification_key_hash: [u8; 32],
+) -> Result<()> {
+    let zone_set = &ctx.accounts.zone_set;
+    require!(
+        ctx.accounts.authority.key() == zone_set.authority,
+        TerraError::UnauthorizedZoneAuthority
+    );
+    require!(
+        !new_verification_key_hash.iter().all(|b| *b == 0),
+        TerraError::EmptyGeometryHash
+    );
+
+    let root = &mut ctx.accounts.ownership_root;
+    let old_hash = root.verification_key_hash;
+    root.verification_key_hash = new_verification_key_hash;
+    root.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(VerificationKeyUpdated {
+        zone_set: zone_set.key(),
+        old_hash,
+        new_hash: new_verification_key_hash,
+        updated_by: ctx.accounts.authority.key(),
+        block_time: root.updated_at,
+    });
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
@@ -338,6 +384,15 @@ pub struct ProofVersionInvalidated {
     pub zone_set: Pubkey,
     pub stale_version: u32,
     pub current_version: u32,
+    pub block_time: i64,
+}
+
+#[event]
+pub struct VerificationKeyUpdated {
+    pub zone_set: Pubkey,
+    pub old_hash: [u8; 32],
+    pub new_hash: [u8; 32],
+    pub updated_by: Pubkey,
     pub block_time: i64,
 }
 

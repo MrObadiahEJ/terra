@@ -450,6 +450,20 @@ pub struct FlipToConsensus<'info> {
     pub admin_signer: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct PauseProgram<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UnpauseProgram<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub admin: Signer<'info>,
+}
+
 // ---------------------------------------------------------------------------
 // IPFS document storage contexts
 // ---------------------------------------------------------------------------
@@ -1240,6 +1254,14 @@ pub mod terra_registry {
         authority_registry::flip_to_consensus(ctx)
     }
 
+    pub fn pause_program(ctx: Context<PauseProgram>) -> Result<()> {
+        authority_registry::pause_program(ctx)
+    }
+
+    pub fn unpause_program(ctx: Context<UnpauseProgram>) -> Result<()> {
+        authority_registry::unpause_program(ctx)
+    }
+
     // -----------------------------------------------------------------------
     // IPFS document storage
     // -----------------------------------------------------------------------
@@ -1500,6 +1522,13 @@ pub mod terra_registry {
 
     pub fn invalidate_proof(ctx: Context<InvalidateProof>, stale_version: u32) -> Result<()> {
         zk::invalidate_proof(ctx, stale_version)
+    }
+
+    pub fn update_verification_key_hash(
+        ctx: Context<UpdateVerificationKeyHash>,
+        new_verification_key_hash: [u8; 32],
+    ) -> Result<()> {
+        zk::update_verification_key_hash(ctx, new_verification_key_hash)
     }
 
     // -----------------------------------------------------------------------
@@ -2981,6 +3010,22 @@ pub struct InvalidateProof<'info> {
     pub authority: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct UpdateVerificationKeyHash<'info> {
+    #[account(
+        seeds = [b"zone_set", zone_set.zone_id.as_ref()],
+        bump,
+    )]
+    pub zone_set: Account<'info, zk::ZoneSet>,
+    #[account(
+        mut,
+        seeds = [b"ownership_root", zone_set.key().as_ref()],
+        bump,
+    )]
+    pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    pub authority: Signer<'info>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -3200,6 +3245,24 @@ pub struct ConsensusFlipped {
     pub admin: Pubkey,
     pub required_endorsements: u8,
     pub validator_count: u8,
+}
+
+// ---------------------------------------------------------------------------
+// Emergency pause events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ProgramPaused {
+    pub registry: Pubkey,
+    pub admin: Pubkey,
+    pub paused_at: i64,
+}
+
+#[event]
+pub struct ProgramUnpaused {
+    pub registry: Pubkey,
+    pub admin: Pubkey,
+    pub unpaused_at: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -3461,6 +3524,14 @@ pub enum TerraError {
     InvalidRegistryMode,
     #[msg("No validator endorsement proposal exists for this candidate")]
     NoProposalFound,
+
+    // Emergency pause
+    #[msg("Program is paused — state-changing operations are frozen")]
+    ProgramPaused,
+    #[msg("Program is not paused")]
+    ProgramNotPaused,
+    #[msg("Program is already paused")]
+    ProgramAlreadyPaused,
 }
 
 #[cfg(test)]

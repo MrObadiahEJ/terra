@@ -1407,3 +1407,283 @@ async fn migrate_rights_recreates_on_new_parcel() {
     assert_eq!(recreated.holder, holder);
     assert_eq!(recreated.rights_kind, right_kind::USAGE);
 }
+
+// ---------------------------------------------------------------------------
+// Pause / unpause tests
+// ---------------------------------------------------------------------------
+
+async fn create_test_registry(ctx: &mut ProgramTestContext, payer: &Keypair) -> Pubkey {
+    let (reg, _) = registry_pda();
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "create_registry").to_vec(),
+        },
+    )
+    .await
+    .expect("create_registry failed");
+    reg
+}
+
+#[tokio::test]
+async fn pause_and_unpause() {
+    let (mut ctx, payer) = setup().await;
+    let reg = create_test_registry(&mut ctx, &payer).await;
+
+    // Pause
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "pause_program").to_vec(),
+        },
+    )
+    .await
+    .expect("pause failed");
+
+    let r: AuthorityRegistry = read_account(&ctx, reg).await;
+    assert!(r.paused, "should be paused");
+
+    // Double-pause rejected
+    let err = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "pause_program").to_vec(),
+        },
+    )
+    .await;
+    assert!(err.is_err(), "double pause must fail");
+
+    // Unpause
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "unpause_program").to_vec(),
+        },
+    )
+    .await
+    .expect("unpause failed");
+
+    let r: AuthorityRegistry = read_account(&ctx, reg).await;
+    assert!(!r.paused, "should be unpaused");
+}
+
+#[tokio::test]
+async fn pause_blocks_staking() {
+    let (mut ctx, payer) = setup().await;
+    let reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+
+    // Create stake pool
+    let (pool, _) = stake_pool_pda(&reg);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(reg, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_stake_pool").to_vec();
+                d.extend_from_slice(&500u16.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_stake_pool failed");
+
+    // Pause
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "pause_program").to_vec(),
+        },
+    )
+    .await
+    .expect("pause failed");
+
+    // Try deposit_stake while paused — should fail with ProgramPaused
+    let (stake, _) = stake_pda(&pool, &payer.pubkey());
+    let err = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "deposit_stake").to_vec();
+                d.extend_from_slice(&1_000_000_000u64.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await;
+    assert!(err.is_err(), "deposit should fail while paused");
+
+    // Unpause and retry — should succeed
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "unpause_program").to_vec(),
+        },
+    )
+    .await
+    .expect("unpause failed");
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "deposit_stake").to_vec();
+                d.extend_from_slice(&1_000_000_000u64.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("deposit should succeed after unpause");
+}
+
+fn stake_pda(pool: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"validator_stake", pool.as_ref(), validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// ZK verification key hash test
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn update_verification_key_hash() {
+    let (mut ctx, payer) = setup().await;
+    let (reg, _) = registry_pda();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "create_registry").to_vec(),
+        },
+    )
+    .await
+    .expect("create_registry failed");
+
+    // Register zone
+    let zone_id = Keypair::new();
+    let (zone_set, _) = zone_set_pda(&zone_id.pubkey());
+    let (root, _) = ownership_root_pda(&zone_set);
+    let snap_hash = [1u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(reg, false),
+                AccountMeta::new(zone_id.pubkey(), false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_zone_set").to_vec();
+                let cid = b"QmTestVK";
+                d.extend_from_slice(&(cid.len() as u32).to_le_bytes());
+                d.extend_from_slice(cid);
+                d.extend_from_slice(&snap_hash);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_zone_set failed");
+
+    // Update VK hash
+    let vk_hash = [42u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&vk_hash);
+                d
+            },
+        },
+    )
+    .await
+    .expect("update_vk_hash failed");
+
+    let r: OwnershipRoot = read_account(&ctx, root).await;
+    assert_eq!(r.verification_key_hash, vk_hash);
+}
