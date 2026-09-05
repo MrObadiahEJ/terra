@@ -8,6 +8,7 @@ pub enum AppError {
     NotFound(String),
     BadRequest(String),
     Conflict(String),
+    Unauthorized(String),
     Database(sqlx::Error),
 }
 
@@ -22,6 +23,10 @@ impl AppError {
 
     pub fn not_found(msg: impl Into<String>) -> Self {
         AppError::NotFound(msg.into())
+    }
+
+    pub fn unauthorized(msg: impl Into<String>) -> Self {
+        AppError::Unauthorized(msg.into())
     }
 }
 
@@ -40,6 +45,7 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, m.clone()),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
+            AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m.clone()),
             AppError::Database(e) => {
                 tracing::error!(error = %e, "database error");
                 (

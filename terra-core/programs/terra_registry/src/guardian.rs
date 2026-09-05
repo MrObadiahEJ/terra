@@ -171,6 +171,7 @@ pub fn revoke_guardianship(
         TerraError::GuardianshipAlreadyActive
     );
     identity.pending_revocation = true;
+    identity.pending_new_owner = new_owner;
     identity.revoke_after = now.saturating_add(GUARDIANSHIP_REVOKE_TIMELOCK_SECS);
     identity.updated_at = now;
 
@@ -186,8 +187,9 @@ pub fn revoke_guardianship(
 }
 
 /// Execute a previously requested guardianship revocation after the timelock
-/// has expired. Anyone may call this (permissionless enforcement) — the
-/// timelock is the security guarantee, not caller identity.
+/// has expired. Only the approved `pending_new_owner` may call this — the
+/// timelock prevents the owner from reacting, and the stored target prevents
+/// front-running by a different wallet.
 pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship>) -> Result<()> {
     crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
 
@@ -202,6 +204,11 @@ pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship
     let new_owner = ctx.accounts.new_owner.key();
     require!(new_owner != Pubkey::default(), TerraError::EmptySuccessor);
     require!(new_owner != identity.owner, TerraError::SuccessorIsOwner);
+    // Enforce the target stored at request time — prevents front-running.
+    require!(
+        new_owner == identity.pending_new_owner,
+        TerraError::NotAuthorized
+    );
 
     let identity_key = identity.key();
     let previous_guardian = identity.owner;
@@ -210,6 +217,7 @@ pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship
     identity.owner = new_owner;
     identity.recovery = Pubkey::default();
     identity.pending_revocation = false;
+    identity.pending_new_owner = Pubkey::default();
     identity.revoke_after = 0;
     identity.updated_at = now;
 
@@ -217,7 +225,7 @@ pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship
         identity: identity_key,
         previous_guardian,
         new_owner,
-        revoked_by: identity.owner,
+        revoked_by: new_owner,
         block_time: now,
     });
     Ok(())

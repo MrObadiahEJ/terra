@@ -78,21 +78,18 @@ pub struct AmalgamationRecord {
 /// belonging to the given parcel. Returns the borsh-serialized data if valid.
 fn verify_rights_account<'info>(
     account: &AccountInfo<'info>,
-    program_id: Pubkey,
+    _program_id: Pubkey,
     expected_parcel: Pubkey,
 ) -> Result<()> {
-    require!(*account.owner == program_id, TerraError::NotOwner);
+    require!(*account.owner == _program_id, TerraError::NotOwner);
+    // Deserialize via Anchor instead of hardcoded offset — safe against
+    // future Rights layout changes.
     let data = account.try_borrow_data()?;
-    let disc: &[u8] = <crate::Rights as anchor_lang::Discriminator>::DISCRIMINATOR;
-    require!(
-        data.len() >= 8 && &data[0..8] == disc,
-        TerraError::InvalidRightKind
-    );
-    // Rights.parcel is at offset 8..40 (after 8-byte discriminator).
-    let mut parcel_bytes = [0u8; 32];
-    parcel_bytes.copy_from_slice(&data[8..40]);
-    let parcel = Pubkey::new_from_array(parcel_bytes);
-    require!(parcel == expected_parcel, TerraError::NotOwner);
+    let mut data_ref: &[u8] = &data;
+    let rights =
+        <crate::Rights as anchor_lang::AccountDeserialize>::try_deserialize(&mut data_ref)?;
+    drop(data);
+    require!(rights.parcel == expected_parcel, TerraError::NotOwner);
     Ok(())
 }
 

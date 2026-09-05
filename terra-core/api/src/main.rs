@@ -1,3 +1,4 @@
+mod auth;
 mod config;
 mod db;
 mod error;
@@ -65,7 +66,11 @@ async fn main() -> Result<()> {
         .nest("/api/v1", routes::router())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(AppState { pool, geo });
+        .with_state(AppState {
+            pool,
+            geo,
+            api_authority: auth::ApiAuthority(config.api_authority_pubkey),
+        });
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

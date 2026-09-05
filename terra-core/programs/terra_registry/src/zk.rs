@@ -72,6 +72,10 @@ pub struct OwnershipRoot {
     /// SHA-256 of the snapshot bytes.
     pub snapshot_hash: [u8; 32],
     /// Ed25519 signature of (merkle_root || version) by the zone authority.
+    /// Reserved for post-audit implementation: will be verified via the
+    /// Ed25519 precompile CPI in generate_ownership_root once the ZK verifier
+    /// program is integrated. Currently initialized to zeros — off-chain
+    /// indexers should verify this field out-of-band.
     pub authority_signature: [u8; 64],
     /// SHA-256 hash of the compiled Groth16 verification key for this zone.
     /// Stored on-chain so that when on-chain pairing verification is
@@ -103,6 +107,10 @@ pub struct NullifierRecord {
     pub disclosure_type: u8,
     /// Solana block time when the proof was verified.
     pub block_time: i64,
+    /// SHA-256 hash of the submitted proof bytes, for auditability and
+    /// dispute resolution. The full proof is ephemeral; this hash anchors
+    /// the exact data that was (authoritatively) accepted.
+    pub proof_hash: [u8; 32],
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +269,10 @@ pub fn verify_ownership_proof(
     require!(root.commitment_count > 0, TerraError::EmptyZoneSet);
 
     let now = Clock::get()?.unix_timestamp;
+
+    // Hash the proof data for auditability — the full proof is ephemeral.
+    let proof_hash = solana_program::hash::hash(&proof_data).to_bytes();
+
     let record = &mut ctx.accounts.nullifier_record;
     record.nullifier_hash = nullifier_hash;
     record.zone_set = ctx.accounts.zone_set.key();
@@ -269,6 +281,7 @@ pub fn verify_ownership_proof(
     record.proof_purpose = proof_purpose.clone();
     record.disclosure_type = disclosure_type;
     record.block_time = now;
+    record.proof_hash = proof_hash;
 
     emit!(OwnershipProofVerified {
         nullifier_hash,

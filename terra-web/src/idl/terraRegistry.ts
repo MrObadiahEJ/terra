@@ -6232,8 +6232,20 @@ export const terraRegistry: Idl = {
             "type": "pubkey"
           },
           {
-            "name": "executed_at",
+            "name": "block_time",
             "type": "i64"
+          },
+          {
+            "name": "proof_hash",
+            "docs": [
+              "SHA-256 hash of the submitted proof bytes for auditability."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       },
@@ -7798,6 +7810,15 @@ export const terraRegistry: Idl = {
               "Unix timestamp after which a pending revocation may be executed."
             ],
             "type": "i64"
+          },
+          {
+            "name": "pending_new_owner",
+            "docs": [
+              "Wallet that was designated as the new owner when revoke_guardianship",
+              "was called. The execute_revoke_guardianship handler enforces this",
+              "matches the signer, preventing front-running by a different wallet."
+            ],
+            "type": "pubkey"
           }
         ]
       }
@@ -9037,6 +9058,13 @@ export const terraRegistry: Idl = {
             "type": "u64"
           },
           {
+            "name": "reward_per_token_stored",
+            "docs": [
+              "Global reward-per-token accumulator, scaled by REWARD_PRECISION (1e9)."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "last_reward_distribution",
             "type": "i64"
           },
@@ -9079,6 +9107,13 @@ export const terraRegistry: Idl = {
           {
             "name": "unbonding_starts_at",
             "type": "i64"
+          },
+          {
+            "name": "reward_per_token_paid",
+            "docs": [
+              "Snapshot of the pool's reward_per_token_stored at last claim/deposit."
+            ],
+            "type": "u64"
           },
           {
             "name": "rewards_accrued",

@@ -191,10 +191,13 @@ pub struct Identity {
     pub created_at: i64,
     pub updated_at: i64,
     /// When true, a recovery wallet has requested revocation but the timelock
-    /// has not yet expired. The pending new_owner is stored in `revoke_after`
-    /// for the indexer; on-chain the actual transfer only completes via
-    /// `execute_revoke_guardianship` after the timelock.
+    /// has not yet expired. The approved target is stored in `pending_new_owner`.
     pub pending_revocation: bool,
+    /// The approved target wallet for a pending revocation. Set by
+    /// `revoke_guardianship`; enforced by `execute_revoke_guardianship`
+    /// so that only the originally-approved wallet can become the new owner.
+    /// Zero means no pending revocation.
+    pub pending_new_owner: Pubkey,
     /// Unix timestamp after which a pending revocation may be executed.
     /// Set by `revoke_guardianship` (which becomes a request-only call).
     /// Zero means no pending revocation.

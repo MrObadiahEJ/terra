@@ -30,6 +30,9 @@ pub const REWARD_DISTRIBUTION_INTERVAL_SECS: i64 = 86400;
 pub const REVIEW_PERIOD_SECS: i64 = 24 * 3600;
 /// Maximum appeal reason length.
 pub const MAX_APPEAL_REASON_LEN: usize = 256;
+/// Scaling factor for the global reward-per-token accumulator.
+/// Prevents precision loss when distributing small rewards across large stakes.
+pub const REWARD_PRECISION: u128 = 1_000_000_000; // 1e9
 
 // ---------------------------------------------------------------------------
 // Slashing report status
@@ -72,6 +75,10 @@ pub struct StakePool {
     pub reward_rate_bps: u16,
     /// Total rewards accrued but not yet distributed (lamports).
     pub accumulated_rewards: u64,
+    /// Global reward-per-token accumulator, scaled by REWARD_PRECISION (1e9).
+    /// When distribute_rewards fires: rpt += period_reward * PRECISION / total_staked.
+    /// Validators claim: (rpt - stake.rpt_paid) * staked_amount / PRECISION.
+    pub reward_per_token_stored: u64,
     /// Timestamp of last reward distribution.
     pub last_reward_distribution: i64,
     /// Total slashing events executed.
@@ -96,7 +103,10 @@ pub struct ValidatorStake {
     pub unbonding_amount: u64,
     /// When unbonding began (0 if not unbonding).
     pub unbonding_starts_at: i64,
-    /// Rewards accumulated but not yet claimed.
+    /// Snapshot of the pool's reward_per_token_stored at the time of last
+    /// claim or deposit. Claimable = (pool.rpt - self.rpt_paid) * staked / PRECISION.
+    pub reward_per_token_paid: u64,
+    /// Rewards accumulated but not yet claimed (legacy field, kept for compat).
     pub rewards_accrued: u64,
     /// Number of past slashing events (for graduated severity).
     pub slash_history: u8,
@@ -165,6 +175,7 @@ pub fn create_stake_pool(ctx: Context<super::CreateStakePool>, reward_rate_bps: 
     pool.total_staked = 0;
     pool.reward_rate_bps = reward_rate_bps;
     pool.accumulated_rewards = 0;
+    pool.reward_per_token_stored = 0;
     pool.last_reward_distribution = now;
     pool.slash_count = 0;
     pool.created_at = now;
@@ -216,6 +227,9 @@ pub fn deposit_stake(ctx: Context<super::DepositStake>, amount: u64) -> Result<(
         stake.validator = validator_key;
         stake.created_at = now;
     }
+    // Sync the reward snapshot so the new deposit doesn't accrue rewards
+    // from before it was added.
+    stake.reward_per_token_paid = ctx.accounts.stake_pool.reward_per_token_stored;
     stake.staked_amount = stake.staked_amount.saturating_add(amount);
     stake.updated_at = now;
 
@@ -562,14 +576,23 @@ pub fn verify_and_slash(ctx: Context<super::VerifyAndSlash>) -> Result<()> {
     Ok(())
 }
 
-/// Validator claims accumulated rewards.
+/// Validator claims accumulated rewards via the global reward-per-token accumulator.
 pub fn claim_rewards(ctx: Context<super::ClaimRewards>) -> Result<()> {
     crate::authority_registry::require_not_paused(&ctx.accounts.region_registry)?;
     let stake = &ctx.accounts.validator_stake;
-    require!(stake.rewards_accrued > 0, TerraError::InsufficientStake);
     require!(stake.staked_amount > 0, TerraError::InsufficientStake);
 
-    let amount = stake.rewards_accrued;
+    let pool = &ctx.accounts.stake_pool;
+    // claimable = staked_amount * (pool.rpt - stake.rpt_paid) / PRECISION
+    let rpt_delta = pool
+        .reward_per_token_stored
+        .saturating_sub(stake.reward_per_token_paid);
+    let amount = (stake.staked_amount as u128)
+        .checked_mul(rpt_delta as u128)
+        .ok_or(TerraError::RightsLimitExceeded)?
+        .checked_div(REWARD_PRECISION)
+        .ok_or(TerraError::RightsLimitExceeded)? as u64;
+    require!(amount > 0, TerraError::InsufficientStake);
 
     // Transfer rewards from pool to validator.
     **ctx
@@ -584,7 +607,8 @@ pub fn claim_rewards(ctx: Context<super::ClaimRewards>) -> Result<()> {
         .try_borrow_mut_lamports()? += amount;
 
     let stake = &mut ctx.accounts.validator_stake;
-    stake.rewards_accrued = 0;
+    stake.reward_per_token_paid = pool.reward_per_token_stored;
+    stake.rewards_accrued = 0; // clear legacy field
     stake.updated_at = Clock::get()?.unix_timestamp;
 
     let pool = &mut ctx.accounts.stake_pool;
@@ -641,6 +665,17 @@ pub fn distribute_rewards(ctx: Context<super::DistributeRewards>) -> Result<()> 
 
     let pool = &mut ctx.accounts.stake_pool;
     pool.accumulated_rewards = pool.accumulated_rewards.saturating_add(period_reward);
+
+    // Update the global reward-per-token accumulator. Individual validators
+    // claim proportional to their stake by snapshotting this value.
+    if pool.total_staked > 0 && period_reward > 0 {
+        let rpt_increment = (period_reward as u128)
+            .checked_mul(REWARD_PRECISION)
+            .ok_or(TerraError::RightsLimitExceeded)?
+            .checked_div(pool.total_staked as u128)
+            .ok_or(TerraError::RightsLimitExceeded)? as u64;
+        pool.reward_per_token_stored = pool.reward_per_token_stored.saturating_add(rpt_increment);
+    }
     pool.last_reward_distribution = now;
     pool.updated_at = now;
 

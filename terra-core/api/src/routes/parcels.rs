@@ -225,9 +225,16 @@ pub struct ReconcileRequest {
 /// digest derivable from the stored geometry.
 async fn reconcile(
     State(state): State<AppState>,
+    auth: crate::auth::SignedRequest,
     Path(id): Path<Uuid>,
     Json(req): Json<ReconcileRequest>,
 ) -> Result<Json<Parcel>, AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/api/v1/parcels/{id}/reconcile"))?;
+
     let onchain_id = decode_hex32(&req.onchain_id)?;
     let geo_hash = decode_hex32(&req.geometry_hash)?;
     let access_hash = decode_hex32(&req.access_hash)?;
@@ -358,9 +365,16 @@ const MIN_FORFEIT_VALIDATORS: u16 = 2;
 
 async fn judicial_forfeiture(
     State(state): State<AppState>,
+    auth: crate::auth::SignedRequest,
     Path(id): Path<Uuid>,
     Json(req): Json<JudicialForfeiture>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/api/v1/parcels/{id}/forfeiture"))?;
+
     let ih = decode_hex32(&req.case_hash)?;
     identities::decode_wallet(&req.new_owner)?;
     identities::decode_wallet(&req.relayer)?;
