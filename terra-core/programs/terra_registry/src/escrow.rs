@@ -317,6 +317,54 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
     Ok(())
 }
 
+/// Mutual cancellation: both buyer and seller agree to cancel while in
+/// ACCEPTED status. Refunds the deposit and returns the parcel to FOR_SALE.
+/// This avoids the heavyweight RFC-007 dispute path for a simple called-off deal.
+pub fn mutual_cancel_escrow(ctx: Context<super::MutualCancelEscrow>) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let escrow = &ctx.accounts.escrow_record;
+    let status = escrow.status;
+    let seller = escrow.seller;
+    let buyer_key = escrow.buyer;
+    let deposit_amount = escrow.deposit_amount;
+    let parcel_key = escrow.parcel;
+
+    require!(
+        status == escrow_status::ACCEPTED,
+        TerraError::InvalidEscrowStatus
+    );
+    require!(
+        ctx.accounts.seller.key() == seller,
+        TerraError::NotDesignatedSeller
+    );
+    require!(
+        ctx.accounts.buyer.key() == buyer_key,
+        TerraError::NotDesignatedBuyer
+    );
+
+    // Return deposited SOL to buyer.
+    if deposit_amount > 0 {
+        let vault_info = ctx.accounts.escrow_vault.to_account_info();
+        let buyer_info = ctx.accounts.buyer.to_account_info();
+        let vault_lamports = vault_info.lamports();
+        let return_amount = deposit_amount.min(vault_lamports);
+        **vault_info.try_borrow_mut_lamports()? -= return_amount;
+        **buyer_info.try_borrow_mut_lamports()? += return_amount;
+    }
+
+    // Reset parcel status.
+    let parcel = &mut ctx.accounts.parcel;
+    parcel.status = parcel_status::FOR_SALE;
+    parcel.updated_at = now;
+
+    emit!(EscrowCancelled {
+        escrow: ctx.accounts.escrow_record.key(),
+        parcel: parcel_key,
+        cancelled_by: ctx.accounts.seller.key(),
+    });
+    Ok(())
+}
+
 /// Either party triggers a dispute, routing the parcel into RFC-007's FROZEN state.
 pub fn dispute_escrow(
     ctx: Context<super::DisputeEscrow>,

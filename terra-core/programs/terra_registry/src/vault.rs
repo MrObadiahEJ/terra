@@ -171,28 +171,20 @@ pub fn authorize_vault_access(
         super::TerraError::NonceRequired
     );
 
-    // Count actual signer validators via remaining_accounts.
-    let mut present: u8 = 0;
-    for signer in ctx.remaining_accounts.iter() {
-        if signer.is_signer && vault.shard_holders.contains(&signer.key()) {
-            present += 1;
-        }
-    }
-    require!(
-        present >= vault.threshold,
-        super::TerraError::InsufficientValidatorSigners
-    );
+    // Count actual signer validators via remaining_accounts (deduplicated).
+    let signers = super::quorum::verify_quorum_signers(
+        ctx.remaining_accounts,
+        &vault.shard_holders,
+        vault.threshold,
+        None,
+    )?;
+    let _present = signers.len() as u8;
 
     emit!(super::VaultAccessAuthorized {
         subject: ctx.accounts.subject.key(),
         vault: vault.key(),
         purpose,
-        validators: ctx
-            .remaining_accounts
-            .iter()
-            .filter(|s| s.is_signer && vault.shard_holders.contains(&s.key()))
-            .map(|s| s.key())
-            .collect(),
+        validators: signers,
         off_chain_nonce,
         expiry,
         block_time: clock.unix_timestamp,

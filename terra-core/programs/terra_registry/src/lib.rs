@@ -237,11 +237,15 @@ pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
 pub mod guardian;
+pub mod identity;
 pub mod ipfs_docs;
+pub mod quorum;
 pub mod staking;
 pub mod subdivision;
 pub mod time_bound;
 pub mod vault;
+pub mod world_registry;
+pub mod recovery;
 pub mod zk;
 
 // ---------------------------------------------------------------------------
@@ -351,6 +355,163 @@ pub struct PingShard<'info> {
 // ---------------------------------------------------------------------------
 // AuthorityRegistry v2 contexts (progressive decentralization)
 // ---------------------------------------------------------------------------
+// WorldRegistry contexts (country genesis)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct CreateWorldRegistry<'info> {
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + world_registry::WorldRegistry::INIT_SPACE,
+        seeds = [b"world_registry"],
+        bump,
+    )]
+    pub world_registry: Account<'info, world_registry::WorldRegistry>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(country_code: [u8; 2])]
+pub struct AllocateCountry<'info> {
+    #[account(mut)]
+    pub world_registry: Account<'info, world_registry::WorldRegistry>,
+    #[account(
+        constraint = admin.key() == world_registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(country_code: [u8; 2])]
+pub struct RequestGenesis<'info> {
+    #[account(
+        init,
+        payer = requester,
+        space = 8 + world_registry::GenesisRequest::INIT_SPACE,
+        seeds = [b"genesis_request", country_code.as_ref()],
+        bump,
+    )]
+    pub genesis_request: Account<'info, world_registry::GenesisRequest>,
+    #[account(seeds = [b"world_registry"], bump)]
+    pub world_registry: Account<'info, world_registry::WorldRegistry>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ConfirmGenesis<'info> {
+    #[account(mut)]
+    pub genesis_request: Account<'info, world_registry::GenesisRequest>,
+    #[account(seeds = [b"world_registry"], bump)]
+    pub world_registry: Account<'info, world_registry::WorldRegistry>,
+    pub confirmer: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Recovery contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct Heartbeat<'info> {
+    #[account(mut)]
+    pub activity_tracker: Account<'info, recovery::ValidatorActivityTracker>,
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub validator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(validator: Pubkey)]
+pub struct SetValidatorActive<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + recovery::ValidatorActivityTracker::INIT_SPACE,
+        seeds = [b"validator_activity", registry.key().as_ref(), validator.as_ref()],
+        bump,
+    )]
+    pub activity_tracker: Account<'info, recovery::ValidatorActivityTracker>,
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CheckQuorumReachable<'info> {
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+}
+
+#[derive(Accounts)]
+#[instruction(candidate: Pubkey)]
+pub struct QueueEmergencyInjection<'info> {
+    #[account(
+        init,
+        payer = admin,
+        space = 8 + recovery::EmergencyInjection::INIT_SPACE,
+        seeds = [
+            b"emergency_injection",
+            registry.key().as_ref(),
+            candidate.as_ref(),
+        ],
+        bump,
+    )]
+    pub emergency_injection: Account<'info, recovery::EmergencyInjection>,
+    #[account(
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ExecuteEmergencyInjection<'info> {
+    #[account(mut)]
+    pub emergency_injection: Account<'info, recovery::EmergencyInjection>,
+    #[account(
+        mut,
+        seeds = [b"authority_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + recovery::ValidatorActivityTracker::INIT_SPACE,
+        seeds = [
+            b"validator_activity",
+            registry.key().as_ref(),
+            emergency_injection.candidate.as_ref(),
+        ],
+        bump,
+    )]
+    pub new_validator_activity: Account<'info, recovery::ValidatorActivityTracker>,
+    #[account(
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Authority Registry contexts
+// ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
 pub struct CreateRegistry<'info> {
@@ -395,6 +556,76 @@ pub struct AddValidator<'info> {
     /// CHECK: validated as a non-zero pubkey in handler.
     pub validator: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap fixed sequence contexts (#1-#3)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct BootstrapSelfProclaim<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub candidate: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddSecondValidator<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    /// Must be validator #1 (the first validator in the registry).
+    pub sponsor: Signer<'info>,
+    /// CHECK: validated as non-zero and non-duplicate in handler.
+    pub candidate: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddThirdValidator<'info> {
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: validated as non-zero and non-duplicate in handler.
+    pub candidate: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Validator Nomination contexts (#4+)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(candidate: Pubkey, documents_hash: [u8; 32], location_hash: [u8; 32], country_code: [u8; 2])]
+pub struct NominateValidator<'info> {
+    #[account(
+        init,
+        payer = sponsor,
+        space = 8 + authority_registry::ValidatorNomination::INIT_SPACE,
+        seeds = [
+            b"validator_nomination",
+            registry.key().as_ref(),
+            candidate.as_ref()
+        ],
+        bump,
+    )]
+    pub nomination: Account<'info, authority_registry::ValidatorNomination>,
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub sponsor: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ConfirmNomination<'info> {
+    #[account(mut)]
+    pub nomination: Account<'info, authority_registry::ValidatorNomination>,
+    #[account(mut)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub confirmer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -453,13 +684,6 @@ pub struct EndorseValidatorAdd<'info> {
     pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
     pub registry: Account<'info, authority_registry::AuthorityRegistry>,
     pub endorser: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct FlipToConsensus<'info> {
-    #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
-    pub admin_signer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -1145,20 +1369,14 @@ pub mod terra_registry {
         let parcel = &mut ctx.accounts.parcel;
         let from = parcel.owner;
 
-        // Count how many of the discovered validator signers are part of the
-        // declared set AND actually signed this transaction.
-        let mut present: u8 = 0;
-        for signer in ctx.remaining_accounts.iter() {
-            if signer.is_signer && validators.contains(&signer.key()) {
-                // Self-dealing check: parcel owner cannot sign as validator.
-                require!(signer.key() != from, TerraError::ValidatorOwnsAsset);
-                present += 1;
-            }
-        }
-        require!(
-            present >= threshold,
-            TerraError::InsufficientValidatorSigners
-        );
+        // Self-dealing check: parcel owner cannot sign as validator.
+        let signers = quorum::verify_quorum_signers(
+            ctx.remaining_accounts,
+            &validators,
+            threshold,
+            Some(from),
+        )?;
+        let present = signers.len() as u8;
 
         // The relaying party must not be the current owner (prevents self-forfeit).
         require!(
@@ -1239,6 +1457,67 @@ pub mod terra_registry {
     }
 
     // -----------------------------------------------------------------------
+    // WorldRegistry (country genesis, cross-border backup)
+    // -----------------------------------------------------------------------
+
+    pub fn create_world_registry(ctx: Context<CreateWorldRegistry>) -> Result<()> {
+        world_registry::create_world_registry(ctx)
+    }
+
+    pub fn allocate_country(
+        ctx: Context<AllocateCountry>,
+        country_code: [u8; 2],
+        approved_admin: Pubkey,
+    ) -> Result<()> {
+        world_registry::allocate_country(ctx, country_code, approved_admin)
+    }
+
+    pub fn request_genesis(
+        ctx: Context<RequestGenesis>,
+        country_code: [u8; 2],
+    ) -> Result<()> {
+        world_registry::request_genesis(ctx, country_code)
+    }
+
+    pub fn confirm_genesis(
+        ctx: Context<ConfirmGenesis>,
+        confirmer_country: [u8; 2],
+    ) -> Result<()> {
+        world_registry::confirm_genesis(ctx, confirmer_country)
+    }
+
+    // -----------------------------------------------------------------------
+    // Recovery (quorum loss, emergency injection)
+    // -----------------------------------------------------------------------
+
+    pub fn heartbeat(mut ctx: Context<Heartbeat>) -> Result<()> {
+        recovery::heartbeat(&mut ctx)
+    }
+
+    pub fn set_validator_active(
+        mut ctx: Context<SetValidatorActive>,
+        validator: Pubkey,
+        is_active: bool,
+    ) -> Result<()> {
+        recovery::set_validator_active(&mut ctx, validator, is_active)
+    }
+
+    pub fn check_quorum_reachable(ctx: Context<CheckQuorumReachable>) -> Result<()> {
+        recovery::check_quorum_reachable(&ctx)
+    }
+
+    pub fn queue_emergency_injection(
+        mut ctx: Context<QueueEmergencyInjection>,
+        candidate: Pubkey,
+    ) -> Result<()> {
+        recovery::queue_emergency_injection(&mut ctx, candidate)
+    }
+
+    pub fn execute_emergency_injection(mut ctx: Context<ExecuteEmergencyInjection>) -> Result<()> {
+        recovery::execute_emergency_injection(&mut ctx)
+    }
+
+    // -----------------------------------------------------------------------
     // AuthorityRegistry v2 (progressive decentralization)
     // -----------------------------------------------------------------------
 
@@ -1248,6 +1527,32 @@ pub mod terra_registry {
 
     pub fn add_validator_to_registry(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
         authority_registry::add_validator(ctx, validator)
+    }
+
+    pub fn bootstrap_self_proclaim(ctx: Context<BootstrapSelfProclaim>, country_code: [u8; 2]) -> Result<()> {
+        authority_registry::bootstrap_self_proclaim(ctx, country_code)
+    }
+
+    pub fn add_second_validator(ctx: Context<AddSecondValidator>) -> Result<()> {
+        authority_registry::add_second_validator(ctx)
+    }
+
+    pub fn add_third_validator(ctx: Context<AddThirdValidator>, candidate: Pubkey) -> Result<()> {
+        authority_registry::add_third_validator(ctx, candidate)
+    }
+
+    pub fn nominate_validator(
+        ctx: Context<NominateValidator>,
+        candidate: Pubkey,
+        documents_hash: [u8; 32],
+        location_hash: [u8; 32],
+        country_code: [u8; 2],
+    ) -> Result<()> {
+        authority_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code)
+    }
+
+    pub fn confirm_nomination(ctx: Context<ConfirmNomination>) -> Result<()> {
+        authority_registry::confirm_nomination(ctx)
     }
 
     pub fn propose_validator(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
@@ -1263,10 +1568,6 @@ pub mod terra_registry {
 
     pub fn endorse_validator_add(ctx: Context<EndorseValidatorAdd>) -> Result<()> {
         authority_registry::endorse_validator_add(ctx)
-    }
-
-    pub fn flip_to_consensus(ctx: Context<FlipToConsensus>) -> Result<()> {
-        authority_registry::flip_to_consensus(ctx)
     }
 
     pub fn pause_program(ctx: Context<PauseProgram>) -> Result<()> {
@@ -1345,6 +1646,10 @@ pub mod terra_registry {
 
     pub fn cancel_escrow(ctx: Context<CancelEscrow>) -> Result<()> {
         escrow::cancel_escrow(ctx)
+    }
+
+    pub fn mutual_cancel_escrow(ctx: Context<MutualCancelEscrow>) -> Result<()> {
+        escrow::mutual_cancel_escrow(ctx)
     }
 
     pub fn dispute_escrow(
@@ -1548,6 +1853,34 @@ pub mod terra_registry {
         new_verification_key_hash: [u8; 32],
     ) -> Result<()> {
         zk::update_verification_key_hash(ctx, new_verification_key_hash)
+    }
+
+    // -----------------------------------------------------------------------
+    // Threshold credentials (replaces authority-attestation ZK model)
+    // -----------------------------------------------------------------------
+
+    pub fn request_credential(
+        mut ctx: Context<RequestCredential>,
+        request_hash: [u8; 32],
+        purpose: String,
+        disclosure_type: u8,
+    ) -> Result<()> {
+        zk::request_credential(&mut ctx, request_hash, purpose, disclosure_type)
+    }
+
+    pub fn sign_credential(mut ctx: Context<SignCredential>) -> Result<()> {
+        zk::sign_credential(&mut ctx)
+    }
+
+    pub fn finalize_credential(mut ctx: Context<FinalizeCredential>) -> Result<()> {
+        zk::finalize_credential(&mut ctx)
+    }
+
+    pub fn verify_credential(
+        mut ctx: Context<VerifyCredential>,
+        proof_data: Vec<u8>,
+    ) -> Result<()> {
+        zk::verify_credential(&mut ctx, proof_data)
     }
 
     // -----------------------------------------------------------------------
@@ -2170,6 +2503,37 @@ pub struct CancelEscrow<'info> {
 }
 
 #[derive(Accounts)]
+pub struct MutualCancelEscrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"escrow", parcel.key().as_ref()],
+        bump,
+        close = seller,
+    )]
+    pub escrow_record: Account<'info, escrow::EscrowRecord>,
+    /// CHECK: escrow vault PDA.
+    #[account(
+        mut,
+        seeds = [b"escrow_vault", escrow_record.key().as_ref()],
+        bump
+    )]
+    pub escrow_vault: SystemAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// CHECK: validated as escrow.seller in handler.
+    #[account(mut)]
+    pub seller: UncheckedAccount<'info>,
+    /// CHECK: validated as escrow.buyer in handler. Receives returned deposit.
+    #[account(mut)]
+    pub buyer: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(case_hash: [u8; 32])]
 pub struct DisputeEscrow<'info> {
     #[account(
@@ -2779,10 +3143,15 @@ pub struct VerifyAndSlash<'info> {
     )]
     /// CHECK: Reporter wallet — validated by constraint.
     pub reporter: UncheckedAccount<'info>,
-    /// CHECK: Treasury wallet receiving slashed lamports. Caller-specified;
-    /// every movement is described by the ValidatorSlashed event.
-    #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
+    /// Treasury PDA receiving slashed lamports. Constrained to a deterministic
+    /// PDA derived from the authority registry — no one can redirect funds to
+    /// an arbitrary wallet.
+    #[account(
+        mut,
+        seeds = [b"treasury", region_registry.key().as_ref()],
+        bump,
+    )]
+    pub treasury: SystemAccount<'info>,
     #[account(
         mut,
         constraint = payer.key() == region_registry.admin @ TerraError::NotAuthorized,
@@ -3076,6 +3445,77 @@ pub struct UpdateVerificationKeyHash<'info> {
     pub authority: Signer<'info>,
 }
 
+// ---------------------------------------------------------------------------
+// Threshold credential contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(request_hash: [u8; 32])]
+pub struct RequestCredential<'info> {
+    #[account(
+        init,
+        payer = prover,
+        space = 8 + zk::CredentialRequest::INIT_SPACE,
+        seeds = [b"credential_request", request_hash.as_ref()],
+        bump,
+    )]
+    pub credential_request: Account<'info, zk::CredentialRequest>,
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    /// CHECK: region registry key — validated off-chain, stored as reference.
+    pub region_registry: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub prover: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SignCredential<'info> {
+    #[account(mut)]
+    pub credential_request: Account<'info, zk::CredentialRequest>,
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub validator_signer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeCredential<'info> {
+    #[account(mut)]
+    pub credential_request: Account<'info, zk::CredentialRequest>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + zk::ThresholdCredential::INIT_SPACE,
+        seeds = [b"threshold_credential", credential_request.request_hash.as_ref()],
+        bump,
+    )]
+    pub threshold_credential: Account<'info, zk::ThresholdCredential>,
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyCredential<'info> {
+    #[account(mut)]
+    pub threshold_credential: Account<'info, zk::ThresholdCredential>,
+    #[account(
+        init_if_needed,
+        payer = prover,
+        space = 8 + zk::CredentialNullifier::INIT_SPACE,
+        seeds = [b"credential_nullifier", threshold_credential.nullifier_hash.as_ref()],
+        bump,
+    )]
+    pub nullifier_record: Account<'info, zk::CredentialNullifier>,
+    #[account(seeds = [b"authority_registry"], bump)]
+    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(mut)]
+    pub prover: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -3290,11 +3730,150 @@ pub struct ValidatorEndorsed {
 }
 
 #[event]
-pub struct ConsensusFlipped {
+pub struct ValidatorNominated {
     pub registry: Pubkey,
+    pub sponsor: Pubkey,
+    pub candidate: Pubkey,
+    pub assigned_physical_confirmer: Pubkey,
+    pub country_code: [u8; 2],
+}
+
+#[event]
+pub struct NominationConfirmed {
+    pub registry: Pubkey,
+    pub candidate: Pubkey,
+    pub confirmer: Pubkey,
+    pub is_physical: bool,
+    pub confirmations_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct ValidatorNominationFinalized {
+    pub registry: Pubkey,
+    pub candidate: Pubkey,
+    pub confirmers: Vec<Pubkey>,
+}
+
+// ---------------------------------------------------------------------------
+// WorldRegistry events (country genesis)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct WorldRegistryCreated {
+    pub world_registry: Pubkey,
     pub admin: Pubkey,
+}
+
+#[event]
+pub struct CountryAllocated {
+    pub world_registry: Pubkey,
+    pub country_code: [u8; 2],
+    pub approved_admin: Pubkey,
+}
+
+#[event]
+pub struct GenesisRequested {
+    pub world_registry: Pubkey,
+    pub country_code: [u8; 2],
+    pub requested_by: Pubkey,
+}
+
+#[event]
+pub struct GenesisConfirmed {
+    pub world_registry: Pubkey,
+    pub country_code: [u8; 2],
+    pub confirmer: Pubkey,
+    pub confirmer_country: [u8; 2],
+    pub confirmations_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct GenesisFinalized {
+    pub world_registry: Pubkey,
+    pub country_code: [u8; 2],
+    pub confirmations: u8,
+    pub distinct_countries: u8,
+}
+
+// ---------------------------------------------------------------------------
+// Recovery events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ValidatorActiveSet {
+    pub registry: Pubkey,
+    pub validator: Pubkey,
+    pub is_active: bool,
+    pub set_by: Pubkey,
+}
+
+#[event]
+pub struct QuorumReachabilityChecked {
+    pub registry: Pubkey,
+    pub total_validators: u8,
+    pub active_count: u8,
     pub required_endorsements: u8,
-    pub validator_count: u8,
+    pub quorum_reachable: bool,
+}
+
+#[event]
+pub struct EmergencyInjectionQueued {
+    pub registry: Pubkey,
+    pub candidate: Pubkey,
+    pub requested_by: Pubkey,
+    pub execute_after: i64,
+}
+
+#[event]
+pub struct EmergencyInjectionExecuted {
+    pub registry: Pubkey,
+    pub candidate: Pubkey,
+    pub executed_by: Pubkey,
+    pub new_validator_count: u8,
+}
+
+// ---------------------------------------------------------------------------
+// Threshold credential events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct CredentialRequested {
+    pub request_hash: [u8; 32],
+    pub prover: Pubkey,
+    pub purpose: String,
+    pub region_registry: Pubkey,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct CredentialSigned {
+    pub request_hash: [u8; 32],
+    pub signer: Pubkey,
+    pub signers_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct CredentialIssued {
+    pub credential_hash: [u8; 32],
+    pub prover: Pubkey,
+    pub purpose: String,
+    pub signer_count: u8,
+    pub nullifier_hash: [u8; 32],
+    pub issued_at: i64,
+}
+
+#[event]
+pub struct CredentialVerified {
+    pub credential_hash: [u8; 32],
+    pub nullifier_hash: [u8; 32],
+    pub prover: Pubkey,
+    pub purpose: String,
+    pub disclosure_type: u8,
+    pub block_time: i64,
+    pub proof_hash: [u8; 32],
 }
 
 // ---------------------------------------------------------------------------
@@ -3574,6 +4153,22 @@ pub enum TerraError {
     InvalidRegistryMode,
     #[msg("No validator endorsement proposal exists for this candidate")]
     NoProposalFound,
+    #[msg("Wrong onboarding stage for this bootstrap operation")]
+    WrongOnboardingStage,
+    #[msg("Sponsor cannot confirm their own nomination")]
+    SponsorCannotConfirm,
+    #[msg("Invalid ISO 3166-1 alpha-2 country code")]
+    InvalidCountryCode,
+    #[msg("Country code has already been allocated")]
+    CountryAlreadyAllocated,
+    #[msg("Country is not allocated to this admin")]
+    CountryNotAllocated,
+    #[msg("Genesis confirmers are not from enough distinct countries")]
+    ConfirmersNotDiverseEnough,
+    #[msg("Emergency injection timelock has not yet elapsed")]
+    EmergencyTimelockNotElapsed,
+    #[msg("Insufficient validator endorsements for threshold credential")]
+    InsufficientEndorsements,
 
     // Emergency pause
     #[msg("Program is paused — state-changing operations are frozen")]

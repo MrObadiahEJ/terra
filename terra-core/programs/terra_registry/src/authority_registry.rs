@@ -13,6 +13,23 @@ pub mod registry_mode {
     pub const PEER_CONSENSUS: u8 = 1;
 }
 
+/// Derive the effective registry mode from the current validator count.
+/// No stored flag — mode transitions automatically when the count crosses
+/// the threshold. There is no moment where a person could have flipped it
+/// but chose not to.
+pub fn effective_mode(validator_count: u8) -> u8 {
+    if validator_count < CONSENSUS_FLIP_THRESHOLD {
+        registry_mode::BOOTSTRAP
+    } else {
+        registry_mode::PEER_CONSENSUS
+    }
+}
+
+/// Compute the required endorsements for peer-consensus: ceil(2n/3).
+pub fn consensus_required(n: u8) -> u8 {
+    (n * CONSENSUS_FRACTION_NUM).div_ceil(CONSENSUS_FRACTION_DEN)
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct AuthorityRegistry {
@@ -22,9 +39,9 @@ pub struct AuthorityRegistry {
     #[max_len(32)]
     pub validators: Vec<Pubkey>,
     /// Minimum endorsements needed for new additions in peer-consensus mode.
+    /// Recomputed on every validator count change; not read from storage for
+    /// authorization decisions.
     pub required_endorsements: u8,
-    /// 0 = bootstrap (admin has unilateral power), 1 = peer-consensus.
-    pub mode: u8,
     /// Emergency pause flag. When true, all pausable subsystem instructions
     /// (staking, cross-border, guardian, zk, escrow, dispute) reject
     /// state-changing calls. Core parcel/identity operations authorized by
@@ -62,7 +79,6 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
     registry.admin = ctx.accounts.admin.key();
     registry.validators = Vec::new();
     registry.required_endorsements = 0;
-    registry.mode = registry_mode::BOOTSTRAP;
     registry.paused = false;
     registry.version = 0;
     registry.created_at = clock.unix_timestamp;
@@ -71,7 +87,7 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
     emit!(super::RegistryCreated {
         registry: registry.key(),
         admin: registry.admin,
-        mode: registry.mode,
+        mode: registry_mode::BOOTSTRAP,
     });
     Ok(())
 }
@@ -141,25 +157,24 @@ pub fn propose_validator(ctx: Context<super::ProposeValidator>, validator: Pubke
     );
 
     let registry = &ctx.accounts.registry;
+    let mode = effective_mode(registry.validators.len() as u8);
     require!(
-        registry.mode == registry_mode::PEER_CONSENSUS,
+        mode == registry_mode::PEER_CONSENSUS,
         super::TerraError::InvalidRegistryMode
     );
     require!(
         !registry.validators.contains(&validator),
         super::TerraError::AlreadyEndorsedRotation // reuse: already registered
     );
-    require!(
-        registry.required_endorsements > 0,
-        super::TerraError::InvalidThreshold
-    );
+    let required = consensus_required(registry.validators.len() as u8);
+    require!(required > 0, super::TerraError::InvalidThreshold);
 
     let clock = Clock::get()?;
     let endorsement = &mut ctx.accounts.endorsement;
     endorsement.registry = registry.key();
     endorsement.proposed = validator;
     endorsement.endorsers = Vec::new();
-    endorsement.required = registry.required_endorsements;
+    endorsement.required = required;
     endorsement.created_at = clock.unix_timestamp;
 
     emit!(super::ValidatorEndorsed {
@@ -194,8 +209,9 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
     );
 
     let clock = Clock::get()?;
+    let mode = effective_mode(registry.validators.len() as u8);
 
-    if registry.mode == registry_mode::BOOTSTRAP {
+    if mode == registry_mode::BOOTSTRAP {
         // Admin has unilateral power.
         require!(
             ctx.accounts.admin_signer.key() == registry.admin,
@@ -209,7 +225,7 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
             registry: registry.key(),
             validator,
             added_by: registry.admin,
-            mode: registry.mode,
+            mode,
         });
     } else {
         // Peer-consensus: a proposed endorsement (created by
@@ -247,8 +263,17 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
             registry: registry.key(),
             validator,
             added_by: endorsement.endorsements_pubkey(),
-            mode: registry.mode,
+            mode,
         });
+    }
+
+    // Recompute required_endorsements after the validator count changed.
+    let n = registry.validators.len() as u8;
+    let new_mode = effective_mode(n);
+    if new_mode == registry_mode::PEER_CONSENSUS {
+        registry.required_endorsements = consensus_required(n);
+    } else {
+        registry.required_endorsements = 0;
     }
 
     Ok(())
@@ -294,10 +319,19 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
     registry.version = registry.version.saturating_add(1);
     registry.updated_at = clock.unix_timestamp;
 
+    // Recompute required_endorsements after the validator count changed.
+    let n = registry.validators.len() as u8;
+    let mode = effective_mode(n);
+    if mode == registry_mode::PEER_CONSENSUS {
+        registry.required_endorsements = consensus_required(n);
+    } else {
+        registry.required_endorsements = 0;
+    }
+
     emit!(super::ValidatorRemoved {
         registry: registry.key(),
         validator,
-        mode: registry.mode,
+        mode,
     });
     Ok(())
 }
@@ -338,40 +372,6 @@ pub fn endorse_validator_add(ctx: Context<super::EndorseValidatorAdd>) -> Result
     Ok(())
 }
 
-/// Flip the registry from bootstrap to peer-consensus mode.
-/// Only the admin can call this.
-pub fn flip_to_consensus(ctx: Context<super::FlipToConsensus>) -> Result<()> {
-    let registry = &mut ctx.accounts.registry;
-    require!(
-        ctx.accounts.admin_signer.key() == registry.admin,
-        super::TerraError::NotAuthorized
-    );
-    require!(
-        registry.mode == registry_mode::BOOTSTRAP,
-        super::TerraError::RotationAlreadyFinalized // reuse: already consensus
-    );
-    require!(
-        !registry.validators.is_empty(),
-        super::TerraError::NoValidators
-    );
-
-    let n = registry.validators.len() as u8;
-    let required = (n * CONSENSUS_FRACTION_NUM).div_ceil(CONSENSUS_FRACTION_DEN);
-
-    registry.mode = registry_mode::PEER_CONSENSUS;
-    registry.required_endorsements = required;
-    registry.version = registry.version.saturating_add(1);
-    registry.updated_at = Clock::get()?.unix_timestamp;
-
-    emit!(super::ConsensusFlipped {
-        registry: registry.key(),
-        admin: registry.admin,
-        required_endorsements: required,
-        validator_count: n,
-    });
-    Ok(())
-}
-
 impl ValidatorEndorsement {
     /// Helper to produce a display pubkey for the endorsement set.
     pub fn endorsements_pubkey(&self) -> Pubkey {
@@ -379,19 +379,319 @@ impl ValidatorEndorsement {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Bootstrap fixed sequence (#1-#3) and Validator Nomination (#4+)
+// ---------------------------------------------------------------------------
+
+/// Maximum confirmations required for a validator nomination.
+pub const NOMINATION_CONFIRMATIONS: u8 = 3;
+/// Two confirmers do remote document review; one does physical/local confirmation.
+pub const REMOTE_CONFIRMER_COUNT: usize = 2;
+
+#[account]
+#[derive(InitSpace)]
+pub struct ValidatorNomination {
+    /// The registry this nomination applies to.
+    pub registry: Pubkey,
+    /// Country code (ISO 3166-1 alpha-2).
+    pub country_code: [u8; 2],
+    /// Existing validator who nominated the candidate.
+    pub sponsor: Pubkey,
+    /// Wallet being nominated for validator status.
+    pub candidate: Pubkey,
+    /// SHA-256 of the candidate's identity documents.
+    pub documents_hash: [u8; 32],
+    /// SHA-256 of a witness location report (never raw GPS).
+    pub location_hash: [u8; 32],
+    /// Randomly selected physical confirmer (set at nomination time via
+    /// deterministic seed, NOT sponsor's choice).
+    pub assigned_physical_confirmer: Pubkey,
+    /// Validators who have confirmed (max NOMINATION_CONFIRMATIONS).
+    #[max_len(3)]
+    pub confirmers: Vec<Pubkey>,
+    /// True once 3 confirmations are collected and candidate is added.
+    pub finalized: bool,
+    pub created_at: i64,
+}
+
+impl ValidatorNomination {
+    /// Deterministically select a physical confirmer from the nearby subset.
+    /// seed = hash(slot, candidate_pubkey) -> index into nearby_validators.
+    pub fn select_physical_confirmer(
+        nearby_validators: &[Pubkey],
+        candidate: &Pubkey,
+    ) -> Option<Pubkey> {
+        if nearby_validators.is_empty() {
+            return None;
+        }
+        let slot = Clock::get().ok()?.slot;
+        let mut data = slot.to_le_bytes().to_vec();
+        data.extend_from_slice(candidate.as_ref());
+        let hash = solana_program::hash::hash(&data).to_bytes();
+        let index = u64::from_le_bytes(hash[..8].try_into().ok()?) as usize % nearby_validators.len();
+        Some(nearby_validators[index])
+    }
+}
+
+/// Bootstrap: first validator self-proclaims. No admin required — this is the
+/// genesis validator for a country.
+pub fn bootstrap_self_proclaim(
+    ctx: Context<super::BootstrapSelfProclaim>,
+    _country_code: [u8; 2],
+) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        registry.validators.is_empty(),
+        super::TerraError::WrongOnboardingStage
+    );
+
+    let validator = ctx.accounts.candidate.key();
+    registry.validators.push(validator);
+    registry.version = registry.version.saturating_add(1);
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::ValidatorAdded {
+        registry: registry.key(),
+        validator,
+        added_by: registry.admin,
+        mode: registry_mode::BOOTSTRAP,
+    });
+    Ok(())
+}
+
+/// Bootstrap: second validator added by #1 alone.
+pub fn add_second_validator(ctx: Context<super::AddSecondValidator>) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        registry.validators.len() == 1,
+        super::TerraError::WrongOnboardingStage
+    );
+    require!(
+        ctx.accounts.sponsor.key() == registry.validators[0],
+        super::TerraError::NotAuthorized
+    );
+
+    let validator = ctx.accounts.candidate.key();
+    require!(
+        !registry.validators.contains(&validator),
+        super::TerraError::AlreadyEndorsedRotation
+    );
+    registry.validators.push(validator);
+    registry.version = registry.version.saturating_add(1);
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::ValidatorAdded {
+        registry: registry.key(),
+        validator,
+        added_by: ctx.accounts.sponsor.key(),
+        mode: registry_mode::BOOTSTRAP,
+    });
+    Ok(())
+}
+
+/// Bootstrap: third validator requires BOTH #1 and #2 signatures
+/// (using verify_quorum_signers from Part 1.1).
+pub fn add_third_validator(
+    ctx: Context<super::AddThirdValidator>,
+    candidate: Pubkey,
+) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        registry.validators.len() == 2,
+        super::TerraError::WrongOnboardingStage
+    );
+
+    // Require both existing validators to sign.
+    let signers = crate::quorum::verify_quorum_signers(
+        ctx.remaining_accounts,
+        &registry.validators,
+        2,
+        None,
+    )?;
+
+    require!(
+        !registry.validators.contains(&candidate),
+        super::TerraError::AlreadyEndorsedRotation
+    );
+    registry.validators.push(candidate);
+    registry.version = registry.version.saturating_add(1);
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::ValidatorAdded {
+        registry: registry.key(),
+        validator: candidate,
+        added_by: signers[0],
+        mode: registry_mode::BOOTSTRAP,
+    });
+    Ok(())
+}
+
+/// Validator #4+: an existing validator (sponsor) nominates a candidate.
+/// The physical confirmer is selected randomly from nearby validators, NOT
+/// chosen by the sponsor. Documents and location are submitted as hashes.
+pub fn nominate_validator(
+    ctx: Context<super::NominateValidator>,
+    candidate: Pubkey,
+    documents_hash: [u8; 32],
+    location_hash: [u8; 32],
+    country_code: [u8; 2],
+) -> Result<()> {
+    let registry = &ctx.accounts.registry;
+    require!(
+        registry.validators.contains(&ctx.accounts.sponsor.key()),
+        super::TerraError::NotValidator
+    );
+    require!(
+        candidate != Pubkey::default(),
+        super::TerraError::EmptySuccessor
+    );
+    require!(
+        !registry.validators.contains(&candidate),
+        super::TerraError::AlreadyEndorsedRotation
+    );
+
+    // Select physical confirmer randomly from the validator pool.
+    // The sponsor cannot choose who performs physical confirmation.
+    let nearby_validators: Vec<Pubkey> = registry.validators.clone();
+    let confirmer = ValidatorNomination::select_physical_confirmer(&nearby_validators, &candidate)
+        .ok_or(super::TerraError::NoValidators)?;
+
+    // Confirmer must not be the sponsor or the candidate.
+    require!(
+        confirmer != ctx.accounts.sponsor.key(),
+        super::TerraError::SponsorCannotConfirm
+    );
+    require!(
+        confirmer != candidate,
+        super::TerraError::SelfDealingNotAllowed
+    );
+
+    let now = Clock::get()?.unix_timestamp;
+    let nomination = &mut ctx.accounts.nomination;
+    nomination.registry = registry.key();
+    nomination.country_code = country_code;
+    nomination.sponsor = ctx.accounts.sponsor.key();
+    nomination.candidate = candidate;
+    nomination.documents_hash = documents_hash;
+    nomination.location_hash = location_hash;
+    nomination.assigned_physical_confirmer = confirmer;
+    nomination.confirmers = Vec::new();
+    nomination.finalized = false;
+    nomination.created_at = now;
+
+    emit!(super::ValidatorNominated {
+        registry: registry.key(),
+        sponsor: ctx.accounts.sponsor.key(),
+        candidate,
+        assigned_physical_confirmer: confirmer,
+        country_code,
+    });
+    Ok(())
+}
+
+/// Confirm a validator nomination. Three confirmations required:
+/// - 2 remote confirmers (document review)
+/// - 1 physical/local confirmer (assigned randomly at nomination time)
+///
+/// The physical confirmer MUST be the assigned confirmer — they cannot be
+/// substituted. Sponsor and candidate cannot confirm their own nomination.
+pub fn confirm_nomination(ctx: Context<super::ConfirmNomination>) -> Result<()> {
+    let confirmer = ctx.accounts.confirmer.key();
+
+    // Validation phase — read-only checks against nomination and registry.
+    {
+        let nomination = &ctx.accounts.nomination;
+        require!(!nomination.finalized, super::TerraError::AlreadyEndorsedRotation);
+        let registry = &ctx.accounts.registry;
+
+        require!(
+            registry.validators.contains(&confirmer),
+            super::TerraError::NotValidator
+        );
+        require!(
+            confirmer != nomination.sponsor,
+            super::TerraError::SponsorCannotConfirm
+        );
+        require!(
+            confirmer != nomination.candidate,
+            super::TerraError::SelfDealingNotAllowed
+        );
+        require!(
+            !nomination.confirmers.contains(&confirmer),
+            super::TerraError::AlreadyEndorsedRotation
+        );
+
+        let is_physical = confirmer == nomination.assigned_physical_confirmer;
+        if !is_physical {
+            let remote_count = nomination
+                .confirmers
+                .iter()
+                .filter(|c| **c != nomination.assigned_physical_confirmer)
+                .count();
+            require!(
+                remote_count < REMOTE_CONFIRMER_COUNT,
+                super::TerraError::ValidationLimitReached
+            );
+        }
+    }
+
+    // Mutation phase — push confirmer and optionally finalize.
+    let is_physical;
+    let confirmations_count;
+    let candidate;
+    let registry_key;
+    {
+        let nomination = &mut ctx.accounts.nomination;
+        is_physical = confirmer == nomination.assigned_physical_confirmer;
+        nomination.confirmers.push(confirmer);
+        candidate = nomination.candidate;
+        confirmations_count = nomination.confirmers.len() as u8;
+
+        if confirmations_count as u8 >= NOMINATION_CONFIRMATIONS {
+            nomination.finalized = true;
+
+            let registry = &mut ctx.accounts.registry;
+            require!(
+                !registry.validators.contains(&candidate),
+                super::TerraError::AlreadyEndorsedRotation
+            );
+            registry.validators.push(candidate);
+            registry.version = registry.version.saturating_add(1);
+            registry.updated_at = Clock::get()?.unix_timestamp;
+
+            let n = registry.validators.len() as u8;
+            let mode = effective_mode(n);
+            if mode == registry_mode::PEER_CONSENSUS {
+                registry.required_endorsements = consensus_required(n);
+            } else {
+                registry.required_endorsements = 0;
+            }
+
+            registry_key = registry.key();
+            emit!(super::ValidatorNominationFinalized {
+                registry: registry_key,
+                candidate,
+                confirmers: nomination.confirmers.clone(),
+            });
+        } else {
+            registry_key = ctx.accounts.registry.key();
+        }
+    }
+
+    emit!(super::NominationConfirmed {
+        registry: registry_key,
+        candidate,
+        confirmer,
+        is_physical,
+        confirmations_count,
+        required: NOMINATION_CONFIRMATIONS,
+    });
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Compute ceil(2n/3) — the quorum required for peer-consensus operations.
-    fn consensus_required(n: u8) -> u8 {
-        (n * CONSENSUS_FRACTION_NUM / CONSENSUS_FRACTION_DEN)
-            + if (n * CONSENSUS_FRACTION_NUM) % CONSENSUS_FRACTION_DEN != 0 {
-                1
-            } else {
-                0
-            }
-    }
 
     #[test]
     fn consensus_quorum_scales() {
@@ -406,27 +706,33 @@ mod tests {
     }
 
     #[test]
+    fn effective_mode_transitions_at_threshold() {
+        assert_eq!(effective_mode(0), registry_mode::BOOTSTRAP);
+        assert_eq!(effective_mode(1), registry_mode::BOOTSTRAP);
+        assert_eq!(effective_mode(2), registry_mode::BOOTSTRAP);
+        assert_eq!(effective_mode(3), registry_mode::BOOTSTRAP);
+        assert_eq!(effective_mode(4), registry_mode::PEER_CONSENSUS);
+        assert_eq!(effective_mode(5), registry_mode::PEER_CONSENSUS);
+        assert_eq!(effective_mode(8), registry_mode::PEER_CONSENSUS);
+    }
+
+    #[test]
     fn bootstrap_mode_allows_unilateral_add() {
-        // In bootstrap mode, the admin can add validators without endorsement.
         let admin = Pubkey::new_unique();
         let v1 = Pubkey::new_unique();
         let v2 = Pubkey::new_unique();
 
         let mut validators = Vec::new();
-        // Simulate bootstrap add.
         validators.push(v1);
         assert_eq!(validators.len(), 1);
         assert!(validators.contains(&v1));
-        // Admin can add another.
         validators.push(v2);
         assert_eq!(validators.len(), 2);
-        // Admin is not in the list (only validators are).
         assert!(!validators.contains(&admin));
     }
 
     #[test]
     fn peer_consensus_requires_quorum() {
-        // Simulate a 3-validator registry requiring ceil(2*3/3) = 2 endorsements.
         let required = consensus_required(3);
         assert_eq!(required, 2);
 
@@ -435,30 +741,18 @@ mod tests {
         let endorser3 = Pubkey::new_unique();
 
         let mut endorsers: Vec<Pubkey> = Vec::new();
-        // One endorsement is not enough.
         endorsers.push(endorser1);
         assert!((endorsers.len() as u8) < required);
-        // Two endorsements meet quorum.
         endorsers.push(endorser2);
         assert!((endorsers.len() as u8) >= required);
-        // The third can endorse but quorum already met.
         endorsers.push(endorser3);
         assert!((endorsers.len() as u8) >= required);
-    }
-
-    #[test]
-    fn flip_to_consensus_cannot_be_called_twice() {
-        // Once mode is PEER_CONSENSUS, flip should be rejected.
-        let mode = registry_mode::PEER_CONSENSUS;
-        assert!(mode != registry_mode::BOOTSTRAP);
     }
 
     #[test]
     fn duplicate_validator_rejected() {
         let v1 = Pubkey::new_unique();
         let mut validators = vec![v1];
-        // Simulate duplicate check.
         assert!(validators.contains(&v1));
-        // Adding again would be rejected.
     }
 }

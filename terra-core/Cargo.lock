@@ -9016,6 +9016,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "terra-identity"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+]
+
+[[package]]
 name = "terra-registry"
 version = "0.1.0"
 dependencies = [
@@ -9025,6 +9032,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "solana-sdk-ids",
+ "terra-identity",
 ]
 
 [[package]]

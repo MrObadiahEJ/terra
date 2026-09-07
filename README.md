@@ -64,7 +64,7 @@ peer-consensus), `ipfs_docs.rs` (document anchors). Full specs live in
 ## Architecture Overview
 
 Three layers, organized around **ISO 19152 (LADM)** concepts:
-
+7
 - **On-chain (Solana/Anchor)** — `terra-core/programs/terra_registry`: parcel
   identity, ownership, rights, and **hashes** of off-chain validation. Minimal
   state, quorum primitives reused everywhere, region-scoped trust.

@@ -1,12 +1,12 @@
 [package]
-name = "terra-registry"
+name = "terra-identity"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "Identity & succession program for Terra land registry"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "terra_registry"
+name = "terra_identity"
 
 [features]
 default = []
@@ -19,11 +19,3 @@ anchor-debug = []
 
 [dependencies]
 anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
-solana-program = "3.0.0"
-terra-identity = { path = "../terra_identity", features = ["cpi"] }
-
-[dev-dependencies]
-solana-program-test = "3.0.0"
-solana-sdk = "3.0.0"
-solana-sdk-ids = "3.0.0"
-borsh = "1.0"

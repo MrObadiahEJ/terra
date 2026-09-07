@@ -18,6 +18,21 @@ pub const LIVENESS_THRESHOLD_SECS: i64 = 7 * 24 * 3600;
 pub const FIRST_OFFENSE_SLASH_BPS: u16 = 1000;
 /// 100% slash for repeat offense (basis points).
 pub const REPEAT_OFFENSE_SLASH_BPS: u16 = 10000;
+
+// ---------------------------------------------------------------------------
+// Pattern-based slashing severity tiers (basis points)
+// ---------------------------------------------------------------------------
+
+/// First offense of any type: 5%.
+pub const PATTERN_FIRST_OFFENSE_BPS: u16 = 500;
+/// Repeat offense of the same type: 20%.
+pub const PATTERN_SAME_TYPE_REPEAT_BPS: u16 = 2000;
+/// Offender has committed 2+ different offense types: 35%.
+pub const PATTERN_MULTIPLE_TYPES_BPS: u16 = 3500;
+/// 3+ offenses of the same type: 60%.
+pub const PATTERN_SAME_TYPE_THRESHOLD_BPS: u16 = 6000;
+/// 4+ total offenses or 3+ different types: 100% (full slash).
+pub const PATTERN_MAX_BPS: u16 = 10000;
 /// Minimum stake: 1 SOL in lamports.
 pub const MIN_STAKE_LAMPORTS: u64 = 1_000_000_000;
 /// Maximum validators per pool.
@@ -55,6 +70,70 @@ pub mod offense_type {
     pub const EQUIVOCATION: u8 = 0;
     pub const LIVENESS: u8 = 1;
     pub const COLLUSION: u8 = 2;
+    pub const MAX: u8 = COLLUSION;
+}
+
+// ---------------------------------------------------------------------------
+// Pattern-based slash computation
+// ---------------------------------------------------------------------------
+
+/// Compute slash basis points based on the offender's offense pattern.
+///
+/// The `offenses` array is `[equivocation_count, liveness_count, collusion_count, _]`.
+/// The most severe applicable tier determines the slash percentage:
+///
+/// 1. 4+ total offenses OR 3+ distinct offense types → 100%
+/// 2. 3+ of same type → 60%
+/// 3. 2+ different offense types → 35%
+/// 4. Repeat of same type → 20%
+/// 5. First offense → 5%
+pub fn compute_pattern_slash_bps(offenses: &[u8; 4], offense_kind: u8) -> Result<u16> {
+    require!(
+        offense_kind <= offense_type::MAX,
+        crate::TerraError::InvalidOffenseType
+    );
+
+    // Total offenses across all types.
+    let total: u8 = offenses.iter().sum();
+
+    // Number of distinct offense types with count > 0 (after this offense).
+    let mut distinct_types: u8 = 0;
+    for i in 0..=offense_type::MAX as usize {
+        let count = if i == offense_kind as usize {
+            offenses[i].saturating_add(1)
+        } else {
+            offenses[i]
+        };
+        if count > 0 {
+            distinct_types = distinct_types.saturating_add(1);
+        }
+    }
+
+    // Count of the current offense type (after this offense).
+    let same_type_count = offenses[offense_kind as usize].saturating_add(1);
+
+    // Tier 1: Max severity — 4+ total or 3+ distinct types.
+    if total >= 4 || distinct_types >= 3 {
+        return Ok(PATTERN_MAX_BPS);
+    }
+
+    // Tier 2: 3+ of the same type.
+    if same_type_count >= 3 {
+        return Ok(PATTERN_SAME_TYPE_THRESHOLD_BPS);
+    }
+
+    // Tier 3: Multiple different offense types.
+    if distinct_types >= 2 {
+        return Ok(PATTERN_MULTIPLE_TYPES_BPS);
+    }
+
+    // Tier 4: Repeat of the same type.
+    if same_type_count >= 2 {
+        return Ok(PATTERN_SAME_TYPE_REPEAT_BPS);
+    }
+
+    // Tier 5: First offense.
+    Ok(PATTERN_FIRST_OFFENSE_BPS)
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +565,7 @@ pub fn verify_and_slash(ctx: Context<super::VerifyAndSlash>) -> Result<()> {
     let reporter_bond;
     let reporter_key;
     let stake_pool_key;
+    let report_offense_kind;
     {
         let report = &ctx.accounts.slashing_report;
         require!(
@@ -502,6 +582,7 @@ pub fn verify_and_slash(ctx: Context<super::VerifyAndSlash>) -> Result<()> {
         reporter_bond = report.reporter_bond;
         reporter_key = report.reporter;
         stake_pool_key = report.stake_pool;
+        report_offense_kind = report.offense_type;
     }
 
     let now = Clock::get()?.unix_timestamp;
@@ -509,12 +590,8 @@ pub fn verify_and_slash(ctx: Context<super::VerifyAndSlash>) -> Result<()> {
     let stake = &mut ctx.accounts.offender_stake;
     let pool = &mut ctx.accounts.stake_pool;
 
-    // Determine slash percentage.
-    let slash_bps = if stake.slash_history == 0 {
-        FIRST_OFFENSE_SLASH_BPS
-    } else {
-        REPEAT_OFFENSE_SLASH_BPS
-    };
+    // Determine slash percentage based on offense pattern.
+    let slash_bps = compute_pattern_slash_bps(&stake.offenses, report_offense_kind)?;
 
     let slash_amount = stake
         .staked_amount
@@ -900,5 +977,46 @@ mod tests {
         assert_eq!(offense_type::EQUIVOCATION, 0);
         assert_eq!(offense_type::LIVENESS, 1);
         assert_eq!(offense_type::COLLUSION, 2);
+    }
+
+    // Pattern-based slashing tests
+    #[test]
+    fn pattern_first_offense() {
+        let offenses = [0, 0, 0, 0];
+        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_FIRST_OFFENSE_BPS);
+    }
+
+    #[test]
+    fn pattern_same_type_repeat() {
+        let offenses = [1, 0, 0, 0];
+        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_SAME_TYPE_REPEAT_BPS);
+    }
+
+    #[test]
+    fn pattern_multiple_types() {
+        let offenses = [1, 1, 0, 0];
+        // Reporting equivocation again: still 2 distinct types (equivocation + liveness).
+        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_MULTIPLE_TYPES_BPS);
+    }
+
+    #[test]
+    fn pattern_three_same_type() {
+        let offenses = [2, 0, 0, 0];
+        // 3rd equivocation → 3 of same type.
+        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_SAME_TYPE_THRESHOLD_BPS);
+    }
+
+    #[test]
+    fn pattern_four_total() {
+        let offenses = [1, 1, 0, 0];
+        // Reporting collusion (3rd type) → 3 distinct types = MAX.
+        assert_eq!(compute_pattern_slash_bps(&offenses, 2).unwrap(), PATTERN_MAX_BPS);
+    }
+
+    #[test]
+    fn pattern_three_distinct_types() {
+        let offenses = [1, 1, 0, 0];
+        // Reporting collusion again → [1, 1, 1, 0] = 3 distinct types = MAX.
+        assert_eq!(compute_pattern_slash_bps(&offenses, 2).unwrap(), PATTERN_MAX_BPS);
     }
 }

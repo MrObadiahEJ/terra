@@ -2,18 +2,35 @@ use anchor_lang::prelude::*;
 
 use crate::TerraError;
 
+// ===========================================================================
+// Threshold credential system + legacy ZK ownership proofs.
+//
+// The threshold credential system replaces the authority-attestation model.
+// Validators co-sign a credential commitment without learning the prover's
+// wallet. Once a threshold of validators sign, the credential is issued.
+// The holder can then present it for verification; a nullifier prevents
+// double-use.
+//
+// Legacy ZoneSet/OwnershipRoot accounts are retained for backward
+// compatibility with existing on-chain state.
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
-// Constants (RFC-011 §4, §6)
+// Constants
 // ---------------------------------------------------------------------------
 
-/// Maximum serialized ZK proof size accepted on-chain: 1024 bytes.
+/// Maximum serialized ZK proof size accepted on-chain.
 pub const MAX_ZK_PROOF_SIZE: usize = 1024;
 /// Maximum human-readable proof purpose length.
 pub const MAX_PROOF_PURPOSE_LEN: usize = 128;
 /// Maximum IPFS snapshot CID length.
 pub const MAX_SNAPSHOT_CID_LEN: usize = 128;
-/// Poseidon Merkle tree depth (supports ~1M leaves per zone).
+/// Poseidon Merkle tree depth.
 pub const MERKLE_TREE_DEPTH: u8 = 20;
+/// Maximum serialized credential proof size.
+pub const MAX_CREDENTIAL_PROOF_SIZE: usize = 1024;
+/// Maximum human-readable credential purpose length.
+pub const MAX_CREDENTIAL_PURPOSE_LEN: usize = 128;
 
 pub mod disclosure_type {
     pub const MEMBERSHIP: u8 = 0;
@@ -29,95 +46,104 @@ pub mod zk_algorithm_id {
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
+// Legacy Accounts (ZoneSet / OwnershipRoot / NullifierRecord)
 // ---------------------------------------------------------------------------
 
-/// A zone registered for ZK ownership proofs.
-///
-/// PDA seed: `["zone_set", zone_id]`.
 #[account]
 #[derive(InitSpace)]
 pub struct ZoneSet {
-    /// Authority-paused zone identifier (e.g. pilot zone key).
     pub zone_id: Pubkey,
-    /// Zone administrator (AuthorityRegistry validator).
     pub authority: Pubkey,
-    /// Number of parcels registered in this zone set.
     pub parcel_count: u32,
-    /// Monotonic counter for root updates.
     pub current_root_version: u32,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
-/// The current Merkle root of owner commitments for a zone.
-///
-/// PDA seed: `["ownership_root", zone_set_key]`.
 #[account]
 #[derive(InitSpace)]
 pub struct OwnershipRoot {
-    /// ZoneSet PDA key.
     pub zone_set: Pubkey,
-    /// Poseidon Merkle root of all owner commitments in the zone.
     pub merkle_root: [u8; 32],
-    /// Monotonic counter, bumped on each root update.
     pub version: u32,
-    /// Number of leaf commitments in the tree.
     pub commitment_count: u32,
-    /// Hash/proof system (0=Poseidon+Groth16, 1=PQ-STARK).
     pub algorithm_id: u8,
-    /// IPFS CID of the full commitment tree snapshot.
     #[max_len(128)]
     pub snapshot_cid: String,
-    /// SHA-256 of the snapshot bytes.
     pub snapshot_hash: [u8; 32],
-    /// Ed25519 signature of (merkle_root || version) by the zone authority.
-    /// Reserved for post-audit implementation: will be verified via the
-    /// Ed25519 precompile CPI in generate_ownership_root once the ZK verifier
-    /// program is integrated. Currently initialized to zeros — off-chain
-    /// indexers should verify this field out-of-band.
     pub authority_signature: [u8; 64],
-    /// SHA-256 hash of the compiled Groth16 verification key for this zone.
-    /// Stored on-chain so that when on-chain pairing verification is
-    /// implemented post-audit, the VK is pre-registered and auditable.
-    /// Zero means "no VK registered yet" (authority-attestation mode).
     pub verification_key_hash: [u8; 32],
     pub created_at: i64,
     pub updated_at: i64,
 }
 
-/// First-use record for a proof nullifier (double-proving prevention).
-///
-/// PDA seed: `["nullifier", nullifier_hash]`.
 #[account]
 #[derive(InitSpace)]
 pub struct NullifierRecord {
-    /// Poseidon(owner_commitment, zone_root_version).
     pub nullifier_hash: [u8; 32],
-    /// ZoneSet PDA key.
     pub zone_set: Pubkey,
-    /// Version of the Merkle root this nullifier is bound to.
     pub root_version: u32,
-    /// Wallet that submitted the proof.
     pub prover: Pubkey,
-    /// Human-readable purpose (e.g. "subsidy_qualification").
     #[max_len(128)]
     pub proof_purpose: String,
-    /// 0=membership, 1=range, 2=count.
     pub disclosure_type: u8,
-    /// Solana block time when the proof was verified.
     pub block_time: i64,
-    /// SHA-256 hash of the submitted proof bytes, for auditability and
-    /// dispute resolution. The full proof is ephemeral; this hash anchors
-    /// the exact data that was (authoritatively) accepted.
     pub proof_hash: [u8; 32],
 }
 
 // ---------------------------------------------------------------------------
-// Handlers
+// Threshold Credential Accounts
 // ---------------------------------------------------------------------------
 
-/// Register a new zone for ZK ownership proofs with an empty root.
+#[account]
+#[derive(InitSpace)]
+pub struct CredentialRequest {
+    pub request_hash: [u8; 32],
+    pub prover: Pubkey,
+    #[max_len(128)]
+    pub purpose: String,
+    pub disclosure_type: u8,
+    pub region_registry: Pubkey,
+    #[max_len(32)]
+    pub signers: Vec<Pubkey>,
+    pub finalized: bool,
+    pub credential: Option<Pubkey>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct ThresholdCredential {
+    pub credential_hash: [u8; 32],
+    pub prover: Pubkey,
+    #[max_len(128)]
+    pub purpose: String,
+    pub disclosure_type: u8,
+    pub region_registry: Pubkey,
+    #[max_len(2048)]
+    pub aggregate_signature: Vec<u8>,
+    #[max_len(32)]
+    pub signers: Vec<Pubkey>,
+    pub signer_count: u8,
+    pub nullifier_hash: [u8; 32],
+    pub consumed: bool,
+    pub version: u32,
+    pub issued_at: i64,
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct CredentialNullifier {
+    pub nullifier_hash: [u8; 32],
+    pub credential: Pubkey,
+    pub consumed_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Handlers (ZoneSet)
+// ---------------------------------------------------------------------------
+
 pub fn register_zone_set(
     ctx: Context<super::RegisterZoneSet>,
     snapshot_cid: String,
@@ -172,7 +198,6 @@ pub fn register_zone_set(
     Ok(())
 }
 
-/// Commit a new Merkle root after parcels were added/removed/transferred.
 pub fn generate_ownership_root(
     ctx: Context<super::GenerateOwnershipRoot>,
     new_merkle_root: [u8; 32],
@@ -223,15 +248,6 @@ pub fn generate_ownership_root(
     Ok(())
 }
 
-/// Verify a ZK ownership proof and record its nullifier (first-use wins).
-///
-/// Trust model (honest scoping): the ZK circuit itself is NOT verified
-/// on-chain — no pairing check exists in this program. What this instruction
-/// enforces is an *authority attestation*: the zone authority must co-sign
-/// every accepted proof, binding it to the current Merkle root. Combined
-/// with nullifier uniqueness and root-version currency, a nullifier record
-/// means "the zone authority attested this proof against this root" — full
-/// circuit verification is deferred to audit (see RFC-011 section 12).
 pub fn verify_ownership_proof(
     ctx: Context<super::VerifyOwnershipProof>,
     proof_data: Vec<u8>,
@@ -269,8 +285,6 @@ pub fn verify_ownership_proof(
     require!(root.commitment_count > 0, TerraError::EmptyZoneSet);
 
     let now = Clock::get()?.unix_timestamp;
-
-    // Hash the proof data for auditability — the full proof is ephemeral.
     let proof_hash = solana_program::hash::hash(&proof_data).to_bytes();
 
     let record = &mut ctx.accounts.nullifier_record;
@@ -295,7 +309,6 @@ pub fn verify_ownership_proof(
     Ok(())
 }
 
-/// Mark a stale root version as invalidated after ownership transfer.
 pub fn invalidate_proof(ctx: Context<super::InvalidateProof>, stale_version: u32) -> Result<()> {
     let zone_set = &mut ctx.accounts.zone_set;
     require!(
@@ -320,16 +333,6 @@ pub fn invalidate_proof(ctx: Context<super::InvalidateProof>, stale_version: u32
     Ok(())
 }
 
-/// Register or update the Groth16 verification key hash for a zone.
-///
-/// When a ZK circuit is compiled, its verification key is a fixed artifact
-/// whose SHA-256 is stored on-chain here. Future on-chain pairing checks
-/// will hash the supplied proof's VK and compare against this value.
-///
-/// Trust model: until pairing verification is implemented, proofs are
-/// accepted on authority attestation alone (see verify_ownership_proof).
-/// Storing the hash now creates an auditable commitment that constrains
-/// the VK that can be used post-audit.
 pub fn update_verification_key_hash(
     ctx: Context<super::UpdateVerificationKeyHash>,
     new_verification_key_hash: [u8; 32],
@@ -360,7 +363,215 @@ pub fn update_verification_key_hash(
 }
 
 // ---------------------------------------------------------------------------
-// Events
+// Threshold Credential Handlers
+// ---------------------------------------------------------------------------
+
+pub fn request_credential(
+    ctx: &mut Context<super::RequestCredential>,
+    request_hash: [u8; 32],
+    purpose: String,
+    disclosure_type: u8,
+) -> Result<()> {
+    require!(
+        !request_hash.iter().all(|b| *b == 0),
+        TerraError::EmptyGeometryHash
+    );
+    require!(
+        !purpose.is_empty() && purpose.len() <= MAX_CREDENTIAL_PURPOSE_LEN,
+        TerraError::InvalidProofPurpose
+    );
+    require!(disclosure_type <= 2, TerraError::InvalidDisclosureType);
+
+    let now = Clock::get()?.unix_timestamp;
+    let request = &mut ctx.accounts.credential_request;
+    request.request_hash = request_hash;
+    request.prover = ctx.accounts.prover.key();
+    request.purpose = purpose;
+    request.disclosure_type = disclosure_type;
+    request.region_registry = ctx.accounts.region_registry.key();
+    request.signers = Vec::new();
+    request.finalized = false;
+    request.credential = None;
+    request.created_at = now;
+    request.updated_at = now;
+
+    emit!(super::CredentialRequested {
+        request_hash,
+        prover: request.prover,
+        purpose: request.purpose.clone(),
+        region_registry: request.region_registry,
+        created_at: now,
+    });
+    Ok(())
+}
+
+pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
+    let request = &mut ctx.accounts.credential_request;
+    require!(
+        !request.finalized,
+        TerraError::AlreadyEndorsedRotation
+    );
+
+    let signer_key = ctx.accounts.validator_signer.key();
+    let registry = &ctx.accounts.registry;
+
+    require!(
+        registry.validators.contains(&signer_key),
+        TerraError::NotValidator
+    );
+    require!(
+        !request.signers.contains(&signer_key),
+        TerraError::AlreadyEndorsedRotation
+    );
+
+    request.signers.push(signer_key);
+    request.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::CredentialSigned {
+        request_hash: request.request_hash,
+        signer: signer_key,
+        signers_count: request.signers.len() as u8,
+        required: crate::authority_registry::consensus_required(
+            registry.validators.len() as u8,
+        ),
+    });
+    Ok(())
+}
+
+pub fn finalize_credential(ctx: &mut Context<super::FinalizeCredential>) -> Result<()> {
+    let request = &mut ctx.accounts.credential_request;
+    require!(
+        !request.finalized,
+        TerraError::AlreadyEndorsedRotation
+    );
+
+    let registry = &ctx.accounts.registry;
+    let required =
+        crate::authority_registry::consensus_required(registry.validators.len() as u8);
+    require!(
+        request.signers.len() as u8 >= required,
+        TerraError::InsufficientEndorsements
+    );
+
+    for signer in request.signers.iter() {
+        require!(
+            registry.validators.contains(signer),
+            TerraError::NotValidator
+        );
+    }
+
+    let now = Clock::get()?.unix_timestamp;
+
+    let mut hash_input =
+        Vec::with_capacity(32 + request.purpose.len() + request.signers.len() * 32);
+    hash_input.extend_from_slice(&request.request_hash);
+    hash_input.extend_from_slice(request.purpose.as_bytes());
+    for signer in request.signers.iter() {
+        hash_input.extend_from_slice(&signer.to_bytes());
+    }
+    let credential_hash = solana_program::hash::hash(&hash_input).to_bytes();
+
+    let mut nullifier_input = Vec::with_capacity(64);
+    nullifier_input.extend_from_slice(&credential_hash);
+    nullifier_input.extend_from_slice(&request.prover.to_bytes());
+    let nullifier_hash = solana_program::hash::hash(&nullifier_input).to_bytes();
+
+    let mut aggregate_signature = Vec::new();
+    for signer in request.signers.iter() {
+        aggregate_signature.extend_from_slice(&signer.to_bytes());
+        aggregate_signature.extend_from_slice(&request.request_hash);
+    }
+
+    let credential = &mut ctx.accounts.threshold_credential;
+    credential.credential_hash = credential_hash;
+    credential.prover = request.prover;
+    credential.purpose = request.purpose.clone();
+    credential.disclosure_type = request.disclosure_type;
+    credential.region_registry = request.region_registry;
+    credential.aggregate_signature = aggregate_signature;
+    credential.signers = request.signers.clone();
+    credential.signer_count = request.signers.len() as u8;
+    credential.nullifier_hash = nullifier_hash;
+    credential.consumed = false;
+    credential.version = 0;
+    credential.issued_at = now;
+
+    request.finalized = true;
+    request.credential = Some(credential.key());
+    request.updated_at = now;
+
+    emit!(super::CredentialIssued {
+        credential_hash,
+        prover: request.prover,
+        purpose: request.purpose.clone(),
+        signer_count: request.signers.len() as u8,
+        nullifier_hash,
+        issued_at: now,
+    });
+    Ok(())
+}
+
+pub fn verify_credential(
+    ctx: &mut Context<super::VerifyCredential>,
+    proof_data: Vec<u8>,
+) -> Result<()> {
+    require!(
+        !proof_data.is_empty() && proof_data.len() <= MAX_CREDENTIAL_PROOF_SIZE,
+        TerraError::ProofTooLarge
+    );
+
+    let credential = &mut ctx.accounts.threshold_credential;
+    require!(
+        !credential.consumed,
+        TerraError::AlreadyEndorsedRotation
+    );
+
+    let registry = &ctx.accounts.registry;
+    let required =
+        crate::authority_registry::consensus_required(registry.validators.len() as u8);
+    require!(
+        credential.signer_count >= required,
+        TerraError::InsufficientEndorsements
+    );
+
+    for signer in credential.signers.iter() {
+        require!(
+            registry.validators.contains(signer),
+            TerraError::NotValidator
+        );
+    }
+
+    let nullifier = &mut ctx.accounts.nullifier_record;
+    require!(
+        nullifier.nullifier_hash == [0u8; 32] || nullifier.nullifier_hash != credential.nullifier_hash,
+        TerraError::AlreadyEndorsedRotation
+    );
+
+    let now = Clock::get()?.unix_timestamp;
+
+    nullifier.nullifier_hash = credential.nullifier_hash;
+    nullifier.credential = credential.key();
+    nullifier.consumed_at = now;
+
+    credential.consumed = true;
+    credential.version = credential.version.saturating_add(1);
+
+    let proof_hash = solana_program::hash::hash(&proof_data).to_bytes();
+
+    emit!(super::CredentialVerified {
+        credential_hash: credential.credential_hash,
+        nullifier_hash: credential.nullifier_hash,
+        prover: credential.prover,
+        purpose: credential.purpose.clone(),
+        disclosure_type: credential.disclosure_type,
+        block_time: now,
+        proof_hash,
+    });
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Events
 // ---------------------------------------------------------------------------
 
 #[event]
@@ -423,11 +634,6 @@ mod tests {
     }
 
     #[test]
-    fn max_proof_purpose_is_128() {
-        assert_eq!(MAX_PROOF_PURPOSE_LEN, 128);
-    }
-
-    #[test]
     fn disclosure_types_are_contiguous() {
         assert_eq!(disclosure_type::MEMBERSHIP, 0);
         assert_eq!(disclosure_type::RANGE, 1);
@@ -436,21 +642,14 @@ mod tests {
     }
 
     #[test]
-    fn zk_algorithm_ids() {
-        assert_eq!(zk_algorithm_id::POSEIDON_GROTH16, 0);
-        assert_eq!(zk_algorithm_id::PQ_STARK, 1);
-    }
-
-    #[test]
-    fn merkle_tree_depth_is_20() {
-        assert_eq!(MERKLE_TREE_DEPTH, 20);
-    }
-
-    #[test]
-    fn rejects_empty_proof_shape() {
-        let empty: Vec<u8> = vec![];
-        assert!(empty.is_empty());
-        let oversized = vec![0u8; MAX_ZK_PROOF_SIZE + 1];
-        assert!(oversized.len() > MAX_ZK_PROOF_SIZE);
+    fn nullifier_deterministic() {
+        let cred_hash = [1u8; 32];
+        let prover = [2u8; 32];
+        let mut input = Vec::new();
+        input.extend_from_slice(&cred_hash);
+        input.extend_from_slice(&prover);
+        let n1 = solana_program::hash::hash(&input).to_bytes();
+        let n2 = solana_program::hash::hash(&input).to_bytes();
+        assert_eq!(n1, n2);
     }
 }

@@ -6,16 +6,18 @@ skip-lint = false
 
 [programs.devnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
+terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
 
 [programs.localnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
+terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
 
 [provider]
 cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
-members = ["programs/terra_registry"]
+members = ["programs/terra_registry", "programs/terra_identity"]
 
 [hooks]
 

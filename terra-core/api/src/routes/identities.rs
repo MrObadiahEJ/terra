@@ -5,6 +5,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::auth::SignedRequest;
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -186,10 +187,12 @@ pub struct RevokeGuardianship {
 /// optional human metadata.
 ///
 /// Security: If the identity already exists, the caller MUST prove ownership
-/// of the current owner wallet by providing the same owner address. This
-/// prevents identity takeover via race condition.
+/// of the current owner wallet by signing the request with that wallet's
+/// private key (via SignedRequest). This prevents identity takeover — a
+/// public owner address alone is not sufficient.
 pub async fn bind_identity(
     State(state): State<AppState>,
+    signed: SignedRequest,
     Json(req): Json<BindIdentity>,
 ) -> Result<(StatusCode, Json<IdentityView>), AppError> {
     let identity_hash = crate::routes::attestations::decode_hex32(&req.identity_hash)?;
@@ -213,6 +216,14 @@ pub async fn bind_identity(
                 "identity already exists with a different owner; transfer ownership on-chain first",
             ));
         }
+        // Cryptographic proof: caller must sign with the current owner wallet's
+        // private key. The plaintext match above is not sufficient — the owner
+        // address is public data readable by anyone.
+        signed
+            .verify_wallet(&current_owner, "POST", "/api/v1/identities")
+            .map_err(|_| AppError::unauthorized(
+                "identity exists: caller must sign with the current owner wallet's private key",
+            ))?;
     }
 
     let row = sqlx::query_as::<_, IdentityRow>(

@@ -12,10 +12,13 @@ use crate::state::AppState;
 // AuthorityRegistry mirror (on-chain AuthorityRegistry / ValidatorEndorsement)
 // ---------------------------------------------------------------------------
 
+/// On-chain: CONSENSUS_FLIP_THRESHOLD = 4 (mode derived, not stored).
+const CONSENSUS_FLIP_THRESHOLD: i16 = 4;
+
 const REGISTRY_SELECT: &str = r#"
     SELECT
         id, pubkey, admin, validators,
-        required_endorsements, mode, version,
+        required_endorsements, version,
         created_at, updated_at
     FROM authority_registries
 "#;
@@ -27,10 +30,46 @@ pub struct AuthorityRegistry {
     pub admin: String,
     pub validators: Vec<String>,
     pub required_endorsements: i16,
+    pub version: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// View model returned to API consumers. Mode is derived from validator count,
+/// not stored — matching the on-chain program's derived-mode design.
+#[derive(Debug, Serialize)]
+pub struct AuthorityRegistryView {
+    pub id: i64,
+    pub pubkey: String,
+    pub admin: String,
+    pub validators: Vec<String>,
+    pub required_endorsements: i16,
+    /// Derived: 0 = bootstrap, 1 = peer-consensus (>= 4 validators).
     pub mode: i16,
     pub version: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl AuthorityRegistryView {
+    pub fn from_row(row: AuthorityRegistry) -> Self {
+        let mode = if (row.validators.len() as i16) >= CONSENSUS_FLIP_THRESHOLD {
+            1i16
+        } else {
+            0i16
+        };
+        Self {
+            id: row.id,
+            pubkey: row.pubkey,
+            admin: row.admin,
+            validators: row.validators,
+            required_endorsements: row.required_endorsements,
+            mode,
+            version: row.version,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,29 +97,29 @@ pub struct ValidatorEndorsement {
 
 async fn list_registries(
     State(state): State<AppState>,
-) -> Result<Json<Vec<AuthorityRegistry>>, AppError> {
+) -> Result<Json<Vec<AuthorityRegistryView>>, AppError> {
     let rows: Vec<AuthorityRegistry> = sqlx::query_as(REGISTRY_SELECT)
         .fetch_all(&state.pool)
         .await?;
-    Ok(Json(rows))
+    Ok(Json(rows.into_iter().map(AuthorityRegistryView::from_row).collect()))
 }
 
 async fn get_registry(
     State(state): State<AppState>,
     Path(pubkey): Path<String>,
-) -> Result<Json<AuthorityRegistry>, AppError> {
+) -> Result<Json<AuthorityRegistryView>, AppError> {
     let row: AuthorityRegistry = sqlx::query_as(&format!("{REGISTRY_SELECT} WHERE pubkey = $1"))
         .bind(&pubkey)
         .fetch_optional(&state.pool)
         .await?
         .ok_or_else(|| AppError::not_found("authority registry not found"))?;
-    Ok(Json(row))
+    Ok(Json(AuthorityRegistryView::from_row(row)))
 }
 
 async fn create_registry(
     State(state): State<AppState>,
     Json(req): Json<CreateRegistryRequest>,
-) -> Result<(StatusCode, Json<AuthorityRegistry>), AppError> {
+) -> Result<(StatusCode, Json<AuthorityRegistryView>), AppError> {
     crate::routes::identities::decode_wallet(&req.pubkey)?;
     crate::routes::identities::decode_wallet(&req.admin)?;
     for v in &req.validators {
@@ -95,21 +134,21 @@ async fn create_registry(
             version = authority_registries.version + 1,
             updated_at = now()
          RETURNING id, pubkey, admin, validators, required_endorsements,
-                   mode, version, created_at, updated_at",
+                   version, created_at, updated_at",
     )
     .bind(&req.pubkey)
     .bind(&req.admin)
     .bind(&req.validators)
     .fetch_one(&state.pool)
     .await?;
-    Ok((StatusCode::CREATED, Json(row)))
+    Ok((StatusCode::CREATED, Json(AuthorityRegistryView::from_row(row))))
 }
 
 async fn add_validator(
     State(state): State<AppState>,
     Path(pubkey): Path<String>,
     Json(req): Json<AddValidatorRequest>,
-) -> Result<Json<AuthorityRegistry>, AppError> {
+) -> Result<Json<AuthorityRegistryView>, AppError> {
     crate::routes::identities::decode_wallet(&req.validator)?;
     let row: AuthorityRegistry = sqlx::query_as(
         "UPDATE authority_registries
@@ -121,20 +160,20 @@ async fn add_validator(
              updated_at = now()
          WHERE pubkey = $1
          RETURNING id, pubkey, admin, validators, required_endorsements,
-                   mode, version, created_at, updated_at",
+                   version, created_at, updated_at",
     )
     .bind(&pubkey)
     .bind(&[req.validator])
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::not_found("authority registry not found"))?;
-    Ok(Json(row))
+    Ok(Json(AuthorityRegistryView::from_row(row)))
 }
 
 async fn remove_validator(
     State(state): State<AppState>,
     Path((pubkey, validator)): Path<(String, String)>,
-) -> Result<Json<AuthorityRegistry>, AppError> {
+) -> Result<Json<AuthorityRegistryView>, AppError> {
     let row: AuthorityRegistry = sqlx::query_as(
         "UPDATE authority_registries
          SET validators = array_remove(validators, $2),
@@ -142,14 +181,14 @@ async fn remove_validator(
              updated_at = now()
          WHERE pubkey = $1
          RETURNING id, pubkey, admin, validators, required_endorsements,
-                   mode, version, created_at, updated_at",
+                   version, created_at, updated_at",
     )
     .bind(&pubkey)
     .bind(&validator)
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| AppError::not_found("authority registry not found"))?;
-    Ok(Json(row))
+    Ok(Json(AuthorityRegistryView::from_row(row)))
 }
 
 async fn endorse_validator_add(
@@ -173,24 +212,6 @@ async fn endorse_validator_add(
     Ok((StatusCode::CREATED, Json(row)))
 }
 
-async fn flip_to_consensus(
-    State(state): State<AppState>,
-    Path(pubkey): Path<String>,
-) -> Result<Json<AuthorityRegistry>, AppError> {
-    let row: AuthorityRegistry = sqlx::query_as(
-        "UPDATE authority_registries
-         SET mode = 1, version = version + 1, updated_at = now()
-         WHERE pubkey = $1
-         RETURNING id, pubkey, admin, validators, required_endorsements,
-                   mode, version, created_at, updated_at",
-    )
-    .bind(&pubkey)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::not_found("authority registry not found"))?;
-    Ok(Json(row))
-}
-
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_registries).post(create_registry))
@@ -198,7 +219,6 @@ pub fn router() -> Router<AppState> {
         .route("/{pubkey}/validators", post(add_validator))
         .route("/{pubkey}/validators/{validator}", delete(remove_validator))
         .route("/{pubkey}/endorsements", post(endorse_validator_add))
-        .route("/{pubkey}/flip", post(flip_to_consensus))
 }
 
 // ---------------------------------------------------------------------------
@@ -207,16 +227,35 @@ pub fn router() -> Router<AppState> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn endorsement_identity_is_registry_plus_proposed() {
-        // Mirror rule: one endorsement row per (registry, proposed) pair.
         let pair = ("REG".to_string(), "VAL".to_string());
         let same = ("REG".to_string(), "VAL".to_string());
         assert_eq!(pair, same);
     }
 
     #[test]
-    fn consensus_mode_value() {
-        assert_eq!(1i16, 1i16); // peer-consensus mode
+    fn derived_mode_at_threshold() {
+        // Below threshold = bootstrap
+        let view = AuthorityRegistryView {
+            id: 1,
+            pubkey: "test".into(),
+            admin: "admin".into(),
+            validators: vec!["v1".into(), "v2".into(), "v3".into()],
+            required_endorsements: 0,
+            version: 1,
+            created_at: Default::default(),
+            updated_at: Default::default(),
+        };
+        assert_eq!(view.mode, 0i16); // bootstrap
+
+        // At threshold = peer-consensus
+        let view = AuthorityRegistryView {
+            validators: vec!["v1".into(), "v2".into(), "v3".into(), "v4".into()],
+            ..view
+        };
+        assert_eq!(view.mode, 1i16); // peer-consensus
     }
 }

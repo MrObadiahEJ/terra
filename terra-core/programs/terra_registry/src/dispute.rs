@@ -164,21 +164,15 @@ pub fn freeze_parcel(ctx: Context<super::FreezeParcel>) -> Result<()> {
         TerraError::InvalidStatus
     );
 
-    // Count actual signer validators via remaining_accounts.
-    let mut present: u8 = 0;
-    let mut present_validators = [Pubkey::default(); MAX_VALIDATORS];
-    for signer in ctx.remaining_accounts.iter() {
-        if signer.is_signer && dispute.validators.contains(&signer.key()) {
-            if (present as usize) < MAX_VALIDATORS {
-                present_validators[present as usize] = signer.key();
-            }
-            present = present.saturating_add(1);
-        }
-    }
-    require!(
-        present >= dispute.required,
-        TerraError::InsufficientValidatorSigners
-    );
+    // Count actual signer validators via remaining_accounts (deduplicated).
+    let signers = crate::quorum::verify_quorum_signers(
+        ctx.remaining_accounts,
+        &dispute.validators,
+        dispute.required,
+        None,
+    )?;
+    let present = signers.len() as u8;
+    let present_validators = crate::quorum::into_fixed_array(&signers);
 
     let dispute = &mut ctx.accounts.dispute;
     dispute.status = dispute_status::FROZEN;
@@ -221,21 +215,15 @@ pub fn adjudicate_dispute(
         TerraError::DisputeExpired
     );
 
-    // Count actual signer validators via remaining_accounts.
-    let mut present: u8 = 0;
-    let mut present_validators = [Pubkey::default(); MAX_VALIDATORS];
-    for signer in ctx.remaining_accounts.iter() {
-        if signer.is_signer && dispute.validators.contains(&signer.key()) {
-            if (present as usize) < MAX_VALIDATORS {
-                present_validators[present as usize] = signer.key();
-            }
-            present = present.saturating_add(1);
-        }
-    }
-    require!(
-        present >= dispute.required,
-        TerraError::InsufficientValidatorSigners
-    );
+    // Count actual signer validators via remaining_accounts (deduplicated).
+    let signers = crate::quorum::verify_quorum_signers(
+        ctx.remaining_accounts,
+        &dispute.validators,
+        dispute.required,
+        None,
+    )?;
+    let present = signers.len() as u8;
+    let present_validators = crate::quorum::into_fixed_array(&signers);
 
     // If owner loses, new_owner must be provided.
     if outcome == dispute_outcome::OWNER_LOSES {

@@ -40,6 +40,23 @@ impl SignedRequest {
         key.verify(payload.as_bytes(), &self.signature)
             .map_err(|_| AppError::unauthorized("invalid signature"))
     }
+
+    /// Verify the signature against a base58-encoded wallet address (Ed25519
+    /// public key). This is the pattern used when the caller must prove
+    /// ownership of a specific wallet, e.g. identity updates.
+    pub fn verify_wallet(&self, wallet_b58: &str, method: &str, path: &str) -> Result<(), AppError> {
+        let pubkey_bytes = bs58::decode(wallet_b58)
+            .into_vec()
+            .map_err(|_| AppError::bad_request("invalid base58 wallet address"))?;
+        if pubkey_bytes.len() != 32 {
+            return Err(AppError::bad_request("wallet address must be 32 bytes"));
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&pubkey_bytes);
+        let key = VerifyingKey::from_bytes(&arr)
+            .map_err(|_| AppError::bad_request("invalid Ed25519 public key"))?;
+        self.verify(&key, method, path)
+    }
 }
 
 impl<S> FromRequestParts<S> for SignedRequest

@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/terra_registry", "api", "geo-engine"]
+members = ["programs/terra_registry", "programs/terra_identity", "api", "geo-engine"]
 resolver = "2"
 
 [profile.release]

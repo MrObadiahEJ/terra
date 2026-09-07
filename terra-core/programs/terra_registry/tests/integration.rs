@@ -8,7 +8,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use terra_registry::{
-    authority_registry::{registry_mode, AuthorityRegistry},
+    authority_registry::{self, AuthorityRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
     guardian, infra_flag, parcel_status, right_kind, staking,
     subdivision::SubdivisionRecord,
@@ -1039,28 +1039,18 @@ async fn peer_consensus_endorsement_flow() {
     let v2 = Keypair::new();
     let v3 = Keypair::new().pubkey();
 
-    // Bootstrap: admin adds two validators unilaterally.
+    // Bootstrap: admin adds four validators to reach PEER_CONSENSUS (threshold=4).
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
     add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
+    let v4 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v4.pubkey()).await;
+    let v5 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v5.pubkey()).await;
 
-    // Flip to peer-consensus (n = 2, required = ceil(4/3) = 2).
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(registry, false),
-                AccountMeta::new_readonly(payer.pubkey(), true),
-            ],
-            data: discriminator("global", "flip_to_consensus").to_vec(),
-        },
-    )
-    .await
-    .expect("flip_to_consensus failed");
+    // Mode is now PEER_CONSENSUS automatically (4 validators >= CONSENSUS_FLIP_THRESHOLD).
     let reg: AuthorityRegistry = read_account(&ctx, registry).await;
-    assert_eq!(reg.mode, registry_mode::PEER_CONSENSUS);
-    assert_eq!(reg.required_endorsements, 2);
+    assert!(reg.validators.len() as u8 >= authority_registry::CONSENSUS_FLIP_THRESHOLD);
+    assert_eq!(reg.required_endorsements, 3); // ceil(2*4/3) = 3
 
     // Propose V3: creates the endorsement record (no quorum yet).
     let (endorsement, _) = endorsement_pda(&registry, &v3);
