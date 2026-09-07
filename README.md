@@ -79,7 +79,7 @@ Three layers, organized around **ISO 19152 (LADM)** concepts:
   API client (`src/lib/api.ts`) covering every backend route.
 
 ```
-browser ──▶ terra-web ──▶ terra-core/api ──┬──▶ PostGIS (mirror + spatial)
+browser ──▶ terra-web ──▶ terra-core/api ───┬─▶ PostGIS (mirror + spatial)
                                             └──▶ Solana (source of truth)
 ```
 

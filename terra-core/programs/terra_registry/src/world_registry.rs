@@ -157,14 +157,8 @@ pub fn request_genesis(ctx: Context<super::RequestGenesis>, country_code: [u8; 2
         TerraError::CountryNotAllocated
     );
 
-    // Check if this country already has a genesis request.
-    require!(
-        !world_registry
-            .allocations
-            .iter()
-            .any(|a| a.country_code == country_code),
-        TerraError::CountryAlreadyAllocated
-    );
+    // The PDA init will fail if a genesis request already exists for this
+    // country (duplicate seed). No additional check needed here.
 
     let now = Clock::get()?.unix_timestamp;
     let request = &mut ctx.accounts.genesis_request;

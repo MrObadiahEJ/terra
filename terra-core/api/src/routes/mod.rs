@@ -18,6 +18,9 @@ pub mod staking;
 pub mod subdivision;
 pub mod vaults;
 pub mod zk_proofs;
+pub mod world_registry;
+pub mod recovery;
+pub mod threshold_credentials;
 
 pub use crate::state::AppState;
 
@@ -39,4 +42,7 @@ pub fn router() -> Router<AppState> {
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())
+        .nest("/world-registry", world_registry::router())
+        .nest("/recovery", recovery::router())
+        .nest("/credentials", threshold_credentials::router())
 }
