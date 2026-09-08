@@ -3488,3 +3488,87 @@ async fn escrow_seller_cancel_before_deposit() {
     assert_eq!(p.status, parcel_status::FOR_SALE);
     assert_eq!(p.owner, seller.pubkey());
 }
+
+// ===========================================================================
+// Batch 6: request_court_guardianship + execute_revoke_guardianship
+// ===========================================================================
+
+#[tokio::test]
+async fn request_court_guardianship_creates_succession() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Bind identity with recovery = payer.
+    let identity_hash = [30u8; 32];
+    let (id_pda, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&payer.pubkey().to_bytes()); // recovery = payer
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity failed");
+
+    // Three validators for guardianship.
+    let vals: Vec<Keypair> = (0..3).map(|_| Keypair::new()).collect();
+    for v in &vals {
+        process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v.pubkey(), 10_000_000))
+            .await
+            .expect("fund validator");
+    }
+
+    let guardian = Keypair::new();
+    let (succession_pda, _) = succession_pda(&id_pda, &guardian.pubkey());
+    let mut validators = [Pubkey::default(); 8];
+    for (i, v) in vals.iter().enumerate() {
+        validators[i] = v.pubkey();
+    }
+
+    // request_court_guardianship: kind=4 (COURT_APPOINTED_GUARDIAN), grace=90d, required=3.
+    let mut data = discriminator("global", "request_court_guardianship").to_vec();
+    data.extend_from_slice(&guardian.pubkey().to_bytes());
+    data.extend_from_slice(&(90 * 24 * 3600_i64).to_le_bytes()); // grace_secs = 90 days
+    data.push(3u8); // required_validations = 3
+    for v in &validators {
+        data.extend_from_slice(&v.to_bytes());
+    }
+    let case_hash = [0xAAu8; 32];
+    data.extend_from_slice(&case_hash);
+    data.extend_from_slice(&borsh_ser(&"limited_to_parcel_test".to_string()));
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("request_court_guardianship failed");
+
+    let s: Succession = read_account(&ctx, succession_pda).await;
+    assert_eq!(s.kind, 4); // COURT_APPOINTED_GUARDIAN
+    assert_eq!(s.required, 3);
+    assert_eq!(s.grace_secs, 90 * 24 * 3600); // 90 days as requested
+    assert_eq!(s.validations_count, 0);
+}
