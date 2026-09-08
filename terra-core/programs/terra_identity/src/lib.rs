@@ -1,3 +1,5 @@
+use anchor_lang::prelude::*;
+
 /// Succession kind constants shared across the Terra identity layer.
 ///
 /// These constants define the types of wallet passation supported by the
@@ -46,6 +48,127 @@ pub const MIN_GUARDIANSHIP_VALIDATIONS: u8 = 3;
 /// Timelock before a recovery wallet's revocation request can be executed.
 /// 48 hours — enough for the owner to react, short enough for emergency use.
 pub const GUARDIANSHIP_REVOKE_TIMELOCK_SECS: i64 = 48 * 3600;
+
+/// Maximum number of validators in an identity passation.
+pub const MAX_VALIDATORS: usize = 8;
+
+// ---------------------------------------------------------------------------
+// Account types
+// ---------------------------------------------------------------------------
+
+/// Binds a person (via a hashed identity credential) to a wallet the person
+/// actually holds, plus a recovery wallet. This is the resolvable on-chain link
+/// behind "who owns this."
+///
+/// PDA: `["identity", identity_hash]`.
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
+pub struct Identity {
+    /// 32-byte hash over the person's identity credential (e.g. national ID),
+    /// so the credential itself never lives on-chain.
+    pub identity_hash: [u8; 32],
+    /// The active wallet acting on behalf of this identity.
+    pub owner: Pubkey,
+    /// A separate wallet the person also controls (backup / recovery).
+    pub recovery: Pubkey,
+    /// Number of parcels currently owned by this identity.
+    pub parcel_count: u16,
+    pub created_at: i64,
+    pub updated_at: i64,
+    /// When true, a recovery wallet has requested revocation but the timelock
+    /// has not yet expired.
+    pub pending_revocation: bool,
+    /// The approved target wallet for a pending revocation.
+    pub pending_new_owner: Pubkey,
+    /// Unix timestamp after which a pending revocation may be executed.
+    pub revoke_after: i64,
+}
+
+/// An in-flight passation of wallet control, gated by BOTH a configurable grace
+/// period AND a minimum number of validator endorsements.
+///
+/// PDA: `["succession", identity, successor]`.
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
+pub struct Succession {
+    /// The Identity whose control is being passed.
+    pub identity: Pubkey,
+    /// The wallet that will take over once gated.
+    pub successor: Pubkey,
+    /// succession_kind.
+    pub kind: u8,
+    pub requested_at: i64,
+    /// effective = requested_at + grace_secs.
+    pub effective_at: i64,
+    /// Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS).
+    pub grace_secs: i64,
+    /// Number of validator endorsements required before claim.
+    pub required: u8,
+    /// Number of endorsements collected so far.
+    pub validations_count: u8,
+    /// Declared local-authority validator set acting as testifiers.
+    pub validators: [Pubkey; MAX_VALIDATORS],
+}
+
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct IdentityBound {
+    pub identity: Pubkey,
+    pub identity_hash: [u8; 32],
+    pub owner: Pubkey,
+    pub recovery: Pubkey,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct ParcelAttached {
+    pub identity: Pubkey,
+    pub parcel: Pubkey,
+    pub owner: Pubkey,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct SuccessionRequested {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub kind: u8,
+    pub grace_secs: i64,
+    pub required: u8,
+    pub count: u8,
+    pub effective_at: i64,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct SuccessionEndorsed {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub validator: Pubkey,
+    pub validations_count: u8,
+    pub required: u8,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct SuccessionCancelled {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub kind: u8,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct SuccessionClaimed {
+    pub identity: Pubkey,
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub kind: u8,
+    pub parcels_repointed: u8,
+}
+
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone)]
+pub struct GuardianshipRevoked {
+    pub identity: Pubkey,
+    pub from: Pubkey,
+    pub to: Pubkey,
+}
 
 // ---------------------------------------------------------------------------
 // Helper functions

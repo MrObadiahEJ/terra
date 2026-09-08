@@ -146,74 +146,48 @@ pub use terra_identity::{
     DEFAULT_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS, MIN_SUCCESSION_GRACE_SECS,
     MIN_SUCCESSION_VALIDATIONS,
 };
+pub use terra_identity::{Identity as IdentityFields, Succession as SuccessionFields};
 /// Floor for the number of validator signers required to forfeit a parcel.
 pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
 
-/// Binds a person (via a hashed identity credential) to a wallet the person
-/// actually holds, plus a recovery wallet. This is the resolvable on-chain link
-/// behind "who owns this." A provisioned wallet is exported to the person; the
-/// program only ever sees the public keys.
-///
-/// PDA: `["identity", identity_hash]`.
+/// On-chain account wrapper for `IdentityFields`.
+/// The canonical struct definition lives in `terra_identity`.
+/// `Deref`/`DerefMut` make field access transparent: `identity.owner` works.
 #[account]
 #[derive(InitSpace)]
-pub struct Identity {
-    /// 32-byte hash over the person's identity credential (e.g. national ID),
-    /// so the credential itself never lives on-chain.
-    pub identity_hash: [u8; 32],
-    /// The active wallet acting on behalf of this identity.
-    pub owner: Pubkey,
-    /// A separate wallet the person also controls (backup / recovery). Used to
-    /// request a recovery passation if the main key is lost.
-    pub recovery: Pubkey,
-    /// Number of parcels currently owned by this identity.
-    ///
-    /// Maintained by attach/claim flows only: direct wallet-to-wallet
-    /// transfers cannot resolve identity linkage on-chain, so this counter
-    /// is advisory. Indexers must derive authoritative counts off-chain.
-    pub parcel_count: u16,
-    pub created_at: i64,
-    pub updated_at: i64,
-    /// When true, a recovery wallet has requested revocation but the timelock
-    /// has not yet expired. The approved target is stored in `pending_new_owner`.
-    pub pending_revocation: bool,
-    /// The approved target wallet for a pending revocation. Set by
-    /// `revoke_guardianship`; enforced by `execute_revoke_guardianship`
-    /// so that only the originally-approved wallet can become the new owner.
-    /// Zero means no pending revocation.
-    pub pending_new_owner: Pubkey,
-    /// Unix timestamp after which a pending revocation may be executed.
-    /// Set by `revoke_guardianship` (which becomes a request-only call).
-    /// Zero means no pending revocation.
-    pub revoke_after: i64,
+pub struct Identity(pub IdentityFields);
+
+impl std::ops::Deref for Identity {
+    type Target = IdentityFields;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-/// An in-flight passation of wallet control, gated by BOTH a configurable grace
-/// period AND a minimum number of validator endorsements (so a stolen wallet
-/// can't seize land) before it can be claimed.
-///
-/// PDA: `["succession", identity, successor]`.
+impl std::ops::DerefMut for Identity {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/// On-chain account wrapper for `SuccessionFields`.
+/// The canonical struct definition lives in `terra_identity`.
+/// `Deref`/`DerefMut` make field access transparent: `succession.kind` works.
 #[account]
 #[derive(InitSpace)]
-pub struct Succession {
-    /// The Identity whose control is being passed.
-    pub identity: Pubkey,
-    /// The wallet that will take over once gated.
-    pub successor: Pubkey,
-    /// succession_kind.
-    pub kind: u8,
-    pub requested_at: i64,
-    /// effective = requested_at + grace_secs. Claim only allowed after this
-    /// AND validations_count >= required.
-    pub effective_at: i64,
-    /// Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS).
-    pub grace_secs: i64,
-    /// Number of validator endorsements required before claim (>= MIN, <= count).
-    pub required: u8,
-    /// Number of endorsements collected so far.
-    pub validations_count: u8,
-    /// Declared local-authority validator set acting as testifiers.
-    pub validators: [Pubkey; MAX_VALIDATORS],
+pub struct Succession(pub SuccessionFields);
+
+impl std::ops::Deref for Succession {
+    type Target = SuccessionFields;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Succession {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 pub mod validator_registry;
@@ -3540,6 +3514,8 @@ pub struct Attested {
     pub required: u8,
     pub count: u8,
 }
+
+// Identity events — canonical definitions in terra_identity; #[event] wrapper here for Anchor logging.
 
 #[event]
 pub struct IdentityBound {

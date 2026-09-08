@@ -1,9 +1,12 @@
 [package]
 name = "terra-identity"
 version = "0.1.0"
-description = "Shared identity constants, enums, and helpers for Terra"
+description = "Shared identity types, constants, events, and helpers for Terra"
 edition = "2021"
 
 [lib]
 crate-type = ["lib"]
 name = "terra_identity"
+
+[dependencies]
+anchor-lang = { version = "1.1.2" }
