@@ -137,33 +137,17 @@ pub struct Attestation {
     pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
-/// Minimum grace period (seconds) a requester may choose. Chosen so legitimate
-/// heirs far from a local validator aren't rushed, while still bounding the
-/// theft window.
-pub const MIN_SUCCESSION_GRACE_SECS: i64 = 7 * 24 * 3600; // 7 days
-/// Maximum grace period a requester may choose.
-pub const MAX_SUCCESSION_GRACE_SECS: i64 = 180 * 24 * 3600; // 180 days
-/// Default grace period when a requester passes 0.
-pub const DEFAULT_SUCCESSION_GRACE_SECS: i64 = 30 * 24 * 3600; // 30 days
-/// Floor for the number of validator endorsements required on a passation.
-pub const MIN_SUCCESSION_VALIDATIONS: u8 = 1;
+// ---------------------------------------------------------------------------
+// Identity constants — imported from terra-identity shared library
+// ---------------------------------------------------------------------------
+
+pub use terra_identity::succession_kind;
+pub use terra_identity::{
+    DEFAULT_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS, MIN_SUCCESSION_GRACE_SECS,
+    MIN_SUCCESSION_VALIDATIONS,
+};
 /// Floor for the number of validator signers required to forfeit a parcel.
 pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
-
-/// The account struct (below) uses these — bump the account size accordingly.
-pub mod succession_kind {
-    /// Wallet passation to an heir/beneficiary (estate / inheritance).
-    pub const SUCCESSOR: u8 = 0;
-    /// Passation because the active key was lost/stolen (recovery).
-    pub const RECOVERY: u8 = 1;
-    /// Passation of a parcel's control (sale / deliberate transfer).
-    pub const TRANSFER: u8 = 2;
-    /// Reserved for RFC-010 (Guardian & Recovery Council).
-    pub const GUARDIANSHIP: u8 = 3;
-    /// Reserved for RFC-010 (Guardian & Recovery Council).
-    pub const COURT_APPOINTED_GUARDIAN: u8 = 4;
-    pub const MAX: u8 = COURT_APPOINTED_GUARDIAN;
-}
 
 /// Binds a person (via a hashed identity credential) to a wallet the person
 /// actually holds, plus a recovery wallet. This is the resolvable on-chain link
@@ -237,7 +221,6 @@ pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
 pub mod guardian;
-pub mod identity;
 pub mod ipfs_docs;
 pub mod quorum;
 pub mod staking;

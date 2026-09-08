@@ -20,7 +20,7 @@ anchor-debug = []
 [dependencies]
 anchor-lang = { version = "1.1.2", features = ["init-if-needed"] }
 solana-program = "3.0.0"
-terra-identity = { path = "../terra_identity", features = ["cpi"] }
+terra-identity = { path = "../terra_identity" }
 
 [dev-dependencies]
 solana-program-test = "3.0.0"

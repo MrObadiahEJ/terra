@@ -3,25 +3,19 @@ use anchor_lang::prelude::*;
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
-// Constants (RFC-010 §5.2)
+// Constants — imported from terra-identity shared library
 // ---------------------------------------------------------------------------
 
-/// Minimum grace period for any guardianship claim: 90 days.
-pub const MIN_GUARDIANSHIP_GRACE_SECS: i64 = 90 * 24 * 3600;
-/// Default grace when a requester passes 0: 180 days.
-pub const DEFAULT_GUARDIANSHIP_GRACE_SECS: i64 = 180 * 24 * 3600;
-/// Minimum validator endorsements for guardianship: 3.
-pub const MIN_GUARDIANSHIP_VALIDATIONS: u8 = 3;
+pub use terra_identity::{
+    DEFAULT_GUARDIANSHIP_GRACE_SECS, GUARDIANSHIP_REVOKE_TIMELOCK_SECS,
+    MIN_GUARDIANSHIP_GRACE_SECS, MIN_GUARDIANSHIP_VALIDATIONS,
+};
 /// Maximum scope-notes length (mirrors the 128-byte Rights notes bound).
 pub const MAX_SCOPE_NOTES_LEN: usize = 128;
-/// Timelock before a recovery wallet's revocation request can be executed.
-/// 48 hours — enough for the owner to react, short enough for emergency use.
-pub const GUARDIANSHIP_REVOKE_TIMELOCK_SECS: i64 = 48 * 3600;
 
 /// Returns true for the two guardianship succession kinds (3, 4).
 pub fn is_guardianship_kind(kind: u8) -> bool {
-    kind == crate::succession_kind::GUARDIANSHIP
-        || kind == crate::succession_kind::COURT_APPOINTED_GUARDIAN
+    terra_identity::is_guardianship_kind(kind)
 }
 
 /// Normalize a requested grace period for a guardianship kind.
@@ -40,12 +34,8 @@ pub fn normalize_guardianship_grace(grace_secs: i64) -> Result<i64> {
 /// Validate the endorsement threshold for a guardianship request.
 pub fn validate_guardianship_threshold(required_validations: u8, declared: usize) -> Result<()> {
     require!(
-        required_validations >= MIN_GUARDIANSHIP_VALIDATIONS,
+        terra_identity::validate_guardianship_threshold(required_validations, declared),
         TerraError::GuardianshipThresholdTooLow
-    );
-    require!(
-        (required_validations as usize) <= declared,
-        TerraError::InvalidThreshold
     );
     Ok(())
 }
