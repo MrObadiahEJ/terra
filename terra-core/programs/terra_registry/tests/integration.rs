@@ -10,6 +10,7 @@ use solana_sdk::{
 use terra_registry::{
     authority_registry::{self, AuthorityRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
+    dispute::{self, Dispute},
     guardian, infra_flag, parcel_status, right_kind, recovery, staking,
     subdivision::SubdivisionRecord,
     world_registry,
@@ -3030,4 +3031,235 @@ async fn judicial_forfeiture_rejects_owner_as_authority() {
 
     let res = process_with(&mut ctx, &owner, &[&owner, &val1, &val2], ix).await;
     assert!(res.is_err(), "owner should not be able to self-forfeit");
+}
+
+// ===========================================================================
+// Batch 4: dispute lifecycle (file, freeze, adjudicate, execute, cancel)
+// ===========================================================================
+
+#[tokio::test]
+async fn dispute_lifecycle_owner_wins() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Owner registers parcel.
+    let owner = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000))
+        .await
+        .expect("fund owner");
+    let parcel_id: [u8; 32] = [50u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &owner,
+        register_ix(&parcel_id, "Disputed Land", &[1u8; 32], &owner.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Two validators for dispute.
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val1.pubkey(), 10_000_000))
+        .await
+        .expect("fund val1");
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val2.pubkey(), 10_000_000))
+        .await
+        .expect("fund val2");
+
+    let case_hash = [77u8; 32];
+    let (dispute_pda, _) = dispute_pda(&parcel_pk, &case_hash);
+
+    // 1. File dispute — owner files, declaring val1+val2 as validators.
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = val1.pubkey();
+    validators[1] = val2.pubkey();
+    let mut data = discriminator("global", "file_dispute").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.push(2u8); // required = 2
+    for v in &validators {
+        data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &owner,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(owner.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("file_dispute failed");
+
+    let d: Dispute = read_account(&ctx, dispute_pda).await;
+    assert_eq!(d.status, 0); // FILED
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, 4); // DISPUTED
+
+    // 2. Freeze parcel — val1+val2 sign as remaining_accounts.
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(dispute_pda, false),
+            AccountMeta::new(parcel_pk, false),
+            AccountMeta::new(val1.pubkey(), true),
+            // remaining_accounts: validator signers
+            AccountMeta::new_readonly(val1.pubkey(), true),
+            AccountMeta::new_readonly(val2.pubkey(), true),
+        ],
+        data: discriminator("global", "freeze_parcel").to_vec(),
+    };
+    process_with(&mut ctx, &val1, &[&val1, &val2], ix)
+        .await
+        .expect("freeze_parcel failed");
+
+    let d: Dispute = read_account(&ctx, dispute_pda).await;
+    assert_eq!(d.status, 1); // FROZEN
+
+    // 3. Adjudicate — owner wins, re-activate parcel.
+    let authority = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &authority.pubkey(), 10_000_000))
+        .await
+        .expect("fund authority");
+
+    let mut adj_data = discriminator("global", "adjudicate_dispute").to_vec();
+    adj_data.push(0u8); // outcome = OWNER_WINS
+    adj_data.extend_from_slice(&Pubkey::default().to_bytes()); // new_owner (ignored for OWNER_WINS)
+    let adj_ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(dispute_pda, false),
+            AccountMeta::new(parcel_pk, false),
+            AccountMeta::new(authority.pubkey(), true),
+            // remaining_accounts: validator signers
+            AccountMeta::new_readonly(val1.pubkey(), true),
+            AccountMeta::new_readonly(val2.pubkey(), true),
+        ],
+        data: adj_data,
+    };
+    process_with(&mut ctx, &authority, &[&authority, &val1, &val2], adj_ix)
+        .await
+        .expect("adjudicate_dispute failed");
+
+    let d: Dispute = read_account(&ctx, dispute_pda).await;
+    assert_eq!(d.status, 2); // ADJUDICATED
+    assert_eq!(d.outcome, 0); // OWNER_WINS
+
+    // 4. Execute judgment — admin executes, parcel returns to REGISTERED.
+    let mut exec_data = discriminator("global", "execute_judgment").to_vec();
+    // extend with nothing — execute_judgment takes no extra args
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true), // payer is admin
+            ],
+            data: exec_data,
+        },
+    )
+    .await
+    .expect("execute_judgment failed");
+
+    let d: Dispute = read_account(&ctx, dispute_pda).await;
+    assert_eq!(d.status, 3); // EXECUTED
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::REGISTERED); // back to REGISTERED
+    assert_eq!(p.owner, owner.pubkey()); // ownership unchanged
+}
+
+#[tokio::test]
+async fn dispute_cancel_by_filer() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    let owner = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000))
+        .await
+        .expect("fund owner");
+    let parcel_id: [u8; 32] = [51u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &owner,
+        register_ix(&parcel_id, "Cancel Test", &[2u8; 32], &owner.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val1.pubkey(), 10_000_000))
+        .await
+        .expect("fund val1");
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val2.pubkey(), 10_000_000))
+        .await
+        .expect("fund val2");
+
+    let case_hash = [88u8; 32];
+    let (dispute_pda, _) = dispute_pda(&parcel_pk, &case_hash);
+
+    // File dispute.
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = val1.pubkey();
+    validators[1] = val2.pubkey();
+    let mut data = discriminator("global", "file_dispute").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.push(2u8);
+    for v in &validators {
+        data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &owner,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(owner.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("file_dispute failed");
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, 4); // DISPUTED
+
+    // Cancel dispute — filer (owner) cancels.
+    process(
+        &mut ctx,
+        &owner,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(owner.pubkey(), true),
+            ],
+            data: discriminator("global", "cancel_dispute").to_vec(),
+        },
+    )
+    .await
+    .expect("cancel_dispute failed");
+
+    let d: Dispute = read_account(&ctx, dispute_pda).await;
+    assert_eq!(d.status, 4); // CANCELLED
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::REGISTERED); // back to REGISTERED
 }
