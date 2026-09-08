@@ -3263,3 +3263,228 @@ async fn dispute_cancel_by_filer() {
     let p: Parcel = read_account(&ctx, parcel_pk).await;
     assert_eq!(p.status, parcel_status::REGISTERED); // back to REGISTERED
 }
+
+// ===========================================================================
+// Batch 5: escrow lifecycle (create, deposit, accept, cancel)
+// ===========================================================================
+
+#[tokio::test]
+async fn escrow_lifecycle_create_deposit_accept() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    // Register parcel and set FOR_SALE.
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [60u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Escrow Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Update status to FOR_SALE.
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status to FOR_SALE");
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::FOR_SALE);
+
+    // Setup buyer.
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 200_000_000; // 0.2 SOL
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // 1. Create escrow — seller creates.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow failed");
+
+    let e: EscrowRecord = read_account(&ctx, escrow_pda).await;
+    assert_eq!(e.status, escrow_status::CREATED);
+    assert_eq!(e.amount, amount);
+    assert_eq!(e.buyer, buyer.pubkey());
+
+    // 2. Deposit — buyer deposits full amount.
+    let mut dep_data = discriminator("global", "deposit_escrow").to_vec();
+    dep_data.extend_from_slice(&amount.to_le_bytes());
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: dep_data,
+        },
+    )
+    .await
+    .expect("deposit_escrow failed");
+
+    let e: EscrowRecord = read_account(&ctx, escrow_pda).await;
+    assert_eq!(e.status, escrow_status::DEPOSITED);
+    assert_eq!(e.deposit_amount, amount);
+
+    // 3. Accept — seller accepts.
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: discriminator("global", "accept_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("accept_escrow failed");
+
+    let e: EscrowRecord = read_account(&ctx, escrow_pda).await;
+    assert_eq!(e.status, escrow_status::ACCEPTED);
+}
+
+#[tokio::test]
+async fn escrow_seller_cancel_before_deposit() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    // Register parcel and set FOR_SALE.
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [61u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Cancel Early", &[4u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status to FOR_SALE");
+
+    let buyer = Keypair::new();
+    let amount: u64 = 200_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow failed");
+
+    let e: EscrowRecord = read_account(&ctx, escrow_pda).await;
+    assert_eq!(e.status, escrow_status::CREATED);
+
+    // Seller cancels before any deposit.
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new(buyer.pubkey(), false), // buyer (receives nothing since no deposit)
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "cancel_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("seller cancel_escrow failed");
+
+    let acc = ctx.banks_client.get_account(escrow_pda).await.unwrap();
+    assert!(acc.is_none(), "escrow account should be closed");
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::FOR_SALE);
+    assert_eq!(p.owner, seller.pubkey());
+}
