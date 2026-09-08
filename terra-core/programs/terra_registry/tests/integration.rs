@@ -2648,3 +2648,238 @@ async fn check_quorum_reachable_emits_event() {
     .await
     .expect("check_quorum_reachable failed");
 }
+
+// ===========================================================================
+// Batch 2: endorse_succession, claim_succession, cancel_succession
+// ===========================================================================
+
+#[tokio::test]
+async fn succession_endorse_and_cancel() {
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity: owner = payer, recovery = some other wallet.
+    let identity_hash = [10u8; 32];
+    let (id_pda, _) = identity_pda(&identity_hash);
+    let recovery = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&recovery.pubkey().to_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity failed");
+
+    let id: Identity = read_account(&ctx, id_pda).await;
+    assert_eq!(id.owner, payer.pubkey());
+    assert_eq!(id.recovery, recovery.pubkey());
+
+    // Request succession: owner transfers to successor.
+    let successor = Keypair::new();
+    let validator1 = Keypair::new();
+    let validator2 = Keypair::new();
+    let (succession_pda, _) = succession_pda(&id_pda, &successor.pubkey());
+    let mut validators = [Pubkey::default(); 8]; // MAX_VALIDATORS = 8
+    validators[0] = validator1.pubkey();
+    validators[1] = validator2.pubkey();
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "request_succession").to_vec();
+                d.extend_from_slice(&successor.pubkey().to_bytes());
+                d.push(0u8); // kind = SUCCESSOR
+                d.extend_from_slice(&0i64.to_le_bytes()); // grace_secs = 0 (default 30d)
+                d.push(2u8); // required_validations = 2
+                for v in &validators {
+                    d.extend_from_slice(&v.to_bytes());
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("request_succession failed");
+
+    let s: Succession = read_account(&ctx, succession_pda).await;
+    assert_eq!(s.validations_count, 0);
+    assert_eq!(s.required, 2);
+
+    // Fund validators so they can sign transactions.
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator1.pubkey(), 10_000_000))
+        .await
+        .expect("fund validator1 failed");
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator2.pubkey(), 10_000_000))
+        .await
+        .expect("fund validator2 failed");
+
+    // Validator1 endorses the succession.
+    process(
+        &mut ctx,
+        &validator1,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(validator1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await
+    .expect("endorse_succession failed");
+
+    let s: Succession = read_account(&ctx, succession_pda).await;
+    assert_eq!(s.validations_count, 1);
+
+    // Owner cancels the succession before it becomes effective.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "cancel_succession").to_vec(),
+        },
+    )
+    .await
+    .expect("cancel_succession failed");
+
+    // Succession account should be closed (close = signer).
+    let acc = ctx.banks_client.get_account(succession_pda).await.unwrap();
+    assert!(acc.is_none(), "succession account should be closed after cancel");
+}
+
+#[tokio::test]
+async fn claim_succession_not_yet_effective() {
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let identity_hash = [11u8; 32];
+    let (id_pda, _) = identity_pda(&identity_hash);
+    let recovery = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&recovery.pubkey().to_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity failed");
+
+    // Request succession with default grace (30 days).
+    let successor = Keypair::new();
+    let validator1 = Keypair::new();
+    let (succession_pda, _) = succession_pda(&id_pda, &successor.pubkey());
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = validator1.pubkey();
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "request_succession").to_vec();
+                d.extend_from_slice(&successor.pubkey().to_bytes());
+                d.push(0u8); // kind = SUCCESSOR
+                d.extend_from_slice(&0i64.to_le_bytes()); // grace_secs = 0 (default)
+                d.push(1u8); // required_validations = 1
+                for v in &validators {
+                    d.extend_from_slice(&v.to_bytes());
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("request_succession failed");
+
+    // Fund validator and endorse.
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator1.pubkey(), 10_000_000))
+        .await
+        .expect("fund validator1 failed");
+    process(
+        &mut ctx,
+        &validator1,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(validator1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await
+    .expect("endorse_succession failed");
+
+    // Claim fails: grace period not elapsed (30 days default).
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &successor.pubkey(), 10_000_000))
+        .await
+        .expect("fund successor failed");
+    let res = process(
+        &mut ctx,
+        &successor,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succession_pda, false),
+                AccountMeta::new(successor.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "claim_succession").to_vec(),
+        },
+    )
+    .await;
+    assert!(res.is_err(), "claim should fail — not yet effective");
+}
