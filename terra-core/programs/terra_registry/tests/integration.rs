@@ -8,7 +8,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use terra_registry::{
-    authority_registry::{self, AuthorityRegistry},
+    validator_registry::{self, ValidatorRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
     guardian, infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
@@ -23,7 +23,7 @@ fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
 }
 
 fn registry_pda() -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[b"authority_registry"], &PROGRAM_ID)
+    Pubkey::find_program_address(&[b"validator_registry"], &PROGRAM_ID)
 }
 
 fn endorsement_pda(registry: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
@@ -1163,8 +1163,8 @@ async fn peer_consensus_endorsement_flow() {
     add_validator_ok(&mut ctx, &payer, &v5.pubkey()).await;
 
     // Mode is now PEER_CONSENSUS automatically (4 validators >= CONSENSUS_FLIP_THRESHOLD).
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
-    assert!(reg.validators.len() as u8 >= authority_registry::CONSENSUS_FLIP_THRESHOLD);
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
+    assert!(reg.validators.len() as u8 >= validator_registry::CONSENSUS_FLIP_THRESHOLD);
     assert_eq!(reg.required_endorsements, 3); // ceil(2*4/3) = 3
 
     // Propose V3: creates the endorsement record (no quorum yet).
@@ -1277,7 +1277,7 @@ async fn peer_consensus_endorsement_flow() {
     process(&mut ctx, &payer, admit_ix)
         .await
         .expect("peer add with quorum failed");
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert!(reg.validators.contains(&v3));
 }
 
@@ -1595,7 +1595,7 @@ async fn pause_and_unpause() {
     .await
     .expect("pause failed");
 
-    let r: AuthorityRegistry = read_account(&ctx, reg).await;
+    let r: ValidatorRegistry = read_account(&ctx, reg).await;
     assert!(r.paused, "should be paused");
 
     // Double-pause rejected
@@ -1630,7 +1630,7 @@ async fn pause_and_unpause() {
     .await
     .expect("unpause failed");
 
-    let r: AuthorityRegistry = read_account(&ctx, reg).await;
+    let r: ValidatorRegistry = read_account(&ctx, reg).await;
     assert!(!r.paused, "should be unpaused");
 }
 
@@ -1886,7 +1886,7 @@ async fn bootstrap_self_proclaim_then_add_second_third() {
     .await
     .expect("bootstrap_self_proclaim failed");
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 1);
     assert_eq!(reg.validators[0], v1.pubkey());
 
@@ -1909,7 +1909,7 @@ async fn bootstrap_self_proclaim_then_add_second_third() {
     .await
     .expect("add_second_validator failed");
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 2);
 
     // add_third_validator: v1 + v2 must both sign via remaining_accounts
@@ -1941,7 +1941,7 @@ async fn bootstrap_self_proclaim_then_add_second_third() {
         .await
         .expect("add_third_validator failed");
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 3);
 }
 
@@ -1959,7 +1959,7 @@ async fn nominate_and_confirm_validator() {
     let v4_existing = Keypair::new();
     add_validator_ok(&mut ctx, &payer, &v4_existing.pubkey()).await;
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 4);
 
     // Nominate v5 as a new validator (sponsor=payer can't confirm).
@@ -2015,7 +2015,7 @@ async fn nominate_and_confirm_validator() {
         .expect("confirm_nomination failed");
     }
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 5);
     assert!(reg.validators.contains(&v5.pubkey()));
 }
@@ -2466,7 +2466,7 @@ async fn remove_validator_by_admin() {
     let v2 = Keypair::new();
     add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 2);
     assert!(reg.validators.contains(&payer.pubkey()));
     assert!(reg.validators.contains(&v2.pubkey()));
@@ -2494,7 +2494,7 @@ async fn remove_validator_by_admin() {
     .await
     .expect("remove_validator failed");
 
-    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert_eq!(reg.validators.len(), 1);
     assert!(!reg.validators.contains(&v2.pubkey()));
 }

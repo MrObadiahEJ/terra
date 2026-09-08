@@ -142,7 +142,7 @@ pub fn revoke_guardianship(
     ctx: Context<super::RevokeGuardianship>,
     new_owner: Pubkey,
 ) -> Result<()> {
-    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
+    crate::validator_registry::require_not_paused(&ctx.accounts.registry)?;
     require!(new_owner != Pubkey::default(), TerraError::EmptySuccessor);
 
     let revoker = ctx.accounts.revoker.key();
@@ -191,7 +191,7 @@ pub fn revoke_guardianship(
 /// timelock prevents the owner from reacting, and the stored target prevents
 /// front-running by a different wallet.
 pub fn execute_revoke_guardianship(ctx: Context<super::ExecuteRevokeGuardianship>) -> Result<()> {
-    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
+    crate::validator_registry::require_not_paused(&ctx.accounts.registry)?;
 
     let now = Clock::get()?.unix_timestamp;
     let identity = &ctx.accounts.identity;

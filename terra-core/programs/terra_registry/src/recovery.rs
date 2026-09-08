@@ -105,7 +105,7 @@ pub fn check_quorum_reachable(ctx: &Context<super::CheckQuorumReachable>) -> Res
     let registry = &ctx.accounts.registry;
 
     let active_count = registry.validators.len() as u8;
-    let quorum_reachable = active_count >= crate::authority_registry::CONSENSUS_FLIP_THRESHOLD
+    let quorum_reachable = active_count >= crate::validator_registry::CONSENSUS_FLIP_THRESHOLD
         && registry.required_endorsements > 0;
 
     emit!(super::QuorumReachabilityChecked {
@@ -167,9 +167,9 @@ pub fn execute_emergency_injection(ctx: &mut Context<super::ExecuteEmergencyInje
     registry.updated_at = Clock::get()?.unix_timestamp;
 
     let n = registry.validators.len() as u8;
-    let mode = crate::authority_registry::effective_mode(n);
-    if mode == crate::authority_registry::registry_mode::PEER_CONSENSUS {
-        registry.required_endorsements = crate::authority_registry::consensus_required(n);
+    let mode = crate::validator_registry::effective_mode(n);
+    if mode == crate::validator_registry::registry_mode::PEER_CONSENSUS {
+        registry.required_endorsements = crate::validator_registry::consensus_required(n);
     } else {
         registry.required_endorsements = 0;
     }

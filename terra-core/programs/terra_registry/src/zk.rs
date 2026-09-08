@@ -149,7 +149,7 @@ pub fn register_zone_set(
     snapshot_cid: String,
     snapshot_hash: [u8; 32],
 ) -> Result<()> {
-    crate::authority_registry::require_not_paused(&ctx.accounts.registry)?;
+    crate::validator_registry::require_not_paused(&ctx.accounts.registry)?;
     require!(
         !snapshot_cid.is_empty() && snapshot_cid.len() <= MAX_SNAPSHOT_CID_LEN,
         TerraError::CidRequired
@@ -431,7 +431,7 @@ pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
         request_hash: request.request_hash,
         signer: signer_key,
         signers_count: request.signers.len() as u8,
-        required: crate::authority_registry::consensus_required(
+        required: crate::validator_registry::consensus_required(
             registry.validators.len() as u8,
         ),
     });
@@ -447,7 +447,7 @@ pub fn finalize_credential(ctx: &mut Context<super::FinalizeCredential>) -> Resu
 
     let registry = &ctx.accounts.registry;
     let required =
-        crate::authority_registry::consensus_required(registry.validators.len() as u8);
+        crate::validator_registry::consensus_required(registry.validators.len() as u8);
     require!(
         request.signers.len() as u8 >= required,
         TerraError::InsufficientEndorsements
@@ -528,7 +528,7 @@ pub fn verify_credential(
 
     let registry = &ctx.accounts.registry;
     let required =
-        crate::authority_registry::consensus_required(registry.validators.len() as u8);
+        crate::validator_registry::consensus_required(registry.validators.len() as u8);
     require!(
         credential.signer_count >= required,
         TerraError::InsufficientEndorsements

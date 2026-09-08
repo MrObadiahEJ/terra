@@ -3,12 +3,10 @@ use anchor_lang::prelude::*;
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHITECTURE NOTE (2026-09-08):
 //
-// This module is conceptually "ValidatorRegistry" in the claim/verification
-// network architecture. The struct name `AuthorityRegistry` and PDA seeds
-// (`b"authority_registry"`) are preserved for on-chain ABI stability.
+// ValidatorRegistry — the on-chain registry of validators.
 //
-// Conceptually: validators are registered through this module, not appointed
-// by an authority provider. The registry tracks the validator set, manages
+// Validators are registered through this module, not appointed by an
+// authority provider. The registry tracks the validator set, manages
 // bootstrap → peer-consensus transitions, and provides quorum primitives.
 //
 // No authority provider is a prerequisite for parcels to exist. Anyone can
@@ -54,7 +52,7 @@ pub fn consensus_required(n: u8) -> u8 {
 
 #[account]
 #[derive(InitSpace)]
-pub struct AuthorityRegistry {
+pub struct ValidatorRegistry {
     /// Bootstrap admin who can add validators unilaterally in bootstrap mode.
     pub admin: Pubkey,
     /// Current list of registered validators.
@@ -161,7 +159,7 @@ pub fn unpause_program(ctx: Context<super::UnpauseProgram>) -> Result<()> {
 
 /// Guard: reject if the registry is paused. Call at the top of every
 /// pausable instruction handler.
-pub fn require_not_paused(registry: &AuthorityRegistry) -> Result<()> {
+pub fn require_not_paused(registry: &ValidatorRegistry) -> Result<()> {
     require!(!registry.paused, super::TerraError::ProgramPaused);
     Ok(())
 }

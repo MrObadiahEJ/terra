@@ -41,7 +41,7 @@ pub const VALID_COUNTRY_CODES: [[u8; 2]; 250] = [
 ];
 
 /// Minimum validators before auto-flip to peer-consensus (reused from
-/// authority_registry (ValidatorRegistry).
+/// validator_registry (ValidatorRegistry).
 pub const CONSENSUS_FLIP_THRESHOLD: u8 = 4;
 
 /// Minimum confirmations for genesis approval.

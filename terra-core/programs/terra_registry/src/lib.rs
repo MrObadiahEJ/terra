@@ -232,7 +232,7 @@ pub struct Succession {
     pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
-pub mod authority_registry;
+pub mod validator_registry;
 pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
@@ -419,8 +419,8 @@ pub struct ConfirmGenesis<'info> {
 pub struct Heartbeat<'info> {
     #[account(mut)]
     pub activity_tracker: Account<'info, recovery::ValidatorActivityTracker>,
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub validator: Signer<'info>,
 }
 
@@ -436,7 +436,7 @@ pub struct SetValidatorActive<'info> {
     )]
     pub activity_tracker: Account<'info, recovery::ValidatorActivityTracker>,
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
     )]
@@ -447,8 +447,8 @@ pub struct SetValidatorActive<'info> {
 
 #[derive(Accounts)]
 pub struct CheckQuorumReachable<'info> {
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
 }
 
 #[derive(Accounts)]
@@ -467,10 +467,10 @@ pub struct QueueEmergencyInjection<'info> {
     )]
     pub emergency_injection: Account<'info, recovery::EmergencyInjection>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
     )]
@@ -485,10 +485,10 @@ pub struct ExecuteEmergencyInjection<'info> {
     pub emergency_injection: Account<'info, recovery::EmergencyInjection>,
     #[account(
         mut,
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         init_if_needed,
         payer = admin,
@@ -518,11 +518,11 @@ pub struct CreateRegistry<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + authority_registry::AuthorityRegistry::INIT_SPACE,
-        seeds = [b"authority_registry"],
+        space = 8 + validator_registry::ValidatorRegistry::INIT_SPACE,
+        seeds = [b"validator_registry"],
         bump
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -531,7 +531,7 @@ pub struct CreateRegistry<'info> {
 #[derive(Accounts)]
 pub struct AddValidator<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// Admin signer — required in bootstrap mode, ignored in peer-consensus
     /// (the endorsement account carries authority instead).
     #[account(mut)]
@@ -544,7 +544,7 @@ pub struct AddValidator<'info> {
     #[account(
         init_if_needed,
         payer = admin_signer,
-        space = 8 + authority_registry::ValidatorEndorsement::INIT_SPACE,
+        space = 8 + validator_registry::ValidatorEndorsement::INIT_SPACE,
         seeds = [
             b"validator_endorsement",
             registry.key().as_ref(),
@@ -552,7 +552,7 @@ pub struct AddValidator<'info> {
         ],
         bump
     )]
-    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    pub endorsement: Account<'info, validator_registry::ValidatorEndorsement>,
     /// CHECK: validated as a non-zero pubkey in handler.
     pub validator: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
@@ -565,7 +565,7 @@ pub struct AddValidator<'info> {
 #[derive(Accounts)]
 pub struct BootstrapSelfProclaim<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub candidate: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -574,7 +574,7 @@ pub struct BootstrapSelfProclaim<'info> {
 #[derive(Accounts)]
 pub struct AddSecondValidator<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// Must be validator #1 (the first validator in the registry).
     pub sponsor: Signer<'info>,
     /// CHECK: validated as non-zero and non-duplicate in handler.
@@ -585,7 +585,7 @@ pub struct AddSecondValidator<'info> {
 #[derive(Accounts)]
 pub struct AddThirdValidator<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: validated as non-zero and non-duplicate in handler.
@@ -603,7 +603,7 @@ pub struct NominateValidator<'info> {
     #[account(
         init,
         payer = sponsor,
-        space = 8 + authority_registry::ValidatorNomination::INIT_SPACE,
+        space = 8 + validator_registry::ValidatorNomination::INIT_SPACE,
         seeds = [
             b"validator_nomination",
             registry.key().as_ref(),
@@ -611,9 +611,9 @@ pub struct NominateValidator<'info> {
         ],
         bump,
     )]
-    pub nomination: Account<'info, authority_registry::ValidatorNomination>,
+    pub nomination: Account<'info, validator_registry::ValidatorNomination>,
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub sponsor: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -622,20 +622,20 @@ pub struct NominateValidator<'info> {
 #[derive(Accounts)]
 pub struct ConfirmNomination<'info> {
     #[account(mut)]
-    pub nomination: Account<'info, authority_registry::ValidatorNomination>,
+    pub nomination: Account<'info, validator_registry::ValidatorNomination>,
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub confirmer: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct ProposeValidator<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         init,
         payer = proposer,
-        space = 8 + authority_registry::ValidatorEndorsement::INIT_SPACE,
+        space = 8 + validator_registry::ValidatorEndorsement::INIT_SPACE,
         seeds = [
             b"validator_endorsement",
             registry.key().as_ref(),
@@ -643,7 +643,7 @@ pub struct ProposeValidator<'info> {
         ],
         bump
     )]
-    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    pub endorsement: Account<'info, validator_registry::ValidatorEndorsement>,
     /// CHECK: validated as a non-zero pubkey in handler.
     pub validator: UncheckedAccount<'info>,
     #[account(mut)]
@@ -654,7 +654,7 @@ pub struct ProposeValidator<'info> {
 #[derive(Accounts)]
 pub struct RemoveValidator<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub admin_signer: Signer<'info>,
     #[account(
         mut,
@@ -665,7 +665,7 @@ pub struct RemoveValidator<'info> {
         ],
         bump,
     )]
-    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
+    pub endorsement: Account<'info, validator_registry::ValidatorEndorsement>,
     /// CHECK: validated against registry in handler.
     pub validator: UncheckedAccount<'info>,
 }
@@ -681,22 +681,22 @@ pub struct EndorseValidatorAdd<'info> {
         ],
         bump,
     )]
-    pub endorsement: Account<'info, authority_registry::ValidatorEndorsement>,
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub endorsement: Account<'info, validator_registry::ValidatorEndorsement>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub endorser: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct PauseProgram<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub admin: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct UnpauseProgram<'info> {
     #[account(mut)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub admin: Signer<'info>,
 }
 
@@ -1522,23 +1522,23 @@ pub mod terra_registry {
     // -----------------------------------------------------------------------
 
     pub fn create_registry(ctx: Context<CreateRegistry>) -> Result<()> {
-        authority_registry::create_registry(ctx)
+        validator_registry::create_registry(ctx)
     }
 
     pub fn add_validator_to_registry(ctx: Context<AddValidator>, validator: Pubkey) -> Result<()> {
-        authority_registry::add_validator(ctx, validator)
+        validator_registry::add_validator(ctx, validator)
     }
 
     pub fn bootstrap_self_proclaim(ctx: Context<BootstrapSelfProclaim>, country_code: [u8; 2]) -> Result<()> {
-        authority_registry::bootstrap_self_proclaim(ctx, country_code)
+        validator_registry::bootstrap_self_proclaim(ctx, country_code)
     }
 
     pub fn add_second_validator(ctx: Context<AddSecondValidator>) -> Result<()> {
-        authority_registry::add_second_validator(ctx)
+        validator_registry::add_second_validator(ctx)
     }
 
     pub fn add_third_validator(ctx: Context<AddThirdValidator>, candidate: Pubkey) -> Result<()> {
-        authority_registry::add_third_validator(ctx, candidate)
+        validator_registry::add_third_validator(ctx, candidate)
     }
 
     pub fn nominate_validator(
@@ -1549,34 +1549,34 @@ pub mod terra_registry {
         country_code: [u8; 2],
         recent_blockhash: [u8; 32],
     ) -> Result<()> {
-        authority_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code, recent_blockhash)
+        validator_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code, recent_blockhash)
     }
 
     pub fn confirm_nomination(ctx: Context<ConfirmNomination>) -> Result<()> {
-        authority_registry::confirm_nomination(ctx)
+        validator_registry::confirm_nomination(ctx)
     }
 
     pub fn propose_validator(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
-        authority_registry::propose_validator(ctx, validator)
+        validator_registry::propose_validator(ctx, validator)
     }
 
     pub fn remove_validator_from_registry(
         ctx: Context<RemoveValidator>,
         validator: Pubkey,
     ) -> Result<()> {
-        authority_registry::remove_validator(ctx, validator)
+        validator_registry::remove_validator(ctx, validator)
     }
 
     pub fn endorse_validator_add(ctx: Context<EndorseValidatorAdd>) -> Result<()> {
-        authority_registry::endorse_validator_add(ctx)
+        validator_registry::endorse_validator_add(ctx)
     }
 
     pub fn pause_program(ctx: Context<PauseProgram>) -> Result<()> {
-        authority_registry::pause_program(ctx)
+        validator_registry::pause_program(ctx)
     }
 
     pub fn unpause_program(ctx: Context<UnpauseProgram>) -> Result<()> {
-        authority_registry::unpause_program(ctx)
+        validator_registry::unpause_program(ctx)
     }
 
     // -----------------------------------------------------------------------
@@ -2282,10 +2282,10 @@ pub struct FileDispute<'info> {
     )]
     pub parcel: Account<'info, Parcel>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub filer: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -2341,10 +2341,10 @@ pub struct ExecuteJudgment<'info> {
     )]
     pub parcel: Account<'info, Parcel>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub authority: Signer<'info>,
 }
 
@@ -2665,10 +2665,10 @@ pub struct RegisterJurisdiction<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub system_program: Program<'info, System>,
 }
 
@@ -2722,10 +2722,10 @@ pub struct VerifyJurisdictionMembership<'info> {
     pub identity: Account<'info, Identity>,
     pub validator: Signer<'info>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub system_program: Program<'info, System>,
 }
 
@@ -2922,10 +2922,10 @@ pub struct MigrateAttestations<'info> {
 #[instruction(reward_rate_bps: u16)]
 pub struct CreateStakePool<'info> {
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         init,
         payer = payer,
@@ -2943,10 +2943,10 @@ pub struct CreateStakePool<'info> {
 #[instruction(amount: u64)]
 pub struct DepositStake<'info> {
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         mut,
         seeds = [b"stake_pool", region_registry.key().as_ref()],
@@ -2985,10 +2985,10 @@ pub struct InitiateUnbonding<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub validator: Signer<'info>,
 }
 
@@ -3012,10 +3012,10 @@ pub struct WithdrawStake<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub validator: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3030,10 +3030,10 @@ pub struct ReportEquivocation<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         seeds = [
             b"validator_stake",
@@ -3070,10 +3070,10 @@ pub struct ReportOffense<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         mut,
         seeds = [
@@ -3132,10 +3132,10 @@ pub struct VerifyAndSlash<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         mut,
         constraint = reporter.key() == slashing_report.reporter @ TerraError::NotValidator,
@@ -3178,10 +3178,10 @@ pub struct ClaimRewards<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub validator: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3196,10 +3196,10 @@ pub struct DistributeRewards<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         mut,
         constraint = authority.key() == region_registry.admin @ TerraError::NotAuthorized,
@@ -3230,10 +3230,10 @@ pub struct DisputeSlashing<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
         constraint = slashing_report.offender == offender.key() @ TerraError::NotDesignatedBuyer,
     )]
@@ -3259,10 +3259,10 @@ pub struct DismissReport<'info> {
     )]
     pub stake_pool: Account<'info, staking::StakePool>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub region_registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     /// CHECK: Reporter wallet — validated by slashing_report PDA seeds.
     pub reporter: UncheckedAccount<'info>,
@@ -3308,10 +3308,10 @@ pub struct RevokeGuardianship<'info> {
     )]
     pub identity: Account<'info, Identity>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub revoker: Signer<'info>,
     /// CHECK: the target new owner — validated as validator or revoker in handler.
     pub new_owner: UncheckedAccount<'info>,
@@ -3326,10 +3326,10 @@ pub struct ExecuteRevokeGuardianship<'info> {
     )]
     pub identity: Account<'info, Identity>,
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// CHECK: validated as the pending new_owner in handler.
     pub new_owner: Signer<'info>,
 }
@@ -3342,10 +3342,10 @@ pub struct ExecuteRevokeGuardianship<'info> {
 #[instruction(snapshot_cid: String, snapshot_hash: [u8; 32])]
 pub struct RegisterZoneSet<'info> {
     #[account(
-        seeds = [b"authority_registry"],
+        seeds = [b"validator_registry"],
         bump,
     )]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// CHECK: Zone identifier account (e.g. pilot zone key).
     pub zone_id: UncheckedAccount<'info>,
     #[account(
@@ -3459,8 +3459,8 @@ pub struct RequestCredential<'info> {
         bump,
     )]
     pub credential_request: Account<'info, zk::CredentialRequest>,
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// CHECK: region registry key — validated off-chain, stored as reference.
     pub region_registry: UncheckedAccount<'info>,
     #[account(mut)]
@@ -3472,8 +3472,8 @@ pub struct RequestCredential<'info> {
 pub struct SignCredential<'info> {
     #[account(mut)]
     pub credential_request: Account<'info, zk::CredentialRequest>,
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub validator_signer: Signer<'info>,
 }
 
@@ -3489,8 +3489,8 @@ pub struct FinalizeCredential<'info> {
         bump,
     )]
     pub threshold_credential: Account<'info, zk::ThresholdCredential>,
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3508,8 +3508,8 @@ pub struct VerifyCredential<'info> {
         bump,
     )]
     pub nullifier_record: Account<'info, zk::CredentialNullifier>,
-    #[account(seeds = [b"authority_registry"], bump)]
-    pub registry: Account<'info, authority_registry::AuthorityRegistry>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub prover: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3694,7 +3694,7 @@ pub struct ShardPinged {
 }
 
 // ---------------------------------------------------------------------------
-// AuthorityRegistry events (progressive decentralization)
+// ValidatorRegistry events (progressive decentralization)
 // ---------------------------------------------------------------------------
 
 #[event]
