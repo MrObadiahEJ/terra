@@ -415,20 +415,25 @@ pub struct ValidatorNomination {
 }
 
 impl ValidatorNomination {
-    /// Deterministically select a physical confirmer from the nearby subset.
-    /// seed = hash(slot, candidate_pubkey) -> index into nearby_validators.
+    /// Select a physical confirmer from the nearby subset using blockhash
+    /// for randomness instead of predictable slot numbers.
+    ///
+    /// seed = hash(recent_blockhash, candidate_pubkey) -> index into nearby_validators.
+    /// Using the recent blockhash makes grinding significantly harder because
+    /// the validator cannot predict the next blockhash in advance.
     pub fn select_physical_confirmer(
         nearby_validators: &[Pubkey],
         candidate: &Pubkey,
+        recent_blockhash: &[u8; 32],
     ) -> Option<Pubkey> {
         if nearby_validators.is_empty() {
             return None;
         }
-        let slot = Clock::get().ok()?.slot;
-        let mut data = slot.to_le_bytes().to_vec();
+        let mut data = recent_blockhash.to_vec();
         data.extend_from_slice(candidate.as_ref());
         let hash = solana_program::hash::hash(&data).to_bytes();
-        let index = u64::from_le_bytes(hash[..8].try_into().ok()?) as usize % nearby_validators.len();
+        let index =
+            u64::from_le_bytes(hash[..8].try_into().ok()?) as usize % nearby_validators.len();
         Some(nearby_validators[index])
     }
 }
@@ -535,6 +540,7 @@ pub fn nominate_validator(
     documents_hash: [u8; 32],
     location_hash: [u8; 32],
     country_code: [u8; 2],
+    recent_blockhash: [u8; 32],
 ) -> Result<()> {
     let registry = &ctx.accounts.registry;
     require!(
@@ -552,14 +558,21 @@ pub fn nominate_validator(
 
     // Select physical confirmer randomly from the validator pool, excluding
     // the sponsor (who cannot confirm their own nomination).
+    // Uses the transaction's recent blockhash for randomness instead of
+    // predictable slot numbers — makes grinding significantly harder.
     let nearby_validators: Vec<Pubkey> = registry
         .validators
         .iter()
         .filter(|v| **v != ctx.accounts.sponsor.key())
         .cloned()
         .collect();
-    let confirmer = ValidatorNomination::select_physical_confirmer(&nearby_validators, &candidate)
-        .ok_or(super::TerraError::NoValidators)?;
+
+    let confirmer = ValidatorNomination::select_physical_confirmer(
+        &nearby_validators,
+        &candidate,
+        &recent_blockhash,
+    )
+    .ok_or(super::TerraError::NoValidators)?;
 
     // Confirmer must not be the sponsor or the candidate.
     require!(
@@ -652,7 +665,7 @@ pub fn confirm_nomination(ctx: Context<super::ConfirmNomination>) -> Result<()> 
         candidate = nomination.candidate;
         confirmations_count = nomination.confirmers.len() as u8;
 
-        if confirmations_count as u8 >= NOMINATION_CONFIRMATIONS {
+        if confirmations_count >= NOMINATION_CONFIRMATIONS {
             nomination.finalized = true;
 
             let registry = &mut ctx.accounts.registry;

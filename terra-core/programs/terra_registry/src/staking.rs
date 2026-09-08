@@ -98,11 +98,11 @@ pub fn compute_pattern_slash_bps(offenses: &[u8; 4], offense_kind: u8) -> Result
 
     // Number of distinct offense types with count > 0 (after this offense).
     let mut distinct_types: u8 = 0;
-    for i in 0..=offense_type::MAX as usize {
+    for (i, &offense_count) in offenses.iter().enumerate().take(offense_type::MAX as usize + 1) {
         let count = if i == offense_kind as usize {
-            offenses[i].saturating_add(1)
+            offense_count.saturating_add(1)
         } else {
-            offenses[i]
+            offense_count
         };
         if count > 0 {
             distinct_types = distinct_types.saturating_add(1);
@@ -728,16 +728,19 @@ pub fn distribute_rewards(ctx: Context<super::DistributeRewards>) -> Result<()> 
     // period reward into the pool. Without this, claims would be paid out of
     // other validators' deposits.
     if period_reward > 0 {
-        **ctx
-            .accounts
-            .treasury
-            .to_account_info()
-            .try_borrow_mut_lamports()? -= period_reward;
-        **ctx
-            .accounts
-            .stake_pool
-            .to_account_info()
-            .try_borrow_mut_lamports()? += period_reward;
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.treasury.key(),
+            &ctx.accounts.stake_pool.key(),
+            period_reward,
+        );
+        anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.treasury.to_account_info(),
+                ctx.accounts.stake_pool.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
     }
 
     let pool = &mut ctx.accounts.stake_pool;

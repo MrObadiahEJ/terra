@@ -598,7 +598,7 @@ pub struct AddThirdValidator<'info> {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-#[instruction(candidate: Pubkey, documents_hash: [u8; 32], location_hash: [u8; 32], country_code: [u8; 2])]
+#[instruction(candidate: Pubkey, documents_hash: [u8; 32], location_hash: [u8; 32], country_code: [u8; 2], recent_blockhash: [u8; 32])]
 pub struct NominateValidator<'info> {
     #[account(
         init,
@@ -1547,8 +1547,9 @@ pub mod terra_registry {
         documents_hash: [u8; 32],
         location_hash: [u8; 32],
         country_code: [u8; 2],
+        recent_blockhash: [u8; 32],
     ) -> Result<()> {
-        authority_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code)
+        authority_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code, recent_blockhash)
     }
 
     pub fn confirm_nomination(ctx: Context<ConfirmNomination>) -> Result<()> {
@@ -2711,8 +2712,7 @@ pub struct VerifyJurisdictionMembership<'info> {
     #[account(mut)]
     pub binding: Account<'info, cross_border::JurisdictionBinding>,
     #[account(
-        seeds = [b"jurisdiction".as_ref(), &binding.jurisdiction_key.to_bytes()],
-        bump,
+        constraint = jurisdiction.key() == binding.jurisdiction_key @ TerraError::InvalidJurisdictionStatus,
     )]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
     #[account(
@@ -2734,8 +2734,7 @@ pub struct RevokeJurisdictionalIdentity<'info> {
     #[account(mut)]
     pub binding: Account<'info, cross_border::JurisdictionBinding>,
     #[account(
-        seeds = [b"jurisdiction".as_ref(), &binding.jurisdiction_key.to_bytes()],
-        bump,
+        constraint = jurisdiction.key() == binding.jurisdiction_key @ TerraError::InvalidJurisdictionStatus,
     )]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
     #[account(

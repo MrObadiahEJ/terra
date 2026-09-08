@@ -12,7 +12,7 @@ use terra_registry::{
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
     guardian, infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
-    subdivision::SubdivisionRecord,
+    subdivision::{self, SubdivisionRecord},
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
     Attestation, Identity, Parcel, Rights, Succession, ID as PROGRAM_ID,
@@ -1968,6 +1968,7 @@ async fn nominate_and_confirm_validator() {
     let documents_hash = [1u8; 32];
     let location_hash = [2u8; 32];
     let country_code = *b"US";
+    let recent_blockhash = ctx.last_blockhash;
 
     process(
         &mut ctx,
@@ -1986,6 +1987,7 @@ async fn nominate_and_confirm_validator() {
                 d.extend_from_slice(&documents_hash);
                 d.extend_from_slice(&location_hash);
                 d.extend_from_slice(&country_code);
+                d.extend_from_slice(&recent_blockhash.to_bytes());
                 d
             },
         },
@@ -5123,4 +5125,988 @@ async fn dispute_escrow_creates_dispute_record() {
     assert_eq!(d.filed_by, buyer.pubkey());
     assert_eq!(d.case_hash, case_hash);
     assert_eq!(d.status, dispute::dispute_status::FILED);
+}
+
+// ===========================================================================
+// Batch 11: untested happy-path handlers
+// ===========================================================================
+
+#[tokio::test]
+async fn amalgamate_parcels_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let id_a: [u8; 32] = [210u8; 32];
+    let id_b: [u8; 32] = [211u8; 32];
+    let geo: [u8; 32] = [1u8; 32];
+    let (parcel_a, _) = parcel_pda(&id_a);
+    let (parcel_b, _) = parcel_pda(&id_b);
+
+    process(&mut ctx, &payer, register_ix(&id_a, "Parcel A", &geo, &payer.pubkey()))
+        .await
+        .expect("register parcel A");
+    process(&mut ctx, &payer, register_ix(&id_b, "Parcel B", &geo, &payer.pubkey()))
+        .await
+        .expect("register parcel B");
+
+    let (amalgamation_pk, _) = amalgamation_pda(&parcel_a, &parcel_b);
+    let new_geo: [u8; 32] = [0xABu8; 32];
+    let mut data = discriminator("global", "amalgamate_parcels").to_vec();
+    data.extend_from_slice(&new_geo);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_a, false),
+                AccountMeta::new(parcel_b, false),
+                AccountMeta::new(amalgamation_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("amalgamate_parcels failed");
+
+    let a: Parcel = read_account(&ctx, parcel_a).await;
+    assert_eq!(a.geometry_hash, new_geo);
+    let b: Parcel = read_account(&ctx, parcel_b).await;
+    assert_eq!(b.status, parcel_status::AMALGAMATED);
+
+    let record: subdivision::AmalgamationRecord = read_account(&ctx, amalgamation_pk).await;
+    assert_eq!(record.result_parcel, parcel_a);
+    assert_eq!(record.source_parcel, parcel_b);
+    assert_eq!(record.status, subdivision::record_status::PENDING);
+}
+
+#[tokio::test]
+async fn invalidate_proof_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new().pubkey();
+    let (zone_set, _) = zone_set_pda(&zone_id);
+    let (root, _) = ownership_root_pda(&zone_set);
+
+    // Register zone set.
+    let mut data = discriminator("global", "register_zone_set").to_vec();
+    data.extend_from_slice(&borsh_ser(&"QmZ".to_string()));
+    data.extend_from_slice(&[33u8; 32]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(zone_id, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_zone_set");
+
+    // Generate ownership root (bumps current_root_version to 1).
+    let mut data = discriminator("global", "generate_ownership_root").to_vec();
+    data.extend_from_slice(&[44u8; 32]); // merkle_root
+    data.extend_from_slice(&borsh_ser(&"QmR".to_string()));
+    data.extend_from_slice(&[45u8; 32]); // snapshot_hash
+    data.extend_from_slice(&borsh_ser(&3u32));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("generate_ownership_root");
+
+    // Generate a second ownership root (bumps current_root_version to 2).
+    let mut data2 = discriminator("global", "generate_ownership_root").to_vec();
+    data2.extend_from_slice(&[46u8; 32]); // merkle_root
+    data2.extend_from_slice(&borsh_ser(&"QmR2".to_string()));
+    data2.extend_from_slice(&[47u8; 32]); // snapshot_hash
+    data2.extend_from_slice(&borsh_ser(&7u32));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("generate_ownership_root 2");
+
+    // Invalidate stale version 1 (current_root_version = 2 after two generate calls).
+    let mut data = discriminator("global", "invalidate_proof").to_vec();
+    data.extend_from_slice(&borsh_ser(&1u32));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("invalidate_proof failed");
+}
+
+#[tokio::test]
+async fn endorse_shard_rotation_happy_path() {
+    use terra_registry::vault::VaultRecord;
+
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [220u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Create vault with 3 shard holders (real keypairs), threshold=2.
+    let h2_kp = Keypair::new();
+    let h3_kp = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let orig_hash: [u8; 32] = [221u8; 32];
+
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://v".to_string()));
+    v_data.extend_from_slice(&orig_hash);
+    v_data.push(0u8); // AES_256_GCM
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), h2_kp.pubkey(), h3_kp.pubkey()]));
+    v_data.push(2u8); // threshold
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await
+    .expect("create_vault");
+
+    // Initiate shard rotation from payer (shard holder #1).
+    let new_hash: [u8; 32] = [222u8; 32];
+    let (rotation_pk, _) = vault_rotation_pda(&vault_pk, &new_hash);
+    let mut r_data = discriminator("global", "initiate_shard_rotation").to_vec();
+    r_data.extend_from_slice(&new_hash);
+    r_data.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), h2_kp.pubkey(), h3_kp.pubkey()]));
+    r_data.push(2u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rotation_pk, false),
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: r_data,
+        },
+    )
+    .await
+    .expect("initiate_shard_rotation");
+
+    // Endorse from h2_kp (different shard holder, not the initiator).
+    let data = discriminator("global", "endorse_shard_rotation").to_vec();
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &h2_kp],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rotation_pk, false),
+                AccountMeta::new_readonly(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(h2_kp.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("endorse_shard_rotation failed");
+
+    use terra_registry::vault::VaultShardRotation;
+    let rot: VaultShardRotation = read_account(&ctx, rotation_pk).await;
+    assert_eq!(rot.endorsements.len(), 1);
+    assert_eq!(rot.endorsements[0], h2_kp.pubkey());
+}
+
+#[tokio::test]
+async fn migrate_attestations_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let id_old: [u8; 32] = [230u8; 32];
+    let id_new: [u8; 32] = [231u8; 32];
+    let (old_pk, _) = parcel_pda(&id_old);
+    let (new_pk, _) = parcel_pda(&id_new);
+
+    process(&mut ctx, &payer, register_ix(&id_old, "Old Parcel", &[1u8; 32], &payer.pubkey()))
+        .await
+        .expect("register old");
+    process(&mut ctx, &payer, register_ix(&id_new, "New Parcel", &[2u8; 32], &payer.pubkey()))
+        .await
+        .expect("register new");
+
+    // Attest on old parcel.
+    let specifier: [u8; 32] = [232u8; 32];
+    let (old_att, _) = attestation_pda(&old_pk, &specifier);
+    let mut att_data = discriminator("global", "attest").to_vec();
+    att_data.extend_from_slice(&specifier);
+    att_data.extend_from_slice(&[233u8; 32]); // content_hash
+    att_data.push(1u8); // required = 1
+    let mut vals = [Pubkey::default(); 8];
+    vals[0] = payer.pubkey();
+    for v in &vals {
+        att_data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(old_pk, false),
+                AccountMeta::new(old_att, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: att_data,
+        },
+    )
+    .await
+    .expect("attest");
+
+    // Migrate attestation to new parcel.
+    let (new_att, _) = attestation_pda(&new_pk, &specifier);
+    let mut data = discriminator("global", "migrate_attestations").to_vec();
+    data.extend_from_slice(&specifier);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(old_pk, false),
+                AccountMeta::new_readonly(new_pk, false),
+                AccountMeta::new(old_att, false),
+                AccountMeta::new(new_att, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("migrate_attestations failed");
+
+    let migrated: Attestation = read_account(&ctx, new_att).await;
+    assert_eq!(migrated.parcel, new_pk);
+    assert_eq!(migrated.specifier, specifier);
+    assert_eq!(migrated.count, 1);
+    assert_eq!(migrated.required, 1);
+}
+
+#[tokio::test]
+async fn dispute_slashing_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let (pool, _) = stake_pool_pda(&registry);
+
+    // Create stake pool.
+    let mut data = discriminator("global", "create_stake_pool").to_vec();
+    data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_stake_pool");
+
+    // Deposit stake.
+    let amount: u64 = 5_000_000_000;
+    let (stake, _) = validator_stake_pda(&pool, &payer.pubkey());
+    let mut data = discriminator("global", "deposit_stake").to_vec();
+    data.extend_from_slice(&borsh_ser(&amount));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("deposit_stake");
+
+    // Report offense by a different reporter.
+    let reporter = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &reporter.pubkey(), 200_000_000))
+        .await
+        .expect("fund reporter");
+    let evidence_hash = [0xCCu8; 32];
+    let offense_details = [0xDDu8; 64];
+    let (slashing_report, _) = Pubkey::find_program_address(
+        &[b"slashing_report", pool.as_ref(), reporter.pubkey().as_ref(), &evidence_hash],
+        &PROGRAM_ID,
+    );
+    let mut data = discriminator("global", "report_validator_offense").to_vec();
+    data.push(1u8); // offense_kind = EVIDENCE_MISMATCH
+    data.extend_from_slice(&evidence_hash);
+    data.extend_from_slice(&offense_details);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(slashing_report, false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("report_validator_offense");
+
+    // Dispute the report (offender = payer signs).
+    let mut data = discriminator("global", "dispute_slashing").to_vec();
+    data.extend_from_slice(&borsh_ser(&"Evidence is fabricated".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(slashing_report, false),
+                AccountMeta::new_readonly(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("dispute_slashing failed");
+
+    let report: staking::SlashingReport = read_account(&ctx, slashing_report).await;
+    assert_eq!(report.status, staking::report_status::APPEALED);
+    assert_eq!(report.resolved_at, 0);
+}
+
+#[tokio::test]
+async fn rebind_cross_border_identity_happy_path() {
+    // NOTE: This test documents a design issue in RebindCrossBorderIdentity.
+    // The context has `close = prover` on old_binding and `init` on new_binding,
+    // but both derive the same PDA seeds [b"cross_border_identity", jurisdiction, identity_hash].
+    // Anchor runs `init` during deserialization (before handler) and `close` after the handler,
+    // so the old account still exists when init tries to create the new one.
+    // Fix options: (a) split into two instructions, (b) use realloc, or
+    // (c) change PDA seeds so old/new differ.
+    //
+    // For now we verify the error is the expected "account already in use".
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    let country_code: [u8; 16] = *b"US              ";
+    let (jurisdiction, _) = jurisdiction_pda(&country_code);
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&"United States".to_string()));
+    data.extend_from_slice(&borsh_ser(&"ipfs://schema".to_string()));
+    data.extend_from_slice(&Pubkey::new_unique().to_bytes());
+    data.extend_from_slice(&[0xAAu8; 32]);
+    data.push(0u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_jurisdiction");
+
+    let id_hash: [u8; 32] = [240u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (binding, _) = xb_binding_pda(&jurisdiction, &id_hash);
+    let mut data = discriminator("global", "bind_cross_border_identity").to_vec();
+    data.extend_from_slice(&[241u8; 32]);
+    data.extend_from_slice(&borsh_ser(&vec![7u8; 100]));
+    data.extend_from_slice(&[242u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0i64));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(binding, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_cross_border_identity");
+
+    // Rebind: expects "account already in use" because old and new share the same PDA.
+    let (new_binding, _) = xb_binding_pda(&jurisdiction, &id_hash);
+    let mut data = discriminator("global", "rebind_cross_border_identity").to_vec();
+    data.extend_from_slice(&[243u8; 32]);
+    data.extend_from_slice(&borsh_ser(&vec![8u8; 100]));
+    data.extend_from_slice(&[244u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0i64));
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(binding, false),
+                AccountMeta::new(new_binding, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "rebind should fail with account-already-in-use (same PDA for old and new binding)"
+    );
+}
+
+#[tokio::test]
+async fn revoke_jurisdictional_identity_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Register jurisdiction.
+    let country_code: [u8; 16] = *b"FR              ";
+    let (jurisdiction, _) = jurisdiction_pda(&country_code);
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&"France".to_string()));
+    data.extend_from_slice(&borsh_ser(&"ipfs://schema".to_string()));
+    data.extend_from_slice(&Pubkey::new_unique().to_bytes());
+    data.extend_from_slice(&[0xBBu8; 32]);
+    data.push(0u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_jurisdiction");
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [250u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Bind cross-border identity.
+    let (binding, _) = xb_binding_pda(&jurisdiction, &id_hash);
+    let mut data = discriminator("global", "bind_cross_border_identity").to_vec();
+    data.extend_from_slice(&[251u8; 32]);
+    data.extend_from_slice(&borsh_ser(&vec![9u8; 100]));
+    data.extend_from_slice(&[252u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0i64));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(binding, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_cross_border_identity");
+
+    // Revoke the binding.
+    let mut data = discriminator("global", "revoke_jurisdictional_identity").to_vec();
+    data.extend_from_slice(&borsh_ser(&"Credential expired".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(binding, false),
+                AccountMeta::new_readonly(jurisdiction, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("revoke_jurisdictional_identity failed");
+
+    let bound: terra_registry::cross_border::JurisdictionBinding = read_account(&ctx, binding).await;
+    assert!(bound.revoked);
+    assert!(bound.revoked_at > 0);
+    assert_eq!(bound.revoked_by, payer.pubkey());
+}
+
+#[tokio::test]
+async fn authorize_vault_access_happy_path() {
+    use terra_registry::vault::VaultRecord;
+
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [196u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Create vault with 2 shard holders, threshold=2.
+    let h1 = Keypair::new();
+    let h2 = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let vault_hash: [u8; 32] = [197u8; 32];
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://vault".to_string()));
+    v_data.extend_from_slice(&vault_hash);
+    v_data.push(0u8); // AES_256_GCM
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s1".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![h1.pubkey(), h2.pubkey()]));
+    v_data.push(2u8); // threshold = 2
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await
+    .expect("create_vault");
+
+    // Authorize vault access. Both shard holders must sign (threshold=2).
+    // authority = h1 (first signer), remaining_accounts = [h1, h2] (both signers).
+    // Read current clock to compute expiry within MAX_ACCESS_EXPIRY_SECS (86400).
+    let clock_acc = ctx
+        .banks_client
+        .get_account(solana_sdk::sysvar::clock::id())
+        .await
+        .unwrap()
+        .unwrap();
+    let now_ts = i64::from_le_bytes(clock_acc.data[8..16].try_into().unwrap());
+    let expiry = now_ts + 3600; // 1 hour from now, within MAX_ACCESS_EXPIRY_SECS
+    let mut data = discriminator("global", "authorize_vault_access").to_vec();
+    data.extend_from_slice(&borsh_ser(&"data migration".to_string()));
+    data.extend_from_slice(&borsh_ser(&expiry));
+    data.extend_from_slice(&[0xABu8; 32]); // off_chain_nonce
+
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &h1, &h2],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(h1.pubkey(), true),  // authority = shard holder
+                AccountMeta::new_readonly(system_program_id(), false),
+                // remaining_accounts: both shard holders as signers
+                AccountMeta::new(h1.pubkey(), true),
+                AccountMeta::new(h2.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("authorize_vault_access failed");
+}
+
+#[tokio::test]
+async fn distribute_rewards_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let (pool, _) = stake_pool_pda(&registry);
+
+    // Create stake pool.
+    let mut data = discriminator("global", "create_stake_pool").to_vec();
+    data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_stake_pool");
+
+    // Deposit stake.
+    let amount: u64 = 5_000_000_000;
+    let (stake, _) = validator_stake_pda(&pool, &payer.pubkey());
+    let mut data = discriminator("global", "deposit_stake").to_vec();
+    data.extend_from_slice(&borsh_ser(&amount));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("deposit_stake");
+
+    // Advance clock > 1 day so distribute_rewards time check passes.
+    let clock_acc = ctx
+        .banks_client
+        .get_account(solana_sdk::sysvar::clock::id())
+        .await
+        .unwrap()
+        .unwrap();
+    let clock_slot = u64::from_le_bytes(clock_acc.data[0..8].try_into().unwrap());
+    let clock_ts = i64::from_le_bytes(clock_acc.data[8..16].try_into().unwrap());
+    let new_ts = clock_ts + 86400 + 1000;
+    ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
+        slot: clock_slot + 100_000,
+        epoch_start_timestamp: new_ts,
+        epoch: 0,
+        leader_schedule_epoch: 0,
+        unix_timestamp: new_ts,
+    });
+
+    // Distribute rewards (treasury must be funded and sign).
+    let treasury = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &treasury.pubkey(), 10_000_000_000))
+        .await
+        .expect("fund treasury");
+
+    let data = discriminator("global", "distribute_rewards").to_vec();
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &treasury],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(treasury.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("distribute_rewards failed");
+
+    let p: staking::StakePool = read_account(&ctx, pool).await;
+    assert!(p.accumulated_rewards > 0);
+    assert!(p.reward_per_token_stored > 0);
+}
+
+#[tokio::test]
+async fn claim_rewards_happy_path() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let (pool, _) = stake_pool_pda(&registry);
+
+    // Create stake pool.
+    let mut data = discriminator("global", "create_stake_pool").to_vec();
+    data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_stake_pool");
+
+    // Deposit stake.
+    let amount: u64 = 5_000_000_000;
+    let (stake, _) = validator_stake_pda(&pool, &payer.pubkey());
+    let mut data = discriminator("global", "deposit_stake").to_vec();
+    data.extend_from_slice(&borsh_ser(&amount));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("deposit_stake");
+
+    // Advance clock > 1 day.
+    let clock_acc = ctx
+        .banks_client
+        .get_account(solana_sdk::sysvar::clock::id())
+        .await
+        .unwrap()
+        .unwrap();
+    let clock_slot = u64::from_le_bytes(clock_acc.data[0..8].try_into().unwrap());
+    let clock_ts = i64::from_le_bytes(clock_acc.data[8..16].try_into().unwrap());
+    let new_ts = clock_ts + 86400 + 1000;
+    ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
+        slot: clock_slot + 100_000,
+        epoch_start_timestamp: new_ts,
+        epoch: 0,
+        leader_schedule_epoch: 0,
+        unix_timestamp: new_ts,
+    });
+
+    // Distribute rewards.
+    let treasury = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &treasury.pubkey(), 10_000_000_000))
+        .await
+        .expect("fund treasury");
+    let data = discriminator("global", "distribute_rewards").to_vec();
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &treasury],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(treasury.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("distribute_rewards");
+
+    let pool_before: staking::StakePool = read_account(&ctx, pool).await;
+    let claimable_rpt_delta = pool_before.reward_per_token_stored;
+
+    // Claim rewards.
+    let mut data = discriminator("global", "claim_rewards").to_vec();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(stake, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("claim_rewards failed");
+
+    let stake_after: staking::ValidatorStake = read_account(&ctx, stake).await;
+    assert_eq!(stake_after.reward_per_token_paid, claimable_rpt_delta);
+
+    let pool_after: staking::StakePool = read_account(&ctx, pool).await;
+    // accumulated_rewards may have small rounding dust from rpt_increment
+    // integer division — check it's effectively zero.
+    assert!(
+        pool_after.accumulated_rewards <= 10,
+        "accumulated_rewards should be ~0, got {}",
+        pool_after.accumulated_rewards
+    );
 }
