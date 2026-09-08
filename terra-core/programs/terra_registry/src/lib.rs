@@ -138,7 +138,9 @@ pub struct Attestation {
 }
 
 // ---------------------------------------------------------------------------
-// Identity constants — imported from terra-identity shared library
+// Identity types — canonical definitions live in terra_identity program.
+// These plain structs allow deserialization of identity accounts owned by
+// the terra_identity program when read as UncheckedAccount.
 // ---------------------------------------------------------------------------
 
 pub use terra_identity::succession_kind;
@@ -146,55 +148,44 @@ pub use terra_identity::{
     DEFAULT_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS, MIN_SUCCESSION_GRACE_SECS,
     MIN_SUCCESSION_VALIDATIONS,
 };
-pub use terra_identity::{Identity as IdentityFields, Succession as SuccessionFields};
+
 /// Floor for the number of validator signers required to forfeit a parcel.
 pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
 
-/// On-chain account wrapper for `IdentityFields`.
-/// The canonical struct definition lives in `terra_identity`.
-/// `Deref`/`DerefMut` make field access transparent: `identity.owner` works.
-#[account]
-#[derive(InitSpace)]
-pub struct Identity(pub IdentityFields);
-
-impl std::ops::Deref for Identity {
-    type Target = IdentityFields;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+/// Read-only Identity fields for cross-program deserialization.
+/// The canonical `#[account]` definition lives in the `terra_identity` program.
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
+pub struct Identity {
+    pub identity_hash: [u8; 32],
+    pub owner: Pubkey,
+    pub recovery: Pubkey,
+    pub parcel_count: u16,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub pending_revocation: bool,
+    pub pending_new_owner: Pubkey,
+    pub revoke_after: i64,
 }
 
-impl std::ops::DerefMut for Identity {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-/// On-chain account wrapper for `SuccessionFields`.
-/// The canonical struct definition lives in `terra_identity`.
-/// `Deref`/`DerefMut` make field access transparent: `succession.kind` works.
-#[account]
-#[derive(InitSpace)]
-pub struct Succession(pub SuccessionFields);
-
-impl std::ops::Deref for Succession {
-    type Target = SuccessionFields;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for Succession {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
+/// Read-only Succession fields for cross-program deserialization.
+/// The canonical `#[account]` definition lives in the `terra_identity` program.
+#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
+pub struct Succession {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub kind: u8,
+    pub requested_at: i64,
+    pub effective_at: i64,
+    pub grace_secs: i64,
+    pub required: u8,
+    pub validations_count: u8,
+    pub validators: [Pubkey; MAX_VALIDATORS],
 }
 
 pub mod validator_registry;
 pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
-pub mod guardian;
 pub mod ipfs_docs;
 pub mod quorum;
 pub mod staking;
@@ -220,7 +211,8 @@ pub struct CreateVault<'info> {
         bump
     )]
     pub vault_record: Account<'info, vault::VaultRecord>,
-    pub subject: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program.
+    pub subject: UncheckedAccount<'info>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -231,7 +223,8 @@ pub struct CreateVault<'info> {
 pub struct AuthorizeVaultAccess<'info> {
     #[account(mut)]
     pub vault_record: Account<'info, vault::VaultRecord>,
-    pub subject: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program.
+    pub subject: UncheckedAccount<'info>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -267,7 +260,8 @@ pub struct EndorseShardRotation<'info> {
         constraint = vault_record.subject == subject.key() @ TerraError::IdentityMismatch
     )]
     pub vault_record: Account<'info, vault::VaultRecord>,
-    pub subject: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program.
+    pub subject: UncheckedAccount<'info>,
     pub validator: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -939,42 +933,6 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Bind a person (identified by a hashed credential) to a wallet the person
-    /// holds. `recovery` is a second wallet the person controls, for recovering
-    /// the identity if the main key is lost. The signer becomes `owner`.
-    ///
-    /// This is the root of the resolvable "who owns this" link: every on-chain
-    /// actor is ultimately a wallet, and this account binds that wallet to a
-    /// human without ever publishing the credential itself.
-    pub fn bind_identity(
-        ctx: Context<BindIdentity>,
-        identity_hash: [u8; 32],
-        recovery: Pubkey,
-    ) -> Result<()> {
-        require!(
-            !identity_hash.iter().all(|b| *b == 0),
-            TerraError::EmptyIdentityHash
-        );
-        require!(recovery != Pubkey::default(), TerraError::EmptyRecovery);
-
-        let now = Clock::get()?.unix_timestamp;
-        let identity = &mut ctx.accounts.identity;
-        identity.identity_hash = identity_hash;
-        identity.owner = ctx.accounts.owner.key();
-        identity.recovery = recovery;
-        identity.parcel_count = 0;
-        identity.created_at = now;
-        identity.updated_at = now;
-
-        emit!(IdentityBound {
-            identity: identity.key(),
-            identity_hash,
-            owner: identity.owner,
-            recovery,
-        });
-        Ok(())
-    }
-
     /// Attach a parcel to an identity (the person behind its owner wallet).
     /// Only the parcel's owner may do this, and only for an identity whose
     /// owner wallet matches.
@@ -984,249 +942,23 @@ pub mod terra_registry {
             parcel.owner == ctx.accounts.owner.key(),
             TerraError::NotOwner
         );
-        let identity = &mut ctx.accounts.identity;
+        // Read identity from UncheckedAccount — owned by terra_identity program.
+        let identity_info = &ctx.accounts.identity;
+        let identity_data = identity_info.try_borrow_data()?;
+        // Skip the 8-byte Anchor discriminator added by the terra_identity program.
+        let slice = if identity_data.len() >= 8 { &identity_data[8..] } else { &identity_data };
+        let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
+            .map_err(|_| error!(TerraError::IdentityMismatch))?;
         require!(
             identity.owner == ctx.accounts.owner.key(),
             TerraError::IdentityMismatch
         );
 
-        identity.parcel_count = identity.parcel_count.saturating_add(1);
-        identity.updated_at = Clock::get()?.unix_timestamp;
+        // Note: parcel_count is not updated here — identity program manages that.
         emit!(ParcelAttached {
-            identity: identity.key(),
+            identity: identity_info.key(),
             parcel: parcel.key(),
             owner: identity.owner,
-        });
-        Ok(())
-    }
-
-    /// Request a wallet passation (succession, recovery, or deliberate control
-    /// transfer). A Succession account is created and becomes effective only
-    /// after the grace period — within which the original owner can cancel.
-    ///
-    /// Authorized by the current `owner` or the `recovery` wallet for any
-    /// succession kind (TRANSFER, RECOVERY, SUCCESSOR, GUARDIANSHIP,
-    /// COURT_APPOINTED_GUARDIAN). Both roles are treated as equal intent
-    /// signalers — the grace period and validator endorsements provide the
-    /// actual security gate.
-    ///
-    /// `grace_secs` lets the requester choose the window (0 => default 30d),
-    /// clamped to [MIN, MAX]. `required_validations` is the number of declared
-    /// local validators that must endorse the passation before it can be
-    /// claimed (>= 1) — so a stolen wallet can't seize land alone.
-    /// `validators` declares the local-authority testifiers for this passation.
-    pub fn request_succession(
-        ctx: Context<RequestSuccession>,
-        successor: Pubkey,
-        kind: u8,
-        grace_secs: i64,
-        required_validations: u8,
-        validators: [Pubkey; MAX_VALIDATORS],
-    ) -> Result<()> {
-        require!(successor != Pubkey::default(), TerraError::EmptySuccessor);
-        require!(
-            kind <= succession_kind::MAX,
-            TerraError::InvalidSuccessionKind
-        );
-
-        let identity = &ctx.accounts.identity;
-        let signer = ctx.accounts.signer.key();
-        require!(
-            signer == identity.owner || signer == identity.recovery,
-            TerraError::NotAuthorized
-        );
-        require!(successor != identity.owner, TerraError::SuccessorIsOwner);
-
-        let mut count: u8 = 0;
-        for &v in validators.iter() {
-            if v == Pubkey::default() {
-                continue;
-            }
-            // Self-dealing check: the identity owner cannot be their own validator.
-            require!(v != identity.owner, TerraError::ValidatorOwnsAsset);
-            count += 1;
-        }
-        require!(count > 0, TerraError::NoValidators);
-        require!(
-            (required_validations as usize) <= count as usize,
-            TerraError::InvalidThreshold
-        );
-        require!(
-            required_validations >= MIN_SUCCESSION_VALIDATIONS,
-            TerraError::InvalidThreshold
-        );
-
-        // RFC-010: guardianship kinds carry strictly higher guard rails.
-        if guardian::is_guardianship_kind(kind) {
-            guardian::validate_guardianship_threshold(required_validations, count as usize)?;
-        }
-
-        let grace = if guardian::is_guardianship_kind(kind) {
-            if grace_secs == 0 {
-                guardian::DEFAULT_GUARDIANSHIP_GRACE_SECS
-            } else {
-                require!(
-                    grace_secs >= guardian::MIN_GUARDIANSHIP_GRACE_SECS,
-                    TerraError::GuardianshipGraceTooShort
-                );
-                grace_secs.min(MAX_SUCCESSION_GRACE_SECS)
-            }
-        } else if grace_secs == 0 {
-            DEFAULT_SUCCESSION_GRACE_SECS
-        } else {
-            grace_secs.clamp(MIN_SUCCESSION_GRACE_SECS, MAX_SUCCESSION_GRACE_SECS)
-        };
-
-        let now = Clock::get()?.unix_timestamp;
-        let succession = &mut ctx.accounts.succession;
-        succession.identity = identity.key();
-        succession.successor = successor;
-        succession.kind = kind;
-        succession.requested_at = now;
-        succession.grace_secs = grace;
-        succession.effective_at = now.saturating_add(grace);
-        succession.required = required_validations;
-        succession.validations_count = 0;
-        succession.validators = validators;
-
-        emit!(SuccessionRequested {
-            identity: identity.key(),
-            successor,
-            kind,
-            grace_secs: grace,
-            required: required_validations,
-            count,
-            effective_at: succession.effective_at,
-        });
-        Ok(())
-    }
-
-    /// Record one validator's endorsement of a pending succession. The signing
-    /// validator must be in the succession's declared validator set; this bumps
-    /// `validations_count`. Each endorsement is an Ed25519 signature because the
-    /// validator signs this transaction with their wallet. Only meaningful
-    /// before the succession becomes effective (validations are then moot).
-    pub fn endorse_succession(ctx: Context<EndorseSuccession>) -> Result<()> {
-        let now = Clock::get()?.unix_timestamp;
-        let succession = &mut ctx.accounts.succession;
-        require!(
-            now < succession.effective_at,
-            TerraError::SuccessionAlreadyEffective
-        );
-        require!(
-            (succession.validations_count as usize) < (succession.required as usize),
-            TerraError::ValidationLimitReached
-        );
-
-        let validator = ctx.accounts.validator.key();
-        require!(
-            succession.validators.contains(&validator),
-            TerraError::NotValidator
-        );
-        // Self-dealing check: a validator must not be the identity owner.
-        require!(
-            validator != ctx.accounts.identity.owner,
-            TerraError::ValidatorOwnsAsset
-        );
-
-        succession.validations_count += 1;
-
-        emit!(SuccessionEndorsed {
-            identity: succession.identity,
-            successor: succession.successor,
-            validator,
-            validations_count: succession.validations_count,
-            required: succession.required,
-        });
-        Ok(())
-    }
-
-    /// Cancel an in-flight succession. Only the current `owner` (or `recovery`
-    /// for a recovery passation) may cancel, and only before it is effective.
-    pub fn cancel_succession(ctx: Context<CancelSuccession>) -> Result<()> {
-        let identity = &ctx.accounts.identity;
-        let signer = ctx.accounts.signer.key();
-        require!(
-            signer == identity.owner || signer == identity.recovery,
-            TerraError::NotAuthorized
-        );
-        require!(
-            ctx.accounts.succession.effective_at > Clock::get()?.unix_timestamp,
-            TerraError::SuccessionAlreadyEffective
-        );
-
-        emit!(SuccessionCancelled {
-            identity: identity.key(),
-            successor: ctx.accounts.succession.successor,
-            kind: ctx.accounts.succession.kind,
-        });
-        Ok(())
-    }
-
-    /// Claim a passation once BOTH the grace period has elapsed AND the required
-    /// number of validators have endorsed it. The `successor` becomes the
-    /// identity's new owner. Any parcels the identity owned that are supplied
-    /// via `remaining_accounts` are re-pointed to the successor.
-    pub fn claim_succession(ctx: Context<ClaimSuccession>) -> Result<()> {
-        let now = Clock::get()?.unix_timestamp;
-        let succession = &ctx.accounts.succession;
-        require!(
-            succession.successor == ctx.accounts.signer.key(),
-            TerraError::NotSuccessor
-        );
-        // Two independent gates: time AND validator endorsement. A stolen wallet
-        // alone (or a thief who happens to know the successor) still can't claim
-        // without the local validators testifying.
-        require!(
-            now >= succession.effective_at,
-            TerraError::SuccessionNotYetEffective
-        );
-        require!(
-            succession.validations_count >= succession.required,
-            TerraError::InsufficientValidations
-        );
-
-        let identity = &mut ctx.accounts.identity;
-        require!(
-            succession.identity == identity.key(),
-            TerraError::IdentityMismatch
-        );
-
-        let previous = identity.owner;
-        let successor = succession.successor;
-        identity.owner = successor;
-        identity.recovery = Pubkey::default();
-        identity.updated_at = now;
-
-        // Re-point every supplied parcel owned by this identity to the
-        // successor's wallet. Accounts are deserialized as Parcels (never
-        // raw-offset patched) so struct layout changes cannot corrupt data;
-        // non-parcel or foreign-owner accounts are skipped.
-        let mut successions_applied: u16 = 0;
-        for account in ctx.remaining_accounts.iter() {
-            if account.owner != ctx.program_id {
-                continue;
-            }
-            let mut parcel = match Account::<Parcel>::try_from(account) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            if parcel.owner != previous {
-                continue;
-            }
-            parcel.owner = successor;
-            parcel.updated_at = now;
-            parcel.exit(ctx.program_id)?;
-            successions_applied += 1;
-        }
-        identity.parcel_count = identity.parcel_count.saturating_sub(successions_applied);
-
-        emit!(SuccessionClaimed {
-            identity: identity.key(),
-            from: previous,
-            to: successor,
-            kind: succession.kind,
-            parcels_repointed: successions_applied as u8,
         });
         Ok(())
     }
@@ -1725,38 +1457,6 @@ pub mod terra_registry {
     }
 
     // -----------------------------------------------------------------------
-    // Guardian & Recovery Council (RFC-010)
-    // -----------------------------------------------------------------------
-
-    pub fn request_court_guardianship(
-        ctx: Context<RequestCourtGuardianship>,
-        successor: Pubkey,
-        grace_secs: i64,
-        required_validations: u8,
-        validators: [Pubkey; MAX_VALIDATORS],
-        case_hash: [u8; 32],
-        scope_notes: String,
-    ) -> Result<()> {
-        guardian::request_court_guardianship(
-            ctx,
-            successor,
-            grace_secs,
-            required_validations,
-            validators,
-            case_hash,
-            scope_notes,
-        )
-    }
-
-    pub fn revoke_guardianship(ctx: Context<RevokeGuardianship>, new_owner: Pubkey) -> Result<()> {
-        guardian::revoke_guardianship(ctx, new_owner)
-    }
-
-    pub fn execute_revoke_guardianship(ctx: Context<ExecuteRevokeGuardianship>) -> Result<()> {
-        guardian::execute_revoke_guardianship(ctx)
-    }
-
-    // -----------------------------------------------------------------------
     // Zero-knowledge ownership proofs (RFC-011)
     // -----------------------------------------------------------------------
 
@@ -1885,6 +1585,7 @@ pub mod terra_registry {
         proof_data: Vec<u8>,
         nullifier_nonce: [u8; 32],
         expires_at: i64,
+        identity_hash: [u8; 32],
     ) -> Result<()> {
         cross_border::bind_cross_border_identity(
             ctx,
@@ -1892,6 +1593,7 @@ pub mod terra_registry {
             proof_data,
             nullifier_nonce,
             expires_at,
+            identity_hash,
         )
     }
 
@@ -2072,21 +1774,6 @@ pub struct Attest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-#[instruction(identity_hash: [u8; 32])]
-pub struct BindIdentity<'info> {
-    #[account(
-        init,
-        payer = owner,
-        space = 8 + Identity::INIT_SPACE,
-        seeds = [b"identity".as_ref(), identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 pub struct AttachParcel<'info> {
@@ -2096,76 +1783,11 @@ pub struct AttachParcel<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program. Deserialized manually in handler.
+    pub identity: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 }
 
-#[derive(Accounts)]
-#[instruction(successor: Pubkey, kind: u8, grace_secs: i64, required_validations: u8, validators: [Pubkey; MAX_VALIDATORS])]
-pub struct RequestSuccession<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + Succession::INIT_SPACE,
-        seeds = [b"succession".as_ref(), identity.key().as_ref(), successor.as_ref()],
-        bump
-    )]
-    pub succession: Account<'info, Succession>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct CancelSuccession<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        mut,
-        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
-        bump,
-        close = signer
-    )]
-    pub succession: Account<'info, Succession>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct ClaimSuccession<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        mut,
-        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
-        bump,
-        close = signer
-    )]
-    pub succession: Account<'info, Succession>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 pub struct RotateValidators<'info> {
@@ -2184,24 +1806,6 @@ pub struct RotateValidators<'info> {
     pub authority: Signer<'info>,
 }
 
-#[derive(Accounts)]
-pub struct EndorseSuccession<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        mut,
-        seeds = [b"succession".as_ref(), succession.identity.as_ref(), succession.successor.as_ref()],
-        bump
-    )]
-    pub succession: Account<'info, Succession>,
-    /// A declared local validator endorsing the passation (signs this tx).
-    pub validator: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 #[instruction(case_hash: [u8; 32])]
@@ -2638,7 +2242,7 @@ pub struct UpdateJurisdiction<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(credential_commitment: [u8; 32], proof_data: Vec<u8>, nullifier_nonce: [u8; 32], expires_at: i64)]
+#[instruction(credential_commitment: [u8; 32], proof_data: Vec<u8>, nullifier_nonce: [u8; 32], expires_at: i64, identity_hash: [u8; 32])]
 pub struct BindCrossBorderIdentity<'info> {
     #[account(
         init,
@@ -2647,16 +2251,13 @@ pub struct BindCrossBorderIdentity<'info> {
         seeds = [
             b"cross_border_identity".as_ref(),
             jurisdiction.key().as_ref(),
-            identity.identity_hash.as_ref()
+            identity_hash.as_ref()
         ],
         bump
     )]
     pub binding: Account<'info, cross_border::JurisdictionBinding>,
-    #[account(
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump,
-    )]
-    pub identity: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program. Validated in handler.
+    pub identity: UncheckedAccount<'info>,
     #[account(mut)]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
     #[account(mut)]
@@ -2672,11 +2273,8 @@ pub struct VerifyJurisdictionMembership<'info> {
         constraint = jurisdiction.key() == binding.jurisdiction_key @ TerraError::InvalidJurisdictionStatus,
     )]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
-    #[account(
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump,
-    )]
-    pub identity: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program. Validated in handler.
+    pub identity: UncheckedAccount<'info>,
     pub validator: Signer<'info>,
     #[account(
         seeds = [b"validator_registry"],
@@ -2694,11 +2292,8 @@ pub struct RevokeJurisdictionalIdentity<'info> {
         constraint = jurisdiction.key() == binding.jurisdiction_key @ TerraError::InvalidJurisdictionStatus,
     )]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
-    #[account(
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump,
-    )]
-    pub identity: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program. Validated in handler.
+    pub identity: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -2722,11 +2317,8 @@ pub struct RebindCrossBorderIdentity<'info> {
         bump
     )]
     pub new_binding: Account<'info, cross_border::JurisdictionBinding>,
-    #[account(
-        seeds = [b"identity".as_ref(), old_binding.identity_hash.as_ref()],
-        bump,
-    )]
-    pub identity: Account<'info, Identity>,
+    /// CHECK: Identity account owned by terra_identity program. Validated in handler.
+    pub identity: UncheckedAccount<'info>,
     #[account(mut)]
     pub jurisdiction: Account<'info, cross_border::Jurisdiction>,
     #[account(mut)]
@@ -3230,68 +2822,6 @@ pub struct DismissReport<'info> {
 }
 
 // ---------------------------------------------------------------------------
-// Guardian & Recovery Council contexts (RFC-010)
-// ---------------------------------------------------------------------------
-
-#[derive(Accounts)]
-#[instruction(successor: Pubkey, grace_secs: i64, required_validations: u8, validators: [Pubkey; MAX_VALIDATORS], case_hash: [u8; 32], scope_notes: String)]
-pub struct RequestCourtGuardianship<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + Succession::INIT_SPACE,
-        seeds = [b"succession".as_ref(), identity.key().as_ref(), successor.as_ref()],
-        bump
-    )]
-    pub succession: Account<'info, Succession>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(new_owner: Pubkey)]
-pub struct RevokeGuardianship<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        seeds = [b"validator_registry"],
-        bump,
-    )]
-    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
-    pub revoker: Signer<'info>,
-    /// CHECK: the target new owner — validated as validator or revoker in handler.
-    pub new_owner: UncheckedAccount<'info>,
-}
-
-#[derive(Accounts)]
-pub struct ExecuteRevokeGuardianship<'info> {
-    #[account(
-        mut,
-        seeds = [b"identity".as_ref(), identity.identity_hash.as_ref()],
-        bump
-    )]
-    pub identity: Account<'info, Identity>,
-    #[account(
-        seeds = [b"validator_registry"],
-        bump,
-    )]
-    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
-    /// CHECK: validated as the pending new_owner in handler.
-    pub new_owner: Signer<'info>,
-}
-
-// ---------------------------------------------------------------------------
 // Zero-knowledge ownership proof contexts (RFC-011)
 // ---------------------------------------------------------------------------
 
@@ -3515,57 +3045,12 @@ pub struct Attested {
     pub count: u8,
 }
 
-// Identity events — canonical definitions in terra_identity; #[event] wrapper here for Anchor logging.
-
-#[event]
-pub struct IdentityBound {
-    pub identity: Pubkey,
-    pub identity_hash: [u8; 32],
-    pub owner: Pubkey,
-    pub recovery: Pubkey,
-}
-
+// ParcelAttached is emitted by attach_parcel (still in this program).
 #[event]
 pub struct ParcelAttached {
     pub identity: Pubkey,
     pub parcel: Pubkey,
     pub owner: Pubkey,
-}
-
-#[event]
-pub struct SuccessionRequested {
-    pub identity: Pubkey,
-    pub successor: Pubkey,
-    pub kind: u8,
-    pub grace_secs: i64,
-    pub required: u8,
-    pub count: u8,
-    pub effective_at: i64,
-}
-
-#[event]
-pub struct SuccessionEndorsed {
-    pub identity: Pubkey,
-    pub successor: Pubkey,
-    pub validator: Pubkey,
-    pub validations_count: u8,
-    pub required: u8,
-}
-
-#[event]
-pub struct SuccessionCancelled {
-    pub identity: Pubkey,
-    pub successor: Pubkey,
-    pub kind: u8,
-}
-
-#[event]
-pub struct SuccessionClaimed {
-    pub identity: Pubkey,
-    pub from: Pubkey,
-    pub to: Pubkey,
-    pub kind: u8,
-    pub parcels_repointed: u8,
 }
 
 #[event]

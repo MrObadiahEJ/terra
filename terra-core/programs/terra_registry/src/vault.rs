@@ -1,4 +1,17 @@
 use anchor_lang::prelude::*;
+use crate::Identity;
+
+/// Deserialize an Identity account from an UncheckedAccount.
+/// The identity account is owned by the terra_identity program.
+pub fn deserialize_identity(info: &UncheckedAccount<'_>) -> Result<Identity> {
+    let data = info.try_borrow_data()?;
+    // The identity account is created by the terra_identity program which uses
+    // the #[account] macro, adding an 8-byte Anchor discriminator prefix. Skip
+    // it when deserializing with plain AnchorDeserialize (borsh).
+    let discriminated = data.len() >= 8;
+    let slice = if discriminated { &data[8..] } else { &data };
+    Identity::try_from_slice(slice).map_err(|_| error!(super::TerraError::IdentityMismatch))
+}
 
 pub const MAX_SHARD_HOLDERS: usize = 8;
 pub const MAX_STORAGE_URIS: usize = 4;
@@ -99,9 +112,9 @@ pub fn create_vault(
     );
 
     let authority_key = ctx.accounts.authority.key();
-    let subject = &ctx.accounts.subject;
+    let subject_identity = deserialize_identity(&ctx.accounts.subject)?;
     require!(
-        authority_key == subject.owner || authority_key == subject.recovery,
+        authority_key == subject_identity.owner || authority_key == subject_identity.recovery,
         super::TerraError::NotAuthorizedToCreate
     );
 
@@ -286,8 +299,9 @@ pub fn endorse_shard_rotation(ctx: Context<super::EndorseShardRotation>) -> Resu
         super::TerraError::AlreadyEndorsedRotation
     );
     // Self-dealing check: validator must not be the vault subject's owner.
+    let subject_identity = deserialize_identity(&ctx.accounts.subject)?;
     require!(
-        validator_key != ctx.accounts.subject.owner,
+        validator_key != subject_identity.owner,
         super::TerraError::ValidatorOwnsAsset
     );
 

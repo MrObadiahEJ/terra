@@ -218,6 +218,7 @@ pub fn bind_cross_border_identity(
     proof_data: Vec<u8>,
     nullifier_nonce: [u8; 32],
     expires_at: i64,
+    identity_hash: [u8; 32],
 ) -> Result<()> {
     require!(
         !proof_data.is_empty() && proof_data.len() <= MAX_PROOF_LEN,
@@ -252,7 +253,7 @@ pub fn bind_cross_border_identity(
     let nullifier: [u8; 32] = sha256_hash(&input).to_bytes();
 
     let binding = &mut ctx.accounts.binding;
-    binding.identity_hash = ctx.accounts.identity.identity_hash;
+    binding.identity_hash = identity_hash;
     binding.jurisdiction_key = jurisdiction.key();
     binding.credential_commitment = credential_commitment;
     binding.nullifier = nullifier;

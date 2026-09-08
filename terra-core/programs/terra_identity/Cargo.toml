@@ -1,12 +1,21 @@
 [package]
 name = "terra-identity"
 version = "0.1.0"
-description = "Shared identity types, constants, events, and helpers for Terra"
+description = "Terra Identity program — PEOPLE domain (identity, succession, guardianship)"
 edition = "2021"
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["cdylib", "lib"]
 name = "terra_identity"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+anchor-debug = []
 
 [dependencies]
 anchor-lang = { version = "1.1.2" }

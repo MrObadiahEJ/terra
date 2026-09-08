@@ -11,12 +11,13 @@ use terra_registry::{
     validator_registry::{self, ValidatorRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
-    guardian, infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
+    infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
     subdivision::{self, SubdivisionRecord},
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
-    Attestation, Identity, Parcel, Rights, Succession, ID as PROGRAM_ID,
+    Attestation, Parcel, Rights, ID as PROGRAM_ID,
 };
+use terra_identity::{Identity, Succession, ID as IDENTITY_PROGRAM_ID};
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"parcel".as_ref(), id.as_ref()], &PROGRAM_ID)
@@ -49,7 +50,7 @@ fn validator_stake_pda(pool: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
 }
 
 fn identity_pda(hash: &[u8; 32]) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[b"identity".as_ref(), hash.as_ref()], &PROGRAM_ID)
+    Pubkey::find_program_address(&[b"identity".as_ref(), hash.as_ref()], &IDENTITY_PROGRAM_ID)
 }
 
 fn succession_pda(identity: &Pubkey, successor: &Pubkey) -> (Pubkey, u8) {
@@ -59,7 +60,7 @@ fn succession_pda(identity: &Pubkey, successor: &Pubkey) -> (Pubkey, u8) {
             identity.as_ref(),
             successor.as_ref(),
         ],
-        &PROGRAM_ID,
+        &IDENTITY_PROGRAM_ID,
     )
 }
 
@@ -206,6 +207,15 @@ fn discriminator(namespace: &str, name: &str) -> [u8; 8] {
     out
 }
 
+/// Build an Instruction targeting the terra_identity program.
+fn identity_ix(accounts: Vec<AccountMeta>, data: Vec<u8>) -> Instruction {
+    Instruction {
+        program_id: IDENTITY_PROGRAM_ID,
+        accounts,
+        data,
+    }
+}
+
 fn borsh_ser<T: borsh::BorshSerialize>(v: &T) -> Vec<u8> {
     let mut out = Vec::new();
     v.serialize(&mut out).unwrap();
@@ -232,6 +242,7 @@ fn register_ix(id: &[u8; 32], name: &str, geo: &[u8; 32], payer: &Pubkey) -> Ins
 async fn setup() -> (ProgramTestContext, Keypair) {
     let mut pt = ProgramTest::new("terra_registry", PROGRAM_ID, None);
     pt.add_program("terra_registry", PROGRAM_ID, None);
+    pt.add_program("terra_identity", IDENTITY_PROGRAM_ID, None);
     pt.set_compute_max_units(500_000);
     let ctx = pt.start_with_context().await;
     let payer = ctx.payer.insecure_clone();
@@ -682,7 +693,7 @@ async fn guardianship_guards_and_revocation() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -706,7 +717,7 @@ async fn guardianship_guards_and_revocation() {
             data.extend_from_slice(&borsh_ser(v));
         }
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(succession, false),
@@ -733,7 +744,7 @@ async fn guardianship_guards_and_revocation() {
     let succ: Succession = read_account(&ctx, succession).await;
     assert_eq!(succ.kind, 3);
     assert_eq!(succ.required, 3);
-    assert_eq!(succ.grace_secs, guardian::DEFAULT_GUARDIANSHIP_GRACE_SECS);
+    assert_eq!(succ.grace_secs, terra_identity::DEFAULT_GUARDIANSHIP_GRACE_SECS);
 
     // Revocation by the recovery wallet now sets a timelock (two-phase).
     // The target must be a registered validator or the revoker itself (but not
@@ -746,11 +757,10 @@ async fn guardianship_guards_and_revocation() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
-                AccountMeta::new_readonly(registry_pda().0, false),
-                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(new_owner, false),
             ],
             data,
@@ -1002,7 +1012,7 @@ async fn cross_border_register_and_bind() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -1021,6 +1031,7 @@ async fn cross_border_register_and_bind() {
     data.extend_from_slice(&borsh_ser(&Vec::<u8>::new()));
     data.extend_from_slice(&[43u8; 32]);
     data.extend_from_slice(&borsh_ser(&0i64));
+    data.extend_from_slice(&id_hash);
     process(
         &mut ctx,
         &payer,
@@ -1045,6 +1056,7 @@ async fn cross_border_register_and_bind() {
     data.extend_from_slice(&borsh_ser(&vec![7u8; 512]));
     data.extend_from_slice(&[43u8; 32]);
     data.extend_from_slice(&borsh_ser(&0i64));
+    data.extend_from_slice(&id_hash);
     process(
         &mut ctx,
         &payer,
@@ -2696,7 +2708,7 @@ async fn succession_endorse_and_cancel() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -2730,7 +2742,7 @@ async fn succession_endorse_and_cancel() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -2770,7 +2782,7 @@ async fn succession_endorse_and_cancel() {
         &mut ctx,
         &validator1,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -2791,7 +2803,7 @@ async fn succession_endorse_and_cancel() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -2821,7 +2833,7 @@ async fn claim_succession_not_yet_effective() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -2849,7 +2861,7 @@ async fn claim_succession_not_yet_effective() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -2880,7 +2892,7 @@ async fn claim_succession_not_yet_effective() {
         &mut ctx,
         &validator1,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -2901,7 +2913,7 @@ async fn claim_succession_not_yet_effective() {
         &mut ctx,
         &successor,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -3507,7 +3519,7 @@ async fn request_court_guardianship_creates_succession() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -3555,7 +3567,7 @@ async fn request_court_guardianship_creates_succession() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(succession_pda, false),
@@ -3591,7 +3603,7 @@ async fn attach_parcel_increments_count() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -3639,8 +3651,10 @@ async fn attach_parcel_increments_count() {
     .await
     .expect("attach_parcel failed");
 
+    // In the new architecture attach_parcel is read-only on the identity
+    // (terra_registry cannot mutate identity accounts). parcel_count stays 0.
     let id: Identity = read_account(&ctx, id_pda).await;
-    assert_eq!(id.parcel_count, 1);
+    assert_eq!(id.parcel_count, 0);
 }
 
 #[tokio::test]
@@ -4508,7 +4522,7 @@ async fn create_vault_happy_path() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -4576,7 +4590,7 @@ async fn cancel_shard_rotation_by_initiator() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -4682,7 +4696,7 @@ async fn ping_shard_updates_last_ping() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -5291,7 +5305,7 @@ async fn endorse_shard_rotation_happy_path() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -5616,7 +5630,7 @@ async fn rebind_cross_border_identity_happy_path() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -5634,6 +5648,7 @@ async fn rebind_cross_border_identity_happy_path() {
     data.extend_from_slice(&borsh_ser(&vec![7u8; 100]));
     data.extend_from_slice(&[242u8; 32]);
     data.extend_from_slice(&borsh_ser(&0i64));
+    data.extend_from_slice(&id_hash);
     process(
         &mut ctx,
         &payer,
@@ -5724,7 +5739,7 @@ async fn revoke_jurisdictional_identity_happy_path() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -5743,6 +5758,7 @@ async fn revoke_jurisdictional_identity_happy_path() {
     data.extend_from_slice(&borsh_ser(&vec![9u8; 100]));
     data.extend_from_slice(&[252u8; 32]);
     data.extend_from_slice(&borsh_ser(&0i64));
+    data.extend_from_slice(&id_hash);
     process(
         &mut ctx,
         &payer,
@@ -5804,7 +5820,7 @@ async fn authorize_vault_access_happy_path() {
         &mut ctx,
         &payer,
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: IDENTITY_PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(identity, false),
                 AccountMeta::new(payer.pubkey(), true),
