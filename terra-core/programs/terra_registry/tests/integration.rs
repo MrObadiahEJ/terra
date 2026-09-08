@@ -1187,6 +1187,30 @@ async fn peer_consensus_endorsement_flow() {
     )
     .await
     .expect("v2 endorse failed");
+    // Endorse as V4 (need 3 endorsements for ceil(2*4/3)=3 quorum).
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v4.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund v4 failed");
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v4],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(v4.pubkey(), true),
+            ],
+            data: discriminator("global", "endorse_validator_add").to_vec(),
+        },
+    )
+    .await
+    .expect("v4 endorse failed");
 
     process(&mut ctx, &payer, admit_ix)
         .await
@@ -1325,6 +1349,10 @@ async fn slash_and_dismiss_require_admin() {
     )
     .await
     .expect("fund intruder failed");
+    let (treasury, _) = Pubkey::find_program_address(
+        &[b"treasury", registry.as_ref()],
+        &PROGRAM_ID,
+    );
     let slash_ix = |signer: &Pubkey| Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
@@ -1333,7 +1361,7 @@ async fn slash_and_dismiss_require_admin() {
             AccountMeta::new(pool, false),
             AccountMeta::new_readonly(registry, false),
             AccountMeta::new(payer.pubkey(), false),
-            AccountMeta::new(Pubkey::new_unique(), false),
+            AccountMeta::new(treasury, false),
             AccountMeta::new(*signer, true),
         ],
         data: discriminator("global", "verify_and_slash").to_vec(),
@@ -1753,7 +1781,7 @@ async fn bootstrap_self_proclaim_then_add_second_third() {
     let v1 = Keypair::new();
 
     // Fund v1 so it can pay rent.
-    let recent_blockhash = ctx.last_blockhash;
+    let recent_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
     let mut fund_data = vec![2u8, 0, 0, 0];
     fund_data.extend_from_slice(&10_000_000_000u64.to_le_bytes());
     let fund_ix = Instruction {
@@ -1860,19 +1888,21 @@ async fn nominate_and_confirm_validator() {
     let (mut ctx, payer) = setup().await;
     let registry = create_registry_ok(&mut ctx, &payer).await;
 
-    // Bootstrap: add 3 validators so we're past the fixed sequence.
+    // Bootstrap: add 4 validators so we're past the fixed sequence.
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
     let v2 = Keypair::new();
     add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
     let v3 = Keypair::new();
     add_validator_ok(&mut ctx, &payer, &v3.pubkey()).await;
+    let v4_existing = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v4_existing.pubkey()).await;
 
     let reg: AuthorityRegistry = read_account(&ctx, registry).await;
-    assert_eq!(reg.validators.len(), 3);
+    assert_eq!(reg.validators.len(), 4);
 
-    // Nominate v4 as a new validator.
-    let v4 = Keypair::new();
-    let (nomination, _) = nomination_pda(&registry, &v4.pubkey());
+    // Nominate v5 as a new validator (sponsor=payer can't confirm).
+    let v5 = Keypair::new();
+    let (nomination, _) = nomination_pda(&registry, &v5.pubkey());
     let documents_hash = [1u8; 32];
     let location_hash = [2u8; 32];
     let country_code = *b"US";
@@ -1890,7 +1920,7 @@ async fn nominate_and_confirm_validator() {
             ],
             data: {
                 let mut d = discriminator("global", "nominate_validator").to_vec();
-                d.extend_from_slice(&v4.pubkey().to_bytes());
+                d.extend_from_slice(&v5.pubkey().to_bytes());
                 d.extend_from_slice(&documents_hash);
                 d.extend_from_slice(&location_hash);
                 d.extend_from_slice(&country_code);
@@ -1901,11 +1931,12 @@ async fn nominate_and_confirm_validator() {
     .await
     .expect("nominate_validator failed");
 
-    // Confirm the nomination from other validators.
-    for confirmer in [&payer, &v2, &v3] {
-        process(
+    // Confirm the nomination from non-sponsor validators.
+    for confirmer in [&v2, &v3, &v4_existing] {
+        process_with(
             &mut ctx,
-            confirmer,
+            &payer,
+            &[&payer, confirmer],
             Instruction {
                 program_id: PROGRAM_ID,
                 accounts: vec![
@@ -1921,8 +1952,8 @@ async fn nominate_and_confirm_validator() {
     }
 
     let reg: AuthorityRegistry = read_account(&ctx, registry).await;
-    assert_eq!(reg.validators.len(), 4);
-    assert!(reg.validators.contains(&v4.pubkey()));
+    assert_eq!(reg.validators.len(), 5);
+    assert!(reg.validators.contains(&v5.pubkey()));
 }
 
 // ===========================================================================
@@ -2139,9 +2170,10 @@ async fn credential_lifecycle() {
 
     // 2. Validators sign the credential request.
     for signer in [&payer, &v2] {
-        process(
+        process_with(
             &mut ctx,
-            signer,
+            &payer,
+            &[&payer, signer],
             Instruction {
                 program_id: PROGRAM_ID,
                 accounts: vec![
@@ -2280,6 +2312,7 @@ async fn pattern_slash_first_vs_repeat() {
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(pool, false),
                 AccountMeta::new(stake, false),
                 AccountMeta::new(payer.pubkey(), true),

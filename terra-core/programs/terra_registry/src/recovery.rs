@@ -80,8 +80,14 @@ pub fn set_validator_active(
     );
 
     let tracker = &mut ctx.accounts.activity_tracker;
-    require!(tracker.validator == validator, TerraError::NotValidator);
-    require!(tracker.registry == registry.key(), TerraError::NotValidator);
+    if tracker.validator == Pubkey::default() {
+        tracker.registry = registry.key();
+        tracker.validator = validator;
+        tracker.last_active = Clock::get()?.unix_timestamp;
+    } else {
+        require!(tracker.validator == validator, TerraError::NotValidator);
+        require!(tracker.registry == registry.key(), TerraError::NotValidator);
+    }
     tracker.is_active = is_active;
 
     emit!(super::ValidatorActiveSet {
