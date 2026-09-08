@@ -218,18 +218,54 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
     let seller_info = ctx.accounts.seller.to_account_info();
     let buyer_info = ctx.accounts.buyer.to_account_info();
 
-    // Transfer SOL from vault to seller.
+    // Transfer SOL from vault to seller via invoke_signed.
     let vault_lamports = vault_info.lamports();
     let transfer_amount = escrow.amount.min(vault_lamports);
 
-    **vault_info.try_borrow_mut_lamports()? -= transfer_amount;
-    **seller_info.try_borrow_mut_lamports()? += transfer_amount;
+    let escrow_key = escrow.key();
+    let (vault_pda, bump) = Pubkey::find_program_address(
+        &[b"escrow_vault", escrow_key.as_ref()],
+        &crate::ID,
+    );
+    let bump_seed = [bump];
+    let signer_seeds: &[&[u8]] = &[
+        b"escrow_vault",
+        escrow_key.as_ref(),
+        &bump_seed,
+    ];
+
+    let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+        &vault_pda,
+        &seller_info.key(),
+        transfer_amount,
+    );
+    anchor_lang::solana_program::program::invoke_signed(
+        &transfer_ix,
+        &[
+            vault_info.clone(),
+            seller_info.clone(),
+            ctx.accounts.system_program.to_account_info(),
+        ],
+        &[signer_seeds],
+    )?;
 
     // Return any excess deposit to buyer.
     let excess = vault_lamports.saturating_sub(transfer_amount);
     if excess > 0 {
-        **vault_info.try_borrow_mut_lamports()? -= excess;
-        **buyer_info.try_borrow_mut_lamports()? += excess;
+        let excess_ix = anchor_lang::solana_program::system_instruction::transfer(
+            &vault_pda,
+            &buyer_info.key(),
+            excess,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &excess_ix,
+            &[
+                vault_info.clone(),
+                buyer_info.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
     }
 
     // Transfer parcel ownership.
@@ -237,8 +273,6 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
     parcel.owner = escrow.buyer;
     parcel.status = parcel_status::TRANSFERRED;
     parcel.updated_at = now;
-
-    let escrow_key = escrow.key();
     let parcel_key = escrow.parcel;
     let seller = escrow.seller;
     let buyer = escrow.buyer;
@@ -289,14 +323,39 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
         _ => return Err(TerraError::InvalidEscrowStatus.into()),
     }
 
-    // Return deposited SOL to buyer.
+    // Return deposited SOL to buyer via invoke_signed.
     if deposit_amount > 0 {
         let vault_info = ctx.accounts.escrow_vault.to_account_info();
         let buyer_info = ctx.accounts.buyer.to_account_info();
         let vault_lamports = vault_info.lamports();
         let return_amount = deposit_amount.min(vault_lamports);
-        **vault_info.try_borrow_mut_lamports()? -= return_amount;
-        **buyer_info.try_borrow_mut_lamports()? += return_amount;
+
+        let escrow_key = ctx.accounts.escrow_record.key();
+        let (vault_pda, bump) = Pubkey::find_program_address(
+            &[b"escrow_vault", escrow_key.as_ref()],
+            &crate::ID,
+        );
+        let bump_seed = [bump];
+        let signer_seeds: &[&[u8]] = &[
+            b"escrow_vault",
+            escrow_key.as_ref(),
+            &bump_seed,
+        ];
+
+        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+            &vault_pda,
+            &buyer_info.key(),
+            return_amount,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_ix,
+            &[
+                vault_info.clone(),
+                buyer_info.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
     }
 
     // Reset parcel status.
@@ -342,14 +401,39 @@ pub fn mutual_cancel_escrow(ctx: Context<super::MutualCancelEscrow>) -> Result<(
         TerraError::NotDesignatedBuyer
     );
 
-    // Return deposited SOL to buyer.
+    // Return deposited SOL to buyer via invoke_signed.
     if deposit_amount > 0 {
         let vault_info = ctx.accounts.escrow_vault.to_account_info();
         let buyer_info = ctx.accounts.buyer.to_account_info();
         let vault_lamports = vault_info.lamports();
         let return_amount = deposit_amount.min(vault_lamports);
-        **vault_info.try_borrow_mut_lamports()? -= return_amount;
-        **buyer_info.try_borrow_mut_lamports()? += return_amount;
+
+        let escrow_key = ctx.accounts.escrow_record.key();
+        let (vault_pda, bump) = Pubkey::find_program_address(
+            &[b"escrow_vault", escrow_key.as_ref()],
+            &crate::ID,
+        );
+        let bump_seed = [bump];
+        let signer_seeds: &[&[u8]] = &[
+            b"escrow_vault",
+            escrow_key.as_ref(),
+            &bump_seed,
+        ];
+
+        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+            &vault_pda,
+            &buyer_info.key(),
+            return_amount,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_ix,
+            &[
+                vault_info.clone(),
+                buyer_info.clone(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
     }
 
     // Reset parcel status.

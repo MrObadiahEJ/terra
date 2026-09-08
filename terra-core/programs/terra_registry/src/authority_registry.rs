@@ -550,9 +550,14 @@ pub fn nominate_validator(
         super::TerraError::AlreadyEndorsedRotation
     );
 
-    // Select physical confirmer randomly from the validator pool.
-    // The sponsor cannot choose who performs physical confirmation.
-    let nearby_validators: Vec<Pubkey> = registry.validators.clone();
+    // Select physical confirmer randomly from the validator pool, excluding
+    // the sponsor (who cannot confirm their own nomination).
+    let nearby_validators: Vec<Pubkey> = registry
+        .validators
+        .iter()
+        .filter(|v| **v != ctx.accounts.sponsor.key())
+        .cloned()
+        .collect();
     let confirmer = ValidatorNomination::select_physical_confirmer(&nearby_validators, &candidate)
         .ok_or(super::TerraError::NoValidators)?;
 

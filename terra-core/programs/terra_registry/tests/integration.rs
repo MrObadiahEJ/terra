@@ -4049,3 +4049,1078 @@ async fn update_jurisdiction_changes_status() {
     assert_eq!(jur.status, 1); // SUSPENDED
     assert_eq!(jur.verification_key_hash, new_vk_hash);
 }
+
+// ===========================================================================
+// Batch 11: Escrow vault bug fix verification
+// ===========================================================================
+
+#[tokio::test]
+async fn cancel_escrow_buyer_deposited_refund() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [61u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Cancel Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status to FOR_SALE");
+
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 200_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow");
+
+    // Buyer deposits.
+    let mut dep_data = discriminator("global", "deposit_escrow").to_vec();
+    dep_data.extend_from_slice(&amount.to_le_bytes());
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: dep_data,
+        },
+    )
+    .await
+    .expect("deposit_escrow");
+
+    let vault_balance_before = ctx
+        .banks_client
+        .get_balance(escrow_vault)
+        .await
+        .unwrap();
+    assert_eq!(vault_balance_before, amount);
+
+    let buyer_balance_before = ctx
+        .banks_client
+        .get_balance(buyer.pubkey())
+        .await
+        .unwrap();
+
+    // Buyer cancels — should refund vault via invoke_signed (the fixed bug).
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new(buyer.pubkey(), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "cancel_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("cancel_escrow failed");
+
+    let vault_balance_after = ctx
+        .banks_client
+        .get_balance(escrow_vault)
+        .await
+        .unwrap();
+    assert_eq!(vault_balance_after, 0, "vault should be empty after refund");
+
+    let buyer_balance_after = ctx
+        .banks_client
+        .get_balance(buyer.pubkey())
+        .await
+        .unwrap();
+    assert!(
+        buyer_balance_after > buyer_balance_before,
+        "buyer should have received refund"
+    );
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::FOR_SALE);
+}
+
+#[tokio::test]
+async fn mutual_cancel_escrow_refunds_buyer() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [62u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Mutual Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status to FOR_SALE");
+
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 200_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow");
+
+    // Buyer deposits full amount.
+    let mut dep_data = discriminator("global", "deposit_escrow").to_vec();
+    dep_data.extend_from_slice(&amount.to_le_bytes());
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: dep_data,
+        },
+    )
+    .await
+    .expect("deposit_escrow");
+
+    // Seller accepts.
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: discriminator("global", "accept_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("accept_escrow");
+
+    let vault_balance_before = ctx
+        .banks_client
+        .get_balance(escrow_vault)
+        .await
+        .unwrap();
+    assert_eq!(vault_balance_before, amount);
+
+    // Mutual cancel — both parties agree. Refund via invoke_signed (the fixed bug).
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new(buyer.pubkey(), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "mutual_cancel_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("mutual_cancel_escrow failed");
+
+    let vault_balance_after = ctx
+        .banks_client
+        .get_balance(escrow_vault)
+        .await
+        .unwrap();
+    assert_eq!(vault_balance_after, 0, "vault should be empty after refund");
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::FOR_SALE);
+}
+
+#[tokio::test]
+async fn settle_escrow_rejects_before_deadline() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [63u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Settle Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status to FOR_SALE");
+
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 200_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow");
+
+    // Buyer deposits.
+    let mut dep_data = discriminator("global", "deposit_escrow").to_vec();
+    dep_data.extend_from_slice(&amount.to_le_bytes());
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: dep_data,
+        },
+    )
+    .await
+    .expect("deposit_escrow");
+
+    // Seller accepts.
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: discriminator("global", "accept_escrow").to_vec(),
+        },
+    )
+    .await
+    .expect("accept_escrow");
+
+    // Attempt settle immediately — should fail (settle_deadline is 3 days in the future).
+    let res = process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new(buyer.pubkey(), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "settle_escrow").to_vec(),
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "settle_escrow should fail before settle_deadline"
+    );
+}
+
+// ===========================================================================
+// Batch 12: Vault module tests
+// ===========================================================================
+
+fn vault_record_pda(subject: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"vault_record", subject.as_ref()], &PROGRAM_ID)
+}
+
+fn vault_rotation_pda(vault_record: &Pubkey, new_hash: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"vault_shard_rotation",
+            vault_record.as_ref(),
+            new_hash.as_ref(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+#[tokio::test]
+async fn create_vault_happy_path() {
+    use terra_registry::vault::VaultRecord;
+
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [70u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let h1 = Keypair::new().pubkey();
+    let h2 = Keypair::new().pubkey();
+    let h3 = Keypair::new().pubkey();
+    let hash: [u8; 32] = [42u8; 32];
+
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://vault1".to_string()));
+    v_data.extend_from_slice(&hash);
+    v_data.push(0u8); // AES_256_GCM
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s1".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![h1, h2, h3]));
+    v_data.push(2u8); // threshold
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await
+    .expect("create_vault failed");
+
+    let v: VaultRecord = read_account(&ctx, vault_pk).await;
+    assert_eq!(v.subject, identity);
+    assert_eq!(v.ciphertext_hash, hash);
+    assert_eq!(v.algorithm_id, 0);
+    assert_eq!(v.threshold, 2);
+    assert_eq!(v.shard_holders.len(), 3);
+    assert_eq!(v.version, 0);
+}
+
+#[tokio::test]
+async fn cancel_shard_rotation_by_initiator() {
+    use terra_registry::vault::VaultRecord;
+
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [71u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let h1 = Keypair::new().pubkey();
+    let h2 = Keypair::new().pubkey();
+    let h3 = Keypair::new().pubkey();
+    let orig_hash: [u8; 32] = [44u8; 32];
+
+    // Create vault with h1 as first shard holder (h1 = payer = initiator).
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://vault2".to_string()));
+    v_data.extend_from_slice(&orig_hash);
+    v_data.push(0u8);
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s1".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), h2, h3]));
+    v_data.push(2u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await
+    .expect("create_vault");
+
+    // Initiate shard rotation.
+    let new_hash: [u8; 32] = [55u8; 32];
+    let (rotation_pk, _) = vault_rotation_pda(&vault_pk, &new_hash);
+
+    let mut r_data = discriminator("global", "initiate_shard_rotation").to_vec();
+    r_data.extend_from_slice(&new_hash);
+    r_data.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), h2, h3]));
+    r_data.push(2u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rotation_pk, false),
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: r_data,
+        },
+    )
+    .await
+    .expect("initiate_shard_rotation failed");
+
+    // Cancel rotation by initiator.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rotation_pk, false),
+                AccountMeta::new_readonly(vault_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "cancel_shard_rotation").to_vec(),
+        },
+    )
+    .await
+    .expect("cancel_shard_rotation failed");
+
+    let rotation_acc = ctx.banks_client.get_account(rotation_pk).await.unwrap();
+    assert!(rotation_acc.is_none(), "rotation account should be closed");
+}
+
+#[tokio::test]
+async fn ping_shard_updates_last_ping() {
+    use terra_registry::vault::VaultRecord;
+
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity.
+    let id_hash: [u8; 32] = [72u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let h1 = Keypair::new().pubkey();
+    let h2 = Keypair::new().pubkey();
+    let hash: [u8; 32] = [46u8; 32];
+
+    // Create vault with payer as shard holder.
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://vault3".to_string()));
+    v_data.extend_from_slice(&hash);
+    v_data.push(0u8);
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s1".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), h1]));
+    v_data.push(2u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await
+    .expect("create_vault");
+
+    let v_before: VaultRecord = read_account(&ctx, vault_pk).await;
+    let ts_before = v_before.last_ping_at;
+
+    // Ping shard (advance a few slots to ensure time passes PING_INTERVAL_SECS).
+    // PING_INTERVAL_SECS = 7 days = 604800 seconds. In test validator each slot
+    // is ~400ms. We need ~1.5M slots for 7 days, which is too many to warp.
+    // However, the check is `now >= last_ping_at + PING_INTERVAL_SECS`.
+    // The vault was just created so last_ping_at = now. So ping will fail
+    // because now < last_ping_at + 7 days.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "ping_shard").to_vec(),
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "ping should fail when interval has not elapsed"
+    );
+}
+
+// ===========================================================================
+// Batch 13: Time-bound & escrow extras
+// ===========================================================================
+
+#[tokio::test]
+async fn renew_right_extends_expiry() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let holder = Keypair::new();
+    let parcel_id: [u8; 32] = [64u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    let nonce: u8 = 0;
+    let (rights_pk, _) = rights_pda(&parcel_pk, nonce);
+
+    // Register parcel.
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Renew Parcel", &[4u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Grant right with permanent expiry (expires_at = 0).
+    let mut grant_data = discriminator("global", "grant_right").to_vec();
+    grant_data.extend_from_slice(&borsh_ser(&nonce));
+    grant_data.extend_from_slice(&borsh_ser(&right_kind::USAGE));
+    grant_data.extend_from_slice(&borsh_ser(&holder.pubkey()));
+    grant_data.extend_from_slice(&borsh_ser(&0i64));
+    grant_data.extend_from_slice(&borsh_ser(&"original".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(rights_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: grant_data,
+        },
+    )
+    .await
+    .expect("grant_right");
+
+    let r: Rights = read_account(&ctx, rights_pk).await;
+    assert_eq!(r.expires_at, 0);
+
+    // Renew right — set new expiry far in the future.
+    let new_expires_at: i64 = 4_000_000_000;
+    let mut renew_data = discriminator("global", "renew_right").to_vec();
+    renew_data.push(nonce);
+    renew_data.extend_from_slice(&borsh_ser(&new_expires_at));
+    renew_data.extend_from_slice(&borsh_ser(&"renewed".to_string()));
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&holder, &payer],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rights_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(holder.pubkey(), true),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: renew_data,
+        },
+    )
+    .await
+    .expect("renew_right failed");
+
+    let r: Rights = read_account(&ctx, rights_pk).await;
+    assert_eq!(r.expires_at, new_expires_at);
+    assert_eq!(r.status, 0); // right_status::ACTIVE after renew
+}
+
+#[tokio::test]
+async fn sweep_permanent_right_rejected() {
+    let (mut ctx, payer) = setup().await;
+
+    let holder = Keypair::new();
+    let parcel_id: [u8; 32] = [65u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    let nonce: u8 = 0;
+    let (rights_pk, _) = rights_pda(&parcel_pk, nonce);
+
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Sweep Parcel", &[4u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Grant permanent right.
+    let mut grant_data = discriminator("global", "grant_right").to_vec();
+    grant_data.extend_from_slice(&borsh_ser(&nonce));
+    grant_data.extend_from_slice(&borsh_ser(&right_kind::USAGE));
+    grant_data.extend_from_slice(&borsh_ser(&holder.pubkey()));
+    grant_data.extend_from_slice(&borsh_ser(&0i64));
+    grant_data.extend_from_slice(&borsh_ser(&"permanent".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(rights_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: grant_data,
+        },
+    )
+    .await
+    .expect("grant_right");
+
+    // Attempt sweep — should fail because permanent rights are not sweepable.
+    let mut sweep_data = discriminator("global", "sweep_expired_rights").to_vec();
+    sweep_data.push(nonce);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rights_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: sweep_data,
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "sweep should fail for permanent rights"
+    );
+}
+
+#[tokio::test]
+async fn expire_escrow_rejects_before_deadline() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [66u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Expire Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status");
+
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 100_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow");
+
+    // Attempt expire immediately — should fail (cancel_deadline is 7 days in the future).
+    let res = process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "expire_escrow").to_vec(),
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "expire_escrow should fail before cancel_deadline"
+    );
+}
+
+#[tokio::test]
+async fn dispute_escrow_creates_dispute_record() {
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
+
+    let (mut ctx, payer) = setup().await;
+
+    let seller = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &seller.pubkey(), 10_000_000))
+        .await
+        .expect("fund seller");
+    let parcel_id: [u8; 32] = [67u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &seller,
+        register_ix(&parcel_id, "Dispute Parcel", &[3u8; 32], &seller.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let mut status_data = discriminator("global", "update_status").to_vec();
+    status_data.push(parcel_status::FOR_SALE);
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+            ],
+            data: status_data,
+        },
+    )
+    .await
+    .expect("update_status");
+
+    let buyer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &buyer.pubkey(), 500_000_000))
+        .await
+        .expect("fund buyer");
+
+    let amount: u64 = 200_000_000;
+    let (escrow_pda, _) = escrow_pda(&parcel_pk);
+    let (escrow_vault, _) = escrow_vault_pda(&escrow_pda);
+
+    // Create escrow.
+    let mut create_data = discriminator("global", "create_escrow").to_vec();
+    create_data.extend_from_slice(&amount.to_le_bytes());
+    create_data.extend_from_slice(&buyer.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &seller,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(seller.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_data,
+        },
+    )
+    .await
+    .expect("create_escrow");
+
+    // Buyer deposits.
+    let mut dep_data = discriminator("global", "deposit_escrow").to_vec();
+    dep_data.extend_from_slice(&amount.to_le_bytes());
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(escrow_vault, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: dep_data,
+        },
+    )
+    .await
+    .expect("deposit_escrow");
+
+    // Buyer files dispute against the escrow.
+    let case_hash: [u8; 32] = [99u8; 32];
+    let (dispute_pk, _) = dispute_pda(&parcel_pk, &case_hash);
+    let validator1 = Keypair::new();
+    let validator2 = Keypair::new();
+
+    let mut disp_data = discriminator("global", "dispute_escrow").to_vec();
+    disp_data.extend_from_slice(&case_hash);
+    disp_data.push(2u8); // required (MIN_DISPUTE_VALIDATORS = 2)
+    // validators array: [validator1, validator2, 0x00...]
+    disp_data.extend_from_slice(&validator1.pubkey().to_bytes());
+    disp_data.extend_from_slice(&validator2.pubkey().to_bytes());
+    for _ in 2..8 {
+        disp_data.extend_from_slice(&Pubkey::default().to_bytes());
+    }
+
+    process(
+        &mut ctx,
+        &buyer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(escrow_pda, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(dispute_pk, false),
+                AccountMeta::new(buyer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: disp_data,
+        },
+    )
+    .await
+    .expect("dispute_escrow failed");
+
+    let e: EscrowRecord = read_account(&ctx, escrow_pda).await;
+    assert_eq!(e.status, escrow_status::DISPUTED);
+    assert_eq!(e.dispute_case_hash, case_hash);
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::DISPUTED);
+
+    let d: dispute::Dispute = read_account(&ctx, dispute_pk).await;
+    assert_eq!(d.filed_by, buyer.pubkey());
+    assert_eq!(d.case_hash, case_hash);
+    assert_eq!(d.status, dispute::dispute_status::FILED);
+}
