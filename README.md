@@ -1,10 +1,27 @@
-# Terra — A Universal Land Registry for Humankind
+# Terra — A Decentralized Land Claim & Verification Network
 
 [![CI](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml/badge.svg)](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml)
 
-> A country-agnostic, blockchain-anchored land administration platform. Built first for Cameroon. Designed from day one to belong to the world.
+> A decentralized, blockchain-anchored protocol where anyone can create claims about land, validators independently verify them, and the network records attestations and immutable history. No authority provider is required to participate.
 
 **Program ID:** `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` (devnet / localnet)
+
+---
+
+## What Terra Is
+
+Terra is a **claim/verification/evidence network** for land and property. It is not an authority-based registry. The distinction is fundamental:
+
+- **Authority-based registry:** Requires a government or institution to register parcels before anyone can use the system. No authority → no parcels → no claims.
+- **Terra's claim network:** Anyone can create a claim about any parcel. Validators independently evaluate evidence. The protocol records attestations and builds immutable history. Claims ≠ Facts — the protocol verifies claims, not legal ownership.
+
+**Core data model:**
+
+```
+People → Claims → Evidence → Validators → Attestations → Consensus → Immutable History
+```
+
+Physical world observation is a first-class layer, not an afterthought. Validators can observe, photograph, and attest to the physical state of land, binding digital records to physical reality.
 
 ---
 
@@ -12,11 +29,11 @@
 
 All protocol modules (RFC-003 → RFC-011) are implemented end-to-end: on-chain
 Anchor program + PostGIS mirror + REST API + frontend client + IDL, with CI
-green on `dev` (fmt, `clippy -D warnings`, 54 lib unit tests, 47 API unit
+green on `dev` (fmt, `clippy -D warnings`, 60 lib unit tests, 47 API unit
 tests incl. live-PostGIS migration run, `tsc --noEmit`).
 
 Beyond CI, every protocol is verified by **BPF integration tests** (real
-program execution via `solana-program-test`, **42/42 passing** covering all
+program execution via `solana-program-test`, **62/62 passing** covering all
 major instruction happy paths and guard rails) and a **76-check API
 smoke suite** against live PostGIS covering happy paths and guard rails
 (double-proof replay, early claims, stale roots, forged signatures, …).
@@ -38,7 +55,7 @@ time-executed, in the harness.
 
 ## Protocol Catalog
 
-One-line principle: **the blockchain records who authorized what. It never
+One-line principle: **the blockchain records who attested to what. It never
 records how to do it, and it never touches key material.**
 
 | RFC | Protocol | On-chain module | Instructions |
@@ -65,12 +82,13 @@ peer-consensus), `ipfs_docs.rs` (document anchors). Full specs live in
 ## Architecture Overview
 
 Three layers, organized around **ISO 19152 (LADM)** concepts:
-7
+
 - **On-chain (Solana/Anchor)** — `terra-core/programs/terra_registry`: parcel
-  identity, ownership, rights, and **hashes** of off-chain validation. Minimal
-  state, quorum primitives reused everywhere, region-scoped trust.
+  identity, claims, evidence, validator attestations, and **hashes** of
+  off-chain validation. Minimal state, quorum primitives reused everywhere,
+  region-scoped trust. No authority provider prerequisite.
 - **Off-chain mirror (PostGIS + Axum)** — `terra-core/api`: every on-chain
-  account has a mirror table (migrations `0001…0019`), plus the spatial engine:
+  account has a mirror table (migrations `0001…0022`), plus the spatial engine:
   maintained parcel centroids, geometry write-guards, `parcel_spatial_stats`
   and `zone_parcel_counts` views, `/spatial/*` radius/zone endpoints.
 - **Geo engine** — `terra-core/geo-engine` (`terra-geo`): pure-Rust OSM road
@@ -84,6 +102,59 @@ browser ──▶ terra-web ──▶ terra-core/api ───┬─▶ PostGIS 
                                             └──▶ Solana (source of truth)
 ```
 
+### Canonical Mental Model
+
+```
+                    ┌──────────────────────────────────────┐
+                    │           Physical World             │
+                    │  (land, boundaries, structures,      │
+                    │   observations, photographs)         │
+                    └──────────────┬───────────────────────┘
+                                   │
+                    ┌──────────────▼───────────────────────┐
+                    │         Claims & Evidence            │
+                    │  (anyone can create, propose,        │
+                    │   dispute, or corroborate)           │
+                    └──────────────┬───────────────────────┘
+                                   │
+                    ┌──────────────▼───────────────────────┐
+                    │        Validator Network             │
+                    │  (progressive levels 0-3,            │
+                    │   evidence-based reputation)         │
+                    └──────────────┬───────────────────────┘
+                                   │
+                    ┌──────────────▼───────────────────────┐
+                    │       Attestations & Consensus       │
+                    │  (quorum rules, stake-weighted,      │
+                    │   evidence-anchored)                 │
+                    └──────────────┬───────────────────────┘
+                                   │
+                    ┌──────────────▼───────────────────────┐
+                    │     Immutable History (Solana)       │
+                    │  (append-only, tamper-evident,       │
+                    │   zone-scoped, timestamped)          │
+                    └──────────────────────────────────────┘
+```
+
+### Validator Capability Levels
+
+| Level | Capability | Description |
+|-------|------------|-------------|
+| 0 | Wallet only | Can create claims and manage their own parcels |
+| 1 | Basic validator | Can attest to claims, sign transactions |
+| 2 | Specialized validator | Can attest to specific claim types (survey, legal, physical) |
+| 3 | High-trust validator | Can co-sign disputes, manage vault shards, adjudicate |
+
+### Key Design Principles
+
+1. **Anyone can claim.** No authority provider is a prerequisite for parcels to exist.
+2. **Claims ≠ Facts.** The protocol verifies claims, not legal ownership.
+3. **Evidence is first-class.** Physical observation is a core layer, not an afterthought.
+4. **Validator reputation is evidence-based.** Driven by evidence history, not scores.
+5. **Free basic participation.** Creating claims and basic validation is free; storage and expensive operations are paid.
+6. **Self-correcting trust.** Random audits + triggered audits for continuous verification.
+7. **Progressive decentralization.** Start with fewer validators, grow to more. Never require an authority provider.
+
 ---
 
 ## Monorepo Structure
@@ -96,7 +167,7 @@ terra/
 ├── terra-core/                       # Rust workspace (terra-registry, terra-api, terra-geo)
 │   ├── programs/terra_registry/src/  # lib.rs + 11 protocol modules + tests/
 │   ├── api/src/routes/               # 18 route modules (parcels, staking, zk_proofs, spatial, …)
-│   ├── api/migrations/               # 0001…0019 (PostGIS schema + mirrors)
+│   ├── api/migrations/               # 0001…0022 (PostGIS schema + mirrors)
 │   └── geo-engine/                   # OSM graph + reachability (terra-geo)
 ├── docs/                             # rfc-003 … rfc-011
 └── .github/workflows/ci.yml          # fmt, clippy, lib/api tests (PostGIS svc), tsc
@@ -128,8 +199,8 @@ createdb -h localhost -p 5433 -U terra terra_dev
 ```bash
 cd terra-core
 cargo check -p terra-registry            # on-chain program (native)
-cargo test -p terra-registry --lib       # 54 unit tests
-cargo test -p terra-api                  # 51 API unit tests
+cargo test -p terra-registry --lib       # 60 unit tests
+cargo test -p terra-api                  # 47 API unit tests
 DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
   cargo run -p terra-api                 # serves /api/v1 (migrations auto-applied)
 ```
@@ -164,11 +235,11 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 54/54 |
-| Unit (API validation logic) | `cargo test -p terra-api` | 51/51 |
-| BPF execution (9 scenarios incl. negative guards, replay, time-guard code) | `cargo test --test integration` + `BPF_OUT_DIR` | 9/9 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 60/60 |
+| Unit (API validation logic) | `cargo test -p terra-api` | 47/47 |
+| BPF execution (62 scenarios incl. negative guards, replay, time-guard code) | `cargo test --test integration` + `BPF_OUT_DIR` | 62/62 |
 | API end-to-end vs live PostGIS (76 checks, happy + guard paths) | smoke suite over `/api/v1` | 76/76 |
-| Migrations on real PostGIS 16 | CI service + local scratch instance | 19/19 apply |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 22/22 apply |
 | Frontend↔API contract (112 calls vs 118 routes, method+path) | static cross-check | 100% match |
 | IDL vs program (instructions/args/errors/accounts) | static cross-check | match |
 | Frontend types | `tsc --noEmit` | clean |
@@ -204,17 +275,18 @@ pnpm dev
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Open-source and community-governed as it grows. Contribution guidelines and
 governance will be published past the devnet pilot.
 
-## 📜 License
+## License
 
 *(To be finalized — Apache-2.0 or MIT recommended, given the multi-country ambition.)*
 
-## ⚠️ Disclaimer
+## Disclaimer
 
-Terra is technical infrastructure and does not itself confer legal title.
-Ownership remains governed by applicable national law; Terra makes
-locally-recognized rights more verifiable, portable, and fraud-resistant.
+Terra is technical infrastructure for creating and verifying claims about land.
+It is not a legal registry and does not itself confer legal title. Ownership
+remains governed by applicable national law; Terra makes locally-recognized
+rights more verifiable, portable, and fraud-resistant.

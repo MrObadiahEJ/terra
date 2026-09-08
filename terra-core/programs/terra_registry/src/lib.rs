@@ -353,7 +353,7 @@ pub struct PingShard<'info> {
 }
 
 // ---------------------------------------------------------------------------
-// AuthorityRegistry v2 contexts (progressive decentralization)
+// ValidatorRegistry v2 contexts (progressive decentralization)
 // ---------------------------------------------------------------------------
 // WorldRegistry contexts (country genesis)
 // ---------------------------------------------------------------------------
@@ -1518,7 +1518,7 @@ pub mod terra_registry {
     }
 
     // -----------------------------------------------------------------------
-    // AuthorityRegistry v2 (progressive decentralization)
+    // ValidatorRegistry v2 (progressive decentralization)
     // -----------------------------------------------------------------------
 
     pub fn create_registry(ctx: Context<CreateRegistry>) -> Result<()> {

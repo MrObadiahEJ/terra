@@ -1,6 +1,28 @@
 use anchor_lang::prelude::*;
 
-/// Maximum validators in the global registry.
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHITECTURE NOTE (2026-09-08):
+//
+// This module is conceptually "ValidatorRegistry" in the claim/verification
+// network architecture. The struct name `AuthorityRegistry` and PDA seeds
+// (`b"authority_registry"`) are preserved for on-chain ABI stability.
+//
+// Conceptually: validators are registered through this module, not appointed
+// by an authority provider. The registry tracks the validator set, manages
+// bootstrap → peer-consensus transitions, and provides quorum primitives.
+//
+// No authority provider is a prerequisite for parcels to exist. Anyone can
+// create claims; validators independently verify them; the protocol records
+// attestations and immutable history.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// ValidatorRegistry — the on-chain registry of validators.
+///
+/// Conceptually the "ValidatorRegistry" in Terra's claim/verification network.
+/// Tracks the validator set, manages bootstrap → peer-consensus transitions,
+/// and provides quorum primitives. No authority provider is required for
+/// parcels to exist; validators are registered through this module and
+/// independently verify claims.
 pub const MAX_REGISTRY_VALIDATORS: usize = 32;
 /// Minimum validators before auto-flip to peer-consensus mode.
 pub const CONSENSUS_FLIP_THRESHOLD: u8 = 4;

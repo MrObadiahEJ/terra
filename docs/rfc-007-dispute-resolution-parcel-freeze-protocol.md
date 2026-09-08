@@ -10,7 +10,7 @@
 
 This RFC specifies the **Dispute Resolution & Parcel Freeze Protocol** — a lifecycle-gated dispute mechanism for Terra parcels. When a legal or factual dispute arises over parcel ownership, the parcel must be frozen (preventing trades, transfers, and sales) while the dispute progresses through adjudication. The protocol introduces a five-state lifecycle on a `Dispute` PDA: `FILED → FROZEN → ADJUDICATED → EXECUTED`, with an exit path to `CANCELLED`.
 
-The on-chain program never handles court documents or evidence — it only anchors a SHA-256 hash of the off-chain case file (`case_hash`) and records state transitions gated by the existing AuthorityRegistry validator quorum. Filing requires 2+ validator co-signatures (anti-grief), freezing requires the same 2+ validators, adjudication requires a court authority signer, and execution finalizes the outcome (owner wins → parcel returns to REGISTERED; owner loses → parcel forfeited to `new_owner`). Disputes auto-cancel after 90 days if not adjudicated.
+The on-chain program never handles court documents or evidence — it only anchors a SHA-256 hash of the off-chain case file (`case_hash`) and records state transitions gated by the validator quorum. Filing requires 2+ validator co-signatures (anti-grief), freezing requires the same 2+ validators, adjudication requires a court authority signer, and execution finalizes the outcome (owner wins → parcel returns to REGISTERED; owner loses → parcel forfeited to `new_owner`). Disputes auto-cancel after 90 days if not adjudicated.
 
 ## 3. Threat Model
 
@@ -63,7 +63,7 @@ The on-chain program never handles court documents or evidence — it only ancho
 
 ### 4.4 No Additional Cryptographic Primitives
 
-The dispute protocol does not require encryption, zero-knowledge proofs, or threshold cryptography. All security is derived from Ed25519 signatures and the AuthorityRegistry validator quorum.
+The dispute protocol does not require encryption, zero-knowledge proofs, or threshold cryptography. All security is derived from Ed25519 signatures and the validator quorum.
 
 ## 5. Data Model
 
@@ -479,7 +479,7 @@ The Dispute Protocol does not use any cryptographic primitives that are vulnerab
 ### 12.2 Future Considerations
 
 If post-quantum signature schemes become necessary:
-- The AuthorityRegistry validator keys would be migrated to a post-quantum scheme
+- The validator registry keys would be migrated to a post-quantum scheme
 - The dispute protocol would automatically benefit from this migration (no on-chain changes required)
 - The `case_hash` (SHA-256) would remain secure (quantum resistance is not required for hashing)
 
@@ -487,14 +487,14 @@ If post-quantum signature schemes become necessary:
 
 - NIST post-quantum standards are finalized (2024)
 - Ed25519 remains secure for the foreseeable future (quantum threat is theoretical)
-- Migration to post-quantum signatures would happen at the AuthorityRegistry level, not the dispute protocol level
+- Migration to post-quantum signatures would happen at the ValidatorRegistry level, not the dispute protocol level
 
 ## 13. Operational Security
 
 ### 13.1 Validator Key Management
 
 - Validators must secure their Ed25519 private keys (hardware wallets recommended)
-- Key rotation is handled at the AuthorityRegistry level
+- Key rotation is handled at the ValidatorRegistry level
 - Compromised keys can be revoked by the registry admin
 
 ### 13.2 Court Authority Key Management

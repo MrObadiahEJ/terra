@@ -1,11 +1,16 @@
--- AuthorityRegistry + IPFS document-anchor mirrors.
+-- ValidatorRegistry (conceptually "ValidatorRegistry") + IPFS document-anchor mirrors.
 --
 -- The frontend has always called /authority-registry/* and /ipfs-docs/* but
 -- no backend served them (every call 404'd). These tables close that gap,
--- mirroring the on-chain AuthorityRegistry / ValidatorEndorsement accounts
+-- mirroring the on-chain ValidatorRegistry / ValidatorEndorsement accounts
 -- and the off-chain document-anchor log.
+--
+-- Note: Table and column names use "authority_registries" for backwards
+-- compatibility with the on-chain PDA seeds. Conceptually, this is the
+-- ValidatorRegistry — validators are registered through this module, not
+-- appointed by an authority provider.
 
--- On-chain AuthorityRegistry mirror (PDA: ["authority_registry"]).
+-- On-chain ValidatorRegistry mirror (PDA: ["authority_registry"]).
 CREATE TABLE IF NOT EXISTS authority_registries (
     id                    BIGSERIAL PRIMARY KEY,
     pubkey                TEXT NOT NULL UNIQUE,

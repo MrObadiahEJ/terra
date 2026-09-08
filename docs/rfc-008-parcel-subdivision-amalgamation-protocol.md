@@ -470,7 +470,7 @@ If a subdivision or amalgamation fails partway through:
 
 ### 13.1 Surveyor Verification
 
-- Surveyors must be licensed and verified off-chain (by the AuthorityRegistry or local government).
+- Surveyors must be licensed and verified off-chain (by the ValidatorRegistry or local government).
 - The on-chain attestation quorum ensures that k validators have reviewed the survey data.
 - A fraudulent surveyor must collude with k-1 validators to falsify geometry — the same trust model as other attestation flows.
 

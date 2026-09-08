@@ -17,7 +17,7 @@ pub const EMERGENCY_INJECTION_TIMELOCK_SECS: i64 = 48 * 3600;
 #[account]
 #[derive(InitSpace)]
 pub struct ValidatorActivityTracker {
-    /// The AuthorityRegistry this tracker belongs to.
+    /// The ValidatorRegistry this tracker belongs to.
     pub registry: Pubkey,
     /// The validator whose activity is tracked.
     pub validator: Pubkey,
@@ -31,7 +31,7 @@ pub struct ValidatorActivityTracker {
 #[account]
 #[derive(InitSpace)]
 pub struct EmergencyInjection {
-    /// The AuthorityRegistry this injection targets.
+    /// The ValidatorRegistry this injection targets.
     pub registry: Pubkey,
     /// Admin who queued the injection.
     pub requested_by: Pubkey,

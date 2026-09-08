@@ -41,7 +41,7 @@ pub const VALID_COUNTRY_CODES: [[u8; 2]; 250] = [
 ];
 
 /// Minimum validators before auto-flip to peer-consensus (reused from
-/// authority_registry).
+/// authority_registry (ValidatorRegistry).
 pub const CONSENSUS_FLIP_THRESHOLD: u8 = 4;
 
 /// Minimum confirmations for genesis approval.
@@ -71,7 +71,7 @@ pub struct WorldRegistry {
 pub struct CountryAllocation {
     /// ISO 3166-1 alpha-2 country code.
     pub country_code: [u8; 2],
-    /// Admin wallet approved to create this country's AuthorityRegistry.
+    /// Admin wallet approved to create this country's ValidatorRegistry.
     pub approved_admin: Pubkey,
 }
 
@@ -120,7 +120,7 @@ pub fn create_world_registry(ctx: Context<super::CreateWorldRegistry>) -> Result
 }
 
 /// Approve a country allocation. Admin-only. This authorizes a specific wallet
-/// to create an AuthorityRegistry for a given country code.
+/// to create a ValidatorRegistry for a given country code.
 pub fn allocate_country(
     ctx: Context<super::AllocateCountry>,
     country_code: [u8; 2],

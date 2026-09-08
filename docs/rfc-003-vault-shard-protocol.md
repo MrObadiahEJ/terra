@@ -33,7 +33,7 @@ This RFC specifies the **Vault Shard Protocol** — a threshold-encrypted person
 ### 3.3 Out of Scope
 
 - Attestation, succession, and forfeiture flows (covered by RFC-001/002)
-- Validator identity verification (covered by AuthorityRegistry)
+- Validator identity verification (covered by ValidatorRegistry)
 - The specific encryption of biometric templates (application-layer concern)
 
 ## 4. Cryptographic Choices

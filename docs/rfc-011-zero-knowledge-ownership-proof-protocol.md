@@ -51,7 +51,7 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 
 ### 3.3 Out of Scope
 
-- Identity verification (covered by AuthorityRegistry and RFC-006)
+- Identity verification (covered by ValidatorRegistry and RFC-006)
 - Parcel valuation (application-layer concern; the circuit accepts pre-committed values)
 - Cross-zone proofs (single zone per proof; cross-zone requires separate circuits)
 - The specific ZK proving system implementation (SNARK vs. STARK is a deployment choice)
@@ -111,8 +111,8 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `zone_id` | `Pubkey` | Authority-paused zone identifier |
-| `authority` | `Pubkey` | Zone administrator (AuthorityRegistry validator) |
+| `zone_id` | `Pubkey` | Zone identifier |
+| `authority` | `Pubkey` | Zone administrator (registered validator) |
 | `parcel_count` | `u32` | Number of parcels registered in this zone set |
 | `current_root_version` | `u32` | Monotonic counter for root updates |
 | `created_at` | `i64` | Zone set creation timestamp |
@@ -154,7 +154,7 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `parcel_id` | `Pubkey` | Parcel PDA key (from AuthorityRegistry) |
+| `parcel_id` | `Pubkey` | Parcel PDA key (from ValidatorRegistry) |
 | `owner` | `Pubkey` | Owner wallet or identity PDA |
 | `value_commitment` | `[u8; 32]` | Pedersen commitment to parcel value |
 | `leaf_hash` | `[u8; 32]` | Poseidon(owner, value_commitment) — inserted into Merkle tree |
@@ -181,13 +181,13 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 - `zone_set` (init, PDA `["zone_set", zone_id]`)
 - `ownership_root` (init, PDA `["ownership_root", zone_set_key]`)
 - `zone_id` (the zone's unique identifier account)
-- `authority` (signer, mut — must be admin or zone authority in AuthorityRegistry)
+- `authority` (signer, mut — must be admin or zone authority in ValidatorRegistry)
 - `system_program`
 
 **Args:** `snapshot_cid: String`, `snapshot_hash: [u8; 32]`
 
 **Guards:**
-- `authority` must be the registry admin or the zone's authority in AuthorityRegistry
+- `authority` must be the registry admin or the zone's authority in ValidatorRegistry
 - `snapshot_hash != [0; 32]`
 - `snapshot_cid` is non-empty
 - No pending zone set already exists for this `zone_id`
@@ -323,7 +323,7 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 
 ### 7.3 Ownership Transfer & Revocation
 
-1. When a parcel is sold or transferred (via AuthorityRegistry), the owner changes.
+1. When a parcel is sold or transferred (via ValidatorRegistry), the owner changes.
 2. The zone authority detects the transfer (event listener or polling).
 3. The authority recomputes the Merkle tree with the new owner's leaf.
 4. The authority calls `generate_ownership_root` with the updated root.
@@ -396,7 +396,7 @@ Each zone has its own Merkle root and nullifier namespace. A proof valid in Zone
 The zone authority is responsible for calling `generate_ownership_root` when ownership changes. If the authority is unresponsive:
 - Proofs continue to work against the current root (ownership has not changed on-chain).
 - If ownership actually transferred but the root wasn't updated, the new owner cannot generate a valid proof until the root is updated.
-- Mitigation: AuthorityRegistry has governance mechanisms for replacing unresponsive authorities.
+- Mitigation: ValidatorRegistry has governance mechanisms for replacing unresponsive authorities.
 
 ### 9.2 Proof Availability Window
 
@@ -523,7 +523,7 @@ When a post-quantum algorithm is standardized and ready for use:
 ### 13.2 Authority Key Security
 
 - The zone authority's Ed25519 key signs Merkle roots. If compromised, an attacker could forge roots.
-- Mitigation: Authority key is managed via AuthorityRegistry governance. Key rotation is supported.
+- Mitigation: Authority key is managed via ValidatorRegistry governance. Key rotation is supported.
 - Multi-sig: The authority can be a multi-sig wallet for high-security zones.
 
 ### 13.3 Snapshot Integrity
@@ -540,8 +540,8 @@ When a post-quantum algorithm is standardized and ready for use:
 
 ### 13.5 Validator Onboarding / Offboarding
 
-- **Onboarding:** New zone authority receives the proving key and snapshot via a secure channel. Their pubkey is registered in AuthorityRegistry.
-- **Offboarding:** The departing authority's key is revoked via AuthorityRegistry governance. A new authority is appointed. The root is updated under the new authority's signature.
+- **Onboarding:** New zone authority receives the proving key and snapshot via a secure channel. Their pubkey is registered in ValidatorRegistry.
+- **Offboarding:** The departing authority's key is revoked via ValidatorRegistry governance. A new authority is appointed. The root is updated under the new authority's signature.
 
 ## 14. Test Vectors
 

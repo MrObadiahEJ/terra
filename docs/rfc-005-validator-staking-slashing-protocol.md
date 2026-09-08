@@ -6,21 +6,19 @@
 - **Created:** 2026-09-03
 - **Supersedes:** None
 
-> **CRITICAL: DO NOT IMPLEMENT WITHOUT GOVERNANCE DECISION.**
+> **CAUTION: REQUIRES GOVERNANCE DECISION BEFORE IMPLEMENTATION.**
 >
-> This RFC proposes a staking/slashing layer on top of Terra's validator set. It **directly conflicts** with the trust model established by AuthorityRegistry (`authority_registry.rs`). AuthorityRegistry bootstraps trust from **institutional appointment** — a vetted admin adds validators, then peer consensus takes over. Staking bootstraps trust from **capital** — the wealthiest participant dictates outcomes. A wealthy adversary can out-stake and out-vote honest appointed validators, subverting the entire authority hierarchy.
+> This RFC proposes a staking/slashing layer on top of Terra's validator set. Staking introduces a different trust model than the existing peer-consensus and evidence-based verification system. If pursued, stake should be **an additional requirement layered on top of validator registration** ("must be registered AND post a bond"), never staking *instead of* registration, and never allowing delegation to let non-validators buy influence.
 >
-> If pursued at all, the only primitive-spirited version is **stake as an additional requirement layered on top of appointment** ("must be AuthorityRegistry-appointed AND post a bond"), never staking *instead of* appointment, and never allowing delegation to let non-validators buy influence.
->
-> **Target phase:** NOT SCHEDULED. Requires an explicit governance decision, not a target phase.
+> **Target phase:** NOT SCHEDULED. Requires an explicit governance decision.
 
 ## 2. Summary
 
-This RFC specifies the **Validator Staking & Slashing Protocol** — an optional economic security layer for Terra. Validators deposited SOL as a bond against misbehavior. Slashing conditions include equivocation (two conflicting signatures on the same parcel), prolonged liveness failure, and collusion evidence. Rewards are distributed proportional to stake × participation. **Delegation is explicitly prohibited** — only AuthorityRegistry-appointed validators may stake, and third parties cannot buy influence through delegation.
+This RFC specifies the **Validator Staking & Slashing Protocol** — an optional economic security layer for Terra. Validators deposit SOL as a bond against misbehavior. Slashing conditions include equivocation (two conflicting signatures on the same parcel), prolonged liveness failure, and collusion evidence. Rewards are distributed proportional to stake × participation. **Delegation is explicitly prohibited** — only registered validators may stake, and third parties cannot buy influence through delegation.
 
 The on-chain program tracks stake pools, individual validator stakes, slashing reports, and reward accrual. Off-chain detection systems identify equivocation and liveness failures. Slashing is gradual (first offense = 10%, repeat = 100%) with a 7-day appeal window.
 
-**Prerequisites:** AuthorityRegistry must be active for the target region. This protocol is scoped per region, parallel to the per-region vault and attestation models.
+**Prerequisites:** ValidatorRegistry must be active for the target region. This protocol is scoped per region, parallel to the per-region vault and attestation models.
 
 ## 3. Threat Model
 
@@ -29,12 +27,12 @@ The on-chain program tracks stake pools, individual validator stakes, slashing r
 | Class | Description | Mitigation |
 |-------|-------------|------------|
 | **Rogue validator** | Signs contradictory attestations for the same parcel | Equivocation detection → slash 10-100% of stake |
-| **Liveness adversary** | Validator goes offline, stalls consensus or reconstruction | Prolonged liveness failure → slash + replace via AuthorityRegistry |
+| **Liveness adversary** | Validator goes offline, stalls consensus or reconstruction | Prolonged liveness failure → slash + replace via validator rotation |
 | **Colluding subset** | Multiple validators conspire on succession fraud or unauthorized data access | Collusion evidence reporting → slash all participants |
-| **Capital attacker** | Wealthy adversary tries to out-stake honest validators | **No delegation** — only AuthorityRegistry-appointed validators can stake. Stake does not grant appointment |
+| **Capital attacker** | Wealthy adversary tries to out-stake honest validators | **No delegation** — only registered validators can stake. Stake does not grant registration |
 | **Slashing abuse** | False equivocation reports to grief honest validators | Reporter must post bond; failed reports lose bond. Appeal process (7 days) |
 | **Bribery attacker** | Offers validators bribes to misbehave | Stake creates economic cost; slashing removes profit from bribery |
-| **Sybil validator** | Tries to register multiple identities to dilute the validator set | AuthorityRegistry prevents sybil — each validator is a distinct institutional appointment |
+| **Sybil validator** | Tries to register multiple identities to dilute the validator set | ValidatorRegistry prevents sybil — each validator is a distinct registration with evidence-based reputation |
 
 ### 3.2 In Scope
 
@@ -49,7 +47,7 @@ The on-chain program tracks stake pools, individual validator stakes, slashing r
 
 - Vault shard protocol (covered by RFC-003)
 - Attestation, succession, and forfeiture flows (covered by RFC-001/002)
-- Validator identity verification (covered by AuthorityRegistry)
+- Validator identity verification (covered by ValidatorRegistry)
 - Delegation pools (explicitly prohibited — see Section 3.1)
 
 ## 4. Cryptographic Choices
@@ -84,11 +82,11 @@ The on-chain program tracks stake pools, individual validator stakes, slashing r
 
 **PDA seed:** `["stake_pool", region_registry_key]`
 
-One stake pool per region, derived from the AuthorityRegistry key for that region.
+One stake pool per region, derived from the ValidatorRegistry key for that region.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `region_registry` | `Pubkey` | AuthorityRegistry key for this region |
+| `region_registry` | `Pubkey` | ValidatorRegistry key for this region |
 | `total_staked` | `u64` | Total SOL staked across all validators (lamports) |
 | `reward_rate_bps` | `u16` | Annual reward rate in basis points (e.g., 500 = 5%) |
 | `accumulated_rewards` | `u64` | Total rewards accrued but not yet distributed (lamports) |
@@ -164,20 +162,20 @@ One record per report, created by the reporter.
 
 ### 6.1 `create_stake_pool`
 
-**Purpose:** Initialize a stake pool for a region. The pool is derived from the AuthorityRegistry key, ensuring one pool per region.
+**Purpose:** Initialize a stake pool for a region. The pool is derived from the ValidatorRegistry key, ensuring one pool per region.
 
 **Accounts:**
 - `stake_pool` (init, PDA `["stake_pool", region_registry_key]`)
-- `region_registry` (readonly — AuthorityRegistry account, used as seed only)
-- `authority` (signer, mut — pays rent; must be the AuthorityRegistry admin)
+- `region_registry` (readonly — ValidatorRegistry account, used as seed only)
+- `authority` (signer, mut — pays rent; must be the registry admin)
 - `system_program`
 
 **Args:** `reward_rate_bps: u16`
 
 **Guards:**
-- `authority` must be the AuthorityRegistry admin for the region
+- `authority` must be the registry admin for the region
 - `reward_rate_bps` must be > 0 and <= 2000 (max 20% annual)
-- `region_registry` must exist and be a valid AuthorityRegistry PDA
+- `region_registry` must exist and be a valid ValidatorRegistry PDA
 - No StakePool already exists for this `region_registry`
 - `region_registry.validators.len() > 0` (pool cannot be created for an empty registry)
 
@@ -188,13 +186,13 @@ One record per report, created by the reporter.
 
 ### 6.2 `deposit_stake`
 
-**Purpose:** A validator deposits SOL as a bond. The validator must be in the AuthorityRegistry for this region.
+**Purpose:** A validator deposits SOL as a bond. The validator must be in the ValidatorRegistry for this region.
 
 **Accounts:**
 - `stake_pool` (mut)
 - `validator_stake` (init, PDA `["validator_stake", stake_pool_key, validator_key]`)
 - `validator` (signer, mut — the validator depositing; pays rent + stake)
-- `region_registry` (readonly — AuthorityRegistry, used to verify validator membership)
+- `region_registry` (readonly — ValidatorRegistry, used to verify validator membership)
 - `system_program`
 
 **Args:** `amount: u64`
@@ -292,7 +290,7 @@ One record per report, created by the reporter.
 
 ### 6.6 `verify_and_slash`
 
-**Purpose:** Execute slashing after evidence review. Can be called by the AuthorityRegistry admin or by a quorum of `ceil(2n/3)` validators who reviewed the evidence.
+**Purpose:** Execute slashing after evidence review. Can be called by the registry admin or by a quorum of `ceil(2n/3)` validators who reviewed the evidence.
 
 **Accounts:**
 - `slashing_report` (mut)
@@ -306,7 +304,7 @@ One record per report, created by the reporter.
 **Guards:**
 - `slashing_report.status == 0` (Pending)
 - Caller is either:
-  - (a) The AuthorityRegistry admin, OR
+  - (a) The registry admin, OR
   - (b) At least `ceil(2n/3)` validators from `stake_pool` are signers (via `remaining_accounts`)
 - `Clock::get()?.unix_timestamp >= slashing_report.filed_at + 24 * 3600` (24-hour review period elapsed)
 - `Clock::get()?.unix_timestamp < slashing_report.appeal_deadline` (still within appeal window — or appeal period expired without appeal)
@@ -362,7 +360,7 @@ One record per report, created by the reporter.
 **Args:** None
 
 **Guards:**
-- `authority` is the StakePool admin (AuthorityRegistry admin)
+- `authority` is the StakePool admin (registry admin)
 - `Clock::get()?.unix_timestamp >= stake_pool.last_reward_distribution + REWARD_DISTRIBUTION_INTERVAL_SECS` (cooldown elapsed)
 - `stake_pool.total_staked > 0`
 
@@ -466,13 +464,13 @@ One record per report, created by the reporter.
 
 ## 8. Collusion Resistance
 
-### 8.1 Appointment + Stake (Not Either/Or)
+### 8.1 Registration + Stake (Not Either/Or)
 
 The trust model is **layered**:
-1. **AuthorityRegistry appointment** — a real human (admin) vouches for the validator's identity and competence.
+1. **Validator registration** — validators are registered through the ValidatorRegistry, with evidence-based reputation.
 2. **Stake bond** — the validator puts capital at risk, creating economic cost for misbehavior.
 
-A wealthy outsider cannot simply out-stake honest validators because they must first be appointed to the AuthorityRegistry. Stake alone does not grant validator status.
+A wealthy outsider cannot simply out-stake honest validators because they must first be registered in the ValidatorRegistry. Stake alone does not grant validator status.
 
 ### 8.2 No Delegation
 
@@ -528,8 +526,8 @@ If they fail again (repeat offense), they face a 100% slash and are effectively 
 
 ### 9.4 Admin Override for Critical Liveness
 
-If the AuthorityRegistry admin determines that a validator's liveness failure poses a systemic risk (e.g., the validator holds shards for active vaults), the admin can:
-1. Remove the validator from the AuthorityRegistry (via `remove_validator_from_registry`)
+If the registry admin determines that a validator's liveness failure poses a systemic risk (e.g., the validator holds shards for active vaults), the admin can:
+1. Remove the validator from the ValidatorRegistry (via `remove_validator_from_registry`)
 2. Initiate vault shard rotation to replace the offline validator's shards
 3. The staking layer handles the economic penalty separately
 
@@ -589,7 +587,7 @@ The `algorithm_id` field (reserved for future use) is a `u8` enum:
 
 When a post-quantum signature scheme is standardized:
 1. Validators generate Dilithium-3 keypairs alongside their Ed25519 keys.
-2. Both keys are registered in the AuthorityRegistry.
+2. Both keys are registered in the ValidatorRegistry.
 3. Staking operations begin requiring dual signatures (Ed25519 + Dilithium-3).
 4. The `algorithm_id` in StakePool is bumped to 1.
 5. Old Ed25519-only signatures are no longer accepted for staking operations.
@@ -614,7 +612,7 @@ Post-quantum evidence verification requires:
 
 - Validators must use hardware wallets (Ledger, Trezor) or HSMs for signing.
 - Hot wallets (software wallets) should only hold minimal operational SOL, not the full stake.
-- Key rotation is handled by AuthorityRegistry (remove old key, add new key), not by the staking layer.
+- Key rotation is handled by ValidatorRegistry (remove old key, add new key), not by the staking layer.
 
 ### 13.2 Evidence Preservation
 
@@ -624,7 +622,7 @@ Post-quantum evidence verification requires:
 
 ### 13.3 Admin Key Security
 
-- The AuthorityRegistry admin key controls stake pool creation, reward distribution, and slashing execution.
+- The registry admin key controls stake pool creation, reward distribution, and slashing execution.
 - This key should be held in a multisig or hardware wallet.
 - Admin actions should be logged and monitored.
 
@@ -638,7 +636,7 @@ If a validator detects they have been falsely accused:
 
 If the admin detects a genuine attack:
 1. Call `verify_and_slash` to execute the slash.
-2. Remove the attacker from the AuthorityRegistry.
+2. Remove the attacker from the ValidatorRegistry.
 3. Initiate vault shard rotation if the attacker held shards.
 4. Notify affected parties.
 
@@ -646,7 +644,7 @@ If the admin detects a genuine attack:
 
 ### 14.1 Stake Pool Creation
 
-- Region AuthorityRegistry: key `Ar1...`
+- Region ValidatorRegistry: key `Ar1...`
 - Admin: wallet A (matches `registry.admin`)
 - Reward rate: 500 bps (5% annual)
 - Expected: StakePool created with `total_staked = 0`, `reward_rate_bps = 500`, `region_registry = Ar1...`

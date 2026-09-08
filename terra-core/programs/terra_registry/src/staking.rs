@@ -140,13 +140,13 @@ pub fn compute_pattern_slash_bps(offenses: &[u8; 4], offense_kind: u8) -> Result
 // Accounts
 // ---------------------------------------------------------------------------
 
-/// One stake pool per region, derived from the AuthorityRegistry key.
+/// One stake pool per region, derived from the ValidatorRegistry key.
 ///
 /// PDA seed: `["stake_pool", region_registry_key]`.
 #[account]
 #[derive(InitSpace)]
 pub struct StakePool {
-    /// AuthorityRegistry key for this region.
+    /// ValidatorRegistry key for this region.
     pub region_registry: Pubkey,
     /// Total SOL staked across all validators (lamports).
     pub total_staked: u64,

@@ -46,7 +46,7 @@ This RFC specifies the **Cross-Border Identity Bridge Protocol** — a jurisdict
 - KYC/AML compliance logic (application-layer concern, varies by jurisdiction)
 - W3C Verifiable Credential schema design (standards-body concern)
 - Cross-border parcel transfer logic (covered by future RFC)
-- Validator identity verification (covered by AuthorityRegistry)
+- Validator identity verification (covered by ValidatorRegistry)
 
 ## 4. Cryptographic Choices
 
@@ -164,7 +164,7 @@ This is the core on-chain record that binds a person (via their identity_hash) t
 **Accounts:**
 - `jurisdiction` (init, PDA `["jurisdiction", country_code]`)
 - `authority` (signer, mut — pays rent; must be registry admin)
-- `registry` (readonly — AuthorityRegistry account)
+- `registry` (readonly — ValidatorRegistry account)
 - `system_program`
 
 **Args:** `country_code: [u8; 16]`, `jurisdiction_name: String`, `credential_schema_cid: String`, `revocation_registry: Pubkey`, `verification_key_hash: [u8; 32]`, `algorithm_id: u8`
@@ -250,7 +250,7 @@ This is the core on-chain record that binds a person (via their identity_hash) t
 - `jurisdiction` (readonly — Jurisdiction PDA)
 - `identity` (readonly — Identity account)
 - `validator` (signer — must be in the registry)
-- `registry` (readonly — AuthorityRegistry)
+- `registry` (readonly — ValidatorRegistry)
 - `system_program`
 
 **Args:** `off_chain_nonce: [u8; 32]`
@@ -561,7 +561,7 @@ When a post-quantum algorithm is ready for use:
 ### 14.3 Cross-Border Verification
 
 - Binding: Alice's Kenya binding
-- Validator: wallet B (registered in AuthorityRegistry)
+- Validator: wallet B (registered in ValidatorRegistry)
 - Off-chain nonce: random 32 bytes
 - Expected: JurisdictionMembershipVerified event emitted, binding.version incremented
 

@@ -57,7 +57,7 @@ The design folds directly into the existing `Succession` account and instruction
 - Medical diagnosis or cognitive impairment assessment (off-chain, professional judgment)
 - Vault shard protocol interactions (covered by RFC-003)
 - Dispute resolution and parcel freeze flows (covered by RFC-007)
-- Validator identity verification (covered by AuthorityRegistry)
+- Validator identity verification (covered by ValidatorRegistry)
 
 ## 4. Cryptographic Choices
 
@@ -315,7 +315,7 @@ pub struct GuardianshipRevoked {
 ### 7.1 Guardianship Appointment Ceremony
 
 1. **Identification of need.** A party (family member, social worker, court) identifies that an identity owner needs a guardian.
-2. **Validator selection.** The petitioner selects ≥3 independent validators from the AuthorityRegistry. Validators must NOT be the identity owner, the proposed guardian, or have a conflict of interest.
+2. **Validator selection.** The petitioner selects ≥3 independent validators from the ValidatorRegistry. Validators must NOT be the identity owner, the proposed guardian, or have a conflict of interest.
 3. **Guardian selection.** The petitioner selects a guardian wallet (the `successor` in the Succession account).
 4. **Scope definition.** The petitioner defines the guardian's scope in the `notes` field (e.g., "limited to parcel X", "full guardianship", "until 2027-01-01").
 5. **Court order (if court-appointed).** For `kind = COURT_APPOINTED_GUARDIAN`, the petitioner obtains a court order and computes `case_hash = SHA-256(court_order_document)`.
@@ -507,7 +507,7 @@ Validators for guardianship endorsements should be:
 1. **Independent.** No conflicts of interest with the guardian or the subject.
 2. **Local.** Familiar with the subject's situation and jurisdiction.
 3. **Responsive.** Available to endorse within the 90-day grace period.
-4. **Trusted.** Known to the community or AuthorityRegistry.
+4. **Trusted.** Known to the community or ValidatorRegistry.
 
 ### 13.2 Court Order Handling
 
