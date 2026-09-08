@@ -16,7 +16,8 @@ green on `dev` (fmt, `clippy -D warnings`, 54 lib unit tests, 47 API unit
 tests incl. live-PostGIS migration run, `tsc --noEmit`).
 
 Beyond CI, every protocol is verified by **BPF integration tests** (real
-program execution via `solana-program-test`, 9/9 passing) and a **76-check API
+program execution via `solana-program-test`, **42/42 passing** covering all
+major instruction happy paths and guard rails) and a **76-check API
 smoke suite** against live PostGIS covering happy paths and guard rails
 (double-proof replay, early claims, stale roots, forged signatures, …).
 
