@@ -3572,3 +3572,161 @@ async fn request_court_guardianship_creates_succession() {
     assert_eq!(s.grace_secs, 90 * 24 * 3600); // 90 days as requested
     assert_eq!(s.validations_count, 0);
 }
+
+// ===========================================================================
+// Batch 7: attach_parcel, rotate_validators
+// ===========================================================================
+
+#[tokio::test]
+async fn attach_parcel_increments_count() {
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity: owner = payer.
+    let identity_hash = [40u8; 32];
+    let (id_pda, _) = identity_pda(&identity_hash);
+    let recovery = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&recovery.pubkey().to_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity failed");
+
+    let id: Identity = read_account(&ctx, id_pda).await;
+    assert_eq!(id.parcel_count, 0);
+
+    // Register parcel owned by payer.
+    let parcel_id: [u8; 32] = [41u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Identity Parcel", &[5u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Attach parcel to identity.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "attach_parcel").to_vec(),
+        },
+    )
+    .await
+    .expect("attach_parcel failed");
+
+    let id: Identity = read_account(&ctx, id_pda).await;
+    assert_eq!(id.parcel_count, 1);
+}
+
+#[tokio::test]
+async fn rotate_validators_updates_attestation() {
+    let (mut ctx, payer) = setup().await;
+
+    // Register parcel.
+    let parcel_id: [u8; 32] = [42u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Attested Parcel", &[6u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Create attestation with 2 validators.
+    let val_old1 = Keypair::new();
+    let val_old2 = Keypair::new();
+    let specifier: [u8; 32] = [43u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+
+    let mut validators_old = [Pubkey::default(); 8];
+    validators_old[0] = val_old1.pubkey();
+    validators_old[1] = val_old2.pubkey();
+
+    let mut att_data = discriminator("global", "attest").to_vec();
+    att_data.extend_from_slice(&specifier);
+    att_data.extend_from_slice(&[7u8; 32]); // content_hash
+    att_data.push(2u8); // required = 2
+    for v in &validators_old {
+        att_data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: att_data,
+        },
+    )
+    .await
+    .expect("attest failed");
+
+    let att: Attestation = read_account(&ctx, att_pk).await;
+    assert_eq!(att.required, 2);
+    assert_eq!(att.count, 2);
+    assert_eq!(att.version, 0); // initial version
+
+    // Rotate validators to a new set.
+    let val_new1 = Keypair::new();
+    let val_new2 = Keypair::new();
+    let mut validators_new = [Pubkey::default(); 8];
+    validators_new[0] = val_new1.pubkey();
+    validators_new[1] = val_new2.pubkey();
+
+    let mut rot_data = discriminator("global", "rotate_validators").to_vec();
+    rot_data.push(1u8); // new_required = 1
+    for v in &validators_new {
+        rot_data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: rot_data,
+        },
+    )
+    .await
+    .expect("rotate_validators failed");
+
+    let att: Attestation = read_account(&ctx, att_pk).await;
+    assert_eq!(att.required, 1);
+    assert_eq!(att.version, 1); // bumped from 0 to 1
+    assert!(att.validators.contains(&val_new1.pubkey()));
+    assert!(att.validators.contains(&val_new2.pubkey()));
+    assert!(!att.validators.contains(&val_old1.pubkey()));
+}
