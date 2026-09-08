@@ -3730,3 +3730,108 @@ async fn rotate_validators_updates_attestation() {
     assert!(att.validators.contains(&val_new2.pubkey()));
     assert!(!att.validators.contains(&val_old1.pubkey()));
 }
+
+// ===========================================================================
+// Batch 8: report_validator_offense
+// ===========================================================================
+
+#[tokio::test]
+async fn report_offense_files_slashing_report() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let (pool, _) = stake_pool_pda(&registry);
+
+    // Create stake pool.
+    let mut data = discriminator("global", "create_stake_pool").to_vec();
+    data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_stake_pool failed");
+
+    // Deposit stake.
+    let amount: u64 = 5_000_000_000;
+    let (stake, _) = validator_stake_pda(&pool, &payer.pubkey());
+    let mut data = discriminator("global", "deposit_stake").to_vec();
+    data.extend_from_slice(&borsh_ser(&amount));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("deposit_stake failed");
+
+    // Report offense against payer by a different reporter.
+    let reporter = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &reporter.pubkey(), 200_000_000))
+        .await
+        .expect("fund reporter");
+
+    let evidence_hash = [0xAAu8; 32];
+    let offense_details = [0xBBu8; 64];
+    let (slashing_report, _) = Pubkey::find_program_address(
+        &[
+            b"slashing_report",
+            pool.as_ref(),
+            reporter.pubkey().as_ref(),
+            &evidence_hash,
+        ],
+        &PROGRAM_ID,
+    );
+
+    let mut data = discriminator("global", "report_validator_offense").to_vec();
+    data.push(1u8); // offense_kind = EVIDENCE_MISMATCH (1)
+    data.extend_from_slice(&evidence_hash);
+    data.extend_from_slice(&offense_details);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(pool, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(slashing_report, false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("report_validator_offense failed");
+
+    let report: staking::SlashingReport = read_account(&ctx, slashing_report).await;
+    assert_eq!(report.reporter, reporter.pubkey());
+    assert_eq!(report.offender, payer.pubkey());
+    assert_eq!(report.offense_type, 1);
+    assert_eq!(report.status, 0); // PENDING
+
+    let stake_acc: staking::ValidatorStake = read_account(&ctx, stake).await;
+    assert_eq!(stake_acc.offenses[1], 1); // one offense of type 1
+}
