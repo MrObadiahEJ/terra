@@ -11,7 +11,7 @@ use terra_registry::{
     authority_registry::{self, AuthorityRegistry},
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
-    guardian, infra_flag, parcel_status, right_kind, recovery, staking,
+    guardian, infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
     subdivision::SubdivisionRecord,
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
@@ -3834,4 +3834,145 @@ async fn report_offense_files_slashing_report() {
 
     let stake_acc: staking::ValidatorStake = read_account(&ctx, stake).await;
     assert_eq!(stake_acc.offenses[1], 1); // one offense of type 1
+}
+
+// ===========================================================================
+// Batch 9: register_document, grant_conditional_right
+// ===========================================================================
+
+#[tokio::test]
+async fn register_document_on_attestation() {
+    let (mut ctx, payer) = setup().await;
+
+    // Register parcel.
+    let parcel_id: [u8; 32] = [70u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Doc Parcel", &[7u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Create attestation.
+    let specifier: [u8; 32] = [71u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+
+    let mut att_data = discriminator("global", "attest").to_vec();
+    att_data.extend_from_slice(&specifier);
+    att_data.extend_from_slice(&[72u8; 32]); // content_hash
+    att_data.push(1u8); // required = 1
+    let mut vals = [Pubkey::default(); 8];
+    vals[0] = payer.pubkey();
+    for v in &vals {
+        att_data.extend_from_slice(&v.to_bytes());
+    }
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: att_data,
+        },
+    )
+    .await
+    .expect("attest failed");
+
+    // Register document on the attestation.
+    let cid = "bafybeigdyrzt5sfp7udm7hu76uh".to_string();
+    let content_hash = [0xAAu8; 32];
+    let category = "deed".to_string();
+    let (doc_pk, _) = document_pda(&att_pk, &cid);
+
+    let mut doc_data = discriminator("global", "register_document").to_vec();
+    doc_data.extend_from_slice(&borsh_ser(&cid));
+    doc_data.extend_from_slice(&content_hash);
+    doc_data.extend_from_slice(&borsh_ser(&category));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(doc_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: doc_data,
+        },
+    )
+    .await
+    .expect("register_document failed");
+
+    let doc: ipfs_docs::DocumentAnchor = read_account(&ctx, doc_pk).await;
+    assert_eq!(doc.attestation, att_pk);
+    assert_eq!(doc.cid, "bafybeigdyrzt5sfp7udm7hu76uh");
+    assert_eq!(doc.category, "deed");
+    assert_eq!(doc.registered_by, payer.pubkey());
+
+    let att: Attestation = read_account(&ctx, att_pk).await;
+    assert_eq!(att.document_count, 1);
+}
+
+#[tokio::test]
+async fn grant_conditional_right_creates_rights_account() {
+    let (mut ctx, payer) = setup().await;
+
+    // Register parcel.
+    let parcel_id: [u8; 32] = [73u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parcel_id, "Rights Parcel", &[8u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let holder = Keypair::new();
+    let (rights_pk, _) = rights_pda(&parcel_pk, 0);
+    let expires_at: i64 = 4_000_000_000; // far future
+    let condition_deadline: i64 = 3_000_000_000; // before expires_at
+
+    let mut data = discriminator("global", "grant_conditional_right").to_vec();
+    data.push(0u8); // nonce = 0
+    data.push(1u8); // rights_kind = 1 (USAGE)
+    data.extend_from_slice(&holder.pubkey().to_bytes());
+    data.extend_from_slice(&expires_at.to_le_bytes());
+    data.extend_from_slice(&condition_deadline.to_le_bytes());
+    data.extend_from_slice(&borsh_ser(&"complete survey".to_string()));
+    data.extend_from_slice(&0i64.to_le_bytes()); // grace_period_secs = 0
+    data.extend_from_slice(&borsh_ser(&"conditional right".to_string()));
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(rights_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("grant_conditional_right failed");
+
+    let r: Rights = read_account(&ctx, rights_pk).await;
+    assert_eq!(r.holder, holder.pubkey());
+    assert_eq!(r.granter, payer.pubkey());
+    assert_eq!(r.parcel, parcel_pk);
+    assert!(r.expires_at > 0);
 }
