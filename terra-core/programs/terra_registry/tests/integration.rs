@@ -12,6 +12,7 @@ use terra_registry::{
     cross_border::{Jurisdiction, JurisdictionBinding},
     guardian, infra_flag, parcel_status, right_kind, recovery, staking,
     subdivision::SubdivisionRecord,
+    world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
     Attestation, Identity, Parcel, Rights, Succession, ID as PROGRAM_ID,
 };
@@ -161,6 +162,38 @@ fn credential_nullifier_pda(nullifier_hash: &[u8; 32]) -> (Pubkey, u8) {
 fn nomination_pda(registry: &Pubkey, candidate: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[b"validator_nomination", registry.as_ref(), candidate.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn dispute_pda(parcel: &Pubkey, case_hash: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"dispute", parcel.as_ref(), case_hash.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn escrow_pda(parcel: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"escrow", parcel.as_ref()], &PROGRAM_ID)
+}
+
+fn escrow_vault_pda(escrow_record: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"escrow_vault", escrow_record.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn document_pda(attestation: &Pubkey, cid: &str) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"document", attestation.as_ref(), cid.as_bytes()],
+        &PROGRAM_ID,
+    )
+}
+
+fn amalgamation_pda(result: &Pubkey, source: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"amalgamation", result.as_ref(), source.as_ref()],
         &PROGRAM_ID,
     )
 }
@@ -2334,4 +2367,284 @@ async fn pattern_slash_first_vs_repeat() {
     // Pattern computation is tested at unit level. This integration test
     // verifies the staking flow end-to-end (deposit works, balances correct).
     // Full slash test requires warp past REVIEW_PERIOD_SECS.
+}
+
+// ===========================================================================
+// Batch 1: update_status, remove_validator, confirm_genesis,
+//          heartbeat, check_quorum_reachable
+// ===========================================================================
+
+#[tokio::test]
+async fn update_status_lifecycle() {
+    let (mut ctx, payer) = setup().await;
+    let id = [1u8; 32];
+    process(&mut ctx, &payer, register_ix(&id, "TestParcel", &[2u8; 32], &payer.pubkey()))
+        .await
+        .expect("register failed");
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    // Update to FOR_SALE (2).
+    let mut data = discriminator("global", "update_status").to_vec();
+    data.push(2u8);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("update_status failed");
+
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, 2); // FOR_SALE
+
+    // Non-owner cannot update.
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000))
+        .await
+        .expect("fund failed");
+    let mut data = discriminator("global", "update_status").to_vec();
+    data.push(3u8);
+    let res = process(
+        &mut ctx,
+        &intruder,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(intruder.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "non-owner must fail");
+}
+
+#[tokio::test]
+async fn remove_validator_by_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let v2 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
+
+    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    assert_eq!(reg.validators.len(), 2);
+    assert!(reg.validators.contains(&payer.pubkey()));
+    assert!(reg.validators.contains(&v2.pubkey()));
+
+    // The endorsement PDA already exists from add_validator_ok (init_if_needed).
+    let (endorsement, _) = endorsement_pda(&registry, &v2.pubkey());
+
+    // Remove v2 via admin (no endorsement needed).
+    let mut data = discriminator("global", "remove_validator_from_registry").to_vec();
+    data.extend_from_slice(&v2.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(v2.pubkey(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("remove_validator failed");
+
+    let reg: AuthorityRegistry = read_account(&ctx, registry).await;
+    assert_eq!(reg.validators.len(), 1);
+    assert!(!reg.validators.contains(&v2.pubkey()));
+}
+
+#[tokio::test]
+async fn confirm_genesis_from_foreign_confirmer() {
+    let (mut ctx, payer) = setup().await;
+    let (wr, _) = world_registry_pda();
+
+    // Create WorldRegistry.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(wr, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "create_world_registry").to_vec(),
+        },
+    )
+    .await
+    .expect("create_world_registry failed");
+
+    // Allocate US to payer.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(wr, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "allocate_country").to_vec();
+                d.extend_from_slice(b"US");
+                d.extend_from_slice(&payer.pubkey().to_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("allocate_country failed");
+
+    // Request genesis for US.
+    let (genesis_ix, _) = genesis_request_pda(b"US");
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(genesis_ix, false),
+                AccountMeta::new_readonly(wr, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "request_genesis").to_vec();
+                d.extend_from_slice(b"US");
+                d
+            },
+        },
+    )
+    .await
+    .expect("request_genesis failed");
+
+    // Foreign confirmer from GB confirms.
+    let confirmer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &confirmer.pubkey(), 10_000_000))
+        .await
+        .expect("fund confirmer failed");
+    process(
+        &mut ctx,
+        &confirmer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(genesis_ix, false),
+                AccountMeta::new_readonly(wr, false),
+                AccountMeta::new(confirmer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "confirm_genesis").to_vec();
+                d.extend_from_slice(b"GB");
+                d
+            },
+        },
+    )
+    .await
+    .expect("confirm_genesis failed");
+
+    let req: world_registry::GenesisRequest = read_account(&ctx, genesis_ix).await;
+    assert_eq!(req.confirmations.len(), 1);
+    assert!(!req.finalized);
+}
+
+#[tokio::test]
+async fn heartbeat_updates_existing_tracker() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+
+    let (tracker, _) = validator_activity_pda(&registry, &payer.pubkey());
+
+    // Create tracker via set_validator_active.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(tracker, false),
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "set_validator_active").to_vec();
+                d.extend_from_slice(&payer.pubkey().to_bytes());
+                d.push(1); // is_active = true
+                d
+            },
+        },
+    )
+    .await
+    .expect("set_validator_active failed");
+
+    let t: recovery::ValidatorActivityTracker = read_account(&ctx, tracker).await;
+    let ts_before = t.last_active;
+
+    // Heartbeat updates the timestamp.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(tracker, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "heartbeat").to_vec(),
+        },
+    )
+    .await
+    .expect("heartbeat failed");
+
+    let t: recovery::ValidatorActivityTracker = read_account(&ctx, tracker).await;
+    assert!(t.last_active >= ts_before);
+    assert!(t.is_active);
+}
+
+#[tokio::test]
+async fn check_quorum_reachable_emits_event() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    // Add 4 validators to reach PEER_CONSENSUS mode.
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let v2 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
+    let v3 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v3.pubkey()).await;
+    let v4 = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &v4.pubkey()).await;
+
+    // check_quorum_reachable just emits an event — verify it doesn't error.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+            ],
+            data: discriminator("global", "check_quorum_reachable").to_vec(),
+        },
+    )
+    .await
+    .expect("check_quorum_reachable failed");
 }
