@@ -271,6 +271,34 @@ async fn process_with(
     ctx.banks_client.process_transaction(tx).await.map(|_| ())
 }
 
+async fn register_parcel_ok(ctx: &mut ProgramTestContext, owner: &Keypair, registry: Pubkey) -> Pubkey {
+    let id: [u8; 32] = [200u8; 32]; // unique per test context
+    let geo: [u8; 32] = [1u8; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+    process(
+        ctx,
+        owner,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(owner.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"Test Parcel".to_string()));
+                d.extend_from_slice(&geo);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel failed");
+    parcel_pk
+}
+
 fn fund_ix(from: &Pubkey, to: &Pubkey, lamports: u64) -> Instruction {
     let mut data = vec![2u8, 0, 0, 0];
     data.extend_from_slice(&lamports.to_le_bytes());
@@ -2882,4 +2910,124 @@ async fn claim_succession_not_yet_effective() {
     )
     .await;
     assert!(res.is_err(), "claim should fail — not yet effective");
+}
+
+// ===========================================================================
+// Batch 3: judicial_forfeiture
+// ===========================================================================
+
+#[tokio::test]
+async fn judicial_forfeiture_transfers_ownership() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Owner of the parcel.
+    let owner = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000))
+        .await
+        .expect("fund owner");
+    let parcel = register_parcel_ok(&mut ctx, &owner, registry).await;
+
+    // Authority (court clerk) — different from owner.
+    let authority = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &authority.pubkey(), 10_000_000))
+        .await
+        .expect("fund authority");
+
+    // Two validators that will sign the forfeiture.
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val1.pubkey(), 10_000_000))
+        .await
+        .expect("fund val1");
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val2.pubkey(), 10_000_000))
+        .await
+        .expect("fund val2");
+
+    let case_hash = [42u8; 32];
+    let new_owner = Keypair::new();
+
+    // Build judicial_forfeiture ix: authority signs, val1+val2 are remaining_accounts signers.
+    let mut data = discriminator("global", "judicial_forfeiture").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.extend_from_slice(&new_owner.pubkey().to_bytes());
+    data.push(2u8); // threshold
+    let mut vals = [Pubkey::default(); 8];
+    vals[0] = val1.pubkey();
+    vals[1] = val2.pubkey();
+    for v in &vals {
+        data.extend_from_slice(&v.to_bytes());
+    }
+
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel, false),
+            AccountMeta::new(authority.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            // remaining_accounts: both validator signers
+            AccountMeta::new_readonly(val1.pubkey(), true),
+            AccountMeta::new_readonly(val2.pubkey(), true),
+        ],
+        data,
+    };
+
+    process_with(&mut ctx, &authority, &[&authority, &val1, &val2], ix)
+        .await
+        .expect("judicial_forfeiture failed");
+
+    let p: Parcel = read_account(&ctx, parcel).await;
+    assert_eq!(p.owner, new_owner.pubkey());
+}
+
+#[tokio::test]
+async fn judicial_forfeiture_rejects_owner_as_authority() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    let owner = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000))
+        .await
+        .expect("fund owner");
+    let parcel = register_parcel_ok(&mut ctx, &owner, registry).await;
+
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val1.pubkey(), 10_000_000))
+        .await
+        .expect("fund val1");
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &val2.pubkey(), 10_000_000))
+        .await
+        .expect("fund val2");
+
+    let case_hash = [99u8; 32];
+    let new_owner = Keypair::new();
+
+    let mut data = discriminator("global", "judicial_forfeiture").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.extend_from_slice(&new_owner.pubkey().to_bytes());
+    data.push(2u8);
+    let mut vals = [Pubkey::default(); 8];
+    vals[0] = val1.pubkey();
+    vals[1] = val2.pubkey();
+    for v in &vals {
+        data.extend_from_slice(&v.to_bytes());
+    }
+
+    // Owner acts as authority — should fail (OwnerCannotSelfForfeit).
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel, false),
+            AccountMeta::new(owner.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            // remaining_accounts: both validator signers
+            AccountMeta::new_readonly(val1.pubkey(), true),
+            AccountMeta::new_readonly(val2.pubkey(), true),
+        ],
+        data,
+    };
+
+    let res = process_with(&mut ctx, &owner, &[&owner, &val1, &val2], ix).await;
+    assert!(res.is_err(), "owner should not be able to self-forfeit");
 }
