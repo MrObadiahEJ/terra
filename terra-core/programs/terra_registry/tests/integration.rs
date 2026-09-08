@@ -3976,3 +3976,76 @@ async fn grant_conditional_right_creates_rights_account() {
     assert_eq!(r.parcel, parcel_pk);
     assert!(r.expires_at > 0);
 }
+
+// ===========================================================================
+// Batch 10: update_jurisdiction
+// ===========================================================================
+
+#[tokio::test]
+async fn update_jurisdiction_changes_status() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Register jurisdiction.
+    let mut country_code = [0u8; 16];
+    country_code[..2].copy_from_slice(b"KE");
+    let (jurisdiction, _) = jurisdiction_pda(&country_code);
+    let vk_hash = [50u8; 32];
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&"Kenya".to_string()));
+    data.extend_from_slice(&borsh_ser(&"QmSchemaKE".to_string()));
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    data.extend_from_slice(&vk_hash);
+    data.extend_from_slice(&borsh_ser(&0u8));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_jurisdiction failed");
+
+    let jur: Jurisdiction = read_account(&ctx, jurisdiction).await;
+    assert_eq!(jur.status, 0); // ACTIVE
+
+    // Update jurisdiction status to SUSPENDED (1).
+    let new_vk_hash = [51u8; 32];
+    let mut data = discriminator("global", "update_jurisdiction").to_vec();
+    // Option<[u8; 32]>: Some = 1 + bytes
+    data.push(1u8); // Some
+    data.extend_from_slice(&new_vk_hash);
+    // Option<Pubkey>: None = 0
+    data.push(0u8);
+    // Option<u8>: Some = 1 + value
+    data.push(1u8); // Some
+    data.push(1u8); // SUSPENDED
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("update_jurisdiction failed");
+
+    let jur: Jurisdiction = read_account(&ctx, jurisdiction).await;
+    assert_eq!(jur.status, 1); // SUSPENDED
+    assert_eq!(jur.verification_key_hash, new_vk_hash);
+}
