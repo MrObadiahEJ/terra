@@ -61,10 +61,12 @@ pub fn create_escrow(ctx: Context<super::CreateEscrow>, amount: u64, buyer: Pubk
         ctx.accounts.parcel.status == parcel_status::FOR_SALE,
         TerraError::InvalidStatus
     );
-    require!(
-        ctx.accounts.seller.key() == ctx.accounts.parcel.owner,
-        TerraError::NotOwner
-    );
+    crate::is_authorized_owner(
+        ctx.accounts.parcel.owner,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.seller.key(),
+    )?;
     require!(buyer != Pubkey::default(), TerraError::EmptySuccessor);
     require!(
         buyer != ctx.accounts.seller.key(),
@@ -168,10 +170,12 @@ pub fn accept_escrow(ctx: Context<super::AcceptEscrow>) -> Result<()> {
         ctx.accounts.seller.key() == escrow.seller,
         TerraError::NotDesignatedSeller
     );
-    require!(
-        ctx.accounts.seller.key() == ctx.accounts.parcel.owner,
-        TerraError::NotOwner
-    );
+    crate::is_authorized_owner(
+        ctx.accounts.parcel.owner,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.seller.key(),
+    )?;
     require!(
         escrow.deposit_amount >= escrow.amount,
         TerraError::InsufficientDeposit

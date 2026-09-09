@@ -268,7 +268,7 @@ pub fn migrate_rights<'a>(ctx: Context<'a, super::MigrateRights<'a>>) -> Result<
     let old_parcel = &ctx.accounts.old_parcel;
     let new_parcel = &mut ctx.accounts.new_parcel;
 
-    require!(authority_key == old_parcel.owner, TerraError::NotAuthorized);
+    crate::is_authorized_owner(old_parcel.owner, old_parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
     require!(
         old_parcel.key() != new_parcel.key(),
         TerraError::SelfDealingNotAllowed
@@ -413,10 +413,7 @@ pub fn migrate_attestations(
     let old_parcel = &ctx.accounts.old_parcel;
     let new_parcel = &ctx.accounts.new_parcel;
 
-    require!(
-        ctx.accounts.authority.key() == old_parcel.owner,
-        TerraError::NotOwner
-    );
+    crate::is_authorized_owner(old_parcel.owner, old_parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
 
     let old_att = &ctx.accounts.old_attestation;
     require!(

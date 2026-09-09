@@ -96,8 +96,14 @@ pub fn renew_right(
 
     // Granter must be the original granter or current parcel owner.
     let granter_key = ctx.accounts.granter.key();
+    let owner_ok = crate::is_authorized_owner(
+        ctx.accounts.parcel.owner,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.granter.key(),
+    );
     require!(
-        granter_key == rights.granter || granter_key == ctx.accounts.parcel.owner,
+        owner_ok.is_ok() || granter_key == rights.granter,
         TerraError::NotAuthorized
     );
 
@@ -174,10 +180,7 @@ pub fn grant_conditional_right(
     notes: String,
 ) -> Result<()> {
     let parcel = &mut ctx.accounts.parcel;
-    require!(
-        parcel.owner == ctx.accounts.owner.key(),
-        TerraError::NotOwner
-    );
+    crate::is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
     require!(
         rights_kind <= crate::right_kind::MAX,
         TerraError::InvalidRightKind

@@ -80,7 +80,13 @@ pub fn file_dispute(
     // Anti-grief: only the parcel owner or a registered validator may file.
     // This prevents random wallets from griefing any registered parcel.
     let filer_key = ctx.accounts.filer.key();
-    let is_owner = filer_key == ctx.accounts.parcel.owner;
+    let is_owner = crate::is_authorized_owner(
+        ctx.accounts.parcel.owner,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.filer.key(),
+    )
+    .is_ok();
     let registry = &ctx.accounts.registry;
     let is_validator = registry.validators.contains(&filer_key);
     require!(is_owner || is_validator, TerraError::NotAuthorized);
@@ -306,8 +312,14 @@ pub fn cancel_dispute(ctx: Context<super::CancelDispute>) -> Result<()> {
     );
     // Only the filer or parcel owner can cancel before adjudication.
     let signer = ctx.accounts.signer.key();
+    let owner_ok = crate::is_authorized_owner(
+        ctx.accounts.parcel.owner,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.signer.key(),
+    );
     require!(
-        signer == dispute.filed_by || signer == ctx.accounts.parcel.owner,
+        signer == dispute.filed_by || owner_ok.is_ok(),
         TerraError::NotAuthorized
     );
 

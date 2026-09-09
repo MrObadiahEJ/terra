@@ -103,12 +103,106 @@ pub mod right_status {
     pub const MAX: u8 = REVOKED;
 }
 
+/// An identity-based right that links an Identity PDA to a Parcel.
+///
+/// This is the foundation for replacing raw wallet ownership (`Parcel.owner`)
+/// with identity-centric ownership. Rather than a wallet pubkey holding a right,
+/// the Identity PDA is the holder — making rights portable across wallets.
+///
+/// PDA: `["identity_rights", identity, parcel, rights_kind]`.
+/// One IdentityRights per (identity, parcel, kind) is allowed.
+#[account]
+#[derive(InitSpace)]
+pub struct IdentityRights {
+    /// The Identity PDA that holds this right.
+    pub identity: Pubkey,
+    /// The parcel this right applies to.
+    pub parcel: Pubkey,
+    /// Right kind (OWNERSHIP, USAGE, EASEMENT, etc.).
+    pub rights_kind: u8,
+    /// Who granted this right (must be the current owner or granter).
+    pub granter: Pubkey,
+    pub created_at: i64,
+    /// Unix timestamp; 0 means no expiration.
+    pub expires_at: i64,
+    /// ACTIVE, EXPIRED, REVOKED.
+    pub status: u8,
+    #[max_len(128)]
+    pub notes: String,
+}
+
+/// Check whether `signer` is authorized to act as owner on `parcel`.
+///
+/// Authorization passes if:
+/// 1. `signer == parcel.owner` (legacy wallet path), OR
+/// 2. `remaining_accounts` contains a valid `IdentityRights` with
+///    `rights_kind == OWNERSHIP`, `status == ACTIVE`, and
+///    `identity.owner == signer` (identity path).
+pub fn is_authorized_owner(
+    parcel_owner: Pubkey,
+    parcel_key: Pubkey,
+    remaining_accounts: &[AccountInfo],
+    signer_key: Pubkey,
+) -> Result<()> {
+    // Fast path: legacy wallet ownership.
+    if parcel_owner == signer_key {
+        return Ok(());
+    }
+
+    // Identity path: look for a valid IdentityRights in remaining_accounts.
+    for acc in remaining_accounts.iter() {
+        let data = acc.try_borrow_data()?;
+        if data.len() < 8 {
+            continue;
+        }
+        let mut slice: &[u8] = &data;
+        let ir = match IdentityRights::try_deserialize(&mut slice) {
+            Ok(ir) => ir,
+            Err(_) => continue,
+        };
+
+        if ir.rights_kind != right_kind::OWNERSHIP {
+            continue;
+        }
+        if ir.parcel != parcel_key {
+            continue;
+        }
+        if ir.status != right_status::ACTIVE {
+            continue;
+        }
+
+        // The IdentityRights must be for the signer's identity.
+        // Read the Identity PDA to verify the signer is its owner.
+        let identity_info = remaining_accounts.iter().find(|a| a.key == &ir.identity);
+        if let Some(identity_acc) = identity_info {
+            let id_data = identity_acc.try_borrow_data()?;
+            let slice_id = if id_data.len() >= 8 { &id_data[8..] } else { &id_data };
+            let identity: Identity =
+                anchor_lang::AnchorDeserialize::try_from_slice(slice_id)
+                    .map_err(|_| error!(TerraError::IdentityMismatch))?;
+            require!(
+                identity.owner == signer_key,
+                TerraError::IdentityMismatch
+            );
+            return Ok(());
+        }
+    }
+
+    Err(error!(TerraError::NotOwner))
+}
+
 /// Maximum number of validators that can approve a single attestation.
 /// Keeps the account space bounded and predictable.
 pub const MAX_VALIDATORS: usize = 8;
 
 /// An on-chain attestation that binds a set of off-chain documents/data to a
 /// parcel and records *who* (which wallets) must validate a transaction.
+///
+/// **DEPRECATED**: This parcel-centric attestation model is superseded by the
+/// verification pipeline (`Claim → Evidence → Observation → VerificationAttestation`).
+/// Existing accounts remain valid for backward compatibility, but new attestations
+/// should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)
+/// is provided to transition legacy attestations into the new model.
 ///
 /// PDA: `["attestation", parcel, specifier]`. The heavy payload — actual
 /// documents and per-validator Ed25519 signatures — lives off-chain, but it is
@@ -706,10 +800,7 @@ pub mod terra_registry {
     /// Transfer ownership of a parcel. Only the current owner can sign.
     pub fn transfer_parcel(ctx: Context<TransferParcel>) -> Result<()> {
         let parcel = &mut ctx.accounts.parcel;
-        require!(
-            parcel.owner == ctx.accounts.owner.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
 
         let from = parcel.owner;
         let to = ctx.accounts.new_owner.key();
@@ -726,10 +817,7 @@ pub mod terra_registry {
 
     /// Update a parcel's status (e.g. for-sale). Owner-only.
     pub fn update_status(ctx: Context<UpdateStatus>, status: u8) -> Result<()> {
-        require!(
-            ctx.accounts.parcel.owner == ctx.accounts.owner.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(ctx.accounts.parcel.owner, ctx.accounts.parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
         require!(status <= parcel_status::MAX, TerraError::InvalidStatus);
 
         let parcel = &mut ctx.accounts.parcel;
@@ -751,10 +839,7 @@ pub mod terra_registry {
         notes: String,
     ) -> Result<()> {
         let parcel = &mut ctx.accounts.parcel;
-        require!(
-            parcel.owner == ctx.accounts.owner.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
         require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
         require!(nonce == parcel.rights_count, TerraError::InvalidNonce);
         require!(
@@ -794,9 +879,14 @@ pub mod terra_registry {
     /// reused by a future grant (safe: the old account no longer exists).
     pub fn revoke_right(ctx: Context<RevokeRight>, _nonce: u8) -> Result<()> {
         let rights = &ctx.accounts.rights;
+        let owner_ok = is_authorized_owner(
+            ctx.accounts.parcel.owner,
+            ctx.accounts.parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        );
         require!(
-            ctx.accounts.parcel.owner == ctx.accounts.owner.key()
-                || rights.granter == ctx.accounts.owner.key(),
+            owner_ok.is_ok() || rights.granter == ctx.accounts.owner.key(),
             TerraError::NotAuthorized
         );
 
@@ -811,6 +901,88 @@ pub mod terra_registry {
         Ok(())
     }
 
+    /// Grant an identity-based right on a parcel. Only the parcel owner (or
+    /// current granter) may sign. The `identity` must be a valid Identity PDA
+    /// owned by the signer.
+    ///
+    /// PDA: `["identity_rights", identity, parcel, rights_kind]`.
+    pub fn grant_identity_right(
+        ctx: Context<GrantIdentityRight>,
+        rights_kind: u8,
+        expires_at: i64,
+        notes: String,
+    ) -> Result<()> {
+        require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
+        require!(notes.len() <= 128, TerraError::NotesTooLong);
+        let now = Clock::get()?.unix_timestamp;
+        if expires_at != 0 {
+            require!(expires_at > now, TerraError::InvalidExpiry);
+        }
+
+        let parcel = &ctx.accounts.parcel;
+        require!(
+            parcel.owner == ctx.accounts.granter.key(),
+            TerraError::NotOwner
+        );
+
+        // Verify the identity account belongs to the granter.
+        let identity_info = &ctx.accounts.identity;
+        let identity_data = identity_info.try_borrow_data()?;
+        let slice = if identity_data.len() >= 8 {
+            &identity_data[8..]
+        } else {
+            &identity_data
+        };
+        let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
+            .map_err(|_| error!(TerraError::IdentityMismatch))?;
+        require!(
+            identity.owner == ctx.accounts.granter.key(),
+            TerraError::IdentityMismatch
+        );
+
+        let ir = &mut ctx.accounts.identity_rights;
+        ir.identity = identity_info.key();
+        ir.parcel = parcel.key();
+        ir.rights_kind = rights_kind;
+        ir.granter = ctx.accounts.granter.key();
+        ir.created_at = now;
+        ir.expires_at = expires_at;
+        ir.status = right_status::ACTIVE;
+        ir.notes = notes;
+
+        emit!(IdentityRightGranted {
+            identity: ir.identity,
+            parcel: ir.parcel,
+            rights_kind: ir.rights_kind,
+        });
+        Ok(())
+    }
+
+    /// Revoke an identity-based right. The original granter may revoke.
+    pub fn revoke_identity_right(
+        ctx: Context<RevokeIdentityRight>,
+        rights_kind: u8,
+    ) -> Result<()> {
+        require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
+
+        let ir = &ctx.accounts.identity_rights;
+        require!(
+            ir.identity == ctx.accounts.identity.key(),
+            TerraError::IdentityMismatch
+        );
+        require!(
+            ir.granter == ctx.accounts.granter.key(),
+            TerraError::NotAuthorized
+        );
+
+        emit!(IdentityRightRevoked {
+            identity: ir.identity,
+            parcel: ir.parcel,
+            rights_kind: ir.rights_kind,
+        });
+        Ok(())
+    }
+
     /// Set the parcel's infrastructure flag bitmask together with the canonical
     /// access digest produced by the off-chain validation engine. Owner-only.
     ///
@@ -821,10 +993,7 @@ pub mod terra_registry {
         flags: u16,
         access_hash: [u8; 32],
     ) -> Result<()> {
-        require!(
-            ctx.accounts.parcel.owner == ctx.accounts.owner.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(ctx.accounts.parcel.owner, ctx.accounts.parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
         require!(
             flags & !infra_flag::ALL == 0,
             TerraError::InvalidInfrastructureFlags
@@ -850,6 +1019,10 @@ pub mod terra_registry {
     /// Register an attestation that binds heavy off-chain data to this parcel
     /// and records the set of validator wallets required to validate it.
     ///
+    /// **DEPRECATED**: Use `create_claim` in the verification pipeline instead.
+    /// This instruction remains for backward compatibility with existing
+    /// attestations. New attestations should use `Claim → Evidence → Observation`.
+    ///
     /// `validators` holds the public keys of the (possibly several) parties
     /// who must sign off on the transaction; `required` is how many signatures
     /// are needed. The signer must be the parcel owner or a registered
@@ -864,10 +1037,7 @@ pub mod terra_registry {
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
         // Only the parcel owner (or program authority) may create attestations.
-        require!(
-            parcel.owner == ctx.accounts.authority.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
         require!(
             !specifier.iter().all(|b| *b == 0),
             TerraError::EmptySpecifier
@@ -916,10 +1086,7 @@ pub mod terra_registry {
     /// owner wallet matches.
     pub fn attach_parcel(ctx: Context<AttachParcel>) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        require!(
-            parcel.owner == ctx.accounts.owner.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
         // Read identity from UncheckedAccount — owned by terra_identity program.
         let identity_info = &ctx.accounts.identity;
         let identity_data = identity_info.try_borrow_data()?;
@@ -944,16 +1111,15 @@ pub mod terra_registry {
     /// Replace the validator set on an attestation (the fix for dead/leaving
     /// validators). Only the parcel owner may rotate. Bumps `version` so a
     /// reconstituted set is provably newer, and resets `required`/`count`.
+    ///
+    /// **DEPRECATED**: Use the verification pipeline's validator management instead.
     pub fn rotate_validators(
         ctx: Context<RotateValidators>,
         new_required: u8,
         new_validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        require!(
-            parcel.owner == ctx.accounts.authority.key(),
-            TerraError::NotOwner
-        );
+        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
         require!(
             ctx.accounts.attestation.parcel == parcel.key(),
             TerraError::AttestationMismatch
@@ -1250,6 +1416,9 @@ pub mod terra_registry {
     // IPFS document storage
     // -----------------------------------------------------------------------
 
+    /// Register an IPFS document anchor tied to an attestation.
+    ///
+    /// **DEPRECATED**: Use `add_evidence` in the verification pipeline instead.
     pub fn register_document(
         ctx: Context<RegisterDocument>,
         cid: String,
@@ -1686,6 +1855,18 @@ pub mod terra_registry {
         verification::claim::verify_claim(ctx)
     }
 
+    /// Migrate a legacy attestation into a verification pipeline claim.
+    ///
+    /// **DEPRECATED**: This is a one-way bridge for migrating old attestations.
+    /// New attestations should use `create_claim` directly.
+    pub fn migrate_attestation_to_claim(
+        ctx: Context<MigrateAttestationToClaim>,
+        claim_id: [u8; 32],
+        claim_type: u8,
+    ) -> Result<()> {
+        verification::bridge::migrate_attestation_to_claim(ctx, claim_id, claim_type)
+    }
+
     // -----------------------------------------------------------------------
     // Verification session
     // -----------------------------------------------------------------------
@@ -1956,6 +2137,67 @@ pub struct RevokeRight<'info> {
     pub rights: Account<'info, Rights>,
     #[account(mut)]
     pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Identity-based rights (A2 — replace wallet-centric ownership)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(rights_kind: u8)]
+pub struct GrantIdentityRight<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// CHECK: Identity account owned by terra_identity program. Verified manually in handler.
+    pub identity: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = granter,
+        space = 8 + IdentityRights::INIT_SPACE,
+        seeds = [
+            b"identity_rights".as_ref(),
+            identity.key().as_ref(),
+            parcel.key().as_ref(),
+            &[rights_kind]
+        ],
+        bump
+    )]
+    pub identity_rights: Account<'info, IdentityRights>,
+    #[account(mut)]
+    pub granter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(rights_kind: u8)]
+pub struct RevokeIdentityRight<'info> {
+    #[account(
+        mut,
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [
+            b"identity_rights".as_ref(),
+            identity.key().as_ref(),
+            parcel.key().as_ref(),
+            &[rights_kind]
+        ],
+        bump,
+        close = granter
+    )]
+    pub identity_rights: Account<'info, IdentityRights>,
+    /// CHECK: Identity account — verified against IdentityRights.identity.
+    pub identity: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub granter: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -3339,6 +3581,36 @@ pub struct VerifyClaim<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Attestation → Claim migration bridge
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(claim_id: [u8; 32])]
+pub struct MigrateAttestationToClaim<'info> {
+    #[account(
+        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
+        bump,
+    )]
+    pub attestation: Account<'info, Attestation>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + verification::Claim::INIT_SPACE,
+        seeds = [b"claim".as_ref(), parcel.key().as_ref(), claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Verification session contexts
 // ---------------------------------------------------------------------------
 
@@ -3786,6 +4058,21 @@ pub struct RightRevoked {
     pub parcel: Pubkey,
     pub rights_kind: u8,
     pub holder: Pubkey,
+}
+
+// Identity-based rights events (A2)
+#[event]
+pub struct IdentityRightGranted {
+    pub identity: Pubkey,
+    pub parcel: Pubkey,
+    pub rights_kind: u8,
+}
+
+#[event]
+pub struct IdentityRightRevoked {
+    pub identity: Pubkey,
+    pub parcel: Pubkey,
+    pub rights_kind: u8,
 }
 
 #[event]
@@ -4732,6 +5019,12 @@ pub enum TerraError {
     InvalidQuorumVoteChoice,
     #[msg("Quorum already resolved")]
     QuorumAlreadyResolved,
+
+    // Identity-based rights (A2)
+    #[msg("Identity rights account already exists for this identity/parcel/kind")]
+    IdentityRightsAlreadyExists,
+    #[msg("Identity rights not found or inactive")]
+    IdentityRightsNotFound,
 }
 
 #[cfg(test)]
