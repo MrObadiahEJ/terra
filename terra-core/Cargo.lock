@@ -9023,6 +9023,7 @@ dependencies = [
  "solana-program",
  "solana-sdk",
  "sqlx",
+ "tempfile",
  "terra-geo",
  "thiserror 1.0.69",
  "tokio",

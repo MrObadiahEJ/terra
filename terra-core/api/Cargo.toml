@@ -28,3 +28,6 @@ solana-sdk = "3"
 solana-program = "3"
 solana-account-decoder = "3"
 terra-geo = { path = "../geo-engine" }
+
+[dev-dependencies]
+tempfile = "3"

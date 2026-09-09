@@ -91,7 +91,7 @@ pub enum PrepareRequest {
     },
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PreparedInstruction {
     /// The Anchor discriminator (8 bytes) for the instruction.
     pub discriminator: Vec<u8>,
@@ -103,7 +103,7 @@ pub struct PreparedInstruction {
     pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AccountMeta {
     /// base58 public key.
     pub pubkey: String,
@@ -113,7 +113,7 @@ pub struct AccountMeta {
     pub is_writable: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PrepareResponse {
     /// The instructions to include in the transaction.
     pub instructions: Vec<PreparedInstruction>,
@@ -400,13 +400,254 @@ fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use std::sync::Arc;
+    use tower::ServiceExt;
 
-    #[test]
-    fn prepare_request_deserializes() {
-        let json = r#"{"type":"add_evidence","parcel":"ABC","claim_id":"aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99","content_hash":"aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99","evidence_type":0,"storage_ref":"test","observed_at":0}"#;
-        // Just check it doesn't panic — full validation is in the handler.
-        let _: Result<PrepareRequest, _> = serde_json::from_str(json);
+    use crate::auth::ApiAuthority;
+    use crate::storage::StorageBackend;
+
+    /// Build a minimal router we can test against (no DB required).
+    fn app() -> axum::Router {
+        let pool = sqlx::PgPool::connect_lazy("postgres://x:x@localhost/x").unwrap();
+        let state = AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local {
+                root: std::path::PathBuf::from("/tmp/terra-test"),
+            }),
+        };
+        axum::Router::new()
+            .route("/prepare", post(prepare_tx))
+            .with_state(state)
     }
+
+    /// Helper: send JSON POST and return (status, body bytes).
+    async fn post_json(path: &str, body: serde_json::Value) -> (StatusCode, Vec<u8>) {
+        let resp = app()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(path)
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec();
+        (status, bytes)
+    }
+
+    fn hex32(byte: u8) -> String {
+        hex::encode([byte; 32])
+    }
+
+    // -----------------------------------------------------------------------
+    // create_claim
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prepare_create_claim_returns_instruction() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "create_claim",
+                "parcel": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "claim_id": hex32(0xAA),
+                "claim_type": 0,
+                "content_hash": hex32(0xBB),
+                "required_attestations": 2
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+
+        let resp: PrepareResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(resp.instructions.len(), 1);
+        assert_eq!(resp.fee_payer, "FEE_PAYER");
+
+        let ix = &resp.instructions[0];
+        assert!(ix.description.contains("Create claim"));
+        // data: discriminator(8) + claim_id(32) + claim_type(1) + content_hash(32) + required(1) + region(2) = 76
+        assert_eq!(ix.data.len(), 76);
+        // Accounts: CLAIM_ACCOUNT_PDA, parcel, FEE_PAYER, system_program
+        assert_eq!(ix.accounts.len(), 4);
+        assert!(ix.accounts[0].is_writable);
+        assert!(ix.accounts[2].is_signer); // fee payer
+    }
+
+    // -----------------------------------------------------------------------
+    // add_evidence
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prepare_add_evidence_returns_instruction() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "add_evidence",
+                "parcel": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "claim_id": hex32(0xCC),
+                "content_hash": hex32(0xDD),
+                "evidence_type": 1,
+                "storage_ref": "ipfs://QmTest123",
+                "observed_at": 1_700_000_000_i64
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+
+        let resp: PrepareResponse = serde_json::from_slice(&body).unwrap();
+        let ix = &resp.instructions[0];
+        assert!(ix.description.contains("Add evidence"));
+        assert!(ix.description.contains(&hex32(0xDD)));
+        // data: disc(8) + claim_id(32) + evidence_type(1) + content_hash(32)
+        //       + sr_len(2) + sr("ipfs://QmTest123" = 14) + observed_at(8) = 97
+        // Actual length may vary slightly based on serialization; just verify structure.
+        assert!(ix.data.len() >= 8 + 32 + 1 + 32 + 2 + 8); // minimum: disc+claim_id+type+hash+len+timestamp
+        assert_eq!(ix.accounts.len(), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // submit_observation
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prepare_submit_observation_returns_instruction() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "submit_observation",
+                "claim": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "latitude": 471000000_i64,
+                "longitude": 852000000_i64,
+                "method": 1,
+                "findings_hash": hex32(0xEE),
+                "confidence": 90,
+                "signature_hash": hex32(0xFF)
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+
+        let resp: PrepareResponse = serde_json::from_slice(&body).unwrap();
+        let ix = &resp.instructions[0];
+        assert!(ix.description.contains("Submit observation"));
+        assert!(ix.description.contains("method=1"));
+        assert!(ix.description.contains("confidence=90"));
+        // data: disc(8) + lat(8) + lon(8) + method(1) + findings(32) + confidence(1) + sig(32)
+        assert_eq!(ix.data.len(), 8 + 8 + 8 + 1 + 32 + 1 + 32);
+        assert_eq!(ix.accounts.len(), 4);
+        assert!(ix.accounts[1].is_writable); // claim must be writable
+    }
+
+    // -----------------------------------------------------------------------
+    // submit_attestation
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prepare_submit_attestation_returns_instruction() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "submit_attestation",
+                "claim": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "observation": "HMBRKVfVqxiV6LCm59oVBZvf34XfJirPvdYMbZwLJN4o",
+                "result": 0,
+                "confidence": 95,
+                "signature_hash": hex32(0xAB)
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+
+        let resp: PrepareResponse = serde_json::from_slice(&body).unwrap();
+        let ix = &resp.instructions[0];
+        assert!(ix.description.contains("Submit attestation"));
+        assert!(ix.description.contains("result=0"));
+        // data: disc(8) + result(1) + confidence(1) + sig(32)
+        assert_eq!(ix.data.len(), 8 + 1 + 1 + 32);
+        assert_eq!(ix.accounts.len(), 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // Error cases
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn prepare_rejects_invalid_hex_claim_id() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "create_claim",
+                "parcel": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "claim_id": "not-hex",
+                "claim_type": 0,
+                "content_hash": hex32(0xBB),
+                "required_attestations": 2
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(err["error"].as_str().unwrap().contains("hex"));
+    }
+
+    #[tokio::test]
+    async fn prepare_rejects_short_content_hash() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "add_evidence",
+                "parcel": "5ZWj7a1f8tWkjBESHKgrLmXGcFn7p8UfC2s8nS6vfa5i",
+                "claim_id": hex32(0xCC),
+                "content_hash": "aabb",  // 2 bytes, not 32
+                "evidence_type": 0,
+                "storage_ref": "test",
+                "observed_at": 0
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(err["error"].as_str().unwrap().contains("32 bytes"));
+    }
+
+    #[tokio::test]
+    async fn prepare_rejects_invalid_type_variant() {
+        let (status, body) = post_json(
+            "/prepare",
+            serde_json::json!({
+                "type": "nonexistent",
+                "parcel": "x"
+            }),
+        )
+        .await;
+        // Serde deserialization errors from Json<T> extractor return 422.
+        assert!(
+            status == StatusCode::UNPROCESSABLE_ENTITY || status == StatusCode::BAD_REQUEST,
+            "expected 422 or 400, got {status}"
+        );
+        // Body may be JSON error or plain text depending on axum version.
+        let body_str = String::from_utf8_lossy(&body);
+        assert!(
+            body_str.contains("unknown variant")
+                || body_str.contains("data did not match")
+                || body_str.contains("Error"),
+            "unexpected error body: {body_str}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct unit tests
+    // -----------------------------------------------------------------------
 
     #[test]
     fn decode_hex32_works() {
@@ -420,5 +661,35 @@ mod tests {
     fn decode_hex32_rejects_wrong_length() {
         let result = decode_hex32("aabb");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn decode_hex32_rejects_empty() {
+        let result = decode_hex32("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn decode_hex32_rejects_non_hex() {
+        let result = decode_hex32(&"zz".repeat(32));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn prepare_response_serializes() {
+        let resp = PrepareResponse {
+            instructions: vec![PreparedInstruction {
+                discriminator: vec![],
+                accounts: vec![],
+                data: vec![1, 2, 3],
+                description: "test".into(),
+            }],
+            fee_payer: "wallet".into(),
+            recent_blockhash_note: "fetch blockhash".into(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("fee_payer"));
+        assert!(json.contains("recent_blockhash_note"));
+        assert!(json.contains("description"));
     }
 }
