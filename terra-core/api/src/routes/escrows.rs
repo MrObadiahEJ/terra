@@ -542,8 +542,6 @@ async fn expire_escrow(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn escrow_status_values_match_constants() {
         // Verify the API status strings match the on-chain constants.

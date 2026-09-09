@@ -121,8 +121,6 @@ pub fn router() -> Router<AppState> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn anchor_requires_cid_content_hash_category() {
         fn valid(cid: &str, hash: &str, cat: &str) -> bool {

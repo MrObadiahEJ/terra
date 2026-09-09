@@ -269,8 +269,6 @@ async fn grant_conditional_right(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn right_status_values_match_constants() {
         assert_eq!("active", "active");

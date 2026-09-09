@@ -245,6 +245,7 @@ mod tests {
             admin: "admin".into(),
             validators: vec!["v1".into(), "v2".into(), "v3".into()],
             required_endorsements: 0,
+            mode: 0,
             version: 1,
             created_at: Default::default(),
             updated_at: Default::default(),
@@ -254,6 +255,7 @@ mod tests {
         // At threshold = peer-consensus
         let view = AuthorityRegistryView {
             validators: vec!["v1".into(), "v2".into(), "v3".into(), "v4".into()],
+            mode: 1,
             ..view
         };
         assert_eq!(view.mode, 1i16); // peer-consensus

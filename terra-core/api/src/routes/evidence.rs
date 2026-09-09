@@ -2,7 +2,7 @@ use axum::extract::{Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -34,12 +34,6 @@ pub struct EvidenceUploadRow {
     pub size_bytes: i64,
     pub uploaded_by: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct EvidenceQuery {
-    /// Optional wallet address of the uploader (for provenance tracking).
-    pub uploaded_by: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
