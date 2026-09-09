@@ -5,6 +5,7 @@ mod error;
 mod geoutil;
 mod routes;
 mod state;
+mod storage;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -35,6 +36,8 @@ async fn main() -> Result<()> {
     tracing::info!("migrations applied, database ready");
 
     let geo = load_geo(config.osm_pbf_path.as_deref()).await?;
+
+    let storage = Arc::new(storage::from_env()?);
 
     // CORS locked to configured origins (default: local Vite dev server).
     // The mirror API is unauthenticated by design for pilot deployments
@@ -70,6 +73,7 @@ async fn main() -> Result<()> {
             pool,
             geo,
             api_authority: auth::ApiAuthority(config.api_authority_pubkey),
+            storage,
         });
 
     let addr = format!("{}:{}", config.host, config.port);

@@ -5,6 +5,7 @@ pub mod authority_registry;
 pub mod cross_border;
 pub mod disputes;
 pub mod escrows;
+pub mod evidence;
 pub mod fusion;
 pub mod geo;
 pub mod health;
@@ -16,6 +17,7 @@ pub mod rights;
 pub mod spatial;
 pub mod staking;
 pub mod subdivision;
+pub mod tx_prep;
 pub mod vaults;
 pub mod zk_proofs;
 pub mod world_registry;
@@ -45,4 +47,6 @@ pub fn router() -> Router<AppState> {
         .nest("/world-registry", world_registry::router())
         .nest("/recovery", recovery::router())
         .nest("/credentials", threshold_credentials::router())
+        .nest("/evidence", evidence::router())
+        .nest("/tx", tx_prep::router())
 }
