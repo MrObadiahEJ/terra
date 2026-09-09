@@ -139,8 +139,7 @@ pub struct Attestation {
 
 // ---------------------------------------------------------------------------
 // Identity types — canonical definitions live in terra_identity program.
-// These plain structs allow deserialization of identity accounts owned by
-// the terra_identity program when read as UncheckedAccount.
+// These are imported directly for cross-program deserialization.
 // ---------------------------------------------------------------------------
 
 pub use terra_identity::succession_kind;
@@ -154,33 +153,11 @@ pub const MIN_FORFEIT_VALIDATORS: u8 = 2;
 
 /// Read-only Identity fields for cross-program deserialization.
 /// The canonical `#[account]` definition lives in the `terra_identity` program.
-#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
-pub struct Identity {
-    pub identity_hash: [u8; 32],
-    pub owner: Pubkey,
-    pub recovery: Pubkey,
-    pub parcel_count: u16,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub pending_revocation: bool,
-    pub pending_new_owner: Pubkey,
-    pub revoke_after: i64,
-}
+pub use terra_identity::state::Identity;
 
 /// Read-only Succession fields for cross-program deserialization.
 /// The canonical `#[account]` definition lives in the `terra_identity` program.
-#[derive(anchor_lang::AnchorSerialize, anchor_lang::AnchorDeserialize, Clone, anchor_lang::InitSpace)]
-pub struct Succession {
-    pub identity: Pubkey,
-    pub successor: Pubkey,
-    pub kind: u8,
-    pub requested_at: i64,
-    pub effective_at: i64,
-    pub grace_secs: i64,
-    pub required: u8,
-    pub validations_count: u8,
-    pub validators: [Pubkey; MAX_VALIDATORS],
-}
+pub use terra_identity::state::Succession;
 
 pub mod validator_registry;
 pub mod cross_border;
@@ -195,6 +172,7 @@ pub mod vault;
 pub mod world_registry;
 pub mod recovery;
 pub mod zk;
+pub mod verification;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -1658,6 +1636,156 @@ pub mod terra_registry {
     ) -> Result<()> {
         subdivision::migrate_attestations(ctx, specifier)
     }
+
+    // -----------------------------------------------------------------------
+    // Verification pipeline (Claim → Evidence → Observation → Attestation)
+    // -----------------------------------------------------------------------
+
+    pub fn create_claim(
+        ctx: Context<CreateClaim>,
+        claim_id: [u8; 32],
+        claim_type: u8,
+        statement_hash: [u8; 32],
+        required_attestations: u8,
+    ) -> Result<()> {
+        verification::claim::create_claim(ctx, claim_id, claim_type, statement_hash, required_attestations)
+    }
+
+    pub fn add_evidence(
+        ctx: Context<AddEvidence>,
+        evidence_type: u8,
+        content_hash: [u8; 32],
+        storage_reference: String,
+        observed_at: i64,
+    ) -> Result<()> {
+        verification::evidence::add_evidence(ctx, evidence_type, content_hash, storage_reference, observed_at)
+    }
+
+    pub fn submit_observation(
+        ctx: Context<SubmitObservation>,
+        location: [i64; 2],
+        method: u8,
+        findings_hash: [u8; 32],
+        confidence: u8,
+        signature_hash: [u8; 32],
+    ) -> Result<()> {
+        verification::observation::submit_observation(ctx, location, method, findings_hash, confidence, signature_hash)
+    }
+
+    pub fn submit_verification_attestation(
+        ctx: Context<SubmitVerificationAttestation>,
+        result: u8,
+        confidence: u8,
+        signature_hash: [u8; 32],
+    ) -> Result<()> {
+        verification::attestation::submit_attestation(ctx, result, confidence, signature_hash)
+    }
+
+    pub fn verify_claim(ctx: Context<VerifyClaim>) -> Result<()> {
+        verification::claim::verify_claim(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Verification session
+    // -----------------------------------------------------------------------
+
+    pub fn open_verification_session(
+        ctx: Context<OpenVerificationSession>,
+        session_id: [u8; 32],
+        required_attestations: u8,
+    ) -> Result<()> {
+        verification::session::open_verification_session(ctx, session_id, required_attestations)
+    }
+
+    pub fn close_verification_session(
+        ctx: Context<CloseVerificationSession>,
+        final_status: u8,
+    ) -> Result<()> {
+        verification::session::close_verification_session(ctx, final_status)
+    }
+
+    pub fn record_session_evidence(ctx: Context<RecordSessionEvidence>) -> Result<()> {
+        verification::session::record_session_evidence(ctx)
+    }
+
+    pub fn record_session_observation(ctx: Context<RecordSessionObservation>) -> Result<()> {
+        verification::session::record_session_observation(ctx)
+    }
+
+    pub fn record_session_attestation(
+        ctx: Context<RecordSessionAttestation>,
+        is_confirmatory: bool,
+    ) -> Result<()> {
+        verification::session::record_session_attestation(ctx, is_confirmatory)
+    }
+
+    // -----------------------------------------------------------------------
+    // Validator reputation
+    // -----------------------------------------------------------------------
+
+    pub fn initialize_validator_reputation(
+        ctx: Context<InitializeValidatorReputation>,
+    ) -> Result<()> {
+        verification::reputation::initialize_validator_reputation(ctx)
+    }
+
+    pub fn record_attestation_outcome(
+        ctx: Context<RecordAttestationOutcome>,
+        confirmed: bool,
+    ) -> Result<()> {
+        verification::reputation::record_attestation_outcome(ctx, confirmed)
+    }
+
+    pub fn jail_validator(ctx: Context<JailValidator>, duration_secs: i64) -> Result<()> {
+        verification::reputation::jail_validator(ctx, duration_secs)
+    }
+
+    pub fn unjail_validator(ctx: Context<UnjailValidator>) -> Result<()> {
+        verification::reputation::unjail_validator(ctx)
+    }
+
+    pub fn slash_validator(
+        ctx: Context<SlashValidator>,
+        reputation_penalty: u16,
+    ) -> Result<()> {
+        verification::reputation::slash_validator(ctx, reputation_penalty)
+    }
+
+    // -----------------------------------------------------------------------
+    // Challenge / Audit
+    // -----------------------------------------------------------------------
+
+    pub fn file_challenge(
+        ctx: Context<FileChallenge>,
+        challenge_hash: [u8; 32],
+        required_votes: u8,
+    ) -> Result<()> {
+        verification::challenge::file_challenge(ctx, challenge_hash, required_votes)
+    }
+
+    pub fn vote_challenge(ctx: Context<VoteChallenge>, vote_uphold: bool) -> Result<()> {
+        verification::challenge::vote_challenge(ctx, vote_uphold)
+    }
+
+    // -----------------------------------------------------------------------
+    // Quorum configuration
+    // -----------------------------------------------------------------------
+
+    pub fn set_quorum_config(
+        ctx: Context<SetQuorumConfig>,
+        parcel_type: u8,
+        region: [u8; 2],
+        required_attestations: u8,
+        required_confidence: u8,
+    ) -> Result<()> {
+        verification::quorum_config::set_quorum_config(
+            ctx,
+            parcel_type,
+            region,
+            required_attestations,
+            required_confidence,
+        )
+    }
 }
 
 #[derive(Accounts)]
@@ -3002,6 +3130,318 @@ pub struct VerifyCredential<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Verification pipeline contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(claim_id: [u8; 32])]
+pub struct CreateClaim<'info> {
+    #[account(
+        init,
+        payer = submitter,
+        space = 8 + verification::Claim::INIT_SPACE,
+        seeds = [b"claim", parcel.key().as_ref(), claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub submitter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddEvidence<'info> {
+    #[account(
+        init,
+        payer = submitter,
+        space = 8 + verification::Evidence::INIT_SPACE,
+        seeds = [
+            b"evidence",
+            claim.key().as_ref(),
+            &[claim.evidence_count],
+        ],
+        bump,
+    )]
+    pub evidence: Account<'info, verification::Evidence>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub submitter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitObservation<'info> {
+    #[account(
+        init,
+        payer = validator,
+        space = 8 + verification::Observation::INIT_SPACE,
+        seeds = [
+            b"observation",
+            claim.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub observation: Account<'info, verification::Observation>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitVerificationAttestation<'info> {
+    #[account(
+        init,
+        payer = validator,
+        space = 8 + verification::VerificationAttestation::INIT_SPACE,
+        seeds = [
+            b"verification_attestation",
+            claim.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub attestation: Account<'info, verification::VerificationAttestation>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(
+        seeds = [
+            b"observation",
+            claim.key().as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub observation: Account<'info, verification::Observation>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyClaim<'info> {
+    #[account(
+        mut,
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+}
+
+// ---------------------------------------------------------------------------
+// Verification session contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(session_id: [u8; 32])]
+pub struct OpenVerificationSession<'info> {
+    #[account(
+        init,
+        payer = opener,
+        space = 8 + verification::VerificationSession::INIT_SPACE,
+        seeds = [b"verification_session", claim.key().as_ref(), session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+    #[account(
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub opener: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseVerificationSession<'info> {
+    #[account(
+        mut,
+        seeds = [b"verification_session", session.claim.as_ref(), session.session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+    pub opener: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RecordSessionEvidence<'info> {
+    #[account(
+        mut,
+        seeds = [b"verification_session", session.claim.as_ref(), session.session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+}
+
+#[derive(Accounts)]
+pub struct RecordSessionObservation<'info> {
+    #[account(
+        mut,
+        seeds = [b"verification_session", session.claim.as_ref(), session.session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+}
+
+#[derive(Accounts)]
+pub struct RecordSessionAttestation<'info> {
+    #[account(
+        mut,
+        seeds = [b"verification_session", session.claim.as_ref(), session.session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+}
+
+// ---------------------------------------------------------------------------
+// Validator reputation contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct InitializeValidatorReputation<'info> {
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + verification::ValidatorReputation::INIT_SPACE,
+        seeds = [b"validator_reputation", validator.key().as_ref()],
+        bump,
+    )]
+    pub reputation: Account<'info, verification::ValidatorReputation>,
+    /// CHECK: the validator being tracked.
+    pub validator: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RecordAttestationOutcome<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_reputation", reputation.validator.as_ref()],
+        bump,
+    )]
+    pub reputation: Account<'info, verification::ValidatorReputation>,
+}
+
+#[derive(Accounts)]
+pub struct JailValidator<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_reputation", reputation.validator.as_ref()],
+        bump,
+    )]
+    pub reputation: Account<'info, verification::ValidatorReputation>,
+}
+
+#[derive(Accounts)]
+pub struct UnjailValidator<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_reputation", reputation.validator.as_ref()],
+        bump,
+    )]
+    pub reputation: Account<'info, verification::ValidatorReputation>,
+}
+
+#[derive(Accounts)]
+pub struct SlashValidator<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_reputation", reputation.validator.as_ref()],
+        bump,
+    )]
+    pub reputation: Account<'info, verification::ValidatorReputation>,
+}
+
+// ---------------------------------------------------------------------------
+// Challenge / Audit contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct FileChallenge<'info> {
+    #[account(
+        init,
+        payer = challenger,
+        space = 8 + verification::Challenge::INIT_SPACE,
+        seeds = [b"challenge", claim_account.key().as_ref(), challenger.key().as_ref()],
+        bump,
+    )]
+    pub challenge: Account<'info, verification::Challenge>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim_account.parcel.as_ref(), claim_account.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim_account: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub challenger: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VoteChallenge<'info> {
+    #[account(
+        mut,
+        seeds = [b"challenge", challenge.claim.as_ref(), challenge.challenger.as_ref()],
+        bump,
+    )]
+    pub challenge: Account<'info, verification::Challenge>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim_account.parcel.as_ref(), claim_account.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim_account: Account<'info, verification::Claim>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    pub validator: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Quorum config contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(parcel_type: u8, region: [u8; 2])]
+pub struct SetQuorumConfig<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + verification::QuorumConfig::INIT_SPACE,
+        seeds = [b"quorum_config", &[parcel_type][..], region.as_ref()],
+        bump,
+    )]
+    pub config: Account<'info, verification::QuorumConfig>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -3350,6 +3790,160 @@ pub struct DocumentRegistered {
     pub registered_by: Pubkey,
 }
 
+// ---------------------------------------------------------------------------
+// Verification pipeline events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ClaimCreated {
+    pub claim: Pubkey,
+    pub parcel: Pubkey,
+    pub claim_id: [u8; 32],
+    pub claim_type: u8,
+    pub submitted_by: Pubkey,
+    pub statement_hash: [u8; 32],
+}
+
+#[event]
+pub struct EvidenceAdded {
+    pub claim: Pubkey,
+    pub evidence: Pubkey,
+    pub nonce: u8,
+    pub evidence_type: u8,
+    pub submitted_by: Pubkey,
+    pub content_hash: [u8; 32],
+}
+
+#[event]
+pub struct ObservationSubmitted {
+    pub claim: Pubkey,
+    pub observation: Pubkey,
+    pub validator: Pubkey,
+    pub method: u8,
+    pub confidence: u8,
+}
+
+#[event]
+pub struct VerificationAttestationSubmitted {
+    pub claim: Pubkey,
+    pub attestation: Pubkey,
+    pub validator: Pubkey,
+    pub result: u8,
+    pub confidence: u8,
+    pub attestation_count: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct ClaimVerified {
+    pub claim: Pubkey,
+    pub parcel: Pubkey,
+    pub claim_type: u8,
+    pub attestation_count: u8,
+    pub verified_at: i64,
+}
+
+#[event]
+pub struct ClaimRejected {
+    pub claim: Pubkey,
+    pub reason: u8,
+}
+
+// ---------------------------------------------------------------------------
+// Verification session events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct VerificationSessionOpened {
+    pub session: Pubkey,
+    pub claim: Pubkey,
+    pub session_id: [u8; 32],
+    pub opened_by: Pubkey,
+    pub expires_at: i64,
+}
+
+#[event]
+pub struct VerificationSessionClosed {
+    pub session: Pubkey,
+    pub claim: Pubkey,
+    pub status: u8,
+    pub closed_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Validator reputation events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ValidatorReputationInitialized {
+    pub validator: Pubkey,
+    pub initialized_at: i64,
+}
+
+#[event]
+pub struct ValidatorJailed {
+    pub validator: Pubkey,
+    pub reputation_score: u16,
+    pub jailed_until: i64,
+}
+
+#[event]
+pub struct ValidatorUnjailed {
+    pub validator: Pubkey,
+    pub unjailed_at: i64,
+}
+
+#[event]
+pub struct ValidatorSlashed {
+    pub validator: Pubkey,
+    pub reputation_score: u16,
+    pub slashed_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Challenge / Audit events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ChallengeFiled {
+    pub challenge: Pubkey,
+    pub claim: Pubkey,
+    pub challenger: Pubkey,
+    pub challenge_hash: [u8; 32],
+    pub review_deadline: i64,
+}
+
+#[event]
+pub struct ChallengeVoteRecorded {
+    pub challenge: Pubkey,
+    pub validator: Pubkey,
+    pub vote_uphold: bool,
+    pub uphold_votes: u8,
+    pub overturn_votes: u8,
+}
+
+#[event]
+pub struct ChallengeResolved {
+    pub challenge: Pubkey,
+    pub claim: Pubkey,
+    pub outcome: u8,
+    pub resolved_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Quorum config events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct QuorumConfigSet {
+    pub config: Pubkey,
+    pub parcel_type: u8,
+    pub region: [u8; 2],
+    pub required_attestations: u8,
+    pub required_confidence: u8,
+    pub set_by: Pubkey,
+}
+
 #[error_code]
 pub enum TerraError {
     #[msg("Parcel id cannot be all zeros")]
@@ -3624,6 +4218,48 @@ pub enum TerraError {
     // Guardian revocation timelock
     #[msg("A revocation request is already pending for this identity")]
     GuardianshipAlreadyActive,
+
+    // Verification pipeline
+    #[msg("Claim id cannot be all zeros")]
+    EmptyClaimId,
+    #[msg("Invalid claim type")]
+    InvalidClaimType,
+    #[msg("Statement hash is required")]
+    EmptyStatementHash,
+    #[msg("Invalid claim status for this operation")]
+    InvalidClaimStatus,
+    #[msg("Only the claim submitter can add evidence")]
+    NotClaimSubmitter,
+    #[msg("Invalid evidence type")]
+    InvalidEvidenceType,
+    #[msg("Storage reference is required")]
+    EmptyStorageReference,
+    #[msg("Confidence must be between 0 and 100")]
+    InvalidConfidence,
+    #[msg("Invalid attestation result")]
+    InvalidAttestationResult,
+    #[msg("Attestation quorum not yet reached")]
+    QuorumNotReached,
+    #[msg("Claim already verified")]
+    ClaimAlreadyVerified,
+    #[msg("Required attestations must be at least 1")]
+    InvalidRequiredAttestations,
+
+    // Verification session
+    #[msg("Session is not in a valid state for this operation")]
+    InvalidSessionStatus,
+
+    // Validator reputation
+    #[msg("Validator is not active")]
+    ValidatorNotActive,
+
+    // Challenge
+    #[msg("Challenge has already been resolved")]
+    ChallengeAlreadyResolved,
+
+    // Quorum config
+    #[msg("Quorum configuration is invalid")]
+    InvalidQuorumConfig,
 }
 
 #[cfg(test)]

@@ -13,11 +13,19 @@ use terra_registry::{
     dispute::{self, Dispute},
     infra_flag, ipfs_docs, parcel_status, right_kind, recovery, staking,
     subdivision::{self, SubdivisionRecord},
+    verification::{
+        self, Claim, Evidence, Observation, VerificationAttestation,
+        VerificationSession, ValidatorReputation, Challenge, QuorumConfig,
+        claim::claim_status, claim::claim_type,
+        evidence::evidence_type, attestation::attestation_result,
+        session::session_status, validator_status, challenge_status,
+    },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
     Attestation, Parcel, Rights, ID as PROGRAM_ID,
 };
-use terra_identity::{Identity, Succession, ID as IDENTITY_PROGRAM_ID};
+use terra_identity::state::{Identity, Succession};
+use terra_identity::ID as IDENTITY_PROGRAM_ID;
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"parcel".as_ref(), id.as_ref()], &PROGRAM_ID)
@@ -196,6 +204,62 @@ fn document_pda(attestation: &Pubkey, cid: &str) -> (Pubkey, u8) {
 fn amalgamation_pda(result: &Pubkey, source: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[b"amalgamation", result.as_ref(), source.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn claim_pda(parcel: &Pubkey, claim_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"claim", parcel.as_ref(), claim_id.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn evidence_pda(claim: &Pubkey, nonce: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"evidence", claim.as_ref(), &[nonce]],
+        &PROGRAM_ID,
+    )
+}
+
+fn observation_pda(claim: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"observation", claim.as_ref(), validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn verification_attestation_pda(claim: &Pubkey, validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"verification_attestation", claim.as_ref(), validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn verification_session_pda(claim: &Pubkey, session_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"verification_session", claim.as_ref(), session_id.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn validator_reputation_pda(validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"validator_reputation", validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn challenge_pda(claim: &Pubkey, challenger: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"challenge", claim.as_ref(), challenger.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn quorum_config_pda(parcel_type: u8, region: &[u8; 2]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"quorum_config", &[parcel_type], region.as_ref()],
         &PROGRAM_ID,
     )
 }
@@ -6125,4 +6189,1041 @@ async fn claim_rewards_happy_path() {
         "accumulated_rewards should be ~0, got {}",
         pool_after.accumulated_rewards
     );
+}
+
+// ---------------------------------------------------------------------------
+// Verification pipeline tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn verification_full_e2e() {
+    let (mut ctx, payer) = setup().await;
+
+    // Register a parcel.
+    let id: [u8; 32] = [242u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // --- create_claim ---
+    let claim_id: [u8; 32] = [1u8; 32];
+    let (claim_pk, claim_bump) = claim_pda(&parcel_pk, &claim_id);
+    let stmt_hash: [u8; 32] = [3u8; 32];
+    let required: u8 = 2;
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::PARCEL_EXISTS);
+                d.extend_from_slice(&stmt_hash);
+                d.push(required);
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    let claim: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim.status, claim_status::SUBMITTED);
+    assert_eq!(claim.attestation_count, 0);
+
+    // --- add_evidence ---
+    let (ev_pk, _) = evidence_pda(&claim_pk, 0);
+    let ev_hash: [u8; 32] = [4u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(ev_pk, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "add_evidence").to_vec();
+                d.push(evidence_type::PHOTO);
+                d.extend_from_slice(&ev_hash);
+                d.extend_from_slice(&borsh_ser(&"ipfs://evidence1".to_string()));
+                d.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("add_evidence failed");
+
+    let claim_after_ev: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_after_ev.evidence_count, 1);
+
+    // --- submit_observation (validator_a) ---
+    let validator_a = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator_a.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    let (obs_a, _) = observation_pda(&claim_pk, &validator_a.pubkey());
+    process(
+        &mut ctx,
+        &validator_a,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_a, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(validator_a.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&0_i64.to_le_bytes()); // lat
+                d.extend_from_slice(&0_i64.to_le_bytes()); // lon
+                d.push(1); // method = GPS
+                d.extend_from_slice(&[5u8; 32]); // findings_hash
+                d.push(90); // confidence
+                d.extend_from_slice(&[6u8; 32]); // signature_hash
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_observation (a) failed");
+
+    let claim_after_obs: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_after_obs.status, claim_status::UNDER_VERIFICATION);
+    assert_eq!(claim_after_obs.observation_count, 1);
+
+    // --- submit_observation (validator_b) ---
+    let validator_b = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator_b.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    let (obs_b, _) = observation_pda(&claim_pk, &validator_b.pubkey());
+    process(
+        &mut ctx,
+        &validator_b,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_b, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(validator_b.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&1_i64.to_le_bytes());
+                d.extend_from_slice(&1_i64.to_le_bytes());
+                d.push(2); // method = survey
+                d.extend_from_slice(&[7u8; 32]);
+                d.push(85);
+                d.extend_from_slice(&[8u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_observation (b) failed");
+
+    // --- submit_attestation (validator_a, CONFIRMED) ---
+    let (att_a, _) = verification_attestation_pda(&claim_pk, &validator_a.pubkey());
+    process(
+        &mut ctx,
+        &validator_a,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(att_a, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(obs_a, false),
+                AccountMeta::new(validator_a.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+                d.push(attestation_result::CONFIRMED);
+                d.push(95);
+                d.extend_from_slice(&[9u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_attestation (a) failed");
+
+    let claim_mid: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_mid.attestation_count, 1);
+
+    // --- submit_attestation (validator_b, CONFIRMED) ---
+    let (att_b, _) = verification_attestation_pda(&claim_pk, &validator_b.pubkey());
+    process(
+        &mut ctx,
+        &validator_b,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(att_b, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(obs_b, false),
+                AccountMeta::new(validator_b.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+                d.push(attestation_result::CONFIRMED);
+                d.push(88);
+                d.extend_from_slice(&[10u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_attestation (b) failed");
+
+    let claim_pre_verify: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_pre_verify.attestation_count, 2);
+
+    // --- verify_claim ---
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(claim_pk, false)],
+            data: discriminator("global", "verify_claim").to_vec(),
+        },
+    )
+    .await
+    .expect("verify_claim failed");
+
+    let claim_final: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_final.status, claim_status::VERIFIED);
+    assert_eq!(claim_final.attestation_count, 2);
+    assert_eq!(claim_final.version, 2);
+}
+
+#[tokio::test]
+async fn verify_claim_quorum_not_reached() {
+    let (mut ctx, payer) = setup().await;
+
+    let id: [u8; 32] = [243u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [2u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    let stmt_hash: [u8; 32] = [11u8; 32];
+
+    // Create claim requiring 3 attestations.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::OWNERSHIP);
+                d.extend_from_slice(&stmt_hash);
+                d.push(3); // require 3 attestations
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    // Only 1 attestation (below quorum of 3).
+    let validator = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    // Submit observation.
+    let (obs, _) = observation_pda(&claim_pk, &validator.pubkey());
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.push(0);
+                d.extend_from_slice(&[12u8; 32]);
+                d.push(90);
+                d.extend_from_slice(&[13u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_observation failed");
+
+    // Submit 1 attestation.
+    let (att, _) = verification_attestation_pda(&claim_pk, &validator.pubkey());
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(att, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(obs, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+                d.push(attestation_result::CONFIRMED);
+                d.push(90);
+                d.extend_from_slice(&[14u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_attestation failed");
+
+    // Attempt to verify — should fail because quorum not reached.
+    let result = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(claim_pk, false)],
+            data: discriminator("global", "verify_claim").to_vec(),
+        },
+    )
+    .await;
+
+    assert!(result.is_err(), "verify_claim should fail with quorum not reached");
+    let claim: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim.status, claim_status::UNDER_VERIFICATION);
+}
+
+#[tokio::test]
+async fn add_evidence_wrong_submitter_fails() {
+    let (mut ctx, payer) = setup().await;
+
+    let id: [u8; 32] = [244u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [3u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::PARCEL_EXISTS);
+                d.extend_from_slice(&[15u8; 32]);
+                d.push(1);
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    // A different key tries to add evidence — should fail.
+    let wrong_submitter = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &wrong_submitter.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let (ev_pk, _) = evidence_pda(&claim_pk, 0);
+    let result = process(
+        &mut ctx,
+        &wrong_submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(ev_pk, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(wrong_submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "add_evidence").to_vec();
+                d.push(evidence_type::PHOTO);
+                d.extend_from_slice(&[16u8; 32]);
+                d.extend_from_slice(&borsh_ser(&"ipfs://bad".to_string()));
+                d.extend_from_slice(&1_700_000_000_i64.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await;
+
+    assert!(result.is_err(), "wrong submitter should fail");
+}
+
+#[tokio::test]
+async fn duplicate_observation_same_validator_fails() {
+    let (mut ctx, payer) = setup().await;
+
+    let id: [u8; 32] = [245u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [4u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::PARCEL_EXISTS);
+                d.extend_from_slice(&[17u8; 32]);
+                d.push(2);
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    let validator = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let (obs, _) = observation_pda(&claim_pk, &validator.pubkey());
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.push(0);
+                d.extend_from_slice(&[18u8; 32]);
+                d.push(90);
+                d.extend_from_slice(&[19u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("first observation failed");
+
+    // Second observation from same validator — should fail (PDA already initialized).
+    let result = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.push(0);
+                d.extend_from_slice(&[20u8; 32]);
+                d.push(80);
+                d.extend_from_slice(&[21u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+
+    assert!(result.is_err(), "duplicate observation from same validator should fail");
+}
+
+// ===========================================================================
+// VerificationSession tests
+// ===========================================================================
+
+#[tokio::test]
+async fn session_open_and_record_evidence() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [250u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // Create a claim first.
+    let claim_id: [u8; 32] = [1u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::PARCEL_EXISTS);
+                d.extend_from_slice(&[2u8; 32]);
+                d.push(1);
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    // Open a verification session.
+    let session_id: [u8; 32] = [10u8; 32];
+    let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(session_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "open_verification_session").to_vec();
+                d.extend_from_slice(&session_id);
+                d.push(2); // required_attestations
+                d
+            },
+        },
+    )
+    .await
+    .expect("open_session failed");
+
+    let session: VerificationSession = read_account(&ctx, session_pk).await;
+    assert_eq!(session.status, session_status::OPEN);
+    assert_eq!(session.required_attestations, 2);
+
+    // Close the session.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(session_pk, false), AccountMeta::new(payer.pubkey(), true)],
+            data: {
+                let mut d = discriminator("global", "close_verification_session").to_vec();
+                d.push(session_status::CLOSED);
+                d
+            },
+        },
+    )
+    .await
+    .expect("close_session failed");
+
+    let session_closed: VerificationSession = read_account(&ctx, session_pk).await;
+    assert_eq!(session_closed.status, session_status::CLOSED);
+}
+
+// ===========================================================================
+// ValidatorReputation tests
+// ===========================================================================
+
+#[tokio::test]
+async fn reputation_initialize_and_record_outcome() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    // Initialize.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rep_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "initialize_validator_reputation").to_vec(),
+        },
+    )
+    .await
+    .expect("init_reputation failed");
+
+    let rep: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep.status, validator_status::ACTIVE);
+    assert_eq!(rep.reputation_score, 10_000);
+
+    // Record confirmed attestation.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(rep_pk, false)],
+            data: {
+                let mut d = discriminator("global", "record_attestation_outcome").to_vec();
+                d.push(1); // confirmed = true
+                d
+            },
+        },
+    )
+    .await
+    .expect("record_outcome failed");
+
+    let rep_after: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep_after.total_attestations, 1);
+    assert_eq!(rep_after.confirmed_attestations, 1);
+
+    // Record disputed attestation — should drop reputation.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(rep_pk, false)],
+            data: {
+                let mut d = discriminator("global", "record_attestation_outcome").to_vec();
+                d.push(0); // confirmed = false
+                d
+            },
+        },
+    )
+    .await
+    .expect("record_dispute failed");
+
+    let rep_disputed: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep_disputed.total_attestations, 2);
+    assert_eq!(rep_disputed.confirmed_attestations, 1);
+    assert_eq!(rep_disputed.disputed_attestations, 1);
+    // score = (1/2)*10000 - 1*500 = 5000 - 500 = 4500
+    assert_eq!(rep_disputed.reputation_score, 4500);
+}
+
+#[tokio::test]
+async fn reputation_jail_and_unjail() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(rep_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "initialize_validator_reputation").to_vec(),
+        },
+    )
+    .await
+    .expect("init_reputation failed");
+
+    // Jail for 100 seconds.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(rep_pk, false)],
+            data: {
+                let mut d = discriminator("global", "jail_validator").to_vec();
+                d.extend_from_slice(&100_i64.to_le_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("jail failed");
+
+    let rep_jailed: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep_jailed.status, validator_status::JAILED);
+
+    // Unjail before timelock — should fail.
+    let result = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(rep_pk, false)],
+            data: discriminator("global", "unjail_validator").to_vec(),
+        },
+    )
+    .await;
+    assert!(result.is_err(), "unjail before timelock should fail");
+
+    // Fast-forward past timelock.
+    let clock = ctx.banks_client.get_sysvar::<solana_sdk::sysvar::clock::Clock>().await.unwrap();
+    ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
+        slot: clock.slot + 1_000_000,
+        epoch_start_timestamp: clock.unix_timestamp + 200,
+        epoch: clock.epoch,
+        leader_schedule_epoch: clock.leader_schedule_epoch,
+        unix_timestamp: clock.unix_timestamp + 200,
+    });
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(rep_pk, false)],
+            data: discriminator("global", "unjail_validator").to_vec(),
+        },
+    )
+    .await
+    .expect("unjail failed");
+
+    let rep_unjailed: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep_unjailed.status, validator_status::ACTIVE);
+}
+
+// ===========================================================================
+// Challenge / Audit tests
+// ===========================================================================
+
+#[tokio::test]
+async fn challenge_file_and_vote() {
+    let (mut ctx, payer) = setup().await;
+
+    // Setup: register validators for both attestation and voting.
+    let v1 = Keypair::new();
+    let v2 = Keypair::new();
+    let v3 = Keypair::new();
+    let (registry, _) = registry_pda();
+
+    // Create registry.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "create_registry").to_vec(),
+        },
+    )
+    .await
+    .expect("create_registry failed");
+
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000)).await.unwrap();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000)).await.unwrap();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v3.pubkey(), 10_000_000)).await.unwrap();
+
+    // Bootstrap: add v1, v2, v3.
+    add_validator_ok(&mut ctx, &payer, &v1.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &v2.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &v3.pubkey()).await;
+
+    // Register parcel and create claim.
+    let id: [u8; 32] = [251u8; 32];
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [1u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::PARCEL_EXISTS);
+                d.extend_from_slice(&[3u8; 32]);
+                d.push(1); // required_attestations = 1
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim failed");
+
+    // Submit observation from v1 (transitions to UNDER_VERIFICATION).
+    let (obs_v1, _) = observation_pda(&claim_pk, &v1.pubkey());
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v1],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_v1, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(v1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_observation").to_vec();
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.extend_from_slice(&0_i64.to_le_bytes());
+                d.push(1);
+                d.extend_from_slice(&[4u8; 32]);
+                d.push(90);
+                d.extend_from_slice(&[5u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_observation failed");
+
+    // Submit attestation from v1 (CONFIRMED, bumps attestation_count).
+    let (att_v1, _) = verification_attestation_pda(&claim_pk, &v1.pubkey());
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v1],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(att_v1, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(obs_v1, false),
+                AccountMeta::new(v1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+                d.push(attestation_result::CONFIRMED);
+                d.push(95);
+                d.extend_from_slice(&[6u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("submit_attestation failed");
+
+    // Verify the claim.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(claim_pk, false)],
+            data: discriminator("global", "verify_claim").to_vec(),
+        },
+    )
+    .await
+    .expect("verify_claim failed");
+
+    // File a challenge.
+    let challenger = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &challenger.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let (chall_pk, _) = challenge_pda(&claim_pk, &challenger.pubkey());
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &challenger],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(chall_pk, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new(challenger.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "file_challenge").to_vec();
+                d.extend_from_slice(&[4u8; 32]); // challenge_hash
+                d.push(2); // required_votes
+                d
+            },
+        },
+    )
+    .await
+    .expect("file_challenge failed");
+
+    let challenge: Challenge = read_account(&ctx, chall_pk).await;
+    assert_eq!(challenge.status, challenge_status::FILED);
+    assert_eq!(challenge.required_votes, 2);
+
+    let claim_challenged: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_challenged.status, claim_status::CHALLENGED);
+
+    // Vote from v1 (uphold).
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v1],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(chall_pk, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(v1.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "vote_challenge").to_vec();
+                d.push(1); // vote_uphold = true
+                d
+            },
+        },
+    )
+    .await
+    .expect("vote_challenge v1 failed");
+
+    let challenge_v1: Challenge = read_account(&ctx, chall_pk).await;
+    assert_eq!(challenge_v1.status, challenge_status::UNDER_REVIEW);
+    assert_eq!(challenge_v1.uphold_votes, 1);
+
+    // Vote from v2 (uphold) — should trigger resolution.
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &v2],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(chall_pk, false),
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(v2.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "vote_challenge").to_vec();
+                d.push(1); // vote_uphold = true
+                d
+            },
+        },
+    )
+    .await
+    .expect("vote_challenge v2 failed");
+
+    let challenge_resolved: Challenge = read_account(&ctx, chall_pk).await;
+    assert_eq!(challenge_resolved.status, challenge_status::UPHELD);
+    assert!(challenge_resolved.resolved_at > 0);
+
+    let claim_rejected: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim_rejected.status, claim_status::REJECTED);
+}
+
+// ===========================================================================
+// QuorumConfig tests
+// ===========================================================================
+
+#[tokio::test]
+async fn quorum_config_set() {
+    let (mut ctx, payer) = setup().await;
+
+    // Create registry first.
+    let (registry, _) = registry_pda();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "create_registry").to_vec(),
+        },
+    )
+    .await
+    .expect("create_registry failed");
+
+    // Set quorum config for parcel_type=0, region=[0,0] (global default).
+    let (config_pk, _) = quorum_config_pda(0, &[0, 0]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(config_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "set_quorum_config").to_vec();
+                d.push(0); // parcel_type
+                d.extend_from_slice(&[0u8, 0]); // region
+                d.push(3); // required_attestations
+                d.push(75); // required_confidence
+                d
+            },
+        },
+    )
+    .await
+    .expect("set_quorum_config failed");
+
+    let config: QuorumConfig = read_account(&ctx, config_pk).await;
+    assert_eq!(config.required_attestations, 3);
+    assert_eq!(config.required_confidence, 75);
+    assert_eq!(config.parcel_type, 0);
+    assert_eq!(config.region, [0, 0]);
 }

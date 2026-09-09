@@ -9020,6 +9020,10 @@ name = "terra-identity"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "borsh",
+ "solana-program-test",
+ "solana-sdk",
+ "solana-sdk-ids",
 ]
 
 [[package]]
