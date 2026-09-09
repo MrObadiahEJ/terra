@@ -955,7 +955,7 @@ pub mod terra_registry {
         } else {
             &identity_data
         };
-        let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
+        let _identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
             .map_err(|_| error!(TerraError::IdentityMismatch))?;
 
         let ir = &mut ctx.accounts.identity_rights;

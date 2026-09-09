@@ -77,9 +77,9 @@ pub fn set_quorum_config(
 /// Falls back to global defaults (parcel_type=0, region=[0,0]) if no
 /// specific config exists.
 pub fn resolve_quorum(
-    registry: &crate::validator_registry::ValidatorRegistry,
-    parcel_type: u8,
-    region: [u8; 2],
+    _registry: &crate::validator_registry::ValidatorRegistry,
+    _parcel_type: u8,
+    _region: [u8; 2],
     required_attestations: u8,
     required_confidence: u8,
 ) -> (u8, u8) {

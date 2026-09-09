@@ -36,7 +36,6 @@ impl StorageBackend {
                 .map(|storage_ref| StoredArtifact {
                     content_hash,
                     storage_ref,
-                    content_type: content_type.to_string(),
                     size_bytes: data.len() as u64,
                     backend_name: self.backend_name().to_string(),
                 }),
@@ -49,8 +48,6 @@ pub struct StoredArtifact {
     pub content_hash: [u8; 32],
     /// Where the file can be retrieved (e.g. local path, IPFS CID, S3 key).
     pub storage_ref: String,
-    /// MIME type of the original upload.
-    pub content_type: String,
     /// Byte length of the original upload.
     pub size_bytes: u64,
     /// Backend identifier (e.g. "local", "ipfs", "s3").
