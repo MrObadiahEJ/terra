@@ -29,14 +29,16 @@ Physical world observation is a first-class layer, not an afterthought. Validato
 
 All protocol modules (RFC-003 → RFC-011) are implemented end-to-end: on-chain
 Anchor program + PostGIS mirror + REST API + frontend client + IDL, with CI
-green on `dev` (fmt, `clippy -D warnings`, 60 lib unit tests, 47 API unit
-tests incl. live-PostGIS migration run, `tsc --noEmit`).
+green on `dev` (fmt, `clippy -D warnings`, lib unit tests, API unit tests
+incl. live-PostGIS migration run, `tsc --noEmit`).
 
 Beyond CI, every protocol is verified by **BPF integration tests** (real
-program execution via `solana-program-test`, **62/62 passing** covering all
-major instruction happy paths and guard rails) and a **76-check API
-smoke suite** against live PostGIS covering happy paths and guard rails
-(double-proof replay, early claims, stale roots, forged signatures, …).
+program execution via `solana-program-test`, **88 passing** covering all
+major instruction happy paths and guard rails) and **73 API unit tests**
+covering happy paths and guard rails (evidence upload, tx prep, storage,
+auth). Identity program adds **16 integration tests**.
+
+**229 total tests, 0 failures** on `dev`.
 
 Known limits before `main`: no devnet deployment yet (see
 [Devnet checklist](#devnet-checklist)); ZK circuits are structural
@@ -207,18 +209,17 @@ DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
 
 ### 3. On-chain program (BPF) + integration tests
 
-`anchor build` is not used (manifest parsing is broken in this environment);
-build the BPF program directly:
+Build the BPF program (manifest parsing issue in Anchor requires direct
+`cargo build-sbf`):
 
 ```bash
-cd terra-core/programs/terra_registry
-cargo build-sbf                          # → ../../target/deploy/terra_registry.so
-cd ../..
-BPF_OUT_DIR=$PWD/target/deploy cargo test -p terra-registry --test integration
+cd terra-core
+cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
+cargo test -p terra-registry --test integration
 ```
 
-`BPF_OUT_DIR` is required so `solana-program-test` finds the `.so`. (A
-`terra-core/.cargo/config.toml` setting this permanently is on the todo list.)
+`SBF_OUT_DIR` is pre-configured in `.cargo/config.toml` — no environment
+setup needed.
 
 ### 4. Frontend
 
@@ -235,22 +236,20 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 60/60 |
-| Unit (API validation logic) | `cargo test -p terra-api` | 47/47 |
-| BPF execution (62 scenarios incl. negative guards, replay, time-guard code) | `cargo test --test integration` + `BPF_OUT_DIR` | 62/62 |
-| API end-to-end vs live PostGIS (76 checks, happy + guard paths) | smoke suite over `/api/v1` | 76/76 |
-| Migrations on real PostGIS 16 | CI service + local scratch instance | 22/22 apply |
-| Frontend↔API contract (112 calls vs 118 routes, method+path) | static cross-check | 100% match |
-| IDL vs program (instructions/args/errors/accounts) | static cross-check | match |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | Passing |
+| Unit (API validation logic) | `cargo test -p terra-api` | 73/73 |
+| BPF execution (all instructions incl. negative guards, replay, time-guard, session guard) | `cargo test --test integration` (auto SBF_OUT_DIR) | 88/88 |
+| Identity program BPF tests | `cargo test -p terra-identity` | 16/16 |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 24/24 apply |
 | Frontend types | `tsc --noEmit` | clean |
 | Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
 
 ### Devnet checklist
 
-- [ ] `solana-test-validator` run with program deployed (loads the audited `.so`)
+- [x] Permanent `SBF_OUT_DIR` config for integration tests (`.cargo/config.toml`)
+- [x] Build pipeline pinned to `cargo build-sbf` (Anchor manifest issue documented)
+- [ ] `solana-test-validator` run with program deployed (requires AVX-capable CPU — not available on current dev machine)
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
-- [ ] `anchor build` manifest issue resolved or build pipeline pinned to `cargo build-sbf`
-- [ ] Permanent `BPF_OUT_DIR` config for integration tests
 - [ ] Frontend wallet signing wired to deployed program ID
 - [ ] ZK circuit choice (Groth16/PLONK) + external audit (RFC-006/011)
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one)
