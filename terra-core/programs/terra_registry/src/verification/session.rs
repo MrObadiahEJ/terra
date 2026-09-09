@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::account_info::AccountInfo;
 
+use crate::verification::quorum_config::QuorumConfig;
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
@@ -21,6 +23,29 @@ pub mod session_status {
 
 /// Verification sessions expire after 30 days if not resolved.
 pub const SESSION_TIMEOUT_SECS: i64 = 30 * 24 * 3600;
+
+// ---------------------------------------------------------------------------
+// Helper: look up QuorumConfig PDA via remaining_accounts
+// ---------------------------------------------------------------------------
+
+pub fn try_load_quorum_config<'info>(
+    remaining_accounts: &[AccountInfo<'info>],
+    parcel_type: u8,
+    region: [u8; 2],
+) -> Result<Option<QuorumConfig>> {
+    let (pda, _) = Pubkey::find_program_address(
+        &[b"quorum_config", &[parcel_type][..], region.as_ref()],
+        &crate::ID,
+    );
+    for acc in remaining_accounts {
+        if acc.key == &pda {
+            let data = acc.try_borrow_data()?;
+            let account = QuorumConfig::try_deserialize(&mut &data[..])?;
+            return Ok(Some(account));
+        }
+    }
+    Ok(None)
+}
 
 // ---------------------------------------------------------------------------
 // VerificationSession account
@@ -76,15 +101,29 @@ impl VerificationSession {
 /// Open a new verification session for a claim. Anyone may open a session.
 /// Only one session may be open per claim at a time (enforced by PDA seed
 /// including session_id — the caller must ensure uniqueness).
+///
+/// The required attestation count is resolved from QuorumConfig (looked up
+/// via remaining_accounts) or falls back to 2.
 pub fn open_verification_session(
     ctx: Context<crate::OpenVerificationSession>,
     session_id: [u8; 32],
-    required_attestations: u8,
+    parcel_type: u8,
+    region: [u8; 2],
 ) -> Result<()> {
     require!(
         !session_id.iter().all(|b| *b == 0),
         TerraError::EmptyClaimId
     );
+
+    // Resolve quorum from QuorumConfig or fall back to defaults.
+    let required_attestations = if let Some(config) =
+        try_load_quorum_config(ctx.remaining_accounts, parcel_type, region)?
+    {
+        config.required_attestations
+    } else {
+        2
+    };
+
     require!(
         required_attestations >= 1,
         TerraError::InvalidRequiredAttestations

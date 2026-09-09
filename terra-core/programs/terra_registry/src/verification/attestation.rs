@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::account_info::AccountInfo;
 
+use crate::verification::reputation::{ValidatorReputation, validator_status};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
@@ -35,11 +37,37 @@ pub struct VerificationAttestation {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: look up ValidatorReputation PDA via remaining_accounts
+// ---------------------------------------------------------------------------
+
+fn try_load_reputation<'info>(
+    remaining_accounts: &[AccountInfo<'info>],
+    validator: &Pubkey,
+) -> Result<Option<ValidatorReputation>> {
+    let (pda, _) = Pubkey::find_program_address(
+        &[b"validator_reputation", validator.as_ref()],
+        &crate::ID,
+    );
+    for acc in remaining_accounts {
+        if acc.key == &pda {
+            let data = acc.try_borrow_data()?;
+            let account = ValidatorReputation::try_deserialize(&mut &data[..])?;
+            return Ok(Some(account));
+        }
+    }
+    Ok(None)
+}
+
+// ---------------------------------------------------------------------------
 // Instruction handlers
 // ---------------------------------------------------------------------------
 
 /// Submit an attestation for a claim. Only validators who have submitted
 /// an observation may attest. One attestation per validator per claim.
+///
+/// If the validator's ValidatorReputation PDA is provided via
+/// remaining_accounts and the validator is JAILED or SLASHED, the
+/// transaction is rejected with `ValidatorJailed`.
 pub fn submit_attestation(
     ctx: Context<crate::SubmitVerificationAttestation>,
     result: u8,
@@ -51,6 +79,16 @@ pub fn submit_attestation(
         TerraError::InvalidAttestationResult
     );
     require!(confidence <= 100, TerraError::InvalidConfidence);
+
+    // Reputation gating: reject jailed/slashed validators.
+    if let Some(reputation) =
+        try_load_reputation(ctx.remaining_accounts, &ctx.accounts.validator.key())?
+    {
+        require!(
+            reputation.status == validator_status::ACTIVE,
+            TerraError::ValidatorJailed
+        );
+    }
 
     let claim = &mut ctx.accounts.claim;
     require!(

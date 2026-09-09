@@ -75,12 +75,16 @@ pub struct Claim {
 // ---------------------------------------------------------------------------
 
 /// Create a new claim about a parcel. Anyone may submit a claim.
+///
+/// `required_attestations` is resolved from QuorumConfig (looked up via
+/// remaining_accounts) or falls back to 2.
 pub fn create_claim(
     ctx: Context<crate::CreateClaim>,
     claim_id: [u8; 32],
     claim_type: u8,
     statement_hash: [u8; 32],
-    required_attestations: u8,
+    parcel_type: u8,
+    region: [u8; 2],
 ) -> Result<()> {
     require!(
         !claim_id.iter().all(|b| *b == 0),
@@ -91,6 +95,16 @@ pub fn create_claim(
         !statement_hash.iter().all(|b| *b == 0),
         TerraError::EmptyStatementHash
     );
+
+    // Resolve quorum from QuorumConfig or fall back to defaults.
+    let required_attestations = if let Some(config) =
+        super::session::try_load_quorum_config(ctx.remaining_accounts, parcel_type, region)?
+    {
+        config.required_attestations
+    } else {
+        2
+    };
+
     require!(
         required_attestations >= 1,
         TerraError::InvalidRequiredAttestations

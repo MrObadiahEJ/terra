@@ -16,9 +16,15 @@ use terra_registry::{
     verification::{
         self, Claim, Evidence, Observation, VerificationAttestation,
         VerificationSession, ValidatorReputation, Challenge, QuorumConfig,
+        Observer, GuardianClaim, CrossBorderVerification, AuditEntry,
+        QuorumVote, QuorumTally,
         claim::claim_status, claim::claim_type,
         evidence::evidence_type, attestation::attestation_result,
         session::session_status, validator_status, challenge_status,
+        observer::observer_status, guardian_claim::guardian_claim_status,
+        guardian_claim::guardian_type,
+        cross_border_bridge::cross_border_verification_status,
+        audit_trail::audit_action, quorum_voting::quorum_vote_choice,
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
@@ -262,6 +268,39 @@ fn quorum_config_pda(parcel_type: u8, region: &[u8; 2]) -> (Pubkey, u8) {
         &[b"quorum_config", &[parcel_type], region.as_ref()],
         &PROGRAM_ID,
     )
+}
+
+fn observer_pda(wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"observer", wallet.as_ref()], &PROGRAM_ID)
+}
+
+fn guardian_claim_pda(claim: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"guardian_claim", claim.as_ref()], &PROGRAM_ID)
+}
+
+fn cross_border_verification_pda(binding: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"cross_border_verification", binding.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn audit_entry_pda(entity: &Pubkey, sequence: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"audit_entry", entity.as_ref(), sequence.to_le_bytes().as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn quorum_vote_pda(claim: &Pubkey, voter: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"quorum_vote", claim.as_ref(), voter.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn quorum_tally_pda(claim: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"quorum_tally", claim.as_ref()], &PROGRAM_ID)
 }
 
 fn discriminator(namespace: &str, name: &str) -> [u8; 8] {
@@ -6225,7 +6264,8 @@ async fn verification_full_e2e() {
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::PARCEL_EXISTS);
                 d.extend_from_slice(&stmt_hash);
-                d.push(required);
+                d.push(0u8);
+                d.extend_from_slice(&[0u8; 2]);
                 d
             },
         },
@@ -6412,9 +6452,47 @@ async fn verification_full_e2e() {
     assert_eq!(claim_final.version, 2);
 }
 
+async fn create_quorum_config(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    parcel_type: u8,
+    region: [u8; 2],
+    required_attestations: u8,
+) -> Pubkey {
+    let (config_pk, _) = quorum_config_pda(parcel_type, &region);
+    let (registry_pk, _) = registry_pda();
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(config_pk, false),
+                AccountMeta::new_readonly(registry_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "set_quorum_config").to_vec();
+                d.push(parcel_type);
+                d.extend_from_slice(&region);
+                d.push(required_attestations);
+                d.push(50); // required_confidence
+                d
+            },
+        },
+    )
+    .await
+    .expect("set_quorum_config failed");
+    config_pk
+}
+
 #[tokio::test]
 async fn verify_claim_quorum_not_reached() {
     let (mut ctx, payer) = setup().await;
+
+    // Create registry (needed for quorum config).
+    create_registry_ok(&mut ctx, &payer).await;
 
     let id: [u8; 32] = [243u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
@@ -6423,7 +6501,10 @@ async fn verify_claim_quorum_not_reached() {
     let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
     let stmt_hash: [u8; 32] = [11u8; 32];
 
-    // Create claim requiring 3 attestations.
+    // Create QuorumConfig with required_attestations=3 for parcel_type=1, region=[1,1].
+    let config_pk = create_quorum_config(&mut ctx, &payer, 1, [1, 1], 3).await;
+
+    // Create claim requiring 3 attestations via QuorumConfig.
     process(
         &mut ctx,
         &payer,
@@ -6434,13 +6515,15 @@ async fn verify_claim_quorum_not_reached() {
                 AccountMeta::new_readonly(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new_readonly(config_pk, false),
             ],
             data: {
                 let mut d = discriminator("global", "create_claim").to_vec();
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::OWNERSHIP);
                 d.extend_from_slice(&stmt_hash);
-                d.push(3); // require 3 attestations
+                d.push(1u8); // parcel_type
+                d.extend_from_slice(&[1u8, 1u8]); // region
                 d
             },
         },
@@ -6551,7 +6634,8 @@ async fn add_evidence_wrong_submitter_fails() {
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::PARCEL_EXISTS);
                 d.extend_from_slice(&[15u8; 32]);
-                d.push(1);
+                d.push(0u8);
+                d.extend_from_slice(&[0u8; 2]);
                 d
             },
         },
@@ -6618,7 +6702,8 @@ async fn duplicate_observation_same_validator_fails() {
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::PARCEL_EXISTS);
                 d.extend_from_slice(&[17u8; 32]);
-                d.push(2);
+                d.push(0u8);
+                d.extend_from_slice(&[0u8; 2]);
                 d
             },
         },
@@ -6716,7 +6801,8 @@ async fn session_open_and_record_evidence() {
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::PARCEL_EXISTS);
                 d.extend_from_slice(&[2u8; 32]);
-                d.push(1);
+                d.push(0u8);
+                d.extend_from_slice(&[0u8; 2]);
                 d
             },
         },
@@ -6742,7 +6828,8 @@ async fn session_open_and_record_evidence() {
             data: {
                 let mut d = discriminator("global", "open_verification_session").to_vec();
                 d.extend_from_slice(&session_id);
-                d.push(2); // required_attestations
+                d.push(0u8); // parcel_type
+                d.extend_from_slice(&[0u8; 2]); // region
                 d
             },
         },
@@ -6976,8 +7063,11 @@ async fn challenge_file_and_vote() {
     add_validator_ok(&mut ctx, &payer, &v3.pubkey()).await;
 
     // Register parcel and create claim.
-    let id: [u8; 32] = [251u8; 32];
+    let _id: [u8; 32] = [251u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // Create QuorumConfig with required_attestations=1 for parcel_type=1, region=[2,2].
+    let config_pk = create_quorum_config(&mut ctx, &payer, 1, [2, 2], 1).await;
 
     let claim_id: [u8; 32] = [1u8; 32];
     let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
@@ -6991,13 +7081,15 @@ async fn challenge_file_and_vote() {
                 AccountMeta::new_readonly(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new_readonly(config_pk, false),
             ],
             data: {
                 let mut d = discriminator("global", "create_claim").to_vec();
                 d.extend_from_slice(&claim_id);
                 d.push(claim_type::PARCEL_EXISTS);
                 d.extend_from_slice(&[3u8; 32]);
-                d.push(1); // required_attestations = 1
+                d.push(1u8); // parcel_type
+                d.extend_from_slice(&[2u8, 2u8]); // region
                 d
             },
         },
@@ -7226,4 +7318,767 @@ async fn quorum_config_set() {
     assert_eq!(config.required_confidence, 75);
     assert_eq!(config.parcel_type, 0);
     assert_eq!(config.region, [0, 0]);
+}
+
+// ===========================================================================
+// Milestone D: QuorumConfig wiring tests
+// ===========================================================================
+
+#[tokio::test]
+async fn quorum_config_wired_to_create_claim() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let (registry, _) = registry_pda();
+
+    // Create registry.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_registry").to_vec(),
+    }).await.unwrap();
+
+    // Set quorum config: parcel_type=5, region=[3,4], required=4.
+    let (config_pk, _) = quorum_config_pda(5, &[3, 4]);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(config_pk, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "set_quorum_config").to_vec();
+            d.push(5);
+            d.extend_from_slice(&[3u8, 4]);
+            d.push(4);
+            d.push(80);
+            d
+        },
+    }).await.unwrap();
+
+    // Create claim with parcel_type=5, region=[3,4] → should pick up required=4.
+    let claim_id: [u8; 32] = [99u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(config_pk, false), // remaining_account
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::PARCEL_EXISTS);
+            d.extend_from_slice(&[7u8; 32]);
+            d.push(5);
+            d.extend_from_slice(&[3u8, 4]);
+            d
+        },
+    }).await.unwrap();
+
+    let claim: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim.required_attestations, 4);
+}
+
+#[tokio::test]
+async fn quorum_config_wired_to_session() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let (registry, _) = registry_pda();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_registry").to_vec(),
+    }).await.unwrap();
+
+    // Set quorum config: parcel_type=2, region=[1,1], required=5.
+    let (config_pk, _) = quorum_config_pda(2, &[1, 1]);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(config_pk, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "set_quorum_config").to_vec();
+            d.push(2);
+            d.extend_from_slice(&[1u8, 1]);
+            d.push(5);
+            d.push(60);
+            d
+        },
+    }).await.unwrap();
+
+    // Create claim with default (no config → required=2).
+    let claim_id: [u8; 32] = [88u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::BOUNDARY);
+            d.extend_from_slice(&[8u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Open session with parcel_type=2, region=[1,1] → should pick up required=5.
+    let session_id: [u8; 32] = [77u8; 32];
+    let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(session_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(config_pk, false), // remaining_account
+        ],
+        data: {
+            let mut d = discriminator("global", "open_verification_session").to_vec();
+            d.extend_from_slice(&session_id);
+            d.push(2);
+            d.extend_from_slice(&[1u8, 1]);
+            d
+        },
+    }).await.unwrap();
+
+    let session: VerificationSession = read_account(&ctx, session_pk).await;
+    assert_eq!(session.required_attestations, 5);
+}
+
+// ===========================================================================
+// Milestone E: Reputation gating tests
+// ===========================================================================
+
+#[tokio::test]
+async fn jailed_validator_cannot_attest() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let validator = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000)).await.unwrap();
+
+    // Initialize reputation as JAILED.
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "initialize_validator_reputation").to_vec(),
+    }).await.unwrap();
+
+    // Jail the validator.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+        ],
+        data: {
+            let mut d = discriminator("global", "jail_validator").to_vec();
+            d.extend_from_slice(&86400_i64.to_le_bytes());
+            d
+        },
+    }).await.unwrap();
+
+    let rep: ValidatorReputation = read_account(&ctx, rep_pk).await;
+    assert_eq!(rep.status, validator_status::JAILED);
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [55u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::PARCEL_EXISTS);
+            d.extend_from_slice(&[6u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Submit observation.
+    let (obs, _) = observation_pda(&claim_pk, &validator.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &validator], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs, false),
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new(validator.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "submit_observation").to_vec();
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.push(0);
+            d.extend_from_slice(&[9u8; 32]);
+            d.push(80);
+            d.extend_from_slice(&[10u8; 32]);
+            d
+        },
+    }).await.unwrap();
+
+    // Attempt to submit attestation — should fail because validator is jailed.
+    let (att, _) = verification_attestation_pda(&claim_pk, &validator.pubkey());
+    let result = process_with(&mut ctx, &payer, &[&payer, &validator], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(att, false),
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(obs, false),
+            AccountMeta::new(validator.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(rep_pk, false), // remaining: reputation
+        ],
+        data: {
+            let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+            d.push(attestation_result::CONFIRMED);
+            d.push(90);
+            d.extend_from_slice(&[11u8; 32]);
+            d
+        },
+    }).await;
+    assert!(result.is_err(), "jailed validator should not be able to attest");
+}
+
+// ===========================================================================
+// Milestone G: Observer registry tests
+// ===========================================================================
+
+#[tokio::test]
+async fn observer_register_and_observe() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let observer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer.pubkey(), 10_000_000)).await.unwrap();
+
+    // Register observer.
+    let (obs_acc_pk, _) = observer_pda(&observer.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_acc_pk, false),
+            AccountMeta::new(observer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "register_observer").to_vec();
+            d.extend_from_slice(&Pubkey::new_unique().to_bytes());
+            d
+        },
+    }).await.unwrap();
+
+    let obs_account: Observer = read_account(&ctx, obs_acc_pk).await;
+    assert_eq!(obs_account.status, observer_status::ACTIVE);
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [44u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::OCCUPANCY);
+            d.extend_from_slice(&[5u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Submit observation from observer.
+    let (obs_pk, _) = observation_pda(&claim_pk, &observer.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new(observer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(obs_acc_pk, false), // remaining: observer
+        ],
+        data: {
+            let mut d = discriminator("global", "submit_observation").to_vec();
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.push(0);
+            d.extend_from_slice(&[7u8; 32]);
+            d.push(85);
+            d.extend_from_slice(&[8u8; 32]);
+            d
+        },
+    }).await.unwrap();
+
+    let observation: Observation = read_account(&ctx, obs_pk).await;
+    assert_eq!(observation.validator, observer.pubkey());
+    assert_eq!(observation.method, 0);
+}
+
+#[tokio::test]
+async fn suspended_observer_cannot_observe() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let (registry, _) = registry_pda();
+
+    // Create registry (payer is admin).
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_registry").to_vec(),
+    }).await.unwrap();
+
+    let observer = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer.pubkey(), 10_000_000)).await.unwrap();
+
+    // Register observer.
+    let (obs_acc_pk, _) = observer_pda(&observer.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_acc_pk, false),
+            AccountMeta::new(observer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "register_observer").to_vec();
+            d.extend_from_slice(&Pubkey::new_unique().to_bytes());
+            d
+        },
+    }).await.unwrap();
+
+    // Suspend observer (admin = payer).
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_acc_pk, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "suspend_observer").to_vec(),
+    }).await.unwrap();
+
+    let obs_account: Observer = read_account(&ctx, obs_acc_pk).await;
+    assert_eq!(obs_account.status, observer_status::SUSPENDED);
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [33u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::PARCEL_EXISTS);
+            d.extend_from_slice(&[4u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Attempt to observe from suspended observer — should fail.
+    let (obs_pk, _) = observation_pda(&claim_pk, &observer.pubkey());
+    let result = process_with(&mut ctx, &payer, &[&payer, &observer], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new(observer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(obs_acc_pk, false), // remaining: observer (suspended)
+        ],
+        data: {
+            let mut d = discriminator("global", "submit_observation").to_vec();
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.extend_from_slice(&0_i64.to_le_bytes());
+            d.push(0);
+            d.extend_from_slice(&[3u8; 32]);
+            d.push(70);
+            d.extend_from_slice(&[2u8; 32]);
+            d
+        },
+    }).await;
+    assert!(result.is_err(), "suspended observer should not be able to observe");
+}
+
+// ===========================================================================
+// Milestone H: Guardian claim integration tests
+// ===========================================================================
+
+#[tokio::test]
+async fn guardian_claim_lifecycle() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let (registry, _) = registry_pda();
+
+    // Create registry.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_registry").to_vec(),
+    }).await.unwrap();
+
+    // Register payer as validator (add_validator_to_registry).
+    let v1 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000)).await.unwrap();
+    let (endorsement, _) = endorsement_pda(&registry, &v1.pubkey());
+    let mut add_val_data = discriminator("global", "add_validator_to_registry").to_vec();
+    add_val_data.extend_from_slice(&borsh_ser(&v1.pubkey()));
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(endorsement, false),
+            AccountMeta::new_readonly(v1.pubkey(), false),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: add_val_data,
+    }).await.unwrap();
+
+    // Also register payer as a validator (needed for create_guardian_claim caller).
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [22u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::OWNERSHIP);
+            d.extend_from_slice(&[1u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Create guardian claim (caller must be validator).
+    let identity_key = Pubkey::new_unique();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    let case_hash: [u8; 32] = [42u8; 32];
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(gc_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new_readonly(identity_key, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_guardian_claim").to_vec();
+            d.extend_from_slice(&case_hash);
+            d.push(guardian_type::COURT);
+            d
+        },
+    }).await.unwrap();
+
+    let gc: GuardianClaim = read_account(&ctx, gc_pk).await;
+    assert_eq!(gc.status, guardian_claim_status::PENDING);
+    assert_eq!(gc.guardian_type, guardian_type::COURT);
+
+    // Resolve guardian claim.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(gc_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "resolve_guardian_claim").to_vec(),
+    }).await.unwrap();
+
+    let gc_resolved: GuardianClaim = read_account(&ctx, gc_pk).await;
+    assert_eq!(gc_resolved.status, guardian_claim_status::RESOLVED);
+}
+
+// ===========================================================================
+// Milestone J: Audit trail tests
+// ===========================================================================
+
+#[tokio::test]
+async fn audit_entry_recorded() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [11u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::PARCEL_EXISTS);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Record audit entry: claim created.
+    let (ae_pk, _) = audit_entry_pda(&claim_pk, 0);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(ae_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "record_audit_entry").to_vec();
+            d.extend_from_slice(&0_u32.to_le_bytes()); // sequence
+            d.push(audit_action::CLAIM_CREATED);
+            d.push(0); // from_status
+            d.push(claim_status::SUBMITTED);
+            d.extend_from_slice(&[0u8; 32]); // metadata_hash
+            d
+        },
+    }).await.unwrap();
+
+    let entry: AuditEntry = read_account(&ctx, ae_pk).await;
+    assert_eq!(entry.entity, claim_pk);
+    assert_eq!(entry.sequence, 0);
+    assert_eq!(entry.action, audit_action::CLAIM_CREATED);
+    assert_eq!(entry.from_status, 0);
+    assert_eq!(entry.to_status, claim_status::SUBMITTED);
+
+    // Record second audit entry (sequence=1).
+    let (ae_pk2, _) = audit_entry_pda(&claim_pk, 1);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(ae_pk2, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "record_audit_entry").to_vec();
+            d.extend_from_slice(&1_u32.to_le_bytes()); // sequence
+            d.push(audit_action::OBSERVATION_SUBMITTED);
+            d.push(claim_status::SUBMITTED);
+            d.push(claim_status::UNDER_VERIFICATION);
+            d.extend_from_slice(&[5u8; 32]); // metadata_hash
+            d
+        },
+    }).await.unwrap();
+
+    let entry2: AuditEntry = read_account(&ctx, ae_pk2).await;
+    assert_eq!(entry2.sequence, 1);
+    assert_eq!(entry2.action, audit_action::OBSERVATION_SUBMITTED);
+    assert_eq!(entry2.to_status, claim_status::UNDER_VERIFICATION);
+}
+
+// ===========================================================================
+// Milestone K: Quorum voting tests
+// ===========================================================================
+
+#[tokio::test]
+async fn quorum_vote_and_finalize() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // Create a claim with required_attestations=2 → quorum_threshold = 2 * 10000 / 100 = 200.
+    let claim_id: [u8; 32] = [12u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::PARCEL_EXISTS);
+            d.extend_from_slice(&[20u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Voter 1 casts CONFIRM vote (weight defaults to MAX_REPUTATION=10000).
+    let voter1 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &voter1.pubkey(), 10_000_000)).await.unwrap();
+    let (qv1, _) = quorum_vote_pda(&claim_pk, &voter1.pubkey());
+    let (tally_pk, _) = quorum_tally_pda(&claim_pk);
+    process_with(&mut ctx, &payer, &[&payer, &voter1], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(qv1, false),
+            AccountMeta::new(tally_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(voter1.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "cast_quorum_vote").to_vec();
+            d.push(quorum_vote_choice::CONFIRM);
+            d
+        },
+    }).await.unwrap();
+
+    let tally: QuorumTally = read_account(&ctx, tally_pk).await;
+    assert_eq!(tally.total_votes, 1);
+    assert_eq!(tally.confirm_weight, 10000);
+    assert_eq!(tally.quorum_threshold, 200);
+    assert!(tally.resolved); // 10000 >= 200, auto-resolved
+
+    // Finalize quorum → claim becomes VERIFIED.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(tally_pk, false),
+            AccountMeta::new(claim_pk, false),
+        ],
+        data: discriminator("global", "finalize_quorum").to_vec(),
+    }).await.unwrap();
+
+    let claim: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim.status, claim_status::VERIFIED);
+}
+
+#[tokio::test]
+async fn quorum_vote_dispute_rejects_claim() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    // Create a claim.
+    let claim_id: [u8; 32] = [13u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(claim_type::BOUNDARY);
+            d.extend_from_slice(&[21u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    // Voter 1 casts DISPUTE vote (weight=10000).
+    let voter1 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &voter1.pubkey(), 10_000_000)).await.unwrap();
+    let (qv1, _) = quorum_vote_pda(&claim_pk, &voter1.pubkey());
+    let (tally_pk, _) = quorum_tally_pda(&claim_pk);
+    process_with(&mut ctx, &payer, &[&payer, &voter1], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(qv1, false),
+            AccountMeta::new(tally_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(voter1.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "cast_quorum_vote").to_vec();
+            d.push(quorum_vote_choice::DISPUTE);
+            d
+        },
+    }).await.unwrap();
+
+    let tally: QuorumTally = read_account(&ctx, tally_pk).await;
+    assert_eq!(tally.dispute_weight, 10000);
+    assert!(!tally.resolved); // not resolved because dispute doesn't auto-resolve
+
+    // Finalize → dispute > confirm, claim REJECTED.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(tally_pk, false),
+            AccountMeta::new(claim_pk, false),
+        ],
+        data: discriminator("global", "finalize_quorum").to_vec(),
+    }).await.unwrap();
+
+    let claim: Claim = read_account(&ctx, claim_pk).await;
+    assert_eq!(claim.status, claim_status::REJECTED);
 }

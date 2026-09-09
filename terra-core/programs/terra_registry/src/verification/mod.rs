@@ -1,17 +1,27 @@
 pub mod attestation;
+pub mod audit_trail;
 pub mod challenge;
 pub mod claim;
+pub mod cross_border_bridge;
 pub mod evidence;
+pub mod guardian_claim;
 pub mod observation;
+pub mod observer;
 pub mod quorum_config;
+pub mod quorum_voting;
 pub mod reputation;
 pub mod session;
 
 pub use attestation::*;
+pub use audit_trail::*;
 pub use challenge::*;
 pub use claim::*;
+pub use cross_border_bridge::*;
 pub use evidence::*;
+pub use guardian_claim::*;
 pub use observation::*;
+pub use observer::*;
 pub use quorum_config::*;
+pub use quorum_voting::*;
 pub use reputation::*;
 pub use session::*;

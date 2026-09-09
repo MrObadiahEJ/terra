@@ -1646,9 +1646,10 @@ pub mod terra_registry {
         claim_id: [u8; 32],
         claim_type: u8,
         statement_hash: [u8; 32],
-        required_attestations: u8,
+        parcel_type: u8,
+        region: [u8; 2],
     ) -> Result<()> {
-        verification::claim::create_claim(ctx, claim_id, claim_type, statement_hash, required_attestations)
+        verification::claim::create_claim(ctx, claim_id, claim_type, statement_hash, parcel_type, region)
     }
 
     pub fn add_evidence(
@@ -1692,9 +1693,10 @@ pub mod terra_registry {
     pub fn open_verification_session(
         ctx: Context<OpenVerificationSession>,
         session_id: [u8; 32],
-        required_attestations: u8,
+        parcel_type: u8,
+        region: [u8; 2],
     ) -> Result<()> {
-        verification::session::open_verification_session(ctx, session_id, required_attestations)
+        verification::session::open_verification_session(ctx, session_id, parcel_type, region)
     }
 
     pub fn close_verification_session(
@@ -1785,6 +1787,93 @@ pub mod terra_registry {
             required_attestations,
             required_confidence,
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // Observer registry
+    // -----------------------------------------------------------------------
+
+    pub fn register_observer(
+        ctx: Context<RegisterObserver>,
+        identity: Pubkey,
+    ) -> Result<()> {
+        verification::observer::register_observer(ctx, identity)
+    }
+
+    pub fn suspend_observer(ctx: Context<SuspendObserver>) -> Result<()> {
+        verification::observer::suspend_observer(ctx)
+    }
+
+    pub fn reactivate_observer(ctx: Context<ReactivateObserver>) -> Result<()> {
+        verification::observer::reactivate_observer(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Guardian claim integration
+    // -----------------------------------------------------------------------
+
+    pub fn create_guardian_claim(
+        ctx: Context<CreateGuardianClaim>,
+        case_hash: [u8; 32],
+        guardian_type: u8,
+    ) -> Result<()> {
+        verification::guardian_claim::create_guardian_claim(ctx, case_hash, guardian_type)
+    }
+
+    pub fn resolve_guardian_claim(ctx: Context<ResolveGuardianClaim>) -> Result<()> {
+        verification::guardian_claim::resolve_guardian_claim(ctx)
+    }
+
+    pub fn dispute_guardian_claim(ctx: Context<DisputeGuardianClaim>) -> Result<()> {
+        verification::guardian_claim::dispute_guardian_claim(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Cross-border verification bridge
+    // -----------------------------------------------------------------------
+
+    pub fn link_cross_border_to_session(
+        ctx: Context<LinkCrossBorderToSession>,
+    ) -> Result<()> {
+        verification::cross_border_bridge::link_cross_border_to_session(ctx)
+    }
+
+    pub fn verify_cross_border(ctx: Context<VerifyCrossBorder>) -> Result<()> {
+        verification::cross_border_bridge::verify_cross_border(ctx)
+    }
+
+    pub fn revoke_cross_border(ctx: Context<RevokeCrossBorder>) -> Result<()> {
+        verification::cross_border_bridge::revoke_cross_border(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Audit trail
+    // -----------------------------------------------------------------------
+
+    pub fn record_audit_entry(
+        ctx: Context<RecordAuditEntry>,
+        sequence: u32,
+        action: u8,
+        from_status: u8,
+        to_status: u8,
+        metadata_hash: [u8; 32],
+    ) -> Result<()> {
+        verification::audit_trail::record_audit_entry(ctx, sequence, action, from_status, to_status, metadata_hash)
+    }
+
+    // -----------------------------------------------------------------------
+    // Quorum voting
+    // -----------------------------------------------------------------------
+
+    pub fn cast_quorum_vote(
+        ctx: Context<CastQuorumVote>,
+        vote_choice: u8,
+    ) -> Result<()> {
+        verification::quorum_voting::cast_quorum_vote(ctx, vote_choice)
+    }
+
+    pub fn finalize_quorum(ctx: Context<FinalizeQuorum>) -> Result<()> {
+        verification::quorum_voting::finalize_quorum(ctx)
     }
 }
 
@@ -3442,6 +3531,236 @@ pub struct SetQuorumConfig<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ---------------------------------------------------------------------------
+// Observer registry contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct RegisterObserver<'info> {
+    #[account(
+        init,
+        payer = wallet,
+        space = 8 + verification::Observer::INIT_SPACE,
+        seeds = [b"observer", wallet.key().as_ref()],
+        bump,
+    )]
+    pub observer: Account<'info, verification::Observer>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SuspendObserver<'info> {
+    #[account(
+        mut,
+        seeds = [b"observer", observer.wallet.as_ref()],
+        bump,
+    )]
+    pub observer: Account<'info, verification::Observer>,
+    /// CHECK: validated against registry admin in handler.
+    pub authority: UncheckedAccount<'info>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+}
+
+#[derive(Accounts)]
+pub struct ReactivateObserver<'info> {
+    #[account(
+        mut,
+        seeds = [b"observer", observer.wallet.as_ref()],
+        bump,
+    )]
+    pub observer: Account<'info, verification::Observer>,
+    /// CHECK: validated against registry admin in handler.
+    pub authority: UncheckedAccount<'info>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+}
+
+// ---------------------------------------------------------------------------
+// Guardian claim contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(case_hash: [u8; 32])]
+pub struct CreateGuardianClaim<'info> {
+    #[account(
+        init,
+        payer = caller,
+        space = 8 + verification::GuardianClaim::INIT_SPACE,
+        seeds = [b"guardian_claim", claim.key().as_ref()],
+        bump,
+    )]
+    pub guardian_claim: Account<'info, verification::GuardianClaim>,
+    #[account(
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    /// CHECK: the identity under guardianship.
+    pub identity: UncheckedAccount<'info>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(mut)]
+    pub caller: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ResolveGuardianClaim<'info> {
+    #[account(
+        mut,
+        seeds = [b"guardian_claim", guardian_claim.claim.as_ref()],
+        bump,
+    )]
+    pub guardian_claim: Account<'info, verification::GuardianClaim>,
+    pub caller: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct DisputeGuardianClaim<'info> {
+    #[account(
+        mut,
+        seeds = [b"guardian_claim", guardian_claim.claim.as_ref()],
+        bump,
+    )]
+    pub guardian_claim: Account<'info, verification::GuardianClaim>,
+    pub caller: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Cross-border verification contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct LinkCrossBorderToSession<'info> {
+    #[account(
+        init,
+        payer = caller,
+        space = 8 + verification::CrossBorderVerification::INIT_SPACE,
+        seeds = [b"cross_border_verification", binding.key().as_ref()],
+        bump,
+    )]
+    pub cross_border_verification: Account<'info, verification::CrossBorderVerification>,
+    /// CHECK: validated as a JurisdictionBinding by seeds.
+    pub binding: UncheckedAccount<'info>,
+    #[account(
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(
+        seeds = [b"verification_session", session.claim.as_ref(), session.session_id.as_ref()],
+        bump,
+    )]
+    pub session: Account<'info, verification::VerificationSession>,
+    /// CHECK: validated as a Jurisdiction by the handler.
+    pub jurisdiction: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub caller: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyCrossBorder<'info> {
+    #[account(
+        mut,
+        seeds = [b"cross_border_verification", cross_border_verification.binding.as_ref()],
+        bump,
+    )]
+    pub cross_border_verification: Account<'info, verification::CrossBorderVerification>,
+    pub caller: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RevokeCrossBorder<'info> {
+    #[account(
+        mut,
+        seeds = [b"cross_border_verification", cross_border_verification.binding.as_ref()],
+        bump,
+    )]
+    pub cross_border_verification: Account<'info, verification::CrossBorderVerification>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// CHECK: validated against registry admin in handler.
+    pub authority: UncheckedAccount<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(sequence: u32)]
+pub struct RecordAuditEntry<'info> {
+    #[account(
+        init,
+        payer = actor,
+        space = 8 + verification::AuditEntry::INIT_SPACE,
+        seeds = [
+            b"audit_entry",
+            entity.key().as_ref(),
+            sequence.to_le_bytes().as_ref(),
+        ],
+        bump,
+    )]
+    pub audit_entry: Account<'info, verification::AuditEntry>,
+    /// CHECK: the entity being audited (claim, session, challenge, etc.).
+    pub entity: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub actor: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Quorum voting contexts
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct CastQuorumVote<'info> {
+    #[account(
+        init,
+        payer = voter,
+        space = 8 + verification::QuorumVote::INIT_SPACE,
+        seeds = [b"quorum_vote", claim.key().as_ref(), voter.key().as_ref()],
+        bump,
+    )]
+    pub quorum_vote: Account<'info, verification::QuorumVote>,
+    #[account(
+        init_if_needed,
+        payer = voter,
+        space = 8 + verification::QuorumTally::INIT_SPACE,
+        seeds = [b"quorum_tally", claim.key().as_ref()],
+        bump,
+    )]
+    pub tally: Account<'info, verification::QuorumTally>,
+    #[account(
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+    #[account(mut)]
+    pub voter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeQuorum<'info> {
+    #[account(
+        mut,
+        seeds = [b"quorum_tally", claim.key().as_ref()],
+        bump,
+    )]
+    pub tally: Account<'info, verification::QuorumTally>,
+    #[account(
+        mut,
+        seeds = [b"claim", claim.parcel.as_ref(), claim.claim_id.as_ref()],
+        bump,
+    )]
+    pub claim: Account<'info, verification::Claim>,
+}
+
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
@@ -3944,6 +4263,129 @@ pub struct QuorumConfigSet {
     pub set_by: Pubkey,
 }
 
+// ---------------------------------------------------------------------------
+// Observer registry events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ObserverRegistered {
+    pub observer: Pubkey,
+    pub wallet: Pubkey,
+    pub identity: Pubkey,
+    pub registered_at: i64,
+}
+
+#[event]
+pub struct ObserverStatusChanged {
+    pub observer: Pubkey,
+    pub wallet: Pubkey,
+    pub status: u8,
+    pub updated_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Guardian claim events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct GuardianClaimCreated {
+    pub guardian_claim: Pubkey,
+    pub claim: Pubkey,
+    pub identity: Pubkey,
+    pub triggered_by: Pubkey,
+    pub case_hash: [u8; 32],
+    pub guardian_type: u8,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct GuardianClaimResolved {
+    pub guardian_claim: Pubkey,
+    pub claim: Pubkey,
+    pub identity: Pubkey,
+    pub resolved_at: i64,
+}
+
+#[event]
+pub struct GuardianClaimDisputed {
+    pub guardian_claim: Pubkey,
+    pub claim: Pubkey,
+    pub identity: Pubkey,
+    pub disputed_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Cross-border verification events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct CrossBorderLinked {
+    pub cross_border_verification: Pubkey,
+    pub binding: Pubkey,
+    pub claim: Pubkey,
+    pub session: Pubkey,
+    pub jurisdiction: Pubkey,
+    pub linked_by: Pubkey,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct CrossBorderVerified {
+    pub cross_border_verification: Pubkey,
+    pub binding: Pubkey,
+    pub claim: Pubkey,
+    pub verified_by: Pubkey,
+    pub verified_at: i64,
+}
+
+#[event]
+pub struct CrossBorderRevoked {
+    pub cross_border_verification: Pubkey,
+    pub binding: Pubkey,
+    pub claim: Pubkey,
+    pub revoked_at: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct AuditEntryRecorded {
+    pub audit_entry: Pubkey,
+    pub entity: Pubkey,
+    pub sequence: u32,
+    pub action: u8,
+    pub from_status: u8,
+    pub to_status: u8,
+    pub actor: Pubkey,
+    pub timestamp: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Quorum voting events
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct QuorumVoteCast {
+    pub claim: Pubkey,
+    pub voter: Pubkey,
+    pub vote: u8,
+    pub weight: u16,
+    pub confirm_weight: u16,
+    pub dispute_weight: u16,
+    pub total_votes: u8,
+}
+
+#[event]
+pub struct QuorumReached {
+    pub claim: Pubkey,
+    pub confirm_weight: u16,
+    pub quorum_threshold: u16,
+    pub total_votes: u8,
+    pub resolved_at: i64,
+}
+
 #[error_code]
 pub enum TerraError {
     #[msg("Parcel id cannot be all zeros")]
@@ -4260,6 +4702,36 @@ pub enum TerraError {
     // Quorum config
     #[msg("Quorum configuration is invalid")]
     InvalidQuorumConfig,
+
+    // Validator reputation gating
+    #[msg("Validator is jailed or slashed and cannot attest")]
+    ValidatorJailed,
+
+    // Observer registry
+    #[msg("Observer is not active")]
+    ObserverNotActive,
+    #[msg("Observer is not suspended")]
+    ObserverNotSuspended,
+
+    // Guardian claim
+    #[msg("Invalid guardian type")]
+    InvalidGuardianType,
+    #[msg("Invalid guardian claim status")]
+    InvalidGuardianClaimStatus,
+
+    // Cross-border verification bridge
+    #[msg("Invalid cross-border verification status")]
+    InvalidCrossBorderStatus,
+
+    // Audit trail
+    #[msg("Invalid audit action")]
+    InvalidAuditAction,
+
+    // Quorum voting
+    #[msg("Invalid quorum vote choice")]
+    InvalidQuorumVoteChoice,
+    #[msg("Quorum already resolved")]
+    QuorumAlreadyResolved,
 }
 
 #[cfg(test)]
