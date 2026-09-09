@@ -8236,6 +8236,101 @@ async fn identity_based_update_status() {
 }
 
 #[tokio::test]
+async fn grant_identity_right_via_identity_path() {
+    // Scenario: Alice owns parcel, grants OWNERSHIP to her identity, then
+    // uses the identity path (not parcel.owner) to grant OWNERSHIP to Bob.
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [250u8; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    // Register parcel — payer is the legacy owner.
+    process(&mut ctx, &payer, register_ix(&id, "Identity Path Plot", &[4u8; 32], &payer.pubkey()))
+        .await
+        .expect("register_parcel");
+
+    // Bind Alice's identity (owned by payer).
+    let alice_hash = [251u8; 32];
+    let (alice_id_pk, _) = identity_pda(&alice_hash);
+    let mut bind_data = discriminator("global", "bind_identity").to_vec();
+    bind_data.extend_from_slice(&alice_hash);
+    bind_data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(&mut ctx, &payer, Instruction {
+        program_id: IDENTITY_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(alice_id_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: bind_data,
+    }).await.expect("bind alice identity");
+
+    // Grant OWNERSHIP to Alice's identity (legacy path — payer is parcel.owner).
+    let (alice_ownership_pk, _) = identity_rights_pda(&alice_id_pk, &parcel_pk, right_kind::OWNERSHIP);
+    let mut grant_data = discriminator("global", "grant_identity_right").to_vec();
+    grant_data.push(right_kind::OWNERSHIP);
+    grant_data.extend_from_slice(&borsh_ser(&0i64));
+    grant_data.extend_from_slice(&borsh_ser(&"alice ownership".to_string()));
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel_pk, false),
+            AccountMeta::new_readonly(alice_id_pk, false),
+            AccountMeta::new(alice_ownership_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: grant_data,
+    }).await.expect("grant alice OWNERSHIP");
+
+    // Bind Bob's identity (owned by a different wallet).
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000)).await.unwrap();
+    let bob_hash = [252u8; 32];
+    let (bob_id_pk, _) = identity_pda(&bob_hash);
+    let mut bind_data_bob = discriminator("global", "bind_identity").to_vec();
+    bind_data_bob.extend_from_slice(&bob_hash);
+    bind_data_bob.extend_from_slice(&borsh_ser(&bob.pubkey()));
+    process(&mut ctx, &bob, Instruction {
+        program_id: IDENTITY_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(bob_id_pk, false),
+            AccountMeta::new(bob.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: bind_data_bob,
+    }).await.expect("bind bob identity");
+
+    // Alice grants OWNERSHIP to Bob's identity via the identity path.
+    // Alice uses her OWNERSHIP IdentityRights as remaining_accounts to prove
+    // authorization — parcel.owner is NOT checked directly.
+    let (bob_ownership_pk, _) = identity_rights_pda(&bob_id_pk, &parcel_pk, right_kind::OWNERSHIP);
+    let mut grant_data_bob = discriminator("global", "grant_identity_right").to_vec();
+    grant_data_bob.push(right_kind::OWNERSHIP);
+    grant_data_bob.extend_from_slice(&borsh_ser(&0i64));
+    grant_data_bob.extend_from_slice(&borsh_ser(&"bob ownership via identity path".to_string()));
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel_pk, false),
+            AccountMeta::new_readonly(bob_id_pk, false),
+            AccountMeta::new(bob_ownership_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            // remaining_accounts: Alice's OWNERSHIP IdentityRights for authorization
+            AccountMeta::new_readonly(alice_ownership_pk, false),
+        ],
+        data: grant_data_bob,
+    }).await.expect("grant bob OWNERSHIP via identity path");
+
+    let bob_ir: IdentityRights = read_account(&ctx, bob_ownership_pk).await;
+    assert_eq!(bob_ir.identity, bob_id_pk);
+    assert_eq!(bob_ir.parcel, parcel_pk);
+    assert_eq!(bob_ir.rights_kind, right_kind::OWNERSHIP);
+    assert_eq!(bob_ir.granter, payer.pubkey());
+    assert_eq!(bob_ir.status, 0); // right_status::ACTIVE
+}
+
+#[tokio::test]
 async fn attestation_to_claim_bridge() {
     let (mut ctx, payer) = setup().await;
     let id: [u8; 32] = [102u8; 32];

@@ -50,10 +50,20 @@ pub mod infra_flag {
     pub const ALL: u16 = (1 << 7) - 1;
 }
 
+/// A parcel of land.
+///
+/// **DEPRECATED: `owner` field** — Ownership should be expressed through
+/// `IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct
+/// `owner` wallet field. The `is_authorized_owner()` function supports both
+/// paths. New code should prefer the IdentityRights path. The `owner` field
+/// is retained for backward compatibility and will be removed in a future
+/// major version once all existing accounts have migrated.
 #[account]
 #[derive(InitSpace)]
 pub struct Parcel {
     pub id: [u8; 32],
+    /// **DEPRECATED**: Use `IdentityRights(OWNERSHIP)` instead.
+    /// Retained for backward compatibility. See `is_authorized_owner()`.
     pub owner: Pubkey,
     #[max_len(64)]
     pub name: String,
@@ -905,6 +915,11 @@ pub mod terra_registry {
     /// current granter) may sign. The `identity` must be a valid Identity PDA
     /// owned by the signer.
     ///
+    /// Authorization: the granter must be either the legacy `parcel.owner` wallet
+    /// **or** the holder of an active OWNERSHIP IdentityRights for this parcel.
+    /// This enables identity-based ownership to grant sub-rights without
+    /// requiring the legacy wallet field.
+    ///
     /// PDA: `["identity_rights", identity, parcel, rights_kind]`.
     pub fn grant_identity_right(
         ctx: Context<GrantIdentityRight>,
@@ -920,12 +935,19 @@ pub mod terra_registry {
         }
 
         let parcel = &ctx.accounts.parcel;
-        require!(
-            parcel.owner == ctx.accounts.granter.key(),
-            TerraError::NotOwner
-        );
+        // Use identity-aware authorization: supports both legacy owner wallet
+        // and IdentityRights (OWNERSHIP, ACTIVE) path.
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.granter.key(),
+        )?;
 
-        // Verify the identity account belongs to the granter.
+        // Verify the identity account is a valid Identity PDA.
+        // Authorization (who can grant) is already checked by is_authorized_owner above.
+        // The identity's owner is not required to match the granter — a granter with
+        // OWNERSHIP rights may grant sub-rights to any valid identity.
         let identity_info = &ctx.accounts.identity;
         let identity_data = identity_info.try_borrow_data()?;
         let slice = if identity_data.len() >= 8 {
@@ -935,10 +957,6 @@ pub mod terra_registry {
         };
         let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
             .map_err(|_| error!(TerraError::IdentityMismatch))?;
-        require!(
-            identity.owner == ctx.accounts.granter.key(),
-            TerraError::IdentityMismatch
-        );
 
         let ir = &mut ctx.accounts.identity_rights;
         ir.identity = identity_info.key();
