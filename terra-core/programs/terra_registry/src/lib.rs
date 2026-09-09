@@ -3648,6 +3648,15 @@ pub struct OpenVerificationSession<'info> {
         bump,
     )]
     pub claim: Account<'info, verification::Claim>,
+    /// Singleton guard: enforces single active session per claim.
+    #[account(
+        init_if_needed,
+        payer = opener,
+        space = 8 + verification::ClaimSessionTracker::INIT_SPACE,
+        seeds = [b"claim_session_tracker", claim.key().as_ref()],
+        bump,
+    )]
+    pub session_tracker: Account<'info, verification::ClaimSessionTracker>,
     #[account(mut)]
     pub opener: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3661,6 +3670,14 @@ pub struct CloseVerificationSession<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
+    /// Must match the tracker for this claim.
+    #[account(
+        mut,
+        seeds = [b"claim_session_tracker", session.claim.as_ref()],
+        bump,
+        constraint = session_tracker.active_session == session.key(),
+    )]
+    pub session_tracker: Account<'info, verification::ClaimSessionTracker>,
     pub opener: Signer<'info>,
 }
 
@@ -3692,6 +3709,14 @@ pub struct RecordSessionAttestation<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
+    /// Must match the tracker for this claim (cleared when quorum reached).
+    #[account(
+        mut,
+        seeds = [b"claim_session_tracker", session.claim.as_ref()],
+        bump,
+        constraint = session_tracker.active_session == session.key(),
+    )]
+    pub session_tracker: Account<'info, verification::ClaimSessionTracker>,
 }
 
 // ---------------------------------------------------------------------------

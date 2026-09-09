@@ -261,6 +261,13 @@ fn verification_session_pda(claim: &Pubkey, session_id: &[u8; 32]) -> (Pubkey, u
     )
 }
 
+fn claim_session_tracker_pda(claim: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"claim_session_tracker", claim.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
 fn validator_reputation_pda(validator: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[b"validator_reputation", validator.as_ref()],
@@ -6825,6 +6832,7 @@ async fn session_open_and_record_evidence() {
     // Open a verification session.
     let session_id: [u8; 32] = [10u8; 32];
     let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
 
     process(
         &mut ctx,
@@ -6834,6 +6842,7 @@ async fn session_open_and_record_evidence() {
             accounts: vec![
                 AccountMeta::new(session_pk, false),
                 AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(tracker_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -6859,7 +6868,11 @@ async fn session_open_and_record_evidence() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(session_pk, false), AccountMeta::new(payer.pubkey(), true)],
+            accounts: vec![
+                AccountMeta::new(session_pk, false),
+                AccountMeta::new(tracker_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
             data: {
                 let mut d = discriminator("global", "close_verification_session").to_vec();
                 d.push(session_status::CLOSED);
@@ -7461,11 +7474,13 @@ async fn quorum_config_wired_to_session() {
     // Open session with parcel_type=2, region=[1,1] → should pick up required=5.
     let session_id: [u8; 32] = [77u8; 32];
     let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(session_pk, false),
             AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             AccountMeta::new_readonly(config_pk, false), // remaining_account
@@ -8529,11 +8544,13 @@ async fn observation_after_closed_session_fails() {
     // Open and immediately close a session.
     let session_id: [u8; 32] = [212u8; 32];
     let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(session_pk, false),
             AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
         ],
@@ -8550,6 +8567,7 @@ async fn observation_after_closed_session_fails() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(session_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new(payer.pubkey(), true),
         ],
         data: {
@@ -8611,6 +8629,7 @@ async fn observation_after_closed_session_fails() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(session_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new_readonly(claim_pk, false),
             AccountMeta::new_readonly(att, false),
         ],
@@ -8684,11 +8703,13 @@ async fn quorum_config_snapshot_isolation() {
 
     let session_id: [u8; 32] = [222u8; 32];
     let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(session_pk, false),
             AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             AccountMeta::new_readonly(qc_pk, false), // remaining_account for quorum config
@@ -8704,6 +8725,21 @@ async fn quorum_config_snapshot_isolation() {
 
     let session: VerificationSession = read_account(&ctx, session_pk).await;
     assert_eq!(session.required_attestations, 3, "session should snapshot config value of 3");
+
+    // Close the first session so we can open a new one.
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(session_pk, false),
+            AccountMeta::new(tracker_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: {
+            let mut d = discriminator("global", "close_verification_session").to_vec();
+            d.push(session_status::CLOSED);
+            d
+        },
+    }).await.unwrap();
 
     // Now change the QuorumConfig to required_attestations = 1.
     process(&mut ctx, &payer, Instruction {
@@ -8724,9 +8760,9 @@ async fn quorum_config_snapshot_isolation() {
         },
     }).await.unwrap();
 
-    // The already-open session should still require 3 attestations.
+    // The closed session should still retain the original config value.
     let session_after: VerificationSession = read_account(&ctx, session_pk).await;
-    assert_eq!(session_after.required_attestations, 3, "open session must retain original config");
+    assert_eq!(session_after.required_attestations, 3, "closed session must retain original config");
 
     // A new session should pick up the new config.
     let session_id2: [u8; 32] = [223u8; 32];
@@ -8736,6 +8772,7 @@ async fn quorum_config_snapshot_isolation() {
         accounts: vec![
             AccountMeta::new(session_pk2, false),
             AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             AccountMeta::new_readonly(qc_pk, false), // remaining_account for quorum config

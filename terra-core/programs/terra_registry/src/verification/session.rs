@@ -48,6 +48,26 @@ pub fn try_load_quorum_config<'info>(
 }
 
 // ---------------------------------------------------------------------------
+// ClaimSessionTracker — enforces single active session per claim
+// ---------------------------------------------------------------------------
+
+/// Singleton guard PDA that tracks which session is currently active for a
+/// given claim. Prevents opening multiple concurrent verification sessions
+/// for the same claim.
+///
+/// PDA: `["claim_session_tracker", claim_key]`
+#[account]
+#[derive(InitSpace)]
+pub struct ClaimSessionTracker {
+    /// The claim this tracker belongs to.
+    pub claim: Pubkey,
+    /// The currently active session (zero key = no active session).
+    pub active_session: Pubkey,
+    /// Bump seed for deterministic derivation.
+    pub bump: u8,
+}
+
+// ---------------------------------------------------------------------------
 // VerificationSession account
 // ---------------------------------------------------------------------------
 
@@ -99,8 +119,8 @@ impl VerificationSession {
 // ---------------------------------------------------------------------------
 
 /// Open a new verification session for a claim. Anyone may open a session.
-/// Only one session may be open per claim at a time (enforced by PDA seed
-/// including session_id — the caller must ensure uniqueness).
+/// Only one session may be open per claim at a time (enforced by
+/// ClaimSessionTracker PDA).
 ///
 /// The required attestation count is resolved from QuorumConfig (looked up
 /// via remaining_accounts) or falls back to 2.
@@ -113,6 +133,14 @@ pub fn open_verification_session(
     require!(
         !session_id.iter().all(|b| *b == 0),
         TerraError::EmptyClaimId
+    );
+
+    // Enforce single active session per claim.
+    let tracker = &mut ctx.accounts.session_tracker;
+    let zero_key = Pubkey::default();
+    require!(
+        tracker.active_session == zero_key,
+        TerraError::InvalidClaimStatus  // reuse: session already active
     );
 
     // Resolve quorum from QuorumConfig or fall back to defaults.
@@ -145,6 +173,10 @@ pub fn open_verification_session(
     session.closed_at = 0;
     session.updated_at = now;
 
+    // Mark this session as active in the tracker.
+    tracker.claim = ctx.accounts.claim.key();
+    tracker.active_session = session.key();
+
     emit!(crate::VerificationSessionOpened {
         session: session.key(),
         claim: session.claim,
@@ -157,7 +189,8 @@ pub fn open_verification_session(
 
 /// Close a verification session. Only the opener may close it.
 /// Sessions can be closed when quorum is reached or when the opener
-/// decides to withdraw the claim.
+/// decides to withdraw the claim. Clears the ClaimSessionTracker so a new
+/// session can be opened for this claim.
 pub fn close_verification_session(
     ctx: Context<crate::CloseVerificationSession>,
     final_status: u8,
@@ -175,6 +208,10 @@ pub fn close_verification_session(
     let session = &mut ctx.accounts.session;
     session.status = final_status;
     session.closed_at = now;
+
+    // Release the tracker so a new session can be opened for this claim.
+    let tracker = &mut ctx.accounts.session_tracker;
+    tracker.active_session = Pubkey::default();
 
     emit!(crate::VerificationSessionClosed {
         session: session.key(),
@@ -212,7 +249,7 @@ pub fn record_session_observation(ctx: Context<crate::RecordSessionObservation>)
 }
 
 /// Record an attestation to the session. Automatically transitions to
-/// QUORUM_REACHED when the threshold is met.
+/// QUORUM_REACHED when the threshold is met. Clears the ClaimSessionTracker.
 pub fn record_session_attestation(
     ctx: Context<crate::RecordSessionAttestation>,
     is_confirmatory: bool,
@@ -232,6 +269,10 @@ pub fn record_session_attestation(
     if session.attestation_count >= session.required_attestations {
         session.status = session_status::QUORUM_REACHED;
         session.closed_at = Clock::get()?.unix_timestamp;
+
+        // Release the tracker so a new session can be opened if needed.
+        let tracker = &mut ctx.accounts.session_tracker;
+        tracker.active_session = Pubkey::default();
 
         emit!(crate::VerificationSessionClosed {
             session: session.key(),

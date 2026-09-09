@@ -14,6 +14,13 @@ pub enum StorageBackend {
 }
 
 impl StorageBackend {
+    /// Short identifier written to the `storage_backend` DB column.
+    pub fn backend_name(&self) -> &'static str {
+        match self {
+            StorageBackend::Local { .. } => "local",
+        }
+    }
+
     /// Store raw bytes, compute SHA-256, return (content_hash, storage_ref).
     pub async fn store(
         &self,
@@ -31,6 +38,7 @@ impl StorageBackend {
                     storage_ref,
                     content_type: content_type.to_string(),
                     size_bytes: data.len() as u64,
+                    backend_name: self.backend_name().to_string(),
                 }),
         }
     }
@@ -45,6 +53,8 @@ pub struct StoredArtifact {
     pub content_type: String,
     /// Byte length of the original upload.
     pub size_bytes: u64,
+    /// Backend identifier (e.g. "local", "ipfs", "s3").
+    pub backend_name: String,
 }
 
 // ---------------------------------------------------------------------------

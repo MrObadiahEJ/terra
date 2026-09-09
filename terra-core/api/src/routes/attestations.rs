@@ -9,6 +9,25 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
+// **DEPRECATED** — Legacy attestation/document/validation endpoints.
+//
+// This module implements the old verification model:
+//   Parcel → Attestation → Document → Validation
+//
+// The canonical verification pipeline is now:
+//   Claim → Evidence → Observation → VerificationAttestation → Session → Quorum
+//
+// These endpoints are retained for backward compatibility only. New integrations
+// should use the Claim/Evidence pipeline and the evidence upload endpoint
+// (POST /api/v1/evidence/upload).
+//
+// Migration path:
+//   - register_attestation → create_claim + add_evidence
+//   - submit_validation   → submit_verification_attestation
+//   - register_document   → evidence upload (POST /api/v1/evidence/upload)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Canonical signed message for every validator signature:
 //   message = bytes( content_hash[32] || onchain_id[32] )
 // A validator signs this 64-byte payload with their Ed25519 key. Anyone can
