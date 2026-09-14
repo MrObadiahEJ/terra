@@ -12636,3 +12636,1541 @@ async fn set_quorum_config_rejects_non_admin() {
     .await;
     assert_custom_error(res, 6010, "non-admin quorum config");
 }
+
+// ===========================================================================
+// Negative-path integration tests: Observer, Reputation, Audit, Pause,
+// World Registry, Attestation
+// ===========================================================================
+
+#[tokio::test]
+async fn suspend_observer_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let observer_wallet = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer_wallet.pubkey(), 10_000_000)).await.unwrap();
+    let (obs_pk, _) = observer_pda(&observer_wallet.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer_wallet], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(observer_wallet.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: { let mut d = discriminator("global", "register_observer").to_vec(); d.extend_from_slice(&Pubkey::new_unique().to_bytes()); d },
+    }).await.unwrap();
+
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let res = process(&mut ctx, &intruder, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(intruder.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "suspend_observer").to_vec(),
+    }).await;
+    assert_custom_error(res, 6010, "non-admin suspend");
+}
+
+#[tokio::test]
+async fn suspend_observer_rejects_already_suspended() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let observer_wallet = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer_wallet.pubkey(), 10_000_000)).await.unwrap();
+    let (obs_pk, _) = observer_pda(&observer_wallet.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer_wallet], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(observer_wallet.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: { let mut d = discriminator("global", "register_observer").to_vec(); d.extend_from_slice(&Pubkey::new_unique().to_bytes()); d },
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "suspend_observer").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "suspend_observer").to_vec(),
+    }).await;
+    assert_custom_error(res, 6145, "already suspended");
+}
+
+#[tokio::test]
+async fn reactivate_observer_rejects_not_suspended() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let observer_wallet = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer_wallet.pubkey(), 10_000_000)).await.unwrap();
+    let (obs_pk, _) = observer_pda(&observer_wallet.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer_wallet], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(observer_wallet.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: { let mut d = discriminator("global", "register_observer").to_vec(); d.extend_from_slice(&Pubkey::new_unique().to_bytes()); d },
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "reactivate_observer").to_vec(),
+    }).await;
+    assert_custom_error(res, 6146, "reactivate not suspended");
+}
+
+#[tokio::test]
+async fn reactivate_observer_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let observer_wallet = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &observer_wallet.pubkey(), 10_000_000)).await.unwrap();
+    let (obs_pk, _) = observer_pda(&observer_wallet.pubkey());
+    process_with(&mut ctx, &payer, &[&payer, &observer_wallet], Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(observer_wallet.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: { let mut d = discriminator("global", "register_observer").to_vec(); d.extend_from_slice(&Pubkey::new_unique().to_bytes()); d },
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(payer.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "suspend_observer").to_vec(),
+    }).await.unwrap();
+
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let res = process(&mut ctx, &intruder, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(obs_pk, false),
+            AccountMeta::new(intruder.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
+        ],
+        data: discriminator("global", "reactivate_observer").to_vec(),
+    }).await;
+    assert_custom_error(res, 6010, "non-admin reactivate");
+}
+
+#[tokio::test]
+async fn record_attestation_outcome_rejects_jailed_validator() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "initialize_validator_reputation").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "record_attestation_outcome").to_vec(); d.push(1); d },
+    }).await;
+    assert_custom_error(res, 6141, "record on jailed validator");
+}
+
+#[tokio::test]
+async fn jail_validator_rejects_already_jailed() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "initialize_validator_reputation").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
+    }).await;
+    assert_custom_error(res, 6141, "jail already jailed");
+}
+
+#[tokio::test]
+async fn unjail_validator_rejects_not_jailed() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "initialize_validator_reputation").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: discriminator("global", "unjail_validator").to_vec(),
+    }).await;
+    assert_custom_error(res, 6131, "unjail not jailed");
+}
+
+#[tokio::test]
+async fn slash_validator_rejects_jailed_validator() {
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(rep_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "initialize_validator_reputation").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(rep_pk, false)],
+        data: { let mut d = discriminator("global", "slash_validator").to_vec(); d.extend_from_slice(&5000_u16.to_le_bytes()); d },
+    }).await;
+    assert_custom_error(res, 6141, "slash jailed validator");
+}
+
+#[tokio::test]
+async fn record_audit_entry_rejects_invalid_action() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [99u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    let (ae_pk, _) = audit_entry_pda(&claim_pk, 0);
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(ae_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "record_audit_entry").to_vec();
+            d.extend_from_slice(&0_u32.to_le_bytes());
+            d.push(255u8);
+            d.push(0);
+            d.push(1);
+            d.extend_from_slice(&[0u8; 32]);
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6150, "invalid audit action");
+}
+
+#[tokio::test]
+async fn pause_program_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let res = process(&mut ctx, &intruder, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(intruder.pubkey(), true),
+        ],
+        data: discriminator("global", "pause_program").to_vec(),
+    }).await;
+    assert_custom_error(res, 6010, "non-admin pause");
+}
+
+#[tokio::test]
+async fn unpause_program_rejects_not_paused() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "unpause_program").to_vec(),
+    }).await;
+    assert_custom_error(res, 6125, "unpause when not paused");
+}
+
+#[tokio::test]
+async fn unpause_program_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(registry, false), AccountMeta::new(payer.pubkey(), true)],
+        data: discriminator("global", "pause_program").to_vec(),
+    }).await.unwrap();
+
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let res = process(&mut ctx, &intruder, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(registry, false),
+            AccountMeta::new(intruder.pubkey(), true),
+        ],
+        data: discriminator("global", "unpause_program").to_vec(),
+    }).await;
+    assert_custom_error(res, 6010, "non-admin unpause");
+}
+
+#[tokio::test]
+async fn allocate_country_rejects_invalid_country_code() {
+    let (mut ctx, payer) = setup().await;
+    let (wr, _) = world_registry_pda();
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(wr, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_world_registry").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(wr, false), AccountMeta::new(payer.pubkey(), true)],
+        data: {
+            let mut d = discriminator("global", "allocate_country").to_vec();
+            d.extend_from_slice(b"ZZ");
+            d.extend_from_slice(&payer.pubkey().to_bytes());
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6118, "invalid country code");
+}
+
+#[tokio::test]
+async fn allocate_country_rejects_duplicate() {
+    let (mut ctx, payer) = setup().await;
+    let (wr, _) = world_registry_pda();
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(wr, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_world_registry").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(wr, false), AccountMeta::new(payer.pubkey(), true)],
+        data: {
+            let mut d = discriminator("global", "allocate_country").to_vec();
+            d.extend_from_slice(b"US");
+            d.extend_from_slice(&payer.pubkey().to_bytes());
+            d
+        },
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(wr, false), AccountMeta::new(payer.pubkey(), true)],
+        data: {
+            let mut d = discriminator("global", "allocate_country").to_vec();
+            d.extend_from_slice(b"US");
+            d.extend_from_slice(&payer.pubkey().to_bytes());
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6119, "duplicate country allocation");
+}
+
+#[tokio::test]
+async fn allocate_country_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let (wr, _) = world_registry_pda();
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(wr, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_world_registry").to_vec(),
+    }).await.unwrap();
+
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let res = process(&mut ctx, &intruder, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(wr, false), AccountMeta::new(intruder.pubkey(), true)],
+        data: {
+            let mut d = discriminator("global", "allocate_country").to_vec();
+            d.extend_from_slice(b"US");
+            d.extend_from_slice(&intruder.pubkey().to_bytes());
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6010, "non-admin allocate country");
+}
+
+#[tokio::test]
+async fn request_genesis_rejects_unallocated_country() {
+    let (mut ctx, payer) = setup().await;
+    let (wr, _) = world_registry_pda();
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(wr, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "create_world_registry").to_vec(),
+    }).await.unwrap();
+
+    let (gen_pk, _) = genesis_request_pda(b"US");
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(gen_pk, false),
+            AccountMeta::new_readonly(wr, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "request_genesis").to_vec();
+            d.extend_from_slice(b"US");
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6120, "unallocated country genesis");
+}
+
+#[tokio::test]
+async fn attest_rejects_empty_specifier() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let (att_pk, _) = attestation_pda(&parcel_pk, &[0u8; 32]);
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "attest").to_vec();
+            d.extend_from_slice(&[0u8; 32]);
+            d.extend_from_slice(&[1u8; 32]);
+            d.push(1u8);
+            for _ in 0..8 { d.extend_from_slice(&Pubkey::new_unique().to_bytes()); }
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6013, "empty specifier");
+}
+
+#[tokio::test]
+async fn attest_rejects_empty_content_hash() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let specifier = [1u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "attest").to_vec();
+            d.extend_from_slice(&specifier);
+            d.extend_from_slice(&[0u8; 32]);
+            d.push(1u8);
+            for _ in 0..8 { d.extend_from_slice(&Pubkey::new_unique().to_bytes()); }
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6014, "empty content hash");
+}
+
+#[tokio::test]
+async fn attest_rejects_no_validators() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let specifier = [2u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "attest").to_vec();
+            d.extend_from_slice(&specifier);
+            d.extend_from_slice(&[3u8; 32]);
+            d.push(1u8);
+            for _ in 0..8 { d.extend_from_slice(&Pubkey::default().to_bytes()); }
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6015, "no validators");
+}
+
+#[tokio::test]
+async fn attest_rejects_invalid_threshold() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let specifier = [3u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+    let validator = Keypair::new();
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "attest").to_vec();
+            d.extend_from_slice(&specifier);
+            d.extend_from_slice(&[4u8; 32]);
+            d.push(5u8);
+            d.extend_from_slice(&validator.pubkey().to_bytes());
+            for _ in 0..7 { d.extend_from_slice(&Pubkey::default().to_bytes()); }
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6016, "threshold exceeds validators");
+}
+
+#[tokio::test]
+async fn rotate_validators_rejects_invalid_threshold() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let specifier = [5u8; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+
+    let validator = Keypair::new();
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "attest").to_vec();
+            d.extend_from_slice(&specifier);
+            d.extend_from_slice(&[5u8; 32]);
+            d.push(1u8);
+            d.extend_from_slice(&validator.pubkey().to_bytes());
+            for _ in 0..7 { d.extend_from_slice(&Pubkey::default().to_bytes()); }
+            d
+        },
+    }).await.unwrap();
+
+    let new_validator = Keypair::new();
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel_pk, false),
+            AccountMeta::new(att_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: {
+            let mut d = discriminator("global", "rotate_validators").to_vec();
+            d.push(3u8);
+            d.extend_from_slice(&new_validator.pubkey().to_bytes());
+            for _ in 0..7 { d.extend_from_slice(&Pubkey::default().to_bytes()); }
+            d
+        },
+    }).await;
+    assert_custom_error(res, 6016, "rotate invalid threshold");
+}
+
+// =========================================================================
+// Vault / Shard negative-path tests
+// =========================================================================
+
+#[tokio::test]
+async fn vault_create_rejects_empty_ciphertext_hash() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[0u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&vec![payer.pubkey()]));
+                d.push(2u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6040, "empty ciphertext hash");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_empty_cid() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&vec![payer.pubkey()]));
+                d.push(2u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6041, "empty CID");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_unsupported_algorithm() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(99u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&vec![payer.pubkey()]));
+                d.push(2u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6053, "unsupported algorithm");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_too_many_shard_holders() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let holders: Vec<Pubkey> = (0..9).map(|_| Keypair::new().pubkey()).collect();
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&holders));
+                d.push(2u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6055, "too many shard holders");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_threshold_exceeds_holders() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&vec![payer.pubkey()]));
+                d.push(5u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6037, "threshold exceeds holders");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_threshold_below_minimum() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&vec![payer.pubkey(), Keypair::new().pubkey()]));
+                d.push(1u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6037, "threshold below minimum");
+}
+
+#[tokio::test]
+async fn vault_create_rejects_empty_shard_holders() {
+    let (mut ctx, payer) = setup().await;
+    let subject = Keypair::new();
+    let (vault_pk, _) = vault_record_pda(&subject.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(subject.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_vault").to_vec();
+                d.extend_from_slice(&borsh_ser(&"cid".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d.extend_from_slice(&borsh_ser(&vec!["uri".to_string()]));
+                d.extend_from_slice(&borsh_ser(&Vec::<Pubkey>::new()));
+                d.push(2u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6055, "empty shard holders");
+}
+
+// =========================================================================
+// Guardian claim negative-path tests
+// =========================================================================
+
+#[tokio::test]
+async fn guardian_create_rejects_empty_case_hash() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [30u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let identity = Keypair::new();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(gc_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new_readonly(identity.pubkey(), false),
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_guardian_claim").to_vec();
+                d.extend_from_slice(&[0u8; 32]);
+                d.push(0u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6030, "empty case hash");
+}
+
+#[tokio::test]
+async fn guardian_create_rejects_invalid_guardian_type() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [31u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let identity = Keypair::new();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(gc_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new_readonly(identity.pubkey(), false),
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_guardian_claim").to_vec();
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(255u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6147, "invalid guardian type");
+}
+
+#[tokio::test]
+async fn guardian_create_rejects_non_validator() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [32u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let non_validator = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &non_validator.pubkey(), 10_000_000)).await.unwrap();
+    let identity = Keypair::new();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    let res = process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &non_validator],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(gc_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new_readonly(identity.pubkey(), false),
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new(non_validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_guardian_claim").to_vec();
+                d.extend_from_slice(&[1u8; 32]);
+                d.push(0u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6028, "non-validator guardian claim");
+}
+
+#[tokio::test]
+async fn guardian_resolve_rejects_already_resolved() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [33u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let identity = Keypair::new();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(gc_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new_readonly(identity.pubkey(), false),
+            AccountMeta::new_readonly(registry_pda().0, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_guardian_claim").to_vec();
+            d.extend_from_slice(&[1u8; 32]);
+            d.push(0u8);
+            d
+        },
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(gc_pk, false), AccountMeta::new(payer.pubkey(), true)],
+        data: discriminator("global", "resolve_guardian_claim").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(gc_pk, false), AccountMeta::new(payer.pubkey(), true)],
+        data: discriminator("global", "resolve_guardian_claim").to_vec(),
+    }).await;
+    assert_custom_error(res, 6148, "resolve already resolved");
+}
+
+#[tokio::test]
+async fn guardian_dispute_rejects_already_disputed() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+    let claim_id: [u8; 32] = [34u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let identity = Keypair::new();
+    let (gc_pk, _) = guardian_claim_pda(&claim_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(gc_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new_readonly(identity.pubkey(), false),
+            AccountMeta::new_readonly(registry_pda().0, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_guardian_claim").to_vec();
+            d.extend_from_slice(&[1u8; 32]);
+            d.push(0u8);
+            d
+        },
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(gc_pk, false), AccountMeta::new(payer.pubkey(), true)],
+        data: discriminator("global", "dispute_guardian_claim").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![AccountMeta::new(gc_pk, false), AccountMeta::new(payer.pubkey(), true)],
+        data: discriminator("global", "dispute_guardian_claim").to_vec(),
+    }).await;
+    assert_custom_error(res, 6148, "dispute already disputed");
+}
+
+// =========================================================================
+// Cross-border verification bridge negative-path tests
+// =========================================================================
+
+#[tokio::test]
+async fn verify_cross_border_rejects_not_pending() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [40u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let session_id: [u8; 32] = [41u8; 32];
+    let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(session_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "open_verification_session").to_vec();
+            d.extend_from_slice(&session_id);
+            d.push(0u8);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let mut country_code = [0u8; 16];
+    country_code[..2].copy_from_slice(b"AB");
+    let (jurisdiction_pk, _) = jurisdiction_pda(&country_code);
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&"Test Jurisdiction".to_string()));
+    data.extend_from_slice(&borsh_ser(&"QmSchema".to_string()));
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    data.extend_from_slice(&[42u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0u8));
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }).await.unwrap();
+
+    let identity_hash = [50u8; 32];
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(&mut ctx, &payer, Instruction {
+        program_id: IDENTITY_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(identity_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "bind_identity").to_vec();
+            d.extend_from_slice(&identity_hash);
+            d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+            d
+        },
+    }).await.unwrap();
+
+    let (binding_pk, _) = xb_binding_pda(&jurisdiction_pk, &identity_hash);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(binding_pk, false),
+            AccountMeta::new_readonly(identity_pk, false),
+            AccountMeta::new(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "bind_cross_border_identity").to_vec();
+            d.extend_from_slice(&[42u8; 32]);
+            d.extend_from_slice(&borsh_ser(&vec![7u8; 64]));
+            d.extend_from_slice(&[43u8; 32]);
+            d.extend_from_slice(&borsh_ser(&0i64));
+            d.extend_from_slice(&identity_hash);
+            d
+        },
+    }).await.unwrap();
+
+    let (cbv_pk, _) = cross_border_verification_pda(&binding_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new_readonly(binding_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new_readonly(session_pk, false),
+            AccountMeta::new_readonly(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "link_cross_border_to_session").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "verify_cross_border").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "verify_cross_border").to_vec(),
+    }).await;
+    assert_custom_error(res, 6149, "verify non-pending");
+}
+
+#[tokio::test]
+async fn revoke_cross_border_rejects_already_revoked() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, _) = registry_pda();
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let claim_id: [u8; 32] = [42u8; 32];
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(claim_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "create_claim").to_vec();
+            d.extend_from_slice(&claim_id);
+            d.push(0);
+            d.extend_from_slice(&[10u8; 32]);
+            d.push(0);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let session_id: [u8; 32] = [43u8; 32];
+    let (session_pk, _) = verification_session_pda(&claim_pk, &session_id);
+    let (tracker_pk, _) = claim_session_tracker_pda(&claim_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(session_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new(tracker_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "open_verification_session").to_vec();
+            d.extend_from_slice(&session_id);
+            d.push(0u8);
+            d.extend_from_slice(&[0u8; 2]);
+            d
+        },
+    }).await.unwrap();
+
+    let mut country_code = [0u8; 16];
+    country_code[..2].copy_from_slice(b"CD");
+    let (jurisdiction_pk, _) = jurisdiction_pda(&country_code);
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&"Test Jurisdiction".to_string()));
+    data.extend_from_slice(&borsh_ser(&"QmSchema".to_string()));
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    data.extend_from_slice(&[43u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0u8));
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }).await.unwrap();
+
+    let identity_hash = [51u8; 32];
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(&mut ctx, &payer, Instruction {
+        program_id: IDENTITY_PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(identity_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "bind_identity").to_vec();
+            d.extend_from_slice(&identity_hash);
+            d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+            d
+        },
+    }).await.unwrap();
+
+    let (binding_pk, _) = xb_binding_pda(&jurisdiction_pk, &identity_hash);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(binding_pk, false),
+            AccountMeta::new_readonly(identity_pk, false),
+            AccountMeta::new(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut d = discriminator("global", "bind_cross_border_identity").to_vec();
+            d.extend_from_slice(&[44u8; 32]);
+            d.extend_from_slice(&borsh_ser(&vec![7u8; 64]));
+            d.extend_from_slice(&[45u8; 32]);
+            d.extend_from_slice(&borsh_ser(&0i64));
+            d.extend_from_slice(&identity_hash);
+            d
+        },
+    }).await.unwrap();
+
+    let (cbv_pk, _) = cross_border_verification_pda(&binding_pk);
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new_readonly(binding_pk, false),
+            AccountMeta::new_readonly(claim_pk, false),
+            AccountMeta::new_readonly(session_pk, false),
+            AccountMeta::new_readonly(jurisdiction_pk, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "link_cross_border_to_session").to_vec(),
+    }).await.unwrap();
+
+    process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "revoke_cross_border").to_vec(),
+    }).await.unwrap();
+
+    let res = process(&mut ctx, &payer, Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cbv_pk, false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(payer.pubkey(), true),
+        ],
+        data: discriminator("global", "revoke_cross_border").to_vec(),
+    }).await;
+    assert_custom_error(res, 6149, "revoke already revoked");
+}
+
+// =========================================================================
+// ZK ownership proof negative-path tests
+// =========================================================================
+
+#[tokio::test]
+async fn zk_register_rejects_empty_snapshot_hash() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new();
+    let (zs_pk, _) = zone_set_pda(&zone_id.pubkey());
+    let (or_pk, _) = ownership_root_pda(&zs_pk);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new_readonly(zone_id.pubkey(), false),
+                AccountMeta::new(zs_pk, false),
+                AccountMeta::new(or_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_zone_set").to_vec();
+                d.extend_from_slice(&borsh_ser(&"snapshot".to_string()));
+                d.extend_from_slice(&[0u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(res.is_err(), "empty snapshot hash should fail");
+}
+
+#[tokio::test]
+async fn zk_register_rejects_empty_snapshot_cid() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new();
+    let (zs_pk, _) = zone_set_pda(&zone_id.pubkey());
+    let (or_pk, _) = ownership_root_pda(&zs_pk);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new_readonly(zone_id.pubkey(), false),
+                AccountMeta::new(zs_pk, false),
+                AccountMeta::new(or_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_zone_set").to_vec();
+                d.extend_from_slice(&borsh_ser(&"".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(res.is_err(), "empty snapshot CID should fail");
+}
+
+#[tokio::test]
+async fn zk_register_rejects_non_admin() {
+    let (mut ctx, payer) = setup().await;
+    let _reg = create_registry_ok(&mut ctx, &payer).await;
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000)).await.unwrap();
+    let zone_id = Keypair::new();
+    let (zs_pk, _) = zone_set_pda(&zone_id.pubkey());
+    let (or_pk, _) = ownership_root_pda(&zs_pk);
+    let res = process(
+        &mut ctx,
+        &intruder,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry_pda().0, false),
+                AccountMeta::new_readonly(zone_id.pubkey(), false),
+                AccountMeta::new(zs_pk, false),
+                AccountMeta::new(or_pk, false),
+                AccountMeta::new(intruder.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_zone_set").to_vec();
+                d.extend_from_slice(&borsh_ser(&"snapshot".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6108, "non-admin register zone set");
+}
