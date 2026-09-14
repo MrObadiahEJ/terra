@@ -8,6 +8,10 @@ skip-lint = false
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
 terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
 
+[programs.mainnet]
+terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
+terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
+
 [programs.localnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
 terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
