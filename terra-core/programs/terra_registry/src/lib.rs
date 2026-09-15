@@ -924,6 +924,10 @@ pub mod terra_registry {
         });
 
         let parcel = &mut ctx.accounts.parcel;
+        require!(
+            parcel.rights_count > 0,
+            TerraError::RightsLimitExceeded
+        );
         parcel.rights_count = parcel.rights_count.saturating_sub(1);
         Ok(())
     }
@@ -3287,7 +3291,7 @@ pub struct DisputeSlashing<'info> {
     )]
     pub region_registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
-        constraint = slashing_report.offender == offender.key() @ TerraError::NotDesignatedBuyer,
+        constraint = slashing_report.offender == offender.key() @ TerraError::NotDesignatedOffender,
     )]
     pub offender: Signer<'info>,
 }
@@ -5210,6 +5214,10 @@ pub enum TerraError {
     IdentityRightsAlreadyExists,
     #[msg("Identity rights not found or inactive")]
     IdentityRightsNotFound,
+
+    // Slashing
+    #[msg("Signer is not the designated offender")]
+    NotDesignatedOffender,
 }
 
 #[cfg(test)]
