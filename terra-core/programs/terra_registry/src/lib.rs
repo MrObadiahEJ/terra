@@ -161,6 +161,13 @@ pub fn is_authorized_owner(
 
     // Identity path: look for a valid IdentityRights in remaining_accounts.
     for acc in remaining_accounts.iter() {
+        // Verify account is owned by the terra_identity program to prevent
+        // fake accounts matching the data layout.
+        require!(
+            acc.owner == &terra_identity::ID,
+            TerraError::NotAuthorized
+        );
+
         let data = acc.try_borrow_data()?;
         if data.len() < 8 {
             continue;
@@ -185,6 +192,11 @@ pub fn is_authorized_owner(
         // Read the Identity PDA to verify the signer is its owner.
         let identity_info = remaining_accounts.iter().find(|a| a.key == &ir.identity);
         if let Some(identity_acc) = identity_info {
+            // Verify the Identity account is also owned by terra_identity.
+            require!(
+                identity_acc.owner == &terra_identity::ID,
+                TerraError::NotAuthorized
+            );
             let id_data = identity_acc.try_borrow_data()?;
             let slice_id = if id_data.len() >= 8 { &id_data[8..] } else { &id_data };
             let identity: Identity =
@@ -303,7 +315,12 @@ pub struct CreateVault<'info> {
 #[derive(Accounts)]
 #[instruction(purpose: String, expiry: i64)]
 pub struct AuthorizeVaultAccess<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"vault_record", subject.key().as_ref()],
+        bump,
+        constraint = vault_record.subject == subject.key() @ TerraError::IdentityMismatch,
+    )]
     pub vault_record: Account<'info, vault::VaultRecord>,
     /// CHECK: Identity account owned by terra_identity program.
     pub subject: UncheckedAccount<'info>,
@@ -2360,7 +2377,15 @@ pub struct AdjudicateDispute<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
-    /// Court authority or designated adjudicator.
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// Court authority or designated adjudicator — must be registry admin.
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
 }
 
@@ -3389,6 +3414,14 @@ pub struct InvalidateProof<'info> {
         bump,
     )]
     pub zone_set: Account<'info, zk::ZoneSet>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
 }
 
@@ -3405,6 +3438,14 @@ pub struct UpdateVerificationKeyHash<'info> {
         bump,
     )]
     pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
 }
 
@@ -3434,7 +3475,11 @@ pub struct RequestCredential<'info> {
 
 #[derive(Accounts)]
 pub struct SignCredential<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"credential_request", credential_request.request_hash.as_ref()],
+        bump,
+    )]
     pub credential_request: Account<'info, zk::CredentialRequest>,
     #[account(seeds = [b"validator_registry"], bump)]
     pub registry: Account<'info, validator_registry::ValidatorRegistry>,
@@ -3443,7 +3488,11 @@ pub struct SignCredential<'info> {
 
 #[derive(Accounts)]
 pub struct FinalizeCredential<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"credential_request", credential_request.request_hash.as_ref()],
+        bump,
+    )]
     pub credential_request: Account<'info, zk::CredentialRequest>,
     #[account(
         init,
@@ -3462,7 +3511,10 @@ pub struct FinalizeCredential<'info> {
 
 #[derive(Accounts)]
 pub struct VerifyCredential<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = !threshold_credential.consumed @ TerraError::NullifierAlreadyUsed,
+    )]
     pub threshold_credential: Account<'info, zk::ThresholdCredential>,
     #[account(
         init_if_needed,
@@ -3689,6 +3741,8 @@ pub struct RecordSessionEvidence<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
+    /// The session opener or a registered validator must sign.
+    pub signer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3699,6 +3753,8 @@ pub struct RecordSessionObservation<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
+    /// The session opener or a registered validator must sign.
+    pub signer: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3748,6 +3804,15 @@ pub struct RecordAttestationOutcome<'info> {
         bump,
     )]
     pub reputation: Account<'info, verification::ValidatorReputation>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3758,6 +3823,15 @@ pub struct JailValidator<'info> {
         bump,
     )]
     pub reputation: Account<'info, verification::ValidatorReputation>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3768,6 +3842,15 @@ pub struct UnjailValidator<'info> {
         bump,
     )]
     pub reputation: Account<'info, verification::ValidatorReputation>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3778,6 +3861,15 @@ pub struct SlashValidator<'info> {
         bump,
     )]
     pub reputation: Account<'info, verification::ValidatorReputation>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -3930,7 +4022,17 @@ pub struct ResolveGuardianClaim<'info> {
         bump,
     )]
     pub guardian_claim: Account<'info, verification::GuardianClaim>,
+    /// Must be the original triggerer or registry admin.
+    #[account(
+        constraint = caller.key() == guardian_claim.triggered_by
+            || caller.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub caller: Signer<'info>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
 }
 
 #[derive(Accounts)]
@@ -3941,7 +4043,17 @@ pub struct DisputeGuardianClaim<'info> {
         bump,
     )]
     pub guardian_claim: Account<'info, verification::GuardianClaim>,
+    /// Must be the original triggerer or registry admin.
+    #[account(
+        constraint = caller.key() == guardian_claim.triggered_by
+            || caller.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub caller: Signer<'info>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
 }
 
 // ---------------------------------------------------------------------------
@@ -3985,6 +4097,16 @@ pub struct VerifyCrossBorder<'info> {
         bump,
     )]
     pub cross_border_verification: Account<'info, verification::CrossBorderVerification>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// Must be a registered validator or registry admin.
+    #[account(
+        constraint = caller.key() == registry.admin
+            || registry.validators.contains(&caller.key()) @ TerraError::NotAuthorized,
+    )]
     pub caller: Signer<'info>,
 }
 
