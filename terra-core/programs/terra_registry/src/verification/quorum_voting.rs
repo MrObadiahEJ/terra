@@ -82,6 +82,11 @@ fn try_load_reputation<'info>(
     );
     for acc in remaining_accounts {
         if acc.key == &pda {
+            // Verify account is owned by this program to prevent injection.
+            require!(
+                acc.owner == &crate::ID,
+                TerraError::NotAuthorized
+            );
             let data = acc.try_borrow_data()?;
             let account = ValidatorReputation::try_deserialize(&mut &data[..])?;
             return Ok(Some(account));

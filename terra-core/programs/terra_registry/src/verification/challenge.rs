@@ -28,6 +28,11 @@ fn try_load_session<'info>(
     claim: &Pubkey,
 ) -> Result<Option<(Pubkey, VerificationSession)>> {
     for acc in remaining_accounts {
+        // Verify account is owned by this program to prevent injection.
+        require!(
+            acc.owner == &crate::ID,
+            TerraError::NotAuthorized
+        );
         let data = acc.try_borrow_data()?;
         // Skip accounts that are too small to be a valid Anchor account.
         if data.len() < 8 {
@@ -162,7 +167,7 @@ pub fn vote_challenge(
     let now = Clock::get()?.unix_timestamp;
     require!(
         now <= challenge.review_deadline,
-        TerraError::SettlementNotYetEffective
+        TerraError::InvalidClaimStatus
     );
 
     let validator = ctx.accounts.validator.key();

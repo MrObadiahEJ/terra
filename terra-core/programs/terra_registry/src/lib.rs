@@ -2682,6 +2682,7 @@ pub struct SweepExpiredRights<'info> {
     #[account(
         seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
         bump,
+        constraint = parcel.owner == keeper.key() @ TerraError::NotOwner,
     )]
     pub parcel: Account<'info, Parcel>,
     pub keeper: Signer<'info>,
@@ -3353,7 +3354,10 @@ pub struct RegisterZoneSet<'info> {
         bump,
     )]
     pub ownership_root: Account<'info, zk::OwnershipRoot>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -3373,6 +3377,14 @@ pub struct GenerateOwnershipRoot<'info> {
         bump,
     )]
     pub ownership_root: Account<'info, zk::OwnershipRoot>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub authority: Signer<'info>,
 }
 
@@ -3791,7 +3803,15 @@ pub struct InitializeValidatorReputation<'info> {
     pub reputation: Account<'info, verification::ValidatorReputation>,
     /// CHECK: the validator being tracked.
     pub validator: UncheckedAccount<'info>,
-    #[account(mut)]
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+    )]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        mut,
+        constraint = payer.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
