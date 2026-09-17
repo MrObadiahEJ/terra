@@ -16058,3 +16058,741 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
     .await;
     assert!(res.is_ok(), "O14: owner can still operate during dispute");
 }
+
+// ============================================================================
+// PROPOSITION B: Authority Path Coverage Tests
+// ============================================================================
+
+// B1: USAGE IdentityRights cannot authorize parcel operations.
+// Only OWNERSHIP rights pass is_authorized_owner; USAGE is explicitly skipped.
+#[tokio::test]
+async fn authority_path_b1_usage_right_cannot_authorize() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xB1; 32];
+    let identity_hash: [u8; 32] = [0xB1; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // Register parcel with payer as owner.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"B1 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    // Bind identity.
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant USAGE IdentityRights (not OWNERSHIP).
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::USAGE);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::USAGE);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"usage right".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant USAGE right");
+
+    // Transfer parcel ownership to bob.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Verify bob is the owner.
+    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(parcel.owner, bob.pubkey());
+
+    // Payer tries to update_status via identity path with USAGE right — should fail.
+    // parcel.owner is now bob, and the identity path only checks OWNERSHIP rights.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B1: USAGE right cannot authorize parcel operations");
+}
+
+// B2: SERVITUDE IdentityRights cannot authorize parcel operations.
+#[tokio::test]
+async fn authority_path_b2_servitude_right_cannot_authorize() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xB2; 32];
+    let identity_hash: [u8; 32] = [0xB2; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"B2 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant SERVITUDE IdentityRights.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::SERVITUDE);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::SERVITUDE);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"servitude".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant SERVITUDE right");
+
+    // Transfer to bob so payer is no longer the legacy owner.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Payer tries to update_status via identity path with SERVITUDE right — should fail.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B2: SERVITUDE right cannot authorize parcel operations");
+}
+
+// B3: EASEMENT IdentityRights cannot authorize parcel operations.
+#[tokio::test]
+async fn authority_path_b3_easement_right_cannot_authorize() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xB3; 32];
+    let identity_hash: [u8; 32] = [0xB3; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"B3 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant EASEMENT IdentityRights.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::EASEMENT);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::EASEMENT);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"easement".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant EASEMENT right");
+
+    // Transfer to bob.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Payer tries to authorize via EASEMENT right — should fail.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B3: EASEMENT right cannot authorize parcel operations");
+}
+
+// B4: LIEN IdentityRights cannot authorize parcel operations.
+#[tokio::test]
+async fn authority_path_b4_lien_right_cannot_authorize() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xB4; 32];
+    let identity_hash: [u8; 32] = [0xB4; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"B4 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant LIEN IdentityRights.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::LIEN);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::LIEN);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"lien".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant LIEN right");
+
+    // Transfer to bob.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Payer tries to authorize via LIEN right — should fail.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B4: LIEN right cannot authorize parcel operations");
+}
+
+// B5: Identity path with wrong parcel key fails.
+#[tokio::test]
+async fn authority_path_b5_wrong_parcel_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id_a: [u8; 32] = [0xB5; 32];
+    let parcel_id_b: [u8; 32] = [0xB6; 32];
+    let identity_hash: [u8; 32] = [0xB5; 32];
+    let (parcel_a_pk, _) = parcel_pda(&parcel_id_a);
+    let (parcel_b_pk, _) = parcel_pda(&parcel_id_b);
+
+    // Register parcel A with payer as owner.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_a_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id_a);
+                d.extend_from_slice(&borsh_ser(&"B5 Parcel A".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel A");
+
+    // Register parcel B owned by someone else (bob).
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &bob,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_b_pk, false),
+                AccountMeta::new(bob.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id_b);
+                d.extend_from_slice(&borsh_ser(&"B5 Parcel B".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel B");
+
+    // Bind identity and grant OWNERSHIP on parcel A.
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_a_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_a_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant OWNERSHIP right on parcel A");
+
+    // Payer tries to use parcel A's IdentityRights to authorize parcel B — should fail.
+    // The IR.parcel is parcel_a_pk, but we're acting on parcel_b_pk (owned by bob).
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_b_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B5: IdentityRights for wrong parcel cannot authorize");
+}
+
+// B6: Inactive (revoked) IdentityRights cannot authorize via identity path.
+#[tokio::test]
+async fn authority_path_b6_revoked_identity_rights_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xB7; 32];
+    let identity_hash: [u8; 32] = [0xB7; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"B6 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant OWNERSHIP IdentityRights.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant OWNERSHIP right");
+
+    // Revoke the IdentityRights.
+    let (revoke_ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(revoke_ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "revoke_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d
+            },
+        },
+    )
+    .await
+    .expect("revoke identity right");
+
+    // Transfer parcel to bob so payer can't use legacy path.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Payer tries to authorize via revoked identity right — should fail.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::REGISTERED);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "B6: Revoked identity rights cannot authorize");
+}
