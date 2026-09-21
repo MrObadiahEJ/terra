@@ -135,7 +135,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, etc.
 │   │   └── tests/
-│   │       └── integration.rs  # 211 integration tests
+│   │       └── integration.rs  # 256 integration tests
 │   └── terra_identity/         # Identity program
 │       └── src/
 ├── api/                        # REST API backend (Axum + Postgres)
@@ -182,6 +182,19 @@ Grant, renew, revoke, and sweep time-limited parcel rights.
 
 ### Audit Trail
 Immutable audit entries for tracking system events.
+
+## Test Coverage
+
+256 integration tests covering all protocol invariants:
+
+| Proposition | Tests | Coverage |
+|-------------|-------|----------|
+| **O1–O14** | 14 | Ownership invariants: legacy/identity auth, revocation, transfer, subdivision, amalgamation, dispute anti-grief |
+| **B1–B6** | 6 | Authority paths: USAGE/SERVITUDE/EASEMENT/LIEN rejection, wrong parcel, closed IdentityRights |
+| **C1–C8** | 8 | Edge cases: sweep expired rights, dispute filing, double dispute, past expiry, nonce reuse, permanent right |
+| **D1–D6** | 6 | Cross-module: identity lifecycle, right lifecycle, dispute lifecycle, attestation+subdivide, staking |
+| **E1–E8** | 8 | Adversarial: wrong PDA, forged signer, threshold bypass, zero ID/name/geometry, double register, self-transfer |
+| **F1–F3** | 3 | E2E lifecycles: full parcel, identity migration, rights+time-bound |
 
 ## Error Codes
 
