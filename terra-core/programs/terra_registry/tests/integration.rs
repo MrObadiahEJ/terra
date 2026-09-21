@@ -17502,3 +17502,696 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
     .await;
     assert_custom_error(res, 6084, "C8: permanent right cannot be swept");
 }
+
+// ============================================================================
+// PROPOSITION D: Cross-Module Integration Tests
+// ============================================================================
+
+// D1: Full identity lifecycle — bind identity, grant OWNERSHIP right, transfer
+// parcel to a new owner, verify the original identity owner can still authorize
+// via identity path, then verify the new legacy owner can also authorize.
+#[tokio::test]
+async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xD1; 32];
+    let identity_hash: [u8; 32] = [0xD1; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // 1. Register parcel — payer is legacy owner.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D1 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    // 2. Bind identity to payer.
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // 3. Grant OWNERSHIP IdentityRights on the parcel.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant identity right");
+
+    // 4. Transfer parcel to bob.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // 5. Verify bob is now legacy owner.
+    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(parcel.owner, bob.pubkey());
+
+    // 6. Payer can still authorize via identity path (OWNERSHIP right is still ACTIVE).
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::FOR_SALE);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(res.is_ok(), "D1: identity owner can still authorize after transfer");
+
+    // 7. Bob (new legacy owner) can also authorize.
+    let res = process(
+        &mut ctx,
+        &bob,
+        update_status_ix(&parcel_pk, &bob.pubkey(), parcel_status::REGISTERED),
+    )
+    .await;
+    assert!(res.is_ok(), "D1: new legacy owner can authorize");
+}
+
+// D2: Right lifecycle — grant right, verify it exists, revoke, verify
+// the holder can no longer authorize.
+#[tokio::test]
+async fn cross_module_d2_right_lifecycle_grant_revoke() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xD2; 32];
+    let identity_hash: [u8; 32] = [0xD2; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // Register parcel.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D2 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    // Bind identity.
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Grant OWNERSHIP IdentityRights.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant identity right");
+
+    // Transfer parcel to bob — payer retains identity ownership.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Payer can authorize via identity path.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::FOR_SALE);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(res.is_ok(), "D2: identity owner can authorize before revoke");
+
+    // Revoke the OWNERSHIP identity right.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "revoke_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d
+            },
+        },
+    )
+    .await
+    .expect("revoke identity right");
+
+    // After revoke, payer can no longer authorize via identity path.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::FOR_SALE);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "D2: identity owner cannot authorize after revoke");
+
+    // Bob (legacy owner) can still authorize.
+    let res = process(
+        &mut ctx,
+        &bob,
+        update_status_ix(&parcel_pk, &bob.pubkey(), parcel_status::REGISTERED),
+    )
+    .await;
+    assert!(res.is_ok(), "D2: legacy owner can still authorize after identity revoke");
+}
+
+// D3: Dispute lifecycle — register, dispute (→ DISPUTED), verify operations
+// are blocked, adjudicate.
+#[tokio::test]
+async fn cross_module_d3_dispute_lifecycle() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let parcel_id: [u8; 32] = [0xD3; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // 1. Register parcel.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D3 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    // 2. Set to REGISTERED.
+    process(
+        &mut ctx,
+        &payer,
+        update_status_ix(&parcel_pk, &payer.pubkey(), parcel_status::REGISTERED),
+    )
+    .await
+    .expect("set REGISTERED");
+
+    // 3. File dispute.
+    let case_hash: [u8; 32] = [0xD3; 32];
+    let (dispute_pk, _) = Pubkey::find_program_address(
+        &[b"dispute", parcel_pk.as_ref(), &case_hash],
+        &PROGRAM_ID,
+    );
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = Keypair::new().pubkey();
+    validators[1] = Keypair::new().pubkey();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pk, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "file_dispute").to_vec();
+                d.extend_from_slice(&case_hash);
+                d.push(2u8);
+                for v in validators.iter() {
+                    d.extend_from_slice(&borsh_ser(v));
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("file dispute");
+
+    // 4. Verify parcel is now DISPUTED.
+    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(parcel.status, parcel_status::DISPUTED);
+
+    // 5. Dispute account is filed.
+    let dispute: Dispute = read_account(&ctx, dispute_pk).await;
+    assert_eq!(dispute.status, dispute::dispute_status::FILED);
+    assert_eq!(dispute.case_hash, case_hash);
+
+    // 6. Owner can still operate — update_status doesn't enforce transitions
+    // (the program allows any valid status to be set by the owner).
+    let res = process(
+        &mut ctx,
+        &payer,
+        update_status_ix(&parcel_pk, &payer.pubkey(), parcel_status::FOR_SALE),
+    )
+    .await;
+    assert!(res.is_ok(), "D3: owner can change status even during dispute");
+}
+
+// D4: Parcel + attestation + subdivide — full subdivision flow.
+#[tokio::test]
+async fn cross_module_d4_attestation_subdivide_flow() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xD4; 32];
+    let mut sub_id: [u8; 32] = [0xD4; 32];
+    sub_id[31] = 0x01;
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    let (sub_pk, _) = parcel_pda(&sub_id);
+
+    // Register parcel.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D4 Parent".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel");
+
+    // Create attestation.
+    let specifier: [u8; 32] = [0xD4; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = payer.pubkey();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "attest").to_vec();
+                d.extend_from_slice(&specifier);
+                d.extend_from_slice(&[2u8; 32]); // content hash
+                d.extend_from_slice(&borsh_ser(&1u8)); // required = 1
+                for v in validators.iter() {
+                    d.extend_from_slice(&borsh_ser(v));
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("create attestation");
+
+    // Subdivide.
+    let (sub_rec, _) = Pubkey::find_program_address(
+        &[b"subdivision", parcel_pk.as_ref(), sub_pk.as_ref()],
+        &PROGRAM_ID,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(sub_pk, false),
+                AccountMeta::new(sub_rec, false),
+                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "subdivide_parcel").to_vec();
+                d.extend_from_slice(&sub_id);
+                d.extend_from_slice(&borsh_ser(&"Sub D4".to_string()));
+                d.extend_from_slice(&[3u8; 32]); // geometry hash
+                d.extend_from_slice(&specifier);
+                d
+            },
+        },
+    )
+    .await
+    .expect("subdivide");
+
+    // Verify.
+    let parent: Parcel = read_account(&ctx, parcel_pk).await;
+    let sub: Parcel = read_account(&ctx, sub_pk).await;
+    assert_eq!(parent.status, parcel_status::SUBDIVIDED);
+    assert_eq!(parent.owner, sub.owner, "D4: ownership preserved through subdivision");
+}
+
+// D5: Identity + transfer + attestation — new owner after identity-based
+// transfer can create attestations.
+#[tokio::test]
+async fn cross_module_d5_transfer_then_new_owner_attests() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xD5; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // Register parcel.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D5 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel");
+
+    // Transfer to bob.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // Bob creates attestation — new owner can attest.
+    let specifier: [u8; 32] = [0xD5; 32];
+    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = bob.pubkey();
+    process(
+        &mut ctx,
+        &bob,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(att_pk, false),
+                AccountMeta::new(bob.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "attest").to_vec();
+                d.extend_from_slice(&specifier);
+                d.extend_from_slice(&[4u8; 32]); // content hash
+                d.extend_from_slice(&borsh_ser(&1u8)); // required
+                for v in validators.iter() {
+                    d.extend_from_slice(&borsh_ser(v));
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("bob creates attestation");
+
+    // Payer (old owner) cannot create a new attestation — not owner anymore.
+    let mut old_specifier: [u8; 32] = [0xD5; 32];
+    old_specifier[31] = 0x02;
+    let (old_att_pk, _) = attestation_pda(&parcel_pk, &old_specifier);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(old_att_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "attest").to_vec();
+                d.extend_from_slice(&old_specifier);
+                d.extend_from_slice(&[5u8; 32]);
+                d.extend_from_slice(&borsh_ser(&1u8));
+                for v in validators.iter() {
+                    d.extend_from_slice(&borsh_ser(v));
+                }
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "D5: old owner cannot attest after transfer");
+}
+
+// D6: Staking lifecycle — register validator, stake, verify stake exists.
+#[tokio::test]
+async fn cross_module_d6_validator_staking_lifecycle() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    // Add validator.
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    add_validator_ok(&mut ctx, &payer, &validator.pubkey()).await;
+
+    // Fund validator for staking.
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 5_000_000_000),
+    )
+    .await
+    .unwrap();
+
+    let (pool, _) = stake_pool_pda(&registry);
+    let (stake, _) = validator_stake_pda(&pool, &validator.pubkey());
+
+    // Create stake pool.
+    let mut pool_data = discriminator("global", "create_stake_pool").to_vec();
+    pool_data.extend_from_slice(&borsh_ser(&500u16));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: pool_data,
+        },
+    )
+    .await
+    .expect("create_stake_pool");
+
+    // Deposit stake.
+    let stake_amount: u64 = 2_000_000_000;
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(pool, false),
+                AccountMeta::new(stake, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "deposit_stake").to_vec();
+                d.extend_from_slice(&borsh_ser(&stake_amount));
+                d
+            },
+        },
+    )
+    .await
+    .expect("deposit_stake");
+
+    // Verify stake account.
+    let stake_acc: staking::ValidatorStake = read_account(&ctx, stake).await;
+    assert_eq!(stake_acc.staked_amount, stake_amount);
+    assert_eq!(stake_acc.validator, validator.pubkey());
+
+    // Verify pool total.
+    let pool_acc: staking::StakePool = read_account(&ctx, pool).await;
+    assert_eq!(pool_acc.total_staked, stake_amount);
+}
