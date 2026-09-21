@@ -18195,3 +18195,351 @@ async fn cross_module_d6_validator_staking_lifecycle() {
     let pool_acc: staking::StakePool = read_account(&ctx, pool).await;
     assert_eq!(pool_acc.total_staked, stake_amount);
 }
+
+// ============================================================================
+// PROPOSITION E: Negative / Adversarial Tests
+// ============================================================================
+
+// E1: Transfer with wrong parcel PDA fails (seeds constraint).
+#[tokio::test]
+async fn negative_e1_wrong_parcel_pda_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let id_a: [u8; 32] = [0xE1; 32];
+    let id_b: [u8; 32] = [0xE2; 32];
+    let (parcel_a_pk, _) = parcel_pda(&id_a);
+    let (parcel_b_pk, _) = parcel_pda(&id_b);
+
+    // Register parcel A.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_a_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id_a);
+                d.extend_from_slice(&borsh_ser(&"E1 Parcel A".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel A");
+
+    // Try to transfer parcel B (doesn't exist) using payer as owner — seeds fail.
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    let res = process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_b_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await;
+    assert!(res.is_err(), "E1: transfer with wrong PDA should fail");
+}
+
+// E2: Transfer with forged signer (wrong wallet as owner) fails.
+#[tokio::test]
+async fn negative_e2_forged_signer_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE2; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    // Register parcel with payer as owner.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E2 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel");
+
+    // Intruder tries to transfer — should fail (not owner).
+    let intruder = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    let bob = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    let res = process(
+        &mut ctx,
+        &intruder,
+        transfer_ix(&parcel_pk, &intruder.pubkey(), &bob.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6003, "E2: forged signer cannot transfer");
+}
+
+// E3: File dispute with required > declared validators fails.
+#[tokio::test]
+async fn negative_e3_threshold_bypass_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
+    let id: [u8; 32] = [0xE3; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E3 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel");
+
+    let case_hash: [u8; 32] = [0xE3; 32];
+    let (dispute_pk, _) = Pubkey::find_program_address(
+        &[b"dispute", parcel_pk.as_ref(), &case_hash],
+        &PROGRAM_ID,
+    );
+    let (registry_pk, _) = registry_pda();
+
+    // 1 declared validator but required = 5.
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = Keypair::new().pubkey();
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(dispute_pk, false),
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(registry_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "file_dispute").to_vec();
+                d.extend_from_slice(&case_hash);
+                d.push(5u8); // required = 5, but only 1 declared
+                for v in validators.iter() {
+                    d.extend_from_slice(&borsh_ser(v));
+                }
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6016, "E3: threshold > declared validators rejected");
+}
+
+// E4: Register parcel with all-zero ID fails.
+#[tokio::test]
+async fn negative_e4_zero_parcel_id_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let zero_id: [u8; 32] = [0u8; 32];
+    let (parcel_pk, _) = parcel_pda(&zero_id);
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&zero_id);
+                d.extend_from_slice(&borsh_ser(&"Zero ID".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6000, "E4: all-zero parcel ID rejected");
+}
+
+// E5: Register parcel with empty name fails.
+#[tokio::test]
+async fn negative_e5_empty_name_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE5; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6001, "E5: empty name rejected");
+}
+
+// E6: Register parcel with all-zero geometry hash fails.
+#[tokio::test]
+async fn negative_e6_zero_geometry_hash_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE6; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E6 Parcel".to_string()));
+                d.extend_from_slice(&[0u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6002, "E6: zero geometry hash rejected");
+}
+
+// E7: Double register same parcel ID fails (PDA collision).
+#[tokio::test]
+async fn negative_e7_double_register_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE7; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    // First registration succeeds.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E7 First".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("first registration");
+
+    // Second registration with same ID fails (PDA already exists).
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E7 Second".to_string()));
+                d.extend_from_slice(&[2u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(res.is_err(), "E7: double register should fail");
+}
+
+// E8: Transfer to self is allowed (no self-transfer check in current code).
+#[tokio::test]
+async fn negative_e8_transfer_to_self_succeeds() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE8; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&"E8 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register parcel");
+
+    // Self-transfer is currently allowed (no-op ownership change).
+    let res = process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &payer.pubkey()),
+    )
+    .await;
+    assert!(res.is_ok(), "E8: self-transfer currently allowed (documented)");
+}
