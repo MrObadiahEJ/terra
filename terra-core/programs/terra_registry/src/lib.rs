@@ -5230,6 +5230,10 @@ pub enum TerraError {
     // P0-5: mandatory reputation gating
     #[msg("Validator reputation account must be provided for attestation")]
     MissingReputation,
+
+    // P0-6: canonical attestation digest
+    #[msg("Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence")]
+    AttestationDigestMismatch,
 }
 
 #[cfg(test)]

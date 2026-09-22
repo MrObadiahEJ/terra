@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
+use solana_program::hash::hashv;
 
 use crate::verification::reputation::{ValidatorReputation, validator_status};
 use crate::TerraError;
@@ -67,6 +68,33 @@ fn load_reputation<'info>(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: canonical attestation digest (P0-6)
+// ---------------------------------------------------------------------------
+
+/// Domain-separated sha-256 over the attestation's content. Off-chain, the
+/// validator signs this exact preimage; on-chain, the stored
+/// `signature_hash` must equal it so the recorded attestation can never
+/// differ from what the validator committed to (and so auditors can
+/// recompute the digest from the account fields alone).
+fn canonical_attestation_digest(
+    claim: &Pubkey,
+    validator: &Pubkey,
+    observation: &Pubkey,
+    result: u8,
+    confidence: u8,
+) -> [u8; 32] {
+    hashv(&[
+        b"terra:attestation:v1",
+        claim.as_ref(),
+        validator.as_ref(),
+        observation.as_ref(),
+        &[result],
+        &[confidence],
+    ])
+    .to_bytes()
+}
+
+// ---------------------------------------------------------------------------
 // Instruction handlers
 // ---------------------------------------------------------------------------
 
@@ -88,6 +116,21 @@ pub fn submit_attestation(
         TerraError::InvalidAttestationResult
     );
     require!(confidence <= 100, TerraError::InvalidConfidence);
+
+    // P0-6: signature_hash must be the canonical digest over this
+    // attestation's content — a tampered result/confidence/accounts cannot
+    // reuse a digest signed over different content.
+    let expected_digest = canonical_attestation_digest(
+        &ctx.accounts.claim.key(),
+        &ctx.accounts.validator.key(),
+        &ctx.accounts.observation.key(),
+        result,
+        confidence,
+    );
+    require!(
+        signature_hash == expected_digest,
+        TerraError::AttestationDigestMismatch
+    );
 
     // Mandatory reputation gating: reject jailed/slashed validators.
     let reputation = load_reputation(ctx.remaining_accounts, &ctx.accounts.validator.key())?;
