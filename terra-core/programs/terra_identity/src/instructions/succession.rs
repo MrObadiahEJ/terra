@@ -80,6 +80,8 @@ pub fn request_succession(
     succession.required = required_validations;
     succession.validations_count = 0;
     succession.validators = validators;
+    succession.endorsers = [Pubkey::default(); MAX_VALIDATORS];
+    succession.endorsers_count = 0;
 
     emit!(SuccessionRequested {
         identity: identity.key(),
@@ -116,6 +118,15 @@ pub fn endorse_succession(ctx: Context<crate::EndorseSuccession>) -> Result<()> 
         IdentityError::ValidatorOwnsAsset
     );
 
+    // P0-1: Prevent duplicate endorsements. Each validator may endorse at most once.
+    let endorsers_count = succession.endorsers_count as usize;
+    require!(
+        !succession.endorsers[..endorsers_count].contains(&validator),
+        IdentityError::AlreadyEndorsed
+    );
+
+    succession.endorsers[endorsers_count] = validator;
+    succession.endorsers_count += 1;
     succession.validations_count += 1;
 
     emit!(SuccessionEndorsed {

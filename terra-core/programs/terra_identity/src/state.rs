@@ -32,6 +32,9 @@ pub struct Succession {
     pub required: u8,
     pub validations_count: u8,
     pub validators: [Pubkey; MAX_VALIDATORS],
+    /// Tracks which validators have endorsed. Each validator can endorse at most once.
+    pub endorsers: [Pubkey; MAX_VALIDATORS],
+    pub endorsers_count: u8,
 }
 
 // ---------------------------------------------------------------------------

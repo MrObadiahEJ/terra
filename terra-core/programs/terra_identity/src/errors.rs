@@ -60,4 +60,6 @@ pub enum IdentityError {
     ParcelDeserializeFailed,
     #[msg("Parcel owner does not match the identity owner")]
     ParcelOwnerMismatch,
+    #[msg("This validator has already endorsed this succession")]
+    AlreadyEndorsed,
 }

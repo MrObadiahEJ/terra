@@ -68,6 +68,8 @@ pub fn request_court_guardianship(
     succession.required = required_validations;
     succession.validations_count = 0;
     succession.validators = validators;
+    succession.endorsers = [Pubkey::default(); MAX_VALIDATORS];
+    succession.endorsers_count = 0;
 
     emit!(CourtGuardianshipRequested {
         identity: identity.key(),
