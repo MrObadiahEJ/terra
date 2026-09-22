@@ -683,7 +683,7 @@ pub struct ProposeValidator<'info> {
     #[account(mut)]
     pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(
-        init,
+        init_if_needed,
         payer = proposer,
         space = 8 + validator_registry::ValidatorEndorsement::INIT_SPACE,
         seeds = [
@@ -1430,6 +1430,10 @@ pub mod terra_registry {
 
     pub fn propose_validator(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
         validator_registry::propose_validator(ctx, validator)
+    }
+
+    pub fn propose_validator_removal(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
+        validator_registry::propose_removal(ctx, validator)
     }
 
     pub fn remove_validator_from_registry(
@@ -5218,6 +5222,10 @@ pub enum TerraError {
     // Slashing
     #[msg("Signer is not the designated offender")]
     NotDesignatedOffender,
+
+    // P0-2: validator governance actions
+    #[msg("Endorsement action does not match the requested governance operation")]
+    WrongEndorsementAction,
 }
 
 #[cfg(test)]

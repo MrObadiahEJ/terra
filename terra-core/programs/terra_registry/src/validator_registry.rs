@@ -33,6 +33,14 @@ pub mod registry_mode {
     pub const PEER_CONSENSUS: u8 = 1;
 }
 
+/// Governance action an endorsement authorizes. P0-2: an endorsement must be
+/// bound to the exact action it authorizes, so an "add" quorum can never be
+/// replayed against a "remove".
+pub mod endorsement_action {
+    pub const ADD: u8 = 0;
+    pub const REMOVE: u8 = 1;
+}
+
 /// Derive the effective registry mode from the current validator count.
 /// No stored flag — mode transitions automatically when the count crosses
 /// the threshold. There is no moment where a person could have flipped it
@@ -79,9 +87,11 @@ pub struct ValidatorRegistry {
 pub struct ValidatorEndorsement {
     /// The registry this endorsement applies to.
     pub registry: Pubkey,
-    /// The validator pubkey being proposed for addition.
+    /// The validator pubkey being proposed (target of the action).
     pub proposed: Pubkey,
-    /// Validators who endorsed this addition.
+    /// P0-2: governance action this endorsement authorizes (ADD or REMOVE).
+    pub action: u8,
+    /// Validators who endorsed this proposal.
     #[max_len(32)]
     pub endorsers: Vec<Pubkey>,
     /// Required endorsements to approve.
@@ -193,6 +203,54 @@ pub fn propose_validator(ctx: Context<super::ProposeValidator>, validator: Pubke
     let endorsement = &mut ctx.accounts.endorsement;
     endorsement.registry = registry.key();
     endorsement.proposed = validator;
+    // P0-2: this proposal authorizes an ADD only.
+    endorsement.action = endorsement_action::ADD;
+    endorsement.endorsers = Vec::new();
+    endorsement.required = required;
+    endorsement.created_at = clock.unix_timestamp;
+
+    emit!(super::ValidatorEndorsed {
+        registry: registry.key(),
+        proposed: validator,
+        endorser: ctx.accounts.proposer.key(),
+        endorsements_count: 0,
+        required: endorsement.required,
+    });
+    Ok(())
+}
+
+/// Propose a validator removal in peer-consensus mode.
+///
+/// Creates the endorsement record that peer validators sign to authorize
+/// removing `validator` from the registry. P0-2: the removal endorsement is
+/// stamped with `action == REMOVE` so the exact governance operation is bound
+/// to the authorization — an add quorum can never be replayed as a removal.
+pub fn propose_removal(ctx: Context<super::ProposeValidator>, validator: Pubkey) -> Result<()> {
+    require!(
+        validator != Pubkey::default(),
+        super::TerraError::EmptySuccessor
+    );
+
+    let registry = &ctx.accounts.registry;
+    let mode = effective_mode(registry.validators.len() as u8);
+    require!(
+        mode == registry_mode::PEER_CONSENSUS,
+        super::TerraError::InvalidRegistryMode
+    );
+    // The target must currently be a registered validator.
+    require!(
+        registry.validators.contains(&validator),
+        super::TerraError::NotValidator
+    );
+    let required = consensus_required(registry.validators.len() as u8);
+    require!(required > 0, super::TerraError::InvalidThreshold);
+
+    let clock = Clock::get()?;
+    let endorsement = &mut ctx.accounts.endorsement;
+    endorsement.registry = registry.key();
+    endorsement.proposed = validator;
+    // P0-2: this proposal authorizes a REMOVE only.
+    endorsement.action = endorsement_action::REMOVE;
     endorsement.endorsers = Vec::new();
     endorsement.required = required;
     endorsement.created_at = clock.unix_timestamp;
@@ -266,6 +324,12 @@ pub fn add_validator(ctx: Context<super::AddValidator>, validator: Pubkey) -> Re
             endorsement.proposed == validator,
             super::TerraError::NotValidator
         );
+        // P0-2: an endorsement authorizes exactly one action. An ADD quorum
+        // must not be consumable by REMOVE.
+        require!(
+            endorsement.action == endorsement_action::ADD,
+            super::TerraError::WrongEndorsementAction
+        );
         require!(
             endorsement.required > 0,
             super::TerraError::InvalidThreshold
@@ -324,6 +388,17 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
         require!(
             endorsement.registry == registry.key(),
             super::TerraError::AttestationMismatch
+        );
+        // P0-2: the endorsement must be a REMOVE endorsement bound to this
+        // exact validator. An ADD proposal can never authorize a removal, and
+        // a removal quorum for validator A cannot be applied to validator B.
+        require!(
+            endorsement.action == endorsement_action::REMOVE,
+            super::TerraError::WrongEndorsementAction
+        );
+        require!(
+            endorsement.proposed == validator,
+            super::TerraError::NotValidator
         );
         require!(
             endorsement.required > 0,

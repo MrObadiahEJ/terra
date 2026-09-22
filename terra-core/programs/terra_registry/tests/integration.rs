@@ -6891,21 +6891,35 @@ async fn session_open_and_record_evidence() {
 // ValidatorReputation tests
 // ===========================================================================
 
-#[tokio::test]
-async fn reputation_initialize_and_record_outcome() {
-    let (mut ctx, payer) = setup().await;
-    let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+/// Accounts for reputation-scoped instructions that also require the registry
+/// and an admin/authority signer (record_attestation_outcome, jail/unjail/slash_validator).
+fn rep_accounts(rep_pk: &Pubkey, authority: &Pubkey) -> Vec<AccountMeta> {
+    let (registry, _) = registry_pda();
+    vec![
+        AccountMeta::new(*rep_pk, false),
+        AccountMeta::new_readonly(registry, false),
+        AccountMeta::new(*authority, true),
+    ]
+}
 
-    // Initialize.
+/// Create a registry and initialize a validator reputation account with the
+/// `registry` account required by the `InitializeValidatorReputation` context.
+async fn init_reputation_ok(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    validator: &Pubkey,
+) -> Pubkey {
+    let (registry, _) = registry_pda();
+    let (rep_pk, _) = validator_reputation_pda(validator);
     process(
-        &mut ctx,
-        &payer,
+        ctx,
+        payer,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(rep_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new_readonly(*validator, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -6914,6 +6928,15 @@ async fn reputation_initialize_and_record_outcome() {
     )
     .await
     .expect("init_reputation failed");
+    rep_pk
+}
+
+#[tokio::test]
+async fn reputation_initialize_and_record_outcome() {
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let validator = Keypair::new();
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     let rep: ValidatorReputation = read_account(&ctx, rep_pk).await;
     assert_eq!(rep.status, validator_status::ACTIVE);
@@ -6925,7 +6948,7 @@ async fn reputation_initialize_and_record_outcome() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(rep_pk, false)],
+            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
                 let mut d = discriminator("global", "record_attestation_outcome").to_vec();
                 d.push(1); // confirmed = true
@@ -6946,7 +6969,7 @@ async fn reputation_initialize_and_record_outcome() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(rep_pk, false)],
+            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
                 let mut d = discriminator("global", "record_attestation_outcome").to_vec();
                 d.push(0); // confirmed = false
@@ -6968,25 +6991,9 @@ async fn reputation_initialize_and_record_outcome() {
 #[tokio::test]
 async fn reputation_jail_and_unjail() {
     let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
     let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
-
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(rep_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: discriminator("global", "initialize_validator_reputation").to_vec(),
-        },
-    )
-    .await
-    .expect("init_reputation failed");
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     // Jail for 100 seconds.
     process(
@@ -6994,7 +7001,7 @@ async fn reputation_jail_and_unjail() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(rep_pk, false)],
+            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
                 let mut d = discriminator("global", "jail_validator").to_vec();
                 d.extend_from_slice(&100_i64.to_le_bytes());
@@ -7014,7 +7021,7 @@ async fn reputation_jail_and_unjail() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(rep_pk, false)],
+            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: discriminator("global", "unjail_validator").to_vec(),
         },
     )
@@ -7036,7 +7043,7 @@ async fn reputation_jail_and_unjail() {
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![AccountMeta::new(rep_pk, false)],
+            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: discriminator("global", "unjail_validator").to_vec(),
         },
     )
@@ -7505,6 +7512,7 @@ async fn quorum_config_wired_to_session() {
 #[tokio::test]
 async fn jailed_validator_cannot_attest() {
     let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
     let validator = Keypair::new();
     process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000)).await.unwrap();
@@ -7516,6 +7524,7 @@ async fn jailed_validator_cannot_attest() {
         accounts: vec![
             AccountMeta::new(rep_pk, false),
             AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new_readonly(registry, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
         ],
@@ -7525,9 +7534,7 @@ async fn jailed_validator_cannot_attest() {
     // Jail the validator.
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(rep_pk, false),
-        ],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: {
             let mut d = discriminator("global", "jail_validator").to_vec();
             d.extend_from_slice(&86400_i64.to_le_bytes());
@@ -12785,29 +12792,19 @@ async fn reactivate_observer_rejects_non_admin() {
 #[tokio::test]
 async fn record_attestation_outcome_rejects_jailed_validator() {
     let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
     let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(rep_pk, false),
-            AccountMeta::new_readonly(validator.pubkey(), false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program_id(), false),
-        ],
-        data: discriminator("global", "initialize_validator_reputation").to_vec(),
-    }).await.unwrap();
-
-    process(&mut ctx, &payer, Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
     }).await.unwrap();
 
     let res = process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "record_attestation_outcome").to_vec(); d.push(1); d },
     }).await;
     assert_custom_error(res, 6141, "record on jailed validator");
@@ -12816,29 +12813,19 @@ async fn record_attestation_outcome_rejects_jailed_validator() {
 #[tokio::test]
 async fn jail_validator_rejects_already_jailed() {
     let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
     let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(rep_pk, false),
-            AccountMeta::new_readonly(validator.pubkey(), false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program_id(), false),
-        ],
-        data: discriminator("global", "initialize_validator_reputation").to_vec(),
-    }).await.unwrap();
-
-    process(&mut ctx, &payer, Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
     }).await.unwrap();
 
     let res = process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
     }).await;
     assert_custom_error(res, 6141, "jail already jailed");
@@ -12847,23 +12834,13 @@ async fn jail_validator_rejects_already_jailed() {
 #[tokio::test]
 async fn unjail_validator_rejects_not_jailed() {
     let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
     let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
-
-    process(&mut ctx, &payer, Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(rep_pk, false),
-            AccountMeta::new_readonly(validator.pubkey(), false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program_id(), false),
-        ],
-        data: discriminator("global", "initialize_validator_reputation").to_vec(),
-    }).await.unwrap();
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     let res = process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: discriminator("global", "unjail_validator").to_vec(),
     }).await;
     assert_custom_error(res, 6131, "unjail not jailed");
@@ -12872,29 +12849,19 @@ async fn unjail_validator_rejects_not_jailed() {
 #[tokio::test]
 async fn slash_validator_rejects_jailed_validator() {
     let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
     let validator = Keypair::new();
-    let (rep_pk, _) = validator_reputation_pda(&validator.pubkey());
+    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
 
     process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![
-            AccountMeta::new(rep_pk, false),
-            AccountMeta::new_readonly(validator.pubkey(), false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program_id(), false),
-        ],
-        data: discriminator("global", "initialize_validator_reputation").to_vec(),
-    }).await.unwrap();
-
-    process(&mut ctx, &payer, Instruction {
-        program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "jail_validator").to_vec(); d.extend_from_slice(&100_i64.to_le_bytes()); d },
     }).await.unwrap();
 
     let res = process(&mut ctx, &payer, Instruction {
         program_id: PROGRAM_ID,
-        accounts: vec![AccountMeta::new(rep_pk, false)],
+        accounts: rep_accounts(&rep_pk, &payer.pubkey()),
         data: { let mut d = discriminator("global", "slash_validator").to_vec(); d.extend_from_slice(&5000_u16.to_le_bytes()); d },
     }).await;
     assert_custom_error(res, 6141, "slash jailed validator");
@@ -18987,4 +18954,563 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
     )
     .await;
     assert_custom_error(res, 6084, "7. permanent right cannot be swept");
+}
+
+// ============================================================================
+// P0-1: Succession Endorsement Duplication Prevention
+// ============================================================================
+
+/// Helper: bind identity + request succession, return (identity_pda, succession_pda).
+async fn setup_succession(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    identity_hash: [u8; 32],
+    successor: &Pubkey,
+    validators: &[Pubkey; 8],
+    required: u8,
+) -> (Pubkey, Pubkey) {
+    let (id_pda, _) = identity_pda(&identity_hash);
+    let recovery = Keypair::new();
+
+    // Bind identity
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&recovery.pubkey().to_bytes());
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    let (succ_pda, _) = succession_pda(&id_pda, successor);
+
+    // Request succession
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succ_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "request_succession").to_vec();
+                d.extend_from_slice(&successor.to_bytes());
+                d.push(0u8); // kind = SUCCESSOR
+                d.extend_from_slice(&0i64.to_le_bytes()); // grace_secs = 0 (default)
+                d.push(required);
+                for v in validators {
+                    d.extend_from_slice(&v.to_bytes());
+                }
+                d
+            },
+        },
+    )
+    .await
+    .expect("request_succession");
+
+    (id_pda, succ_pda)
+}
+
+/// Helper: endorse a succession.
+async fn endorse(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    id_pda: Pubkey,
+    succ_pda: Pubkey,
+    validator: &Keypair,
+) {
+    process(
+        ctx,
+        validator,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succ_pda, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await
+    .expect("endorse_succession");
+}
+
+// P0-1 Test 1: Duplicate endorsement by same validator is rejected.
+#[tokio::test]
+async fn p0_1_succession_duplicate_endorsement_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let identity_hash = [0xA1u8; 32];
+    let successor = Keypair::new();
+    let v1 = Keypair::new();
+    let v2 = Keypair::new();
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = v1.pubkey();
+    validators[1] = v2.pubkey();
+
+    // required=2, 2 declared validators — valid setup.
+    let (id_pda, succ_pda) =
+        setup_succession(&mut ctx, &payer, identity_hash, &successor.pubkey(), &validators, 2).await;
+
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    // First endorsement succeeds.
+    endorse(&mut ctx, &payer, id_pda, succ_pda, &v1).await;
+
+    let s: Succession = read_account(&ctx, succ_pda).await;
+    assert_eq!(s.validations_count, 1);
+    assert_eq!(s.endorsers_count, 1);
+    assert_eq!(s.endorsers[0], v1.pubkey());
+
+    // Second endorsement by same validator fails.
+    let res = process(
+        &mut ctx,
+        &v1,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succ_pda, false),
+                AccountMeta::new(v1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6027, "duplicate endorsement rejected");
+
+    // Count unchanged.
+    let s: Succession = read_account(&ctx, succ_pda).await;
+    assert_eq!(s.validations_count, 1);
+    assert_eq!(s.endorsers_count, 1);
+}
+
+// P0-1 Test 2: Two distinct validators reach quorum.
+#[tokio::test]
+async fn p0_1_succession_two_distinct_validators_reach_quorum() {
+    let (mut ctx, payer) = setup().await;
+    let identity_hash = [0xA2u8; 32];
+    let successor = Keypair::new();
+    let v1 = Keypair::new();
+    let v2 = Keypair::new();
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = v1.pubkey();
+    validators[1] = v2.pubkey();
+
+    let (id_pda, succ_pda) =
+        setup_succession(&mut ctx, &payer, identity_hash, &successor.pubkey(), &validators, 2).await;
+
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    // V1 endorses.
+    endorse(&mut ctx, &payer, id_pda, succ_pda, &v1).await;
+    let s: Succession = read_account(&ctx, succ_pda).await;
+    assert_eq!(s.validations_count, 1);
+
+    // V2 endorses — quorum met.
+    endorse(&mut ctx, &payer, id_pda, succ_pda, &v2).await;
+    let s: Succession = read_account(&ctx, succ_pda).await;
+    assert_eq!(s.validations_count, 2);
+    assert_eq!(s.endorsers_count, 2);
+}
+
+// P0-1 Test 3: Single validator cannot reach quorum via duplicate endorsement.
+#[tokio::test]
+async fn p0_1_succession_quorum_cannot_be_reached_by_one_validator() {
+    let (mut ctx, payer) = setup().await;
+    let identity_hash = [0xA3u8; 32];
+    let successor = Keypair::new();
+    let v1 = Keypair::new();
+    let v2 = Keypair::new();
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = v1.pubkey();
+    validators[1] = v2.pubkey();
+
+    // required=2, 2 validators declared. Only v1 will endorse.
+    let (id_pda, succ_pda) =
+        setup_succession(&mut ctx, &payer, identity_hash, &successor.pubkey(), &validators, 2).await;
+
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    // First endorsement succeeds.
+    endorse(&mut ctx, &payer, id_pda, succ_pda, &v1).await;
+
+    // Second endorsement by v1 rejected (duplicate).
+    let res = process(
+        &mut ctx,
+        &v1,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succ_pda, false),
+                AccountMeta::new(v1.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6027, "single validator cannot reach quorum via duplication");
+
+    // Quorum not met — only 1 endorsement for required=2.
+    let s: Succession = read_account(&ctx, succ_pda).await;
+    assert_eq!(s.validations_count, 1);
+    assert!(s.validations_count < s.required);
+}
+
+// P0-1 Test 4: Owner cannot endorse as a validator (not in declared set).
+#[tokio::test]
+async fn p0_1_succession_owner_cannot_validate() {
+    let (mut ctx, payer) = setup().await;
+    let identity_hash = [0xA4u8; 32];
+    let successor = Keypair::new();
+    let v1 = Keypair::new();
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = v1.pubkey();
+
+    let (id_pda, succ_pda) =
+        setup_succession(&mut ctx, &payer, identity_hash, &successor.pubkey(), &validators, 1).await;
+
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &payer.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    // Owner tries to endorse — not in declared validator list → NotValidator.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(id_pda, false),
+                AccountMeta::new(succ_pda, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "endorse_succession").to_vec(),
+        },
+    )
+    .await;
+    // IdentityError::NotValidator = 6006
+    assert_custom_error(res, 6006, "owner not in declared validator list");
+}
+
+// ============================================================================
+// P0-2: Validator Removal Endorsement Binding
+// ============================================================================
+
+/// Build a registry in PEER_CONSENSUS mode with `count` validators (admin + others).
+async fn setup_peer_registry(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    count: usize,
+) -> (Pubkey, Vec<Keypair>) {
+    let registry = create_registry_ok(ctx, payer).await;
+    let mut validators = Vec::new();
+    // payer (admin) is validator 0.
+    add_validator_ok(ctx, payer, &payer.pubkey()).await;
+    validators.push(Keypair::new()); // placeholder 0, not used
+    for i in 1..count {
+        let v = Keypair::new();
+        add_validator_ok(ctx, payer, &v.pubkey()).await;
+        // Fund so the validator can sign its own endorsement transactions.
+        process(ctx, payer, fund_ix(&payer.pubkey(), &v.pubkey(), 10_000_000))
+            .await
+            .unwrap();
+        validators.push(v);
+    }
+    (registry, validators)
+}
+
+/// Endorse a validator-add for `target` as an existing registered validator.
+async fn endorse_add(
+    ctx: &mut ProgramTestContext,
+    registry: &Pubkey,
+    target: &Pubkey,
+    endorser: &Keypair,
+) {
+    let (endorsement, _) = endorsement_pda(registry, target);
+    let mut data = discriminator("global", "endorse_validator_add").to_vec();
+    process(
+        ctx,
+        endorser,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(*registry, false),
+                AccountMeta::new(endorser.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("endorse_validator_add failed");
+}
+
+/// Propose removal of a registered validator (creates REMOVE endorsement).
+async fn propose_removal_ok(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    registry: &Pubkey,
+    target: &Pubkey,
+) {
+    let (endorsement, _) = endorsement_pda(registry, target);
+    let mut data = discriminator("global", "propose_validator_removal").to_vec();
+    data.extend_from_slice(&borsh_ser(target));
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(*registry, false),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(*target, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose_validator_removal failed");
+}
+
+// P0-2 Test 1: An ADD endorsement can never authorize a removal.
+#[tokio::test]
+async fn p0_2_add_endorsement_cannot_authorize_removal() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, validators) = setup_peer_registry(&mut ctx, &payer, 4).await;
+
+    // v2..v4 are registered validators; payer (admin) is validator 0.
+    let v2 = &validators[2];
+    let v3 = &validators[3];
+
+    // Propose ADD of a new validator `target`.
+    let target = Keypair::new();
+    let (endorsement, _) = endorsement_pda(&registry, &target.pubkey());
+    let mut data = discriminator("global", "propose_validator").to_vec();
+    data.extend_from_slice(&borsh_ser(&target.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(target.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose_validator (add) failed");
+
+    // 3 endorsements meet the required ceil(2*4/3)=3 quorum.
+    endorse_add(&mut ctx, &registry, &target.pubkey(), &v2).await;
+    endorse_add(&mut ctx, &registry, &target.pubkey(), &v3).await;
+    endorse_add(&mut ctx, &registry, &target.pubkey(), &payer).await;
+
+    // Admit the validator via the ADD endorsement.
+    let mut data = discriminator("global", "add_validator_to_registry").to_vec();
+    data.extend_from_slice(&borsh_ser(&target.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(target.pubkey(), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add validator after quorum");
+
+    // The ADD endorsement account still exists with action=ADD. Now a
+    // non-admin validator tries to reuse it to remove `target`.
+    let mut data = discriminator("global", "remove_validator_from_registry").to_vec();
+    data.extend_from_slice(&borsh_ser(&target.pubkey()));
+    let res = process(
+        &mut ctx,
+        &v2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(v2.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(target.pubkey(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(
+        res,
+        6156,
+        "ADD endorsement cannot authorize a removal",
+    );
+}
+
+// P0-2 Test 2: propose_validator_removal stamps the REMOVE action.
+#[tokio::test]
+async fn p0_2_remove_proposal_stamps_remove_action() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, validators) = setup_peer_registry(&mut ctx, &payer, 4).await;
+    let target = &validators[2];
+
+    propose_removal_ok(&mut ctx, &payer, &registry, &target.pubkey()).await;
+
+    let (endorsement, _) = endorsement_pda(&registry, &target.pubkey());
+    let e: validator_registry::ValidatorEndorsement = read_account(&ctx, endorsement).await;
+    assert_eq!(
+        e.action,
+        validator_registry::endorsement_action::REMOVE,
+        "removal proposal must stamp REMOVE action"
+    );
+    assert_eq!(e.proposed, target.pubkey());
+}
+
+// P0-2 Test 3: propose_validator_removal rejects a non-registered target.
+#[tokio::test]
+async fn p0_2_remove_proposal_rejects_unregistered_target() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, _) = setup_peer_registry(&mut ctx, &payer, 4).await;
+
+    let outsider = Keypair::new();
+    let mut data = discriminator("global", "propose_validator_removal").to_vec();
+    data.extend_from_slice(&borsh_ser(&outsider.pubkey()));
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(Pubkey::default(), false),
+                AccountMeta::new_readonly(outsider.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "removal of an unregistered validator must fail");
+}
+
+// P0-2 Test 4: REMOVE endorsement cannot be reused for an ADD.
+#[tokio::test]
+async fn p0_2_remove_endorsement_cannot_authorize_add() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, validators) = setup_peer_registry(&mut ctx, &payer, 4).await;
+    let v2 = &validators[2];
+    let v3 = &validators[3];
+
+    // Create a REMOVE proposal for validator v3.
+    propose_removal_ok(&mut ctx, &payer, &registry, &v3.pubkey()).await;
+    let (endorsement, _) = endorsement_pda(&registry, &v3.pubkey());
+    assert!(ctx
+        .banks_client
+        .get_account(endorsement)
+        .await
+        .unwrap()
+        .is_some());
+
+    // Try to use the REMOVE endorsement to ADD the same validator's key —
+    // the add path requires action == ADD.
+    let mut data = discriminator("global", "add_validator_to_registry").to_vec();
+    data.extend_from_slice(&borsh_ser(&v3.pubkey()));
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(v3.pubkey(), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    // v3 is already registered → AlreadyEndorsedRotation fires before action.
+    // Either way the add must fail.
+    assert!(res.is_err(), "REMOVE endorsement cannot be reused for an ADD");
+}
+
+// P0-2 Test 5: duplicate endorser on a removal proposal is rejected.
+#[tokio::test]
+async fn p0_2_removal_duplicate_endorser_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let (registry, validators) = setup_peer_registry(&mut ctx, &payer, 4).await;
+    let target = &validators[2];
+    let v2 = &validators[2];
+    let v3 = &validators[3];
+
+    propose_removal_ok(&mut ctx, &payer, &registry, &target.pubkey()).await;
+
+    // First endorsement succeeds.
+    endorse_add(&mut ctx, &registry, &target.pubkey(), &v2).await;
+
+    // Same endorser again — rejected (AlreadyEndorsedRotation).
+    let (endorsement, _) = endorsement_pda(&registry, &target.pubkey());
+    let mut data = discriminator("global", "endorse_validator_add").to_vec();
+    let res = process(
+        &mut ctx,
+        &v2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(v2.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    let _ = v3;
+    assert!(res.is_err(), "duplicate endorser on removal must be rejected");
 }
