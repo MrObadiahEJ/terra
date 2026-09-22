@@ -37,25 +37,33 @@ pub struct VerificationAttestation {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: look up ValidatorReputation PDA via remaining_accounts
+// Helper: load the required ValidatorReputation PDA via remaining_accounts
 // ---------------------------------------------------------------------------
 
-fn try_load_reputation<'info>(
+/// Loads the validator's reputation account. The reputation PDA
+/// (`["validator_reputation", validator]`) MUST be present in
+/// `remaining_accounts`; otherwise the jail/slash gate could be bypassed by
+/// simply omitting the account. Rejects accounts not owned by this program.
+fn load_reputation<'info>(
     remaining_accounts: &[AccountInfo<'info>],
     validator: &Pubkey,
-) -> Result<Option<ValidatorReputation>> {
+) -> Result<ValidatorReputation> {
     let (pda, _) = Pubkey::find_program_address(
         &[b"validator_reputation", validator.as_ref()],
         &crate::ID,
     );
     for acc in remaining_accounts {
         if acc.key == &pda {
+            require!(
+                acc.owner == &crate::ID,
+                TerraError::MissingReputation
+            );
             let data = acc.try_borrow_data()?;
             let account = ValidatorReputation::try_deserialize(&mut &data[..])?;
-            return Ok(Some(account));
+            return Ok(account);
         }
     }
-    Ok(None)
+    err!(TerraError::MissingReputation)
 }
 
 // ---------------------------------------------------------------------------
@@ -65,8 +73,9 @@ fn try_load_reputation<'info>(
 /// Submit an attestation for a claim. Only validators who have submitted
 /// an observation may attest. One attestation per validator per claim.
 ///
-/// If the validator's ValidatorReputation PDA is provided via
-/// remaining_accounts and the validator is JAILED or SLASHED, the
+/// The validator's `ValidatorReputation` PDA MUST be supplied via
+/// `remaining_accounts`. If it is missing, the transaction is rejected with
+/// `MissingReputation`. If the validator is JAILED or SLASHED, the
 /// transaction is rejected with `ValidatorJailed`.
 pub fn submit_attestation(
     ctx: Context<crate::SubmitVerificationAttestation>,
@@ -80,15 +89,12 @@ pub fn submit_attestation(
     );
     require!(confidence <= 100, TerraError::InvalidConfidence);
 
-    // Reputation gating: reject jailed/slashed validators.
-    if let Some(reputation) =
-        try_load_reputation(ctx.remaining_accounts, &ctx.accounts.validator.key())?
-    {
-        require!(
-            reputation.status == validator_status::ACTIVE,
-            TerraError::ValidatorJailed
-        );
-    }
+    // Mandatory reputation gating: reject jailed/slashed validators.
+    let reputation = load_reputation(ctx.remaining_accounts, &ctx.accounts.validator.key())?;
+    require!(
+        reputation.status == validator_status::ACTIVE,
+        TerraError::ValidatorJailed
+    );
 
     let claim = &mut ctx.accounts.claim;
     require!(

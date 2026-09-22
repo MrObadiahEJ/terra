@@ -5226,6 +5226,10 @@ pub enum TerraError {
     // P0-2: validator governance actions
     #[msg("Endorsement action does not match the requested governance operation")]
     WrongEndorsementAction,
+
+    // P0-5: mandatory reputation gating
+    #[msg("Validator reputation account must be provided for attestation")]
+    MissingReputation,
 }
 
 #[cfg(test)]
