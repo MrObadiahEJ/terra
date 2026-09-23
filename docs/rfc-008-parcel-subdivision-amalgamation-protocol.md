@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (subdivision.rs end-to-end)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 
@@ -610,3 +610,14 @@ If a subdivision or amalgamation fails partway through:
   - SubdivisionRecord for (A, C): `rights_migrated = true`, `attestations_migrated = true`
   - Parcel A status = SUBDIVIDED
   - No disputes referencing A (cancelled before subdivision)
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `subdivision.rs` subdivide/amalgamate/migrate-rights/migrate-attestations end-to-end.
+
+**Next for this RFC:**
+1. No separate open audit findings — covered by Phase 1 program-wide hygiene.
+2. When changing lineage records, add/extend BPF migration assertions (walk Rights/Attestations after subdivide).
+3. After program edits: `make idl`.

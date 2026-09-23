@@ -33,15 +33,19 @@ pub fn request_court_guardianship(
     );
     require!(successor != identity.owner, IdentityError::SuccessorIsOwner);
 
-    let mut count: u8 = 0;
+    // Reject duplicate validators — same rationale as request_succession.
+    let unique_count = count_unique_validators(&validators)
+        .map_err(|_| error!(IdentityError::DuplicateValidator))?;
+    require!(unique_count > 0, IdentityError::NotValidator);
+    let count = unique_count as u8;
+
+    // Self-dealing: no declared validator may be the identity owner.
     for &v in validators.iter() {
         if v == Pubkey::default() {
             continue;
         }
         require!(v != identity.owner, IdentityError::ValidatorOwnsAsset);
-        count += 1;
     }
-    require!(count > 0, IdentityError::NotValidator);
     require!(
         validate_guardianship_threshold(required_validations, count as usize),
         IdentityError::GuardianshipThresholdTooLow

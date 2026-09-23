@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (cross_border.rs; admin/validator constraints on VerifyCrossBorder)
 - **Created:** 2026-09-03
 - **Target Phase:** 7 (Regional Expansion) at earliest
 - **Supersedes:** None
@@ -605,3 +605,14 @@ When a post-quantum algorithm is ready for use:
 
 - Validator B tries to verify a binding that belongs to a different jurisdiction
 - Expected: `JurisdictionMismatch` error (binding.jurisdiction_key != jurisdiction.key())
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `cross_border.rs` register/update/bind/verify/revoke/rebind; Phase 1: `VerifyCrossBorder` constrained to admin or registered validators (SECURITY.md C-7).
+
+**Next for this RFC:**
+1. ZK credential circuit still needs external audit before treating bindings as production-privacy (paired with RFC-011).
+2. Keep uniqueness/ownership checks when extending binding PDAs; add cases to identity/registry BPF suites.
+3. After program edits: `make idl`.

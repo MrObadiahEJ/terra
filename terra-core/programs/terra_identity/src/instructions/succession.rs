@@ -28,15 +28,22 @@ pub fn request_succession(
     );
     require!(successor != identity.owner, IdentityError::SuccessorIsOwner);
 
-    let mut count: u8 = 0;
+    // Reject duplicate validators — each slot must be a distinct pubkey.
+    // Without this, [v1, v1, v1] would report count=3 while only one
+    // unique validator can ever endorse (endorse_succession dedups),
+    // making the threshold unreachable and corrupting the declared set.
+    let unique_count = count_unique_validators(&validators)
+        .map_err(|_| error!(IdentityError::DuplicateValidator))?;
+    require!(unique_count > 0, IdentityError::NotValidator);
+    let count = unique_count as u8;
+
+    // Self-dealing: no declared validator may be the identity owner.
     for &v in validators.iter() {
         if v == Pubkey::default() {
             continue;
         }
         require!(v != identity.owner, IdentityError::ValidatorOwnsAsset);
-        count += 1;
     }
-    require!(count > 0, IdentityError::NotValidator);
     require!(
         (required_validations as usize) <= count as usize,
         IdentityError::InvalidThreshold

@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (escrow.rs end-to-end; audited via SECURITY.md Phase 1)
 - **Created:** 2026-09-02
 - **Supersedes:** None
 - **Depends on:** RFC-003 (Vault Shard Protocol), RFC-007 (Dispute Resolution & Parcel Freeze)
@@ -676,3 +676,14 @@ When Solana introduces post-quantum signature support:
 - **Escrow:** status `DEPOSITED`, seller = wallet A
 - **Signer:** wallet C (not the designated seller)
 - **Expected:** `NotDesignatedSeller` error
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `escrow.rs` create/deposit/accept/settle/cancel/dispute/expire; Phase 1 unique-validator set on `dispute_escrow` (`DuplicateValidator`); unit tests in lib suite.
+
+**Next for this RFC:**
+1. L-2 (escrow vault lamports / rent-exempt edge) is **accepted** — only revisit if changing settle/transfer math.
+2. Run `cargo test -p terra-registry --test integration -- --test-threads=1` when machine/time allow (escrow happy paths live there).
+3. After program edits: `make idl`.

@@ -1,75 +1,70 @@
-# React + TypeScript + Vite
+# Terra Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite frontend for Terra — claims, parcels, verification, and a Cesium/Leaflet map view.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React 19** + **TypeScript** + **Vite**
+- **CesiumJS** (globe) and **Leaflet** (map)
+- **Solana wallet adapter** (`@solana/web3.js`, `@coral-xyz/anchor`)
+- **Zustand** state, **React Router**
+- **pnpm** package manager
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+pnpm install --frozen-lockfile
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+pnpm dev        # Vite dev server
+pnpm build      # tsc -b && vite build
+pnpm lint       # ESLint
+pnpm preview    # Preview production build
+pnpm exec tsc --noEmit   # Type check only (CI)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Layout
 
 ```
+terra-web/src/
+├── App.tsx           # Router shell
+├── main.tsx          # Entry
+├── pages/            # Route pages
+├── components/       # UI + map/globe
+├── lib/              # API client (api.ts), helpers
+├── store/            # Zustand stores
+├── idl/              # terra_registry.json + generated types
+└── index.css
+```
+
+## IDL
+
+`src/idl/terra_registry.json` is generated from the on-chain program. After
+changing `terra-core/programs/terra_registry`, regenerate from the repo:
+
+```bash
+cd ../terra-core && make idl
+```
+
+**Known lag:** checked-in IDL currently reflects an older program (≈74
+instructions / 23 accounts / 58 events / 120 errors) while source is **118 /
+47 / 108 / 160**. Always run `make idl` before shipping client changes that
+depend on new instructions, accounts, events, or error codes.
+
+## Current Status & Next Steps
+
+**Done:** React 19 + Vite shell, typed API client (`src/lib/api.ts`), Cesium
+globe + Leaflet map, wallet adapter wiring, `tsc --noEmit` clean on `dev`.
+
+**Next (for anyone continuing without prior context):**
+1. Run `cd ../terra-core && make idl`, then re-sync `src/idl/` types — do not hand-edit the JSON.
+2. Wire wallet signing to the deployed program IDs (root README / `Anchor.toml`); no live devnet deployment yet.
+3. Extend pages/components against new API routes as RFC-012 Phase 2+ lands (23 routes today; list lives in `terra-core/api/src/routes/`).
+4. Keep `pnpm exec tsc --noEmit` and `pnpm lint` green (CI runs the typecheck).
+
+Source of truth for protocol behavior: root `README.md` → `terra-core/SECURITY.md` → `docs/rfc-012-…`.
+
+## Environment
+
+Configure Solana cluster / program IDs via wallet adapter and env as needed for
+localnet, devnet, or mainnet. Program IDs are listed in the root README and
+`terra-core/Anchor.toml`.

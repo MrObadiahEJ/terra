@@ -486,8 +486,8 @@ pub fn dispute_escrow(
         TerraError::EmptyCaseHash
     );
 
-    // Count declared validators and enforce self-dealing checks.
-    let mut count: u8 = 0;
+    // Count unique validators; enforce self-dealing and reject duplicates.
+    let count = crate::quorum::require_unique_validators(&validators)?;
     for &v in validators.iter() {
         if v == Pubkey::default() {
             continue;
@@ -496,7 +496,6 @@ pub fn dispute_escrow(
         require!(v != escrow.buyer, TerraError::ValidatorOwnsAsset);
         require!(v != escrow.seller, TerraError::ValidatorOwnsAsset);
         require!(v != filer, TerraError::ValidatorOwnsAsset);
-        count += 1;
     }
     require!(count > 0, TerraError::NoValidators);
     require!(

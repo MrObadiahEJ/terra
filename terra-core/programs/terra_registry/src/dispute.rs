@@ -91,8 +91,8 @@ pub fn file_dispute(
     let is_validator = registry.validators.contains(&filer_key);
     require!(is_owner || is_validator, TerraError::NotAuthorized);
 
-    // Count declared validators and enforce self-dealing checks.
-    let mut count: u8 = 0;
+    // Count unique validators; enforce self-dealing and reject duplicates.
+    let count = crate::quorum::require_unique_validators(&validators)?;
     for &v in validators.iter() {
         if v == Pubkey::default() {
             continue;
@@ -107,7 +107,6 @@ pub fn file_dispute(
             v != ctx.accounts.parcel.owner,
             TerraError::ValidatorOwnsAsset
         );
-        count += 1;
     }
     require!(count > 0, TerraError::NoValidators);
     require!(

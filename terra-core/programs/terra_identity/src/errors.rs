@@ -62,4 +62,6 @@ pub enum IdentityError {
     ParcelOwnerMismatch,
     #[msg("This validator has already endorsed this succession")]
     AlreadyEndorsed,
+    #[msg("Duplicate validator in the declared validator set")]
+    DuplicateValidator,
 }

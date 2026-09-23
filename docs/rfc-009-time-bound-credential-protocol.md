@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (time_bound.rs; keeper sweep now requires parcel owner)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 
@@ -583,3 +583,14 @@ The conditional right mechanism relies on off-chain enforcement (oracle, social 
 2. Time passes, expires: status = EXPIRED
 3. Holder + granter call `renew_right` with new expiry: status = ACTIVE (new right or same account)
 4. Cycle can repeat indefinitely
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `time_bound.rs` renew/sweep/conditional-grant; Phase 1: `SweepExpiredRights` requires parcel owner (SECURITY.md M-1).
+
+**Next for this RFC:**
+1. Keeper/sweep callers other than owner are intentionally rejected — extend only via explicit access-control design, not looser constraints.
+2. Time-based expiry relies on clock; document/guard as with staking unbonding on live clusters.
+3. After program edits: `make idl`.

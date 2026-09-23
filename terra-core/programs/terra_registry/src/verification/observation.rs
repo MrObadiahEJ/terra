@@ -53,9 +53,15 @@ pub fn submit_observation(
         TerraError::InvalidClaimStatus
     );
 
-    // If an observer PDA is provided via remaining_accounts, verify and bump.
+    // If an observer PDA is provided via remaining_accounts, verify ownership
+    // and status. Reject accounts not owned by this program (prevents
+    // injection of fake Observer layouts from a foreign program).
     let observer_key = ctx.accounts.validator.key();
     for acc in ctx.remaining_accounts {
+        // Only consider accounts owned by this program.
+        if acc.owner != &crate::ID {
+            continue;
+        }
         let data = acc.try_borrow_data()?;
         if data.len() < 8 {
             continue;

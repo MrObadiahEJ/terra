@@ -1086,13 +1086,8 @@ pub mod terra_registry {
             TerraError::EmptyContentHash
         );
 
-        let mut count: u8 = 0;
-        for &v in validators.iter() {
-            if v == Pubkey::default() {
-                continue;
-            }
-            count += 1;
-        }
+        // Count unique validators; reject duplicates.
+        let count = quorum::require_unique_validators(&validators)?;
         require!(count > 0, TerraError::NoValidators);
         require!(
             (required as usize) <= count as usize,
@@ -1164,13 +1159,8 @@ pub mod terra_registry {
             TerraError::AttestationMismatch
         );
 
-        let mut count: u8 = 0;
-        for &v in new_validators.iter() {
-            if v == Pubkey::default() {
-                continue;
-            }
-            count += 1;
-        }
+        // Count unique validators in the rotated set; reject duplicates.
+        let count = quorum::require_unique_validators(&new_validators)?;
         require!(count > 0, TerraError::NoValidators);
         require!(
             (new_required as usize) <= count as usize,
@@ -1221,7 +1211,8 @@ pub mod terra_registry {
             TerraError::InvalidThreshold
         );
 
-        let mut count: u8 = 0;
+        // Count unique validators; reject duplicates and self-dealing (owner).
+        let count = quorum::require_unique_validators(&validators)?;
         for &v in validators.iter() {
             if v == Pubkey::default() {
                 continue;
@@ -1231,8 +1222,8 @@ pub mod terra_registry {
                 v != ctx.accounts.parcel.owner,
                 TerraError::ValidatorOwnsAsset
             );
-            count += 1;
         }
+        require!(count > 0, TerraError::NoValidators);
         require!(
             (threshold as usize) <= count as usize,
             TerraError::InvalidThreshold
@@ -5234,6 +5225,10 @@ pub enum TerraError {
     // P0-6: canonical attestation digest
     #[msg("Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence")]
     AttestationDigestMismatch,
+
+    // P1: unique validator sets
+    #[msg("Duplicate validator in the declared validator set")]
+    DuplicateValidator,
 }
 
 #[cfg(test)]

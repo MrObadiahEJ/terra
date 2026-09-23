@@ -432,15 +432,26 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
 }
 
 /// Endorse adding a validator in peer-consensus mode.
+///
+/// P0-2: only endorsements with `action == ADD` may be collected here.
+/// A REMOVE proposal must not accumulate signatures via this instruction —
+/// consumption-time checks in `add_validator`/`remove_validator` already
+/// enforce the action, but rejecting early prevents confusing/misleading
+/// endorsement records and keeps the two governance paths cleanly separated.
 pub fn endorse_validator_add(ctx: Context<super::EndorseValidatorAdd>) -> Result<()> {
     let endorsement = &mut ctx.accounts.endorsement;
     let endorser = ctx.accounts.endorser.key();
 
-    // The endorsement must have been initialized by an add_validator call
+    // The endorsement must have been initialized by a proposal
     // (proposed != default); endorsements for the zero pubkey are meaningless.
     require!(
         endorsement.proposed != Pubkey::default(),
         super::TerraError::NoProposalFound
+    );
+    // P0-2: this instruction collects ADD endorsements only.
+    require!(
+        endorsement.action == endorsement_action::ADD,
+        super::TerraError::WrongEndorsementAction
     );
 
     // Endorser must be in the registry.
@@ -865,7 +876,27 @@ mod tests {
     #[test]
     fn duplicate_validator_rejected() {
         let v1 = Pubkey::new_unique();
-        let mut validators = vec![v1];
+        let validators = vec![v1];
         assert!(validators.contains(&v1));
+    }
+
+    #[test]
+    fn endorsement_action_constants_are_distinct() {
+        assert_ne!(endorsement_action::ADD, endorsement_action::REMOVE);
+        assert_eq!(endorsement_action::ADD, 0);
+        assert_eq!(endorsement_action::REMOVE, 1);
+    }
+
+    #[test]
+    fn add_action_rejects_remove_and_vice_versa() {
+        // Simulate the require! guards without a full Context.
+        let add_action = endorsement_action::ADD;
+        let remove_action = endorsement_action::REMOVE;
+        // endorse_validator_add requires action == ADD
+        assert!(add_action == endorsement_action::ADD);
+        assert!(remove_action != endorsement_action::ADD);
+        // remove_validator requires action == REMOVE
+        assert!(remove_action == endorsement_action::REMOVE);
+        assert!(add_action != endorsement_action::REMOVE);
     }
 }

@@ -2,15 +2,15 @@
 
 ## 1. Status
 
-- **Status:** Draft (NOT SCHEDULED — architectural fork)
+- **Status:** Implemented (staking.rs; governance caution remains — reconfirm before mainnet)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 
-> **CAUTION: REQUIRES GOVERNANCE DECISION BEFORE IMPLEMENTATION.**
+> **CAUTION: REQUIRES GOVERNANCE DECISION BEFORE MAINNET.**
 >
 > This RFC proposes a staking/slashing layer on top of Terra's validator set. Staking introduces a different trust model than the existing peer-consensus and evidence-based verification system. If pursued, stake should be **an additional requirement layered on top of validator registration** ("must be registered AND post a bond"), never staking *instead of* registration, and never allowing delegation to let non-validators buy influence.
 >
-> **Target phase:** NOT SCHEDULED. Requires an explicit governance decision.
+> **Code status:** `staking.rs` is implemented on `dev` (deposit/unbond/withdraw/report/slash/claim/distribute/dispute/dismiss). **Target phase:** was "NOT SCHEDULED"; treat implementation as experimental until an explicit governance reconfirm before mainnet (see root README Devnet checklist / SECURITY.md Recommendations).
 
 ## 2. Summary
 
@@ -748,3 +748,15 @@ If the admin detects a genuine attack:
 - Reporter: wallet E, files report with evidence_hash `H1`
 - Reporter: wallet E tries to file another report with the same evidence_hash `H1`
 - Expected: `DuplicateReport` error (PDA seed collision — same reporter + same evidence_hash)
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `staking.rs` on `dev` (pool, deposit, unbond, withdraw, report, slash, claim, distribute, dispute, dismiss); 7-day unbonding is **guard-verified**, not clock-executed in tests.
+
+**Next for this RFC (do not skip):**
+1. **Governance reconfirm before mainnet** — code exists but this RFC originally required an explicit decision; keep stake as *additional* bond, never instead of registration, no delegation.
+2. Replace residual `NotDesignatedBuyer` misuse on the appeal path with a dedicated variant (SECURITY.md L-3) if touching `staking.rs`.
+3. Implement or document real-time unbonding against wall-clock on a live validator (root README Devnet checklist).
+4. After program edits: `make idl`.

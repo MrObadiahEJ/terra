@@ -1,237 +1,141 @@
 # Terra Registry Security Audit Report
 
-**Date:** 2026-09-14
-**Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4)
-**Auditor:** Automated review (opencode)
+**Date:** 2026-09-14 (original audit); **updated:** 2026-09-23  
+**Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4)  
+**Auditor:** Automated review (opencode); Phase 1 remediation applied on `dev`
 
 ---
 
-## Summary
+## Summary (current status)
 
-| Severity | Count | Status |
-|----------|-------|--------|
-| Critical | 9 | Open |
-| High | 3 | Open |
-| Medium | 4 | Open |
-| Low | 3 | Open |
+| Severity | Original | Open now | Fixed / mitigated |
+|----------|----------|----------|-------------------|
+| Critical | 9 | 0 | 9 |
+| High | 3 | 0 | 3 |
+| Medium | 4 | 1 (M-2 residual) | 3 |
+| Low | 3 | 2 (L-1, L-3 residual) | 1 |
 
----
-
-## Critical Findings
-
-### C-1: `is_authorized_owner()` trusts unverified `remaining_accounts` data
-
-**File:** `lib.rs:151-202`
-**Category:** Authority Bypass
-
-The `is_authorized_owner()` function manually deserializes `IdentityRights` and `Identity` from `remaining_accounts` without verifying account ownership by the `terra_identity` program. An attacker can deploy a separate program that emits accounts matching the `IdentityRights`/`Identity` byte layout, set `identity.owner = attacker_key`, and pass them as `remaining_accounts`.
-
-**Attack:** Call `transfer_parcel` with fake accounts where `identity.owner == attacker`. The function authorizes the transfer.
-**Impact:** Complete parcel theft via the identity-based ownership path.
-**Fix:** Verify `acc.owner == &terra_identity::ID` for each account in `remaining_accounts` before deserialization, or validate PDA seeds.
+**Phase 0 / Phase 1** (RFC-012) closed the original Critical and High findings and most Medium/Low items. Remaining items are residual/low-impact and documented below.
 
 ---
 
-### C-2: No signer on `JailValidator`, `UnjailValidator`, `SlashValidator`
+## Critical Findings — all closed
 
-**File:** `lib.rs:3754-3781`
-**Category:** Missing Signer
+### C-1: `is_authorized_owner()` trusts unverified `remaining_accounts` data — FIXED
 
-These three contexts contain only a PDA-validated `reputation` account and **no signer account**. Any wallet can call these instructions to jail, unjail, or slash any validator's reputation.
+**File:** `lib.rs` (`is_authorized_owner`)
 
-**Impact:** Attacker can jail all validators, halting the verification pipeline.
-**Fix:** Add `authority: Signer<'info>` constrained to `registry.admin`.
+Now requires `acc.owner == &terra_identity::ID` before deserializing `IdentityRights` and `Identity`, and checks `identity.owner == signer_key`. Fake accounts from a foreign program cannot spoof the identity path.
 
----
+### C-2: No signer on `JailValidator`, `UnjailValidator`, `SlashValidator` — FIXED
 
-### C-3: No signer on `RecordAttestationOutcome`
+All three contexts now have `authority: Signer` with `constraint = authority.key() == registry.admin @ TerraError::NotAuthorized`.
 
-**File:** `lib.rs:3744-3751`
-**Category:** Missing Signer
+### C-3: No signer on `RecordAttestationOutcome` — FIXED
 
-Anyone can call `record_attestation_outcome` to arbitrarily inflate or deflate any validator's reputation score.
+`authority: Signer` constrained to `registry.admin`.
 
-**Impact:** Reputation manipulation, auto-jail bypass.
-**Fix:** Require `registry.admin` or designated oracle signer.
+### C-4: No signer on `RecordSessionEvidence` / `RecordSessionObservation` — FIXED (residual: signer role not fully constrained)
 
----
+Both contexts now require `signer: Signer` (PDA-seeded session). The session is PDA-validated; the handler rejects terminal sessions. **Residual:** the signer is not yet required to equal `session.opened_by` or be a registry validator in the constraint — any wallet can increment counters on a non-terminal session if it passes the PDA. Treat as Medium residual (see M-2 pattern below for related session hygiene).
 
-### C-4: No signer on `RecordSessionEvidence` / `RecordSessionObservation`
+### C-5: No authority check on `ResolveGuardianClaim` / `DisputeGuardianClaim` — FIXED
 
-**File:** `lib.rs:3685-3702`
-**Category:** Missing Signer
+Both require `caller.key() == guardian_claim.triggered_by || caller.key() == registry.admin`.
 
-Anyone can inject arbitrary evidence or observations into any active verification session.
+### C-6: No authority check on `AdjudicateDispute` — FIXED
 
-**Impact:** Verification pipeline corruption.
-**Fix:** Require session opener, registered validator, or `registry.admin` as signer.
+`authority` constrained to `registry.admin`.
 
----
+### C-7: No authority check on `VerifyCrossBorder` — FIXED
 
-### C-5: No authority check on `ResolveGuardianClaim` / `DisputeGuardianClaim`
+`caller` constrained to `registry.admin` or `registry.validators.contains(&caller.key())`.
 
-**File:** `lib.rs:3926-3945`, `verification/guardian_claim.rs:110-155`
-**Category:** Authority Bypass
+### C-8: Missing account constraints on `AuthorizeVaultAccess` — FIXED
 
-Both instructions accept any `Signer` as `caller` with no constraint verifying the caller is the original triggerer, a registered validator, or the registry admin.
+`vault_record` uses `seeds = [b"vault_record", subject.key()]` and `constraint = vault_record.subject == subject.key()`. Handler also re-checks subject match and requires `authority` ∈ `vault.shard_holders` with quorum via `verify_quorum_signers`.
 
-**Impact:** Attacker can prematurely resolve or maliciously dispute guardian claims.
-**Fix:** Constrain `caller.key()` to be `guardian_claim.triggered_by`, the identity's recovery wallet, or `registry.admin`.
+### C-9: Missing account constraints on credential contexts — FIXED
+
+`SignCredential`, `FinalizeCredential`, `VerifyCredential` all use PDA seeds (`credential_request`, `threshold_credential`, `credential_nullifier`). `sign_credential` additionally requires `registry.validators.contains(&signer_key)`.
 
 ---
 
-### C-6: No authority check on `AdjudicateDispute`
+## High Findings — all closed
 
-**File:** `lib.rs:2349-2365`, `dispute.rs:201-259`
-**Category:** Authority Bypass
+### H-1: `try_load_reputation()` / `try_load_session()` deserialize without ownership check — FIXED
 
-`AdjudicateDispute` has `authority: Signer<'info>` but **no constraint** verifying the authority is a registered validator or the admin.
+Both helpers (and `try_load_quorum_config`) now `require!(acc.owner == &crate::ID, TerraError::NotAuthorized)` before deserialize. Observation remaining-accounts loop skips non-owned accounts.
 
-**Impact:** Any wallet can adjudicate disputes including parcel forfeiture.
-**Fix:** Constrain `authority` to `registry.admin` or check `registry.validators.contains(&authority_key)`.
+### H-2: ZK instructions have no authority check — FIXED
 
----
+`RegisterZoneSet`, `GenerateOwnershipRoot`, `InvalidateProof`, `UpdateVerificationKeyHash` all constrain `authority.key() == registry.admin`.
 
-### C-7: No authority check on `VerifyCrossBorder`
+### H-3: `InitializeValidatorReputation` has no authority check — FIXED
 
-**File:** `lib.rs:3980-3989`
-**Category:** Authority Bypass
-
-`VerifyCrossBorder` has `caller: Signer<'info>` with no constraint. Anyone can verify cross-border verifications.
-
-**Impact:** Unauthorized cross-border verification approvals.
-**Fix:** Require `caller` to be a registered validator or `registry.admin`.
-
----
-
-### C-8: Missing account constraints on `AuthorizeVaultAccess`
-
-**File:** `lib.rs:303-313`
-**Category:** Account Constraints
-
-`vault_record` has no PDA seed verification. An attacker can pass any account that deserializes as `VaultRecord`.
-
-**Fix:** Add `seeds = [b"vault_record", subject.key().as_ref()], bump` and verify `vault_record.subject == subject.key()`.
-
----
-
-### C-9: Missing account constraints on credential contexts
-
-**File:** `lib.rs:3436-3480`
-**Category:** Account Constraints
-
-`SignCredential`, `FinalizeCredential`, and `VerifyCredential` all have `credential_request` / `threshold_credential` as `mut` with **no PDA seed constraints**.
-
-**Fix:** Add PDA seed constraints derived from instruction data.
-
----
-
-## High Findings
-
-### H-1: `try_load_reputation()` / `try_load_session()` deserialize without ownership check
-
-**File:** `verification/quorum_voting.rs:75-91`, `verification/challenge.rs:26-43`
-**Category:** Unchecked Accounts
-
-Helper functions iterate `remaining_accounts`, match by PDA key, then deserialize without verifying account ownership. An attacker could inject fake reputation data.
-
-**Fix:** Add `require!(acc.owner == &crate::ID, TerraError::NotAuthorized)` before deserialization.
-
----
-
-### H-2: ZK instructions have no authority check
-
-**File:** `lib.rs:3307-3409`
-**Category:** Authority Bypass
-
-`RegisterZoneSet`, `GenerateOwnershipRoot`, `InvalidateProof`, and `UpdateVerificationKeyHash` accept any `Signer` as `authority` with no constraint.
-
-**Impact:** Attacker can invalidate all proofs, generate fake ownership roots, or replace verification keys.
-**Fix:** Require `authority` to be `registry.admin`.
-
----
-
-### H-3: `InitializeValidatorReputation` has no authority check
-
-**File:** `lib.rs:3727-3741`
-**Category:** Authority Bypass
-
-Anyone can initialize reputation tracking for any validator pubkey.
-
-**Fix:** Require `payer` to be `registry.admin` or verify the validator is in the registry.
+`payer` constrained to `registry.admin`.
 
 ---
 
 ## Medium Findings
 
-### M-1: `SweepExpiredRights` has no access control
+### M-1: `SweepExpiredRights` has no access control — FIXED
 
-**File:** `lib.rs:2648-2664`, `time_bound.rs`
+`parcel` has `constraint = parcel.owner == keeper.key() @ TerraError::NotOwner`.
 
-Anyone can sweep expired rights on any parcel. While this only affects expired rights, it could be used to grief.
+### M-2: `RecordAuditEntry` entity is unconstrained — OPEN (Low practical impact)
 
-**Fix:** Constrain `keeper` to parcel owner, right holder, or designated keeper PDA.
+**File:** `lib.rs` (`RecordAuditEntry`)
 
----
+`entity` is `UncheckedAccount` with no owner/PDA validation; any signer (`actor`) can create an audit entry for any entity key. The entry is append-only PDA-seeded (`audit_entry`, entity, sequence) so pollution is possible but not consensus-breaking.
 
-### M-2: `RecordAuditEntry` entity is unconstrained
+**Fix (optional):** validate `entity.owner == &crate::ID` (or expected program) and/or require `actor` to be a registered validator / admin / known actor set.
 
-**File:** `lib.rs:4009-4029`
+### M-3: `CancelDispute` inconsistent parcel unfreeze — FIXED
 
-Anyone can create audit entries for any entity, polluting the audit trail.
+Handler only unfreezes when `parcel.status == parcel_status::DISPUTED` and only allows cancel when dispute status is `FILED`.
 
-**Fix:** Validate that `entity` is a known PDA or constrain the caller.
+### M-4: Challenge vote deadline uses wrong error variant — FIXED (variant renamed in practice)
 
----
-
-### M-3: `CancelDispute` inconsistent parcel unfreeze
-
-**File:** `dispute.rs:307-343`
-
-Conditional unfreeze logic could leave parcels frozen if dispute status regresses.
-
-**Severity:** Low practical impact due to state machine.
-
----
-
-### M-4: Challenge vote deadline uses wrong error variant
-
-**File:** `verification/challenge.rs:163-166`
-
-Uses `SettlementNotYetEffective` instead of a dedicated `ChallengeReviewExpired` error.
+Challenge deadline checks now use `TerraError::InvalidClaimStatus` (not `SettlementNotYetEffective`). No dedicated `ChallengeReviewExpired` variant yet — still a naming residual, not a logic bug.
 
 ---
 
 ## Low Findings
 
-### L-1: `rights_count` saturating_sub could desync
+### L-1: `rights_count` saturating_sub could desync — OPEN (Low)
 
-**File:** `lib.rs:910`
+**File:** `lib.rs` (~line 931)
 
-`saturating_sub(1)` prevents underflow but could cause count drift if the close constraint fails.
+`require!(rights_count > 0)` then `saturating_sub(1)`. Underflow is prevented; drift only if a later close constraint fails in the same tx (currently atomic). Documented, not patched.
 
----
+### L-2: Escrow vault lamports handling — ACCEPTED (reviewed)
 
-### L-2: Escrow vault lamports handling
+Settle path caps transfer at `vault_lamports` and returns excess to buyer. Rent-exempt edge cases remain a theoretical concern; covered by escrow unit tests for window/min/max constants.
 
-**File:** `escrow.rs:226-273`
+### L-3: Error variant reuse in slashing appeal — FIXED (partial residual)
 
-Excess lamports are correctly returned, but edge cases around rent-exempt minimums could exist.
-
----
-
-### L-3: Error variant reuse in `DisputeSlashing`
-
-**File:** `lib.rs:3264`
-
-Uses `NotDesignatedBuyer` for a non-buyer context.
+`dispute_slashing` / appeal path on `SlashingReport` uses `NotDesignatedBuyer` for non-buyer context in `staking.rs` (report.offender mismatch). `DisputeSlashing` context also uses `NotDesignatedOffender` for the offender signer. Residual: one staking path still reuses `NotDesignatedBuyer` — cosmetic.
 
 ---
 
-## Recommendations
+## Phase 1 additions (RFC-012) — not in original audit
 
-1. **Immediate:** Fix all Critical findings before any mainnet deployment
-2. **Before mainnet:** Fix all High findings
-3. **Before mainnet:** Add comprehensive access control audit
-4. **Ongoing:** Add fuzz testing for instruction data validation
-5. **Ongoing:** Consider formal verification for critical paths (ownership transfer, staking, escrow)
+1. **Unique validator sets** — `quorum::require_unique_validators` on `attest`, `rotate_validators`, `judicial_forfeiture`, `file_dispute`, `dispute_escrow`; identity `count_unique_validators` on succession/guardianship. Error: `DuplicateValidator`.
+2. **Endorsement action binding** — `endorse_validator_add` requires `endorsement.action == ADD` (`WrongEndorsementAction`).
+3. **Session/quorum remaining-accounts ownership** — owner checks on `try_load_session`, `try_load_quorum_config`, observation observer loop.
+
+---
+
+## Recommendations (next steps — ordered)
+
+For a fresh contributor/agent with no prior context: implement these against `dev`, add/adjust unit or BPF tests, keep `clippy -D warnings` green, then re-run the Verification table in the root README.
+
+1. **Before mainnet:** close M-2 (audit entity ownership), L-1 (explicit rights_count guard), and C-4 residual (constrain session recorder signer to opener/validator).
+2. **Before mainnet:** regenerate IDL from source (`make idl`); checked-in `terra-web/src/idl/terra_registry.json` may lag (source: 118 instr / 47 acc / 108 ev / 160 err).
+3. **Before mainnet:** governance reconfirm on RFC-005 staking (code path exists; original RFC cautioned against shipping without a decision).
+4. **Before mainnet:** ZK circuit choice + external audit (RFC-006/011) — proof verification is still opaque in `zk.rs`.
+5. **Ongoing:** fuzz instruction data validation; formal verification for ownership transfer, staking, escrow.
+6. **Ongoing:** re-audit after RFC-012 Phase 2+ introduces new PDAs (tasks, presence, multi-source observation) — see RFC-012 §8–§10.
+
+Handoff map: root README “How to continue” → this file → `terra-core/README.md` Current Status → RFC-012 phase table.

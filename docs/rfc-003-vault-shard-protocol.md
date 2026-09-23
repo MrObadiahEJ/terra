@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (vault.rs end-to-end; audited via SECURITY.md Phase 1)
 - **Created:** 2026-09-01
 - **Supersedes:** None
 
@@ -571,3 +571,14 @@ If the reconstruction device is seized:
 - Vault: last_ping_at = 3 days ago
 - Validator D calls ping_shard
 - Expected: `PingIntervalNotElapsed` error
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `vault.rs` implements create/authorize/rotate/endorse/execute/cancel/ping end-to-end; PDA seeds + Phase 1 constraints (see `terra-core/SECURITY.md` C-8).
+
+**Next for this RFC:**
+1. No known open Critical/High for vault — re-audit after any seed/layout change.
+2. Cover long-form BPF cases in `terra-registry/tests/integration.rs` when a full run is possible (269-test suite; not re-run on constrained machines).
+3. After program edits: `make idl` so `terra-web` types stay in sync.

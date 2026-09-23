@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (terra_identity guardianship.rs + registry guardian_claim bridge; unique-validator sets enforced)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 - **Implements:** `succession_kind::GUARDIANSHIP` (3) and `succession_kind::COURT_APPOINTED_GUARDIAN` (4) — prep hooks already landed in `lib.rs:137-139`
@@ -652,3 +652,14 @@ For minor subjects:
 7. All parcels re-pointed to subject
 
 Expected: All events emitted in order, identity transitions correct, parcels re-pointed correctly.
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** Implemented as Succession specialization — `terra_identity` `guardianship.rs` (+ registry `guardian_claim` bridge); Phase 1: unique-validator sets, guardian claim authority (C-5).
+
+**Next for this RFC:**
+1. Keep thresholds ≥3 validators and ≥90-day grace when editing guards; court path needs non-zero `case_hash`.
+2. Identity BPF suite: `cargo test -p terra-identity --test integration` (18 tests) — extend when changing claim/revoke flows.
+3. After program edits: `make idl` if registry bridge PDAs/instructions change.

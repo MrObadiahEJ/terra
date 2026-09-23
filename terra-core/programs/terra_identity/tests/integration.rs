@@ -889,3 +889,169 @@ async fn guardianship_empty_case_hash_fails() {
 
     assert!(result.is_err(), "empty case_hash should fail");
 }
+
+// ===========================================================================
+// Integration tests — duplicate validators / duplicate endorsements
+// ===========================================================================
+
+#[tokio::test]
+async fn succession_duplicate_validators_fails() {
+    let (mut ctx, payer) = setup().await;
+
+    let id_hash: [u8; 32] = [20u8; 32];
+    let recovery = Keypair::new();
+    let (identity_pk, _) = identity_pda(&id_hash);
+    process(
+        &mut ctx,
+        &payer,
+        bind_identity_ix(&id_hash, &recovery.pubkey(), &payer.pubkey()),
+    )
+    .await
+    .expect("bind_identity failed");
+
+    let v1 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let successor = Keypair::new();
+
+    // [v1, v1, ...] — duplicate must be rejected with DuplicateValidator.
+    let result = process(
+        &mut ctx,
+        &payer,
+        request_succession_ix(
+            &identity_pk,
+            &id_hash,
+            &successor.pubkey(),
+            succession_kind::SUCCESSOR,
+            0,
+            2, // would be "reachable" only if duplicates counted as unique
+            &[v1.pubkey(), v1.pubkey()],
+            &payer.pubkey(),
+        ),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "duplicate validators in request_succession must fail"
+    );
+}
+
+#[tokio::test]
+async fn succession_duplicate_endorsement_fails() {
+    let (mut ctx, payer) = setup().await;
+
+    let id_hash: [u8; 32] = [21u8; 32];
+    let recovery = Keypair::new();
+    let (identity_pk, _) = identity_pda(&id_hash);
+    process(
+        &mut ctx,
+        &payer,
+        bind_identity_ix(&id_hash, &recovery.pubkey(), &payer.pubkey()),
+    )
+    .await
+    .expect("bind_identity failed");
+
+    let v1 = Keypair::new();
+    let v2 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let successor = Keypair::new();
+
+    // required=2 with two distinct validators so the first endorse can succeed
+    // and the second (duplicate) hits AlreadyEndorsed, not ValidationLimitReached.
+    process(
+        &mut ctx,
+        &payer,
+        request_succession_ix(
+            &identity_pk,
+            &id_hash,
+            &successor.pubkey(),
+            succession_kind::SUCCESSOR,
+            0,
+            2,
+            &[v1.pubkey(), v2.pubkey()],
+            &payer.pubkey(),
+        ),
+    )
+    .await
+    .expect("request_succession failed");
+
+    // First endorsement succeeds.
+    process_with(
+        &mut ctx,
+        &payer,
+        &[&v1],
+        endorse_succession_ix(&identity_pk, &id_hash, &successor.pubkey(), &v1),
+    )
+    .await
+    .expect("first endorse should succeed");
+
+    // Second endorsement from the same validator must fail.
+    let result = process_with(
+        &mut ctx,
+        &payer,
+        &[&v1],
+        endorse_succession_ix(&identity_pk, &id_hash, &successor.pubkey(), &v1),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "duplicate endorsement from same validator must fail"
+    );
+}
+
+#[tokio::test]
+async fn guardianship_duplicate_validators_fails() {
+    let (mut ctx, payer) = setup().await;
+
+    let id_hash: [u8; 32] = [22u8; 32];
+    let recovery = Keypair::new();
+    let (identity_pk, _) = identity_pda(&id_hash);
+    process(
+        &mut ctx,
+        &payer,
+        bind_identity_ix(&id_hash, &recovery.pubkey(), &payer.pubkey()),
+    )
+    .await
+    .expect("bind_identity failed");
+
+    let v1 = Keypair::new();
+    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
+        .await
+        .unwrap();
+
+    let guardian = Keypair::new();
+    let case_hash = [7u8; 32];
+
+    // Duplicate v1 must be rejected.
+    let result = process(
+        &mut ctx,
+        &payer,
+        request_court_guardianship_ix(
+            &identity_pk,
+            &id_hash,
+            &guardian.pubkey(),
+            0,
+            3,
+            &[v1.pubkey(), v1.pubkey(), v1.pubkey()],
+            &case_hash,
+            "ok",
+            &payer.pubkey(),
+        ),
+    )
+    .await;
+
+    assert!(
+        result.is_err(),
+        "duplicate validators in request_court_guardianship must fail"
+    );
+}

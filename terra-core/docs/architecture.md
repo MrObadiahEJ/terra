@@ -2,39 +2,41 @@
 
 ## System Overview
 
-Terra is a decentralized land registry system on Solana built with Anchor. It manages land parcels, rights, escrow, staking, verification, and cross-border governance through two on-chain programs.
+Terra is a decentralized land claim & verification network on Solana built with Anchor. It manages land parcels, rights, escrow, staking, verification, vaults, ZK proofs, and cross-border governance through two on-chain programs, a PostGIS mirror API, and a geo engine.
 
-## Programs
+**Program IDs** (devnet / localnet / mainnet slots in `Anchor.toml`):
 
 | Program | ID | Crate | Purpose |
 |---------|-----|-------|---------|
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
+**Source counts** (as of 2026-09-23): `terra_registry` — 118 instructions, 47 `#[account]` types, 108 events, 160 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (155 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (160 codes)
 ├── cross_border.rs           # Cross-border jurisdiction + identity binding
 ├── dispute.rs                # Parcel dispute filing, freeze, adjudicate, execute
 ├── escrow.rs                 # Parcel escrow (create, deposit, accept, settle, cancel)
 ├── staking.rs                # Validator staking pool, slashing, rewards
 ├── vault.rs                  # Encrypted vault, shard holders, rotation
 ├── zk.rs                     # ZK ownership proofs, threshold credentials
-├── quorum.rs                 # Quorum signers verification utility
+├── quorum.rs                 # Quorum signers + unique-validator utilities
 ├── world_registry.rs         # Country allocation, genesis confirmation
 ├── subdivision.rs            # Parcel subdivision and amalgamation
 ├── time_bound.rs             # Time-bound rights (grant, renew, sweep)
 ├── recovery.rs               # Validator liveness, emergency injection
-├── validator_registry.rs     # Validator onboarding, nomination, pause
+├── validator_registry.rs     # Validator onboarding, nomination, endorse add/remove
 ├── ipfs_docs.rs              # IPFS document registration
 └── verification/
     ├── claim.rs              # Verification claims (14 types)
     ├── evidence.rs           # Claim evidence (13 types)
     ├── observation.rs        # Validator observations
     ├── attestation.rs        # Verification attestations
-    ├── session.rs            # Verification sessions
+    ├── session.rs            # Verification sessions + quorum_config load
     ├── challenge.rs          # Claim challenges
     ├── reputation.rs         # Validator reputation scoring + jail/unjail
     ├── quorum_config.rs      # Quorum configuration per parcel type
@@ -44,6 +46,16 @@ terra_registry/
     ├── cross_border_bridge.rs # Cross-border verification
     ├── bridge.rs             # Legacy attestation-to-claim migration
     └── audit_trail.rs        # Append-only audit log
+
+terra_identity/
+├── lib.rs                    # Program entry (8 instructions)
+├── state.rs                  # Identity, Succession accounts
+├── errors.rs                 # IdentityError (29 codes, 6000+)
+├── helpers.rs                # count_unique_validators + unit tests
+└── instructions/
+    ├── bind_identity.rs
+    ├── succession.rs
+    └── guardianship.rs       # RFC-010 court guardianship
 ```
 
 ## Data Model
@@ -102,6 +114,13 @@ terra_registry/
 | `Jurisdiction` | `["jurisdiction", country_code]` | Cross-border jurisdiction |
 | `JurisdictionBinding` | `["cross_border_identity", jurisdiction_key, identity_hash]` | Identity binding |
 | `CrossBorderVerification` | `["cross_border_verification", binding]` | Cross-border verification |
+
+### Identity Program
+
+| Account | Program | Description |
+|---------|---------|-------------|
+| `Identity` | terra_identity | Cryptographic identity anchor |
+| `Succession` | terra_identity | Succession / guardianship request |
 
 ## Lifecycle Flows
 
@@ -175,28 +194,60 @@ EXECUTE (after timelock + endorsements)
 
 ## Key Patterns
 
-1. **Dual ownership:** Wallet-based (`Parcel.owner`) and identity-based (`IdentityRights`) ownership paths via `is_authorized_owner()`
-2. **Anti-grief:** Minimum 2 validators for disputes, self-dealing checks everywhere
-3. **Progressive decentralization:** Bootstrap phase (1-3 validators) then peer-consensus endorsement
-4. **Emergency pause:** Admin can pause the program; most handlers check `require_not_paused()`
-5. **Deprecation bridge:** Legacy `Attestation` → `Claim` via `migrate_attestation_to_claim`
+1. **Dual ownership:** Wallet-based (`Parcel.owner`) and identity-based (`IdentityRights`) ownership paths via `is_authorized_owner()` with `terra_identity` account-ownership checks.
+2. **Anti-grief:** Minimum 2 validators for disputes/forfeiture, self-dealing checks everywhere, **unique validator sets** (`require_unique_validators`).
+3. **Progressive decentralization:** Bootstrap phase (1-3 validators) then peer-consensus endorsement (`endorse_validator_add` enforces ADD action).
+4. **Emergency pause:** Admin can pause the program; most handlers check `require_not_paused()`.
+5. **Deprecation bridge:** Legacy `Attestation` → `Claim` via `migrate_attestation_to_claim`.
+6. **Remaining-accounts hygiene:** Session, quorum_config, reputation, and observation loaders verify `acc.owner == &crate::ID` before deserialize.
 
 ## Error Codes
 
-155 custom error codes (6000-6154) defined in the `TerraError` enum in `lib.rs`.
+- `terra_registry`: **160** custom codes in `TerraError` (starts at Anchor 6000; ends with `DuplicateValidator`).
+- `terra_identity`: **29** custom codes in `IdentityError` (starts at 6000; ends with `DuplicateValidator`).
 
 ## Constants
 
 | Module | Key Constants |
 |--------|--------------|
-| `parcel_status` | PENDING=0 through AMALGAMATED=9 |
-| `right_kind` | OWNERSHIP=0, TENANCY=1, LEASE=2, LIEN=3 |
+| `parcel_status` | PENDING=0 … AMALGAMATED=9 |
+| `right_kind` | OWNERSHIP=0, USAGE=1, EASEMENT=2, SERVITUDE=3, LIEN=4 |
 | `escrow` | SETTLEMENT_WINDOW=3 days, CANCEL_WINDOW=7 days, MIN=0.1 SOL, MAX=1M SOL |
-| `staking` | UNBONDING_PERIOD=7 days, MIN_STAKE=1 SOL, REWARD_INTERVAL=1 day |
+| `staking` | UNBONDING_PERIOD=7 days, MIN_STAKE=1 SOL, REWARD_INTERVAL=1 day, FIRST_OFFENSE=10%, REPEAT=100% |
 | `vault` | MAX_SHARD_HOLDERS=8, PING_INTERVAL=7 days, ROTATION_TIMELOCK=7 days |
-| `dispute` | MIN_VALIDATORS=2, EXPIRY=90 days |
-| `reputation` | MAX=10,000 bps, JAIL_DURATION=7 days, AUTO_JAIL_THRESHOLD=2,000 bps |
+| `dispute` | MIN_DISPUTE_VALIDATORS=2, MIN_FORFEIT_VALIDATORS=2, EXPIRY=90 days |
+| `reputation` | MAX=10,000 bps, JAIL_DURATION=7 days, auto-jail below 2,000 bps |
 | `session` | TIMEOUT=30 days |
 | `challenge` | REVIEW_PERIOD=14 days |
 | `cross_border` | MAX_PROOF_LEN=512, MAX_JURISDICTION_NAME=64 |
 | `world_registry` | GENESIS_MIN_CONFIRMATIONS=5, MIN_DISTINCT_COUNTRIES=3 |
+| `MAX_VALIDATORS` | 8 (per attestation / declared set) |
+
+## Workspace & Ops
+
+| Item | Location |
+|------|----------|
+| Workspace members | `programs/terra_registry`, `programs/terra_identity`, `api`, `geo-engine` |
+| API routes | `terra-core/api/src/routes/` — 23 modules |
+| Migrations | `terra-core/api/migrations/` — `0001`…`0024` |
+| Build | `cargo build-sbf` (see `build.sh`, `SBF_OUT_DIR` in `.cargo/config.toml`) |
+| Make targets | `build`, `test`, `lint`, `fix`, `idl`, `deploy-*`, `clean`, `size`, `verify-devnet` |
+| CI | `.github/workflows/ci.yml` — fmt, clippy, registry lib tests, API+PostGIS, tsc |
+
+See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architecture.md) (architecture contract) and [SECURITY.md](../SECURITY.md) (audit status).
+
+## Current State & Next Steps (handoff)
+
+**Complete as of 2026-09-23:**
+- All modules in the map above are implemented; source counts (§Source counts) match `dev`.
+- RFC-012 Phase 0 (contract + `rfc012_structure` 21 tests) and Phase 1 (unique validator sets, endorsement binding, ownership checks, admin constraints) — see SECURITY.md and RFC-012 §8.
+
+**Next work (do not skip order):**
+1. Security residuals before mainnet: M-2, L-1, C-4 (SECURITY.md Recommendations).
+2. `make idl` — refresh `terra-web/src/idl/` (currently lags 118/47/108/160 source).
+3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
+4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
+5. RFC-005 staking: governance reconfirm before mainnet (code path exists).
+6. **RFC-012 Phase 2+** — new PDAs from RFC-012 §10 (`ValidatorProfile`, presence, tasks, …); update this module map, migration map, and `rfc012_structure` tests when adding entities. Start from RFC-012 §8–§10.
+
+Entry point for new contributors/AI: root `README.md` → “How to continue (handoff)”.

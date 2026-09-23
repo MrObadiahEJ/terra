@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Draft
+- **Status:** Implemented (zk.rs structural; on-chain proof verification still opaque — external audit required)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 - **Target Phase:** 8 (Global platform) — earliest
@@ -632,3 +632,14 @@ When a post-quantum algorithm is standardized and ready for use:
 
 - Authority tries to invalidate version=0
 - Expected: `CannotInvalidateGenesisVersion` error
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** Structural `zk.rs` — zone roots, nullifier first-use, admin on register/generate-root/invalidate/update-vk (SECURITY.md H-2). **Proof verification remains opaque** (no on-chain Groth16/PLONK yet).
+
+**Next for this RFC (blocking for production privacy claims):**
+1. Choose circuit (Groth16 vs PLONK), integrate real verifier, **external audit** — treat as multi-month; do not claim production ZK without it.
+2. Depends on RFC-006 credential path audited first (see WARNING in §1).
+3. After verifier integration: regenerate IDL, extend unit + BPF tests for verify/invalidate happy + replay paths.

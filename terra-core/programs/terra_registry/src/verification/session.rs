@@ -39,6 +39,8 @@ pub fn try_load_quorum_config<'info>(
     );
     for acc in remaining_accounts {
         if acc.key == &pda {
+            // Verify account is owned by this program to prevent injection.
+            require!(acc.owner == &crate::ID, TerraError::NotAuthorized);
             let data = acc.try_borrow_data()?;
             let account = QuorumConfig::try_deserialize(&mut &data[..])?;
             return Ok(Some(account));

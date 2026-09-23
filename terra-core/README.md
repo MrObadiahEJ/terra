@@ -69,20 +69,44 @@ make lint
 ### Build
 
 ```bash
-# Build all programs
-cargo build-sbf
+# Build all programs + IDL
+./build.sh
+# or
+make build
 
-# Build with Anchor (generates IDLs)
-anchor build --skip-lint
+# Programs only (no IDL)
+cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
+cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
+
+# IDL only
+make idl
 ```
 
 ### Test
 
 ```bash
-# Run integration tests (single-threaded for consistency)
-cargo test --test integration -- --test-threads=1
+# Registry unit tests (guards, quorum, staking, …)
+cargo test -p terra-registry --lib
 
-# Or via Make
+# Identity unit tests
+cargo test -p terra-identity --lib
+
+# RFC-012 structural tests
+cargo test -p terra-registry --test rfc012_structure
+
+# Identity BPF integration tests (requires SBF build)
+cargo test -p terra-identity --test integration
+
+# Registry BPF integration tests (long-running)
+cargo test -p terra-registry --test integration -- --test-threads=1
+
+# API unit tests (needs DATABASE_URL for PostGIS-backed cases)
+cargo test -p terra-api
+
+# Geo engine
+cargo test -p terra-geo
+
+# Via Make (integration only)
 make test
 ```
 
@@ -115,31 +139,38 @@ CONFIRM_MAINNET=yes ./deploy.sh mainnet
 
 ```
 terra-core/
-├── Anchor.toml                 # Anchor configuration
+├── Anchor.toml                 # Anchor configuration (program IDs, cluster)
 ├── Cargo.toml                  # Workspace root
 ├── Makefile                    # Build/test/deploy shortcuts
-├── build.sh                    # Build script
+├── build.sh                    # Build script (cargo build-sbf + anchor build)
 ├── deploy.sh                   # Deployment script
-├── SECURITY.md                 # Security audit report
+├── SECURITY.md                 # Security audit status (Phase 1 closed)
 ├── programs/
 │   ├── terra_registry/         # Core registry program
 │   │   ├── src/
-│   │   │   ├── lib.rs          # Entry point, contexts, error codes
+│   │   │   ├── lib.rs          # Entry point, contexts, error codes (160)
 │   │   │   ├── cross_border.rs # Cross-border identity bridge
 │   │   │   ├── dispute.rs      # Parcel dispute system
 │   │   │   ├── escrow.rs       # Parcel escrow (buy/sell)
 │   │   │   ├── staking.rs      # Validator staking
 │   │   │   ├── vault.rs        # Encrypted vault & shard rotation
 │   │   │   ├── zk.rs           # ZK ownership proofs
-│   │   │   ├── quorum.rs       # Quorum utilities
+│   │   │   ├── quorum.rs       # Quorum + unique-validator utilities
+│   │   │   ├── validator_registry.rs # Peer-consensus endorsements
 │   │   │   ├── world_registry.rs # Country allocation & genesis
-│   │   │   └── verification/   # Claims, sessions, challenges, etc.
+│   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       └── integration.rs  # 256 integration tests
+│   │       ├── integration.rs  # 269 BPF integration tests
+│   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
-│       └── src/
+│       ├── src/
+│       │   ├── helpers.rs      # count_unique_validators + tests
+│       │   └── instructions/   # bind, succession, guardianship
+│       └── tests/integration.rs # 18 BPF tests
 ├── api/                        # REST API backend (Axum + Postgres)
-├── geo-engine/                 # OSM data processing engine
+│   ├── src/routes/             # 23 route modules
+│   └── migrations/             # 0001…0024 (PostGIS + mirrors)
+├── geo-engine/                 # OSM data processing engine (terra-geo)
 ├── docs/                       # Documentation
 │   └── architecture.md         # Detailed architecture
 └── .github/workflows/ci.yml   # CI/CD pipeline
@@ -185,20 +216,39 @@ Immutable audit entries for tracking system events.
 
 ## Test Coverage
 
-256 integration tests covering all protocol invariants:
+| Suite | Count | Notes |
+|-------|------:|-------|
+| terra-registry lib | 59 | Guards, quorum, staking, subdivision, zk, … |
+| terra-identity lib | 6 | Unique-validator helpers |
+| rfc012_structure | 21 | RFC document structural checks |
+| terra-identity integration | 18 | BPF happy paths + guard rails |
+| terra-registry integration | 269 | Full instruction matrix (long-running) |
+| terra-api | 73 | Route validation + storage helpers |
+| terra-geo | 4 | Graph reachability |
 
-| Proposition | Tests | Coverage |
-|-------------|-------|----------|
-| **O1–O14** | 14 | Ownership invariants: legacy/identity auth, revocation, transfer, subdivision, amalgamation, dispute anti-grief |
-| **B1–B6** | 6 | Authority paths: USAGE/SERVITUDE/EASEMENT/LIEN rejection, wrong parcel, closed IdentityRights |
-| **C1–C8** | 8 | Edge cases: sweep expired rights, dispute filing, double dispute, past expiry, nonce reuse, permanent right |
-| **D1–D6** | 6 | Cross-module: identity lifecycle, right lifecycle, dispute lifecycle, attestation+subdivide, staking |
-| **E1–E8** | 8 | Adversarial: wrong PDA, forged signer, threshold bypass, zero ID/name/geometry, double register, self-transfer |
-| **F1–F3** | 3 | E2E lifecycles: full parcel, identity migration, rights+time-bound |
+Verified on `dev` (2026-09-23): registry lib 59/59, identity lib 6/6, rfc012 21/21, identity BPF 18/18, API 73/73, geo 4/4; `cargo fmt` + `clippy -D warnings` clean; both programs `cargo build-sbf` OK. Registry BPF suite (269) is maintained but not re-run on constrained machines.
+
+## Current Status (as of 2026-09-23)
+
+**Done:**
+- All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).
+- RFC-012 **Phase 0** (architecture contract + `rfc012_structure` tests) and **Phase 1** (security hardening: unique validator sets, endorsement action binding, `remaining_accounts` ownership checks, admin constraints) — details in [SECURITY.md](SECURITY.md).
+- PostGIS mirror API (23 routes, migrations `0001`…`0024`) + geo-engine + workspace CI green on `dev`.
+
+**Open / next (in priority order):**
+1. Close remaining SECURITY.md items before mainnet: M-2 (audit entity owner), L-1 (`rights_count` guard), C-4 residual (session recorder signer).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` currently lags source (74/23/58/120 vs 118/47/108/160).
+3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
+4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
+5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
+6. RFC-012 Phases 2–10 (generalized validator → tasks → observations → routing → reputation governance → economics → infrastructure → cross-border/privacy) — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md).
+
+Anyone picking this up: start from root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 
 ## Error Codes
 
-The program defines 155 custom error codes (6000-6154). See `lib.rs` for the complete `TerraError` enum.
+- **terra_registry:** 160 custom error codes (`TerraError` in `lib.rs`).
+- **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License
 

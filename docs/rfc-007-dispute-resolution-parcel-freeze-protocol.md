@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-- **Status:** Implemented (Phase 5)
+- **Status:** Implemented (dispute.rs; unique-validator sets enforced on file_dispute)
 - **Created:** 2026-09-02
 - **Supersedes:** None
 
@@ -626,3 +626,14 @@ If post-quantum signature schemes become necessary:
 
 - Attempt to `execute_judgment` on a dispute with status FROZEN (not yet adjudicated)
 - Expected: `InvalidDisputeStatus` error
+
+---
+
+## Handoff — status & next steps (2026-09-23)
+
+**Done:** `dispute.rs` file/freeze/adjudicate/execute/cancel; Phase 1: unique-validator sets on `file_dispute`, admin on adjudicate, cancel unfreeze consistency (M-3 fixed).
+
+**Next for this RFC:**
+1. No open Critical/High — regression lives in long-form `integration.rs` (run when possible).
+2. If changing state machine, update `rfc012_structure` only if RFC-012 text references this flow; else unit + BPF tests suffice.
+3. After program edits: `make idl`.
