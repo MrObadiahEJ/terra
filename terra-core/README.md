@@ -160,7 +160,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 269 BPF integration tests
+│   │       ├── integration.rs  # 275 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -218,15 +218,15 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 62 | Guards, quorum, staking, subdivision, zk, … |
+| terra-registry lib | 68 | Guards, quorum, staking, subdivision, zk, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 18 | BPF happy paths + guard rails |
-| terra-registry integration | 269 | Full instruction matrix (long-running) |
+| terra-registry integration | 275 | Full instruction matrix (long-running) |
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-24): registry lib 68/68, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 tests 4/4, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (275) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-24): registry lib 68/68, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 tests 4/4, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (Phase 2). Full registry BPF suite (275) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
 
 ## Current Status (as of 2026-09-24)
 
