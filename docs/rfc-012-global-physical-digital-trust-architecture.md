@@ -1,6 +1,6 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
-**Status:** Accepted (Phases 0–4 complete on `dev`; Phases 5–10 pending)  
+**Status:** Accepted (Phases 0–5 complete on `dev`; Phases 6–10 pending)  
 **Created:** 2026-09-22  
 **Updated:** 2026-09-24  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
@@ -217,18 +217,18 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **2** | Generalize validator | **Complete** (2026-09-24) | `ValidatorProfile`/`Presence`/`Availability`/`Capability`/`RelationshipEdge` PDAs + 9 instructions, 5 accounts, 7 events, 9 errors; unit + BPF tests green; IDL 128/49/115/169 |
 | **3** | Introduce tasks | **Complete** (2026-09-24) | `VerificationTask`/`TaskRequirement`/`TaskAssignment` PDAs + 6 instructions (create/add/assign/claim/submit/cancel), 3 accounts, 5 events, 13 errors; unit + BPF tests green; IDL 134/52/120/182 |
 | **4** | Introduce observations | **Complete** (2026-09-24) | `ObservationV2` PDA (seeds `["observation_v2", task_id, observer, nonce]`) + `submit_observation_v2`; multi-source PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; provenance SELF_REPORTED…SATELLITE_CONFIRMED; subject/capture_device/observer role separation; 1 account, 1 instruction, 1 event, 2 errors; 4 unit + 2 BPF tests; IDL 135/53/121/184 |
-| **5** | Evidence/provenance | Pending | `EvidenceManifest`/`EvidenceArtifact` + richer provenance flows |
+| **5** | Evidence/provenance | **Complete** (2026-09-24) | `EvidenceManifest`/`EvidenceArtifact` PDAs (`["evidence_manifest", task_id, submitter, nonce]`, `["evidence_artifact", manifest, artifact_index]`) + `submit_evidence_manifest`/`add_evidence_artifact`; artifact kinds PHOTO…OTHER; optional ObservationV2 link; append-only index + cap 32; 2 accounts, 2 instructions, 2 events, 3 errors (6184–6186); 5 unit + 2 BPF tests; IDL 137/55/123/187 |
 | **6** | Dynamic routing | Pending | Capability + geography + availability + reputation + independence + randomness selection |
 | **7** | Reputation governance | Pending | Fraud report → review → random independent committee → decision → capability downgrade → appeal → rehabilitation |
 | **8** | Economic/resource layer | Pending | Task cost → escrow → rewards → infrastructure → coverage subsidy |
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Phase 4 is complete on `dev` (2026-09-24). Before starting Phase 5 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 4 2026-09-24 it is 135/53/121/184 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 5 is complete on `dev` (2026-09-24). Before starting Phase 6 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 5 2026-09-24 it is 137/55/123/187 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2 + Phase 5 EvidenceManifest/EvidenceArtifact) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
-## 8.1. Handoff: Phase 4 complete; how to start Phase 5
+## 8.1. Handoff: Phase 5 complete; how to start Phase 6
 
 **Already done (do not redo):** Phase 0 structural tests (`terra-core/programs/terra_registry/tests/rfc012_structure.rs`, 21 tests); Phase 1 unique-validator sets, endorsement action binding, remaining-accounts owner checks, admin constraints — verified list in `terra-core/SECURITY.md` “Phase 1 additions”.
 
@@ -238,13 +238,15 @@ Phase 4 is complete on `dev` (2026-09-24). Before starting Phase 5 on a clean ch
 
 **Phase 4 delivered (2026-09-24):** `observation_v2.rs` module with `ObservationV2` account (PDA seeds `["observation_v2", task_id, observer, nonce]`); instruction `submit_observation_v2` (permissionless; observer pays rent); `observation_source` PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; `observation_provenance` SELF_REPORTED/DEVICE_GNSS/MULTI_DEVICE/LOCAL_VALIDATORS/SURVEY_GRADE/SATELLITE_CONFIRMED; subject / capture_device / observer independent roles (Design Rule 7); event `ObservationV2Submitted`; errors `InvalidObservationSource` (6182), `InvalidObservationProvenance` (6183); 4 lib unit tests + 2 BPF integration tests (`phase4_*`). Legacy claim-bound `Observation` remains (migration map §9 — dual path until Phase 5 evidence layers).
 
+**Phase 5 delivered (2026-09-24):** `evidence_manifest.rs` module with `EvidenceManifest` (PDA seeds `["evidence_manifest", task_id, submitter, nonce]`) and `EvidenceArtifact` (PDA seeds `["evidence_artifact", manifest, artifact_index]`); instructions `submit_evidence_manifest` (permissionless; optional ObservationV2 link; pre-declared `root_hash`) and `add_evidence_artifact` (append-only index == `artifact_count`, cap `MAX_MANIFEST_ARTIFACTS=32`); artifact kinds PHOTO/DOCUMENT/VIDEO/MODEL/GEOMETRY/OTHER; per-artifact `source` + `provenance` reuse Phase 4 observation enums (richer provenance); events `EvidenceManifestSubmitted` / `EvidenceArtifactAdded`; errors `InvalidEvidenceArtifactKind` (6184), `EvidenceIndexMismatch` (6185), `EvidenceManifestFull` (6186); reused `EmptyContentHash` (6014), `EmptyStorageReference` (6134), `TaskAlreadyFinalized` (6174); 5 lib unit tests + 2 BPF integration tests (`phase5_*`). Legacy claim-bound `Evidence` remains (migration map §9 — single legacy evidence = one-artifact manifest during dual-write).
+
 **Immediate next actions for Phase 5:**
-1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 4 delivered ObservationV2 per the sketch; Phase 5 should add `EvidenceManifest` + `EvidenceArtifact` PDAs (`["evidence_manifest", task_id, nonce]`, `["evidence_artifact", manifest, artifact_index]`) and richer provenance wiring.
-2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), and Phase 4 (135/53/121/184); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 5 delivered EvidenceManifest/EvidenceArtifact per the sketch; Phase 6 should add dynamic validator routing (capability + geography + availability + reputation + independence + randomness selection over Phase 2 profile PDAs + Phase 3 task assignments).
+2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), Phase 4 (135/53/121/184), and Phase 5 (137/55/123/187); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 
-**Phase order (next):** 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
+**Phase order (next):** 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
 
 ---
 

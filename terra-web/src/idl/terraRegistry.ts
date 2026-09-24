@@ -1,6 +1,3 @@
-// Auto-generated from terra_registry.json — DO NOT EDIT
-import type { Idl } from "@coral-xyz/oxn";
-
 export const terraRegistry: Idl = {
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
   "metadata": {
@@ -152,6 +149,165 @@ export const terraRegistry: Idl = {
         {
           "name": "observed_at",
           "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "add_evidence_artifact",
+      "discriminator": [
+        168,
+        32,
+        22,
+        198,
+        143,
+        156,
+        44,
+        153
+      ],
+      "accounts": [
+        {
+          "name": "artifact",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  114,
+                  116,
+                  105,
+                  102,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest"
+              },
+              {
+                "kind": "arg",
+                "path": "artifact_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "manifest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  109,
+                  97,
+                  110,
+                  105,
+                  102,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.submitter",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.nonce",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "artifact_index",
+          "type": "u16"
+        },
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "provenance",
+          "type": "u8"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
         }
       ]
     },
@@ -343,7 +499,7 @@ export const terraRegistry: Idl = {
         {
           "name": "admin_signer",
           "docs": [
-            "Admin signer \u2014 required in bootstrap mode, ignored in peer-consensus",
+            "Admin signer — required in bootstrap mode, ignored in peer-consensus",
             "(the endorsement account carries authority instead)."
           ],
           "writable": true,
@@ -505,7 +661,7 @@ export const terraRegistry: Idl = {
         {
           "name": "authority",
           "docs": [
-            "Court authority or designated adjudicator \u2014 must be registry admin."
+            "Court authority or designated adjudicator — must be registry admin."
           ],
           "signer": true
         }
@@ -938,7 +1094,7 @@ export const terraRegistry: Idl = {
         "",
         "**DEPRECATED**: Use `create_claim` in the verification pipeline instead.",
         "This instruction remains for backward compatibility with existing",
-        "attestations. New attestations should use `Claim \u2192 Evidence \u2192 Observation`.",
+        "attestations. New attestations should use `Claim → Evidence → Observation`.",
         "",
         "`validators` holds the public keys of the (possibly several) parties",
         "who must sign off on the transaction; `required` is how many signatures",
@@ -5689,7 +5845,7 @@ export const terraRegistry: Idl = {
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
+        "belongs to someone who refuses to release it — e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -10221,6 +10377,120 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "submit_evidence_manifest",
+      "discriminator": [
+        232,
+        67,
+        67,
+        96,
+        211,
+        196,
+        129,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "manifest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  109,
+                  97,
+                  110,
+                  105,
+                  102,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "account",
+                "path": "submitter"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "observation",
+          "type": "pubkey"
+        },
+        {
+          "name": "root_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_observation",
       "discriminator": [
         109,
@@ -11684,7 +11954,7 @@ export const terraRegistry: Idl = {
           "name": "treasury",
           "docs": [
             "Treasury PDA receiving slashed lamports. Constrained to a deterministic",
-            "PDA derived from the authority registry \u2014 no one can redirect funds to",
+            "PDA derived from the authority registry — no one can redirect funds to",
             "an arbitrary wallet."
           ],
           "writable": true,
@@ -12589,6 +12859,32 @@ export const terraRegistry: Idl = {
         242,
         62,
         92
+      ]
+    },
+    {
+      "name": "EvidenceArtifact",
+      "discriminator": [
+        18,
+        40,
+        202,
+        16,
+        128,
+        245,
+        57,
+        135
+      ]
+    },
+    {
+      "name": "EvidenceManifest",
+      "discriminator": [
+        9,
+        190,
+        128,
+        86,
+        64,
+        17,
+        31,
+        5
       ]
     },
     {
@@ -13540,6 +13836,32 @@ export const terraRegistry: Idl = {
         253,
         235,
         89
+      ]
+    },
+    {
+      "name": "EvidenceArtifactAdded",
+      "discriminator": [
+        17,
+        174,
+        204,
+        232,
+        109,
+        240,
+        149,
+        44
+      ]
+    },
+    {
+      "name": "EvidenceManifestSubmitted",
+      "discriminator": [
+        239,
+        142,
+        224,
+        208,
+        67,
+        1,
+        245,
+        201
       ]
     },
     {
@@ -15023,7 +15345,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6069,
       "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received \u2014 seller cannot accept"
+      "msg": "Full deposit not yet received — seller cannot accept"
     },
     {
       "code": 6070,
@@ -15038,12 +15360,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6072,
       "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired \u2014 cannot cancel"
+      "msg": "Buyer grace period has expired — cannot cancel"
     },
     {
       "code": 6073,
       "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
+      "msg": "Cancel window has not yet expired — escrow not stale"
     },
     {
       "code": 6074,
@@ -15178,12 +15500,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6100,
       "name": "StakeAlreadyActive",
-      "msg": "Stake is already active \u2014 cannot deposit again"
+      "msg": "Stake is already active — cannot deposit again"
     },
     {
       "code": 6101,
       "name": "UnbondingInProgress",
-      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
+      "msg": "Unbonding is in progress — cannot deposit or withdraw"
     },
     {
       "code": 6102,
@@ -15298,7 +15620,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6124,
       "name": "ProgramPaused",
-      "msg": "Program is paused \u2014 state-changing operations are frozen"
+      "msg": "Program is paused — state-changing operations are frozen"
     },
     {
       "code": 6125,
@@ -15594,6 +15916,21 @@ export const terraRegistry: Idl = {
       "code": 6183,
       "name": "InvalidObservationProvenance",
       "msg": "Invalid observation provenance"
+    },
+    {
+      "code": 6184,
+      "name": "InvalidEvidenceArtifactKind",
+      "msg": "Invalid evidence artifact kind"
+    },
+    {
+      "code": 6185,
+      "name": "EvidenceIndexMismatch",
+      "msg": "Evidence artifact index does not match manifest count"
+    },
+    {
+      "code": 6186,
+      "name": "EvidenceManifestFull",
+      "msg": "Evidence manifest has reached the maximum number of artifacts"
     }
   ],
   "types": [
@@ -15687,13 +16024,13 @@ export const terraRegistry: Idl = {
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
         "**DEPRECATED**: This parcel-centric attestation model is superseded by the",
-        "verification pipeline (`Claim \u2192 Evidence \u2192 Observation \u2192 VerificationAttestation`).",
+        "verification pipeline (`Claim → Evidence → Observation → VerificationAttestation`).",
         "Existing accounts remain valid for backward compatibility, but new attestations",
         "should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)",
         "is provided to transition legacy attestations into the new model.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
-        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
+        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -16222,7 +16559,7 @@ export const terraRegistry: Idl = {
           {
             "name": "required_attestations",
             "docs": [
-              "Quorum threshold \u2014 number of attestations needed to verify."
+              "Quorum threshold — number of attestations needed to verify."
             ],
             "type": "u8"
           },
@@ -16901,7 +17238,7 @@ export const terraRegistry: Idl = {
           {
             "name": "status",
             "docs": [
-              "Current dispute status (FILED \u2192 FROZEN \u2192 ADJUDICATED \u2192 EXECUTED)."
+              "Current dispute status (FILED → FROZEN → ADJUDICATED → EXECUTED)."
             ],
             "type": "u8"
           },
@@ -16936,7 +17273,7 @@ export const terraRegistry: Idl = {
             "docs": [
               "Validators that actually co-signed (recorded at freeze/adjudicate).",
               "Unlike `validators` (declared at filing), this is on-chain proof of",
-              "who testified \u2014 events alone are not reliably indexable."
+              "who testified — events alone are not reliably indexable."
             ],
             "type": {
               "array": [
@@ -17668,6 +18005,221 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "EvidenceArtifact",
+      "docs": [
+        "One artifact inside a manifest (photo / document / video / model / geometry).",
+        "",
+        "PDA: `[\"evidence_artifact\", manifest, artifact_index]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manifest",
+            "docs": [
+              "Parent manifest (PDA seed)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "artifact_index",
+            "docs": [
+              "Append-only index within the manifest (PDA seed)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "kind",
+            "docs": [
+              "One of `artifact_kind`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "Capture source — one of `observation_source` (reused for provenance richness)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "docs": [
+              "Provenance — one of `observation_provenance`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "content_hash",
+            "docs": [
+              "sha256 of the artifact bytes / content envelope."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_reference",
+            "docs": [
+              "IPFS CID, URL, or content address (≤128 bytes)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceArtifactAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "artifact",
+            "type": "pubkey"
+          },
+          {
+            "name": "manifest",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "artifact_index",
+            "type": "u16"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "source",
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceManifest",
+      "docs": [
+        "Structured list of evidence artifacts for a verification task.",
+        "",
+        "PDA: `[\"evidence_manifest\", task_id, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "docs": [
+              "Task this manifest supports."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "submitter",
+            "docs": [
+              "Wallet that opened the manifest (PDA seed companion). Pays rent."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Unique nonce per (task_id, submitter). PDA seed."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "observation",
+            "docs": [
+              "Optional ObservationV2 this manifest expands (`Pubkey::default()` = none)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "artifact_count",
+            "docs": [
+              "Number of artifacts appended so far (0..=MAX_MANIFEST_ARTIFACTS)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "root_hash",
+            "docs": [
+              "Pre-declared or rolling manifest root hash (sha256 of artifact set).",
+              "May be zero at open; clients recompute/verify off-chain."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceManifestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manifest",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "observation",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
       "name": "GenesisConfirmation",
       "docs": [
         "Record of a cross-country genesis confirmation."
@@ -18051,7 +18603,7 @@ export const terraRegistry: Idl = {
         "",
         "This is the foundation for replacing raw wallet ownership (`Parcel.owner`)",
         "with identity-centric ownership. Rather than a wallet pubkey holding a right,",
-        "the Identity PDA is the holder \u2014 making rights portable across wallets.",
+        "the Identity PDA is the holder — making rights portable across wallets.",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`.",
         "One IdentityRights per (identity, parcel, kind) is allowed."
@@ -18706,7 +19258,7 @@ export const terraRegistry: Idl = {
         "",
         "PDA: `[\"observation_v2\", task_id, observer, nonce]`",
         "",
-        "Roles (Design Rule 7): `subject` \u2260 `capture_device` \u2260 `observer`",
+        "Roles (Design Rule 7): `subject` ≠ `capture_device` ≠ `observer`",
         "(submitter). A document owned by Alice (`subject`), photographed on",
         "Bob's phone (`capture_device`), submitted by Charlie (`observer`)."
       ],
@@ -18742,7 +19294,7 @@ export const terraRegistry: Idl = {
           {
             "name": "subject",
             "docs": [
-              "What is observed \u2014 claim, parcel, identity, or other account key."
+              "What is observed — claim, parcel, identity, or other account key."
             ],
             "type": "pubkey"
           },
@@ -18813,7 +19365,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence",
             "docs": [
-              "Confidence 0\u2013100."
+              "Confidence 0–100."
             ],
             "type": "u8"
           },
@@ -19141,7 +19693,7 @@ export const terraRegistry: Idl = {
       "docs": [
         "A parcel of land.",
         "",
-        "**DEPRECATED: `owner` field** \u2014 Ownership should be expressed through",
+        "**DEPRECATED: `owner` field** — Ownership should be expressed through",
         "`IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct",
         "`owner` wallet field. The `is_authorized_owner()` function supports both",
         "paths. New code should prefer the IdentityRights path. The `owner` field",
@@ -20754,7 +21306,7 @@ export const terraRegistry: Idl = {
           {
             "name": "req_index",
             "docs": [
-              "Append-only index (0, 1, \u2026 requirement_count-1)."
+              "Append-only index (0, 1, … requirement_count-1)."
             ],
             "type": "u8"
           },
@@ -20819,7 +21371,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence_target_bps",
             "docs": [
-              "Minimum confidence the result should target (0\u201310000 bps)."
+              "Minimum confidence the result should target (0–10000 bps)."
             ],
             "type": "u16"
           },
@@ -21045,7 +21597,7 @@ export const terraRegistry: Idl = {
           {
             "name": "is_active",
             "docs": [
-              "Soft flag \u2014 set to false by admin to forcibly exclude a validator from",
+              "Soft flag — set to false by admin to forcibly exclude a validator from",
               "quorum without removing them from the registry."
             ],
             "type": "bool"
@@ -21455,7 +22007,7 @@ export const terraRegistry: Idl = {
     {
       "name": "ValidatorPresence",
       "docs": [
-        "Dynamic geographic presence \u2014 timestamped, confidence-scored, expiring.",
+        "Dynamic geographic presence — timestamped, confidence-scored, expiring.",
         "",
         "Never treat as immutable identity. PDA: `[\"validator_presence\", wallet]`"
       ],
@@ -21469,7 +22021,7 @@ export const terraRegistry: Idl = {
           {
             "name": "latitude_e7",
             "docs": [
-              "Latitude in degrees * 1e7 (i32) \u2014 compact fixed-point."
+              "Latitude in degrees * 1e7 (i32) — compact fixed-point."
             ],
             "type": "i32"
           },
@@ -21497,7 +22049,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence_bps",
             "docs": [
-              "Confidence in this presence fix (0\u201310000 bps)."
+              "Confidence in this presence fix (0–10000 bps)."
             ],
             "type": "u16"
           },
@@ -21549,7 +22101,7 @@ export const terraRegistry: Idl = {
     {
       "name": "ValidatorProfile",
       "docs": [
-        "Core validator profile \u2014 identity + tier attributes (not location-bound).",
+        "Core validator profile — identity + tier attributes (not location-bound).",
         "",
         "PDA: `[\"validator_profile\", wallet]`"
       ],
@@ -21559,7 +22111,7 @@ export const terraRegistry: Idl = {
           {
             "name": "wallet",
             "docs": [
-              "The validator's wallet (mobile participant \u2014 NOT a region)."
+              "The validator's wallet (mobile participant — NOT a region)."
             ],
             "type": "pubkey"
           },
@@ -21585,7 +22137,7 @@ export const terraRegistry: Idl = {
           {
             "name": "note",
             "docs": [
-              "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
+              "Free-form operator note (device class, org, …) — not used for selection."
             ],
             "type": "string"
           },
@@ -21700,7 +22252,7 @@ export const terraRegistry: Idl = {
               "Emergency pause flag. When true, all pausable subsystem instructions",
               "(staking, cross-border, guardian, zk, escrow, dispute) reject",
               "state-changing calls. Core parcel/identity operations authorized by",
-              "individual owners are unaffected \u2014 the admin stops processing via",
+              "individual owners are unaffected — the admin stops processing via",
               "off-chain policy."
             ],
             "type": "bool"
@@ -21728,7 +22280,7 @@ export const terraRegistry: Idl = {
       "docs": [
         "Directed relationship graph edge (endorsement / co-validation / infra).",
         "",
-        "Correlation \u2260 fraud \u2014 used for review, not auto-punishment (RFC-012 \u00a76.12).",
+        "Correlation ≠ fraud — used for review, not auto-punishment (RFC-012 §6.12).",
         "PDA: `[\"validator_edge\", from, to, edge_type]`"
       ],
       "type": {
@@ -21752,7 +22304,7 @@ export const terraRegistry: Idl = {
           {
             "name": "weight_bps",
             "docs": [
-              "Optional strength (0\u201310000 bps); default 10000 for binary endorsement."
+              "Optional strength (0–10000 bps); default 10000 for binary endorsement."
             ],
             "type": "u16"
           },
@@ -22609,7 +23161,7 @@ export const terraRegistry: Idl = {
           {
             "name": "subject",
             "docs": [
-              "What the task is about \u2014 claim, parcel, identity, or other account.",
+              "What the task is about — claim, parcel, identity, or other account.",
               "Not constrained to one program (migration map: claims become subjects)."
             ],
             "type": "pubkey"
@@ -22768,7 +23320,7 @@ export const terraRegistry: Idl = {
           {
             "name": "admin",
             "docs": [
-              "Global founder \u2014 temporary sole authority during bootstrap phase."
+              "Global founder — temporary sole authority during bootstrap phase."
             ],
             "type": "pubkey"
           },

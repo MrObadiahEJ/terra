@@ -24487,3 +24487,468 @@ async fn phase4_observation_guards() {
     .await;
     assert_custom_error(res, 6174, "observe cancelled task must fail");
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 5 — evidence provenance (EvidenceManifest / EvidenceArtifact)
+// ---------------------------------------------------------------------------
+
+fn evidence_manifest_pda(task_id: &[u8; 32], submitter: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"evidence_manifest",
+            task_id.as_ref(),
+            submitter.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn evidence_artifact_pda(manifest: &Pubkey, artifact_index: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"evidence_artifact",
+            manifest.as_ref(),
+            &artifact_index.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn evidence_manifest_data(
+    task_id: &[u8; 32],
+    nonce: u16,
+    observation: &Pubkey,
+    root_hash: &[u8; 32],
+) -> Vec<u8> {
+    let mut data = discriminator("global", "submit_evidence_manifest").to_vec();
+    data.extend_from_slice(task_id);
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(observation.as_ref());
+    data.extend_from_slice(root_hash);
+    data
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evidence_artifact_data(
+    artifact_index: u16,
+    kind: u8,
+    source: u8,
+    provenance: u8,
+    content_hash: &[u8; 32],
+    storage_reference: &str,
+) -> Vec<u8> {
+    let mut data = discriminator("global", "add_evidence_artifact").to_vec();
+    data.extend_from_slice(&artifact_index.to_le_bytes());
+    data.push(kind);
+    data.push(source);
+    data.push(provenance);
+    data.extend_from_slice(content_hash);
+    data.extend_from_slice(&(storage_reference.len() as u32).to_le_bytes());
+    data.extend_from_slice(storage_reference.as_bytes());
+    data
+}
+
+#[tokio::test]
+async fn phase5_manifest_and_artifacts_read_back() {
+    use terra_registry::evidence_manifest::{
+        self, EvidenceArtifact, EvidenceManifest, MAX_MANIFEST_ARTIFACTS,
+    };
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let subject_acct = Pubkey::new_unique();
+    let task_id = [21u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    // Create an open task.
+    let data = create_task_data_simple(
+        &task_id,
+        &subject_acct,
+        verification_task::task_class::PHYSICAL,
+        deadline,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task failed");
+
+    // Fund a dedicated submitter wallet.
+    let submitter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &submitter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund submitter failed");
+
+    // Optional observation link (Pubkey::default = none).
+    let observation_link = Pubkey::default();
+    let nonce: u16 = 0;
+    let (manifest_pk, _) = evidence_manifest_pda(&task_id, &submitter.pubkey(), nonce);
+    let root_hash = [42u8; 32];
+    let data = evidence_manifest_data(&task_id, nonce, &observation_link, &root_hash);
+    process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_evidence_manifest failed");
+
+    let manifest: EvidenceManifest = read_account(&ctx, manifest_pk).await;
+    assert_eq!(manifest.task_id, task_id);
+    assert_eq!(manifest.submitter, submitter.pubkey());
+    assert_eq!(manifest.nonce, nonce);
+    assert_eq!(manifest.observation, observation_link);
+    assert_eq!(manifest.artifact_count, 0);
+    assert_eq!(manifest.root_hash, root_hash);
+    assert!(manifest.created_at > 0);
+
+    // Append PHOTO artifact (index 0).
+    let (art0_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    let data = evidence_artifact_data(
+        0,
+        evidence_manifest::artifact_kind::PHOTO,
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::DEVICE_GNSS,
+        &[10u8; 32],
+        "ipfs://bafyphoto",
+    );
+    process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art0_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add PHOTO artifact failed");
+
+    // Append DOCUMENT artifact (index 1).
+    let (art1_pk, _) = evidence_artifact_pda(&manifest_pk, 1);
+    let data = evidence_artifact_data(
+        1,
+        evidence_manifest::artifact_kind::DOCUMENT,
+        terra_registry::observation_v2::observation_source::DOCUMENT,
+        terra_registry::observation_v2::observation_provenance::SURVEY_GRADE,
+        &[11u8; 32],
+        "ipfs://bafydeed",
+    );
+    process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art1_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add DOCUMENT artifact failed");
+
+    let manifest: EvidenceManifest = read_account(&ctx, manifest_pk).await;
+    assert_eq!(manifest.artifact_count, 2);
+
+    let art0: EvidenceArtifact = read_account(&ctx, art0_pk).await;
+    assert_eq!(art0.manifest, manifest_pk);
+    assert_eq!(art0.artifact_index, 0);
+    assert_eq!(art0.kind, evidence_manifest::artifact_kind::PHOTO);
+    assert_eq!(
+        art0.source,
+        terra_registry::observation_v2::observation_source::CAMERA
+    );
+    assert_eq!(
+        art0.provenance,
+        terra_registry::observation_v2::observation_provenance::DEVICE_GNSS
+    );
+    assert_eq!(art0.content_hash, [10u8; 32]);
+    assert_eq!(art0.storage_reference, "ipfs://bafyphoto");
+    assert!(art0.created_at > 0);
+
+    let art1: EvidenceArtifact = read_account(&ctx, art1_pk).await;
+    assert_eq!(art1.artifact_index, 1);
+    assert_eq!(art1.kind, evidence_manifest::artifact_kind::DOCUMENT);
+    assert_eq!(art1.storage_reference, "ipfs://bafydeed");
+    assert_eq!(art1.content_hash, [11u8; 32]);
+
+    // Cap constant sanity (full-cap path is unit-tested; BPF covers 0..2 append).
+    assert_eq!(MAX_MANIFEST_ARTIFACTS, 32);
+}
+
+#[tokio::test]
+async fn phase5_evidence_guards() {
+    use terra_registry::evidence_manifest::{self, EvidenceManifest};
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let subject_acct = Pubkey::new_unique();
+    let task_id = [22u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    let data = create_task_data_simple(
+        &task_id,
+        &subject_acct,
+        verification_task::task_class::REMOTE,
+        deadline,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task failed");
+
+    let submitter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &submitter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund submitter failed");
+
+    let observation_link = Pubkey::default();
+    let nonce: u16 = 0;
+    let (manifest_pk, _) = evidence_manifest_pda(&task_id, &submitter.pubkey(), nonce);
+    let data = evidence_manifest_data(&task_id, nonce, &observation_link, &[1u8; 32]);
+    process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_evidence_manifest failed");
+
+    // Invalid artifact kind (99) → 6184. Fresh artifact index 0 (init fails first).
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    let data = evidence_artifact_data(
+        0,
+        99, // invalid kind
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::SELF_REPORTED,
+        &[1u8; 32],
+        "ipfs://x",
+    );
+    let res = process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6184, "invalid artifact kind must fail");
+
+    // Out-of-order index (5 when count=0) → 6185 EvidenceIndexMismatch.
+    // Kind/source/provenance/content/storage must pass so we reach the index guard.
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 5);
+    let data = evidence_artifact_data(
+        5,
+        evidence_manifest::artifact_kind::PHOTO,
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::SELF_REPORTED,
+        &[2u8; 32],
+        "ipfs://y",
+    );
+    let res = process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6185, "out-of-order artifact index must fail");
+
+    // Zero content_hash → 6014 EmptyContentHash (index 0 is correct order).
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    let data = evidence_artifact_data(
+        0,
+        evidence_manifest::artifact_kind::PHOTO,
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::SELF_REPORTED,
+        &[0u8; 32],
+        "ipfs://z",
+    );
+    let res = process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6014, "empty content_hash must fail");
+
+    // Empty storage_reference → 6134 EmptyStorageReference.
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    let data = evidence_artifact_data(
+        0,
+        evidence_manifest::artifact_kind::PHOTO,
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::SELF_REPORTED,
+        &[3u8; 32],
+        "",
+    );
+    let res = process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6134, "empty storage_reference must fail");
+
+    // Cancel the task, then try to append → 6174 TaskAlreadyFinalized.
+    let mut data = discriminator("global", "cancel_task").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("cancel_task failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.status, verification_task::task_status::CANCELLED);
+
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    let data = evidence_artifact_data(
+        0,
+        evidence_manifest::artifact_kind::PHOTO,
+        terra_registry::observation_v2::observation_source::CAMERA,
+        terra_registry::observation_v2::observation_provenance::SELF_REPORTED,
+        &[4u8; 32],
+        "ipfs://after-cancel",
+    );
+    let res = process(
+        &mut ctx,
+        &submitter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(submitter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6174, "append after cancel must fail");
+
+    // Manifest still has count 0 (failed appends rolled back).
+    let manifest: EvidenceManifest = read_account(&ctx, manifest_pk).await;
+    assert_eq!(manifest.artifact_count, 0);
+}

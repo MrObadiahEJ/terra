@@ -153,6 +153,165 @@
       ]
     },
     {
+      "name": "add_evidence_artifact",
+      "discriminator": [
+        168,
+        32,
+        22,
+        198,
+        143,
+        156,
+        44,
+        153
+      ],
+      "accounts": [
+        {
+          "name": "artifact",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  97,
+                  114,
+                  116,
+                  105,
+                  102,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest"
+              },
+              {
+                "kind": "arg",
+                "path": "artifact_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "manifest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  109,
+                  97,
+                  110,
+                  105,
+                  102,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.submitter",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.nonce",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "artifact_index",
+          "type": "u16"
+        },
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "provenance",
+          "type": "u8"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "add_second_validator",
       "discriminator": [
         117,
@@ -10218,6 +10377,120 @@
       ]
     },
     {
+      "name": "submit_evidence_manifest",
+      "discriminator": [
+        232,
+        67,
+        67,
+        96,
+        211,
+        196,
+        129,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "manifest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  109,
+                  97,
+                  110,
+                  105,
+                  102,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "account",
+                "path": "submitter"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "observation",
+          "type": "pubkey"
+        },
+        {
+          "name": "root_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_observation",
       "discriminator": [
         109,
@@ -12589,6 +12862,32 @@
       ]
     },
     {
+      "name": "EvidenceArtifact",
+      "discriminator": [
+        18,
+        40,
+        202,
+        16,
+        128,
+        245,
+        57,
+        135
+      ]
+    },
+    {
+      "name": "EvidenceManifest",
+      "discriminator": [
+        9,
+        190,
+        128,
+        86,
+        64,
+        17,
+        31,
+        5
+      ]
+    },
+    {
       "name": "GenesisRequest",
       "discriminator": [
         37,
@@ -13537,6 +13836,32 @@
         253,
         235,
         89
+      ]
+    },
+    {
+      "name": "EvidenceArtifactAdded",
+      "discriminator": [
+        17,
+        174,
+        204,
+        232,
+        109,
+        240,
+        149,
+        44
+      ]
+    },
+    {
+      "name": "EvidenceManifestSubmitted",
+      "discriminator": [
+        239,
+        142,
+        224,
+        208,
+        67,
+        1,
+        245,
+        201
       ]
     },
     {
@@ -15591,6 +15916,21 @@
       "code": 6183,
       "name": "InvalidObservationProvenance",
       "msg": "Invalid observation provenance"
+    },
+    {
+      "code": 6184,
+      "name": "InvalidEvidenceArtifactKind",
+      "msg": "Invalid evidence artifact kind"
+    },
+    {
+      "code": 6185,
+      "name": "EvidenceIndexMismatch",
+      "msg": "Evidence artifact index does not match manifest count"
+    },
+    {
+      "code": 6186,
+      "name": "EvidenceManifestFull",
+      "msg": "Evidence manifest has reached the maximum number of artifacts"
     }
   ],
   "types": [
@@ -17660,6 +18000,221 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceArtifact",
+      "docs": [
+        "One artifact inside a manifest (photo / document / video / model / geometry).",
+        "",
+        "PDA: `[\"evidence_artifact\", manifest, artifact_index]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manifest",
+            "docs": [
+              "Parent manifest (PDA seed)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "artifact_index",
+            "docs": [
+              "Append-only index within the manifest (PDA seed)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "kind",
+            "docs": [
+              "One of `artifact_kind`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "Capture source — one of `observation_source` (reused for provenance richness)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "docs": [
+              "Provenance — one of `observation_provenance`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "content_hash",
+            "docs": [
+              "sha256 of the artifact bytes / content envelope."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_reference",
+            "docs": [
+              "IPFS CID, URL, or content address (≤128 bytes)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceArtifactAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "artifact",
+            "type": "pubkey"
+          },
+          {
+            "name": "manifest",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "artifact_index",
+            "type": "u16"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "source",
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceManifest",
+      "docs": [
+        "Structured list of evidence artifacts for a verification task.",
+        "",
+        "PDA: `[\"evidence_manifest\", task_id, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "docs": [
+              "Task this manifest supports."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "submitter",
+            "docs": [
+              "Wallet that opened the manifest (PDA seed companion). Pays rent."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Unique nonce per (task_id, submitter). PDA seed."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "observation",
+            "docs": [
+              "Optional ObservationV2 this manifest expands (`Pubkey::default()` = none)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "artifact_count",
+            "docs": [
+              "Number of artifacts appended so far (0..=MAX_MANIFEST_ARTIFACTS)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "root_hash",
+            "docs": [
+              "Pre-declared or rolling manifest root hash (sha256 of artifact set).",
+              "May be zero at open; clients recompute/verify off-chain."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceManifestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "manifest",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "submitter",
+            "type": "pubkey"
+          },
+          {
+            "name": "observation",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
           }
         ]
       }

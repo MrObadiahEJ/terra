@@ -294,6 +294,7 @@ pub use terra_identity::state::Succession;
 pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
+pub mod evidence_manifest;
 pub mod ipfs_docs;
 pub mod observation_v2;
 pub mod quorum;
@@ -2249,6 +2250,41 @@ pub mod terra_registry {
             evidence_hash,
             confidence,
             signature_hash,
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Evidence provenance (RFC-012 Phase 5)
+    // -----------------------------------------------------------------------
+
+    pub fn submit_evidence_manifest(
+        ctx: Context<SubmitEvidenceManifest>,
+        task_id: [u8; 32],
+        nonce: u16,
+        observation: Pubkey,
+        root_hash: [u8; 32],
+    ) -> Result<()> {
+        evidence_manifest::submit_evidence_manifest(ctx, task_id, nonce, observation, root_hash)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_evidence_artifact(
+        ctx: Context<AddEvidenceArtifact>,
+        artifact_index: u16,
+        kind: u8,
+        source: u8,
+        provenance: u8,
+        content_hash: [u8; 32],
+        storage_reference: String,
+    ) -> Result<()> {
+        evidence_manifest::add_evidence_artifact(
+            ctx,
+            artifact_index,
+            kind,
+            source,
+            provenance,
+            content_hash,
+            storage_reference,
         )
     }
 
@@ -4553,6 +4589,76 @@ pub struct SubmitObservationV2<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Evidence provenance contexts (RFC-012 Phase 5)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(task_id: [u8; 32], nonce: u16)]
+pub struct SubmitEvidenceManifest<'info> {
+    #[account(
+        init,
+        payer = submitter,
+        space = 8 + evidence_manifest::EvidenceManifest::INIT_SPACE,
+        seeds = [
+            b"evidence_manifest",
+            task_id.as_ref(),
+            submitter.key().as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub manifest: Account<'info, evidence_manifest::EvidenceManifest>,
+    #[account(
+        seeds = [b"task", task_id.as_ref()],
+        bump,
+        constraint = task.task_id == task_id @ TerraError::InvalidTaskRequirement,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    /// CHECK: submitter is only a wallet pubkey (signer + rent payer).
+    #[account(mut)]
+    pub submitter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(artifact_index: u16)]
+pub struct AddEvidenceArtifact<'info> {
+    #[account(
+        init,
+        payer = submitter,
+        space = 8 + evidence_manifest::EvidenceArtifact::INIT_SPACE,
+        seeds = [
+            b"evidence_artifact",
+            manifest.key().as_ref(),
+            &artifact_index.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub artifact: Account<'info, evidence_manifest::EvidenceArtifact>,
+    #[account(
+        mut,
+        seeds = [
+            b"evidence_manifest",
+            manifest.task_id.as_ref(),
+            manifest.submitter.as_ref(),
+            &manifest.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub manifest: Account<'info, evidence_manifest::EvidenceManifest>,
+    #[account(
+        seeds = [b"task", manifest.task_id.as_ref()],
+        bump,
+        constraint = task.task_id == manifest.task_id @ TerraError::InvalidTaskRequirement,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    /// CHECK: submitter is only a wallet pubkey (signer + rent payer).
+    #[account(mut)]
+    pub submitter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -5482,6 +5588,30 @@ pub struct ObservationV2Submitted {
 }
 
 // ---------------------------------------------------------------------------
+// Evidence provenance events (RFC-012 Phase 5)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct EvidenceManifestSubmitted {
+    pub manifest: Pubkey,
+    pub task_id: [u8; 32],
+    pub submitter: Pubkey,
+    pub observation: Pubkey,
+    pub nonce: u16,
+}
+
+#[event]
+pub struct EvidenceArtifactAdded {
+    pub artifact: Pubkey,
+    pub manifest: Pubkey,
+    pub task_id: [u8; 32],
+    pub artifact_index: u16,
+    pub kind: u8,
+    pub source: u8,
+    pub provenance: u8,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -6074,6 +6204,14 @@ pub enum TerraError {
     InvalidObservationSource,
     #[msg("Invalid observation provenance")]
     InvalidObservationProvenance,
+
+    // RFC-012 Phase 5: evidence provenance
+    #[msg("Invalid evidence artifact kind")]
+    InvalidEvidenceArtifactKind,
+    #[msg("Evidence artifact index does not match manifest count")]
+    EvidenceIndexMismatch,
+    #[msg("Evidence manifest has reached the maximum number of artifacts")]
+    EvidenceManifestFull,
 }
 
 #[cfg(test)]
