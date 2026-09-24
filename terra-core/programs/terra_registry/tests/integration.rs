@@ -23363,3 +23363,575 @@ async fn phase2_availability_and_edge() {
     .await;
     assert!(res.is_err(), "self-edge must be rejected");
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 3 — verification tasks
+// ---------------------------------------------------------------------------
+
+fn task_pda(task_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"task", task_id.as_ref()], &PROGRAM_ID)
+}
+
+fn task_requirement_pda(task_id: &[u8; 32], req_index: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"task_requirement", task_id.as_ref(), &[req_index]],
+        &PROGRAM_ID,
+    )
+}
+
+fn task_assignment_pda(task_id: &[u8; 32], validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"task_assignment", task_id.as_ref(), validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn create_task_data(
+    task_id: &[u8; 32],
+    subject: &Pubkey,
+    task_class: u8,
+    reward_lamports: u64,
+    deadline: i64,
+    description_hash: &[u8; 32],
+    required_validators: u8,
+) -> Vec<u8> {
+    let mut data = discriminator("global", "create_verification_task").to_vec();
+    data.extend_from_slice(task_id);
+    data.extend_from_slice(subject.as_ref());
+    data.push(task_class);
+    data.extend_from_slice(&reward_lamports.to_le_bytes());
+    data.extend_from_slice(&deadline.to_le_bytes());
+    data.extend_from_slice(description_hash);
+    data.push(required_validators);
+    data
+}
+
+#[tokio::test]
+async fn phase3_create_requirement_assign_submit_complete() {
+    use terra_registry::verification_task::{
+        self, TaskAssignment, TaskRequirement, VerificationTask,
+    };
+
+    let (mut ctx, payer) = setup().await;
+    let subject = Pubkey::new_unique();
+    let task_id = [7u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+    let description_hash = [9u8; 32];
+
+    // create_verification_task
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        1_000_000,
+        deadline,
+        &description_hash,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create_verification_task failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.task_id, task_id);
+    assert_eq!(task.requester, payer.pubkey());
+    assert_eq!(task.subject, subject);
+    assert_eq!(task.task_class, verification_task::task_class::PHYSICAL);
+    assert_eq!(task.status, verification_task::task_status::OPEN);
+    assert_eq!(task.reward_lamports, 1_000_000);
+    assert_eq!(task.deadline, deadline);
+    assert_eq!(task.description_hash, description_hash);
+    assert_eq!(task.requirement_count, 0);
+    assert_eq!(task.assigned_count, 0);
+    assert_eq!(task.required_validators, 1);
+    assert_eq!(task.result_count, 0);
+    assert_eq!(task.outcome, verification_task::task_outcome::PENDING);
+
+    // add_task_requirement (append-only, index 0)
+    let (req_pk, _) = task_requirement_pda(&task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0); // req_index
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+    data.extend_from_slice(&0u16.to_le_bytes()); // min_reputation
+    data.push(0); // min_tier
+    data.extend_from_slice(b"CM"); // jurisdiction
+    data.extend_from_slice(&100u32.to_le_bytes()); // radius_m
+    data.extend_from_slice(&387_500_000i32.to_le_bytes());
+    data.extend_from_slice(&121_500_000i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes()); // independence_bps
+    data.extend_from_slice(&8000u16.to_le_bytes()); // confidence_target_bps
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add_task_requirement failed");
+
+    let req: TaskRequirement = read_account(&ctx, req_pk).await;
+    assert_eq!(req.task_id, task_id);
+    assert_eq!(req.req_index, 0);
+    assert_eq!(
+        req.capability_code,
+        terra_registry::validator_profile::capability_code::GNSS
+    );
+    assert_eq!(req.radius_m, 100);
+    assert_eq!(req.center_lat_e7, 387_500_000);
+    assert_eq!(req.center_lon_e7, 121_500_000);
+    assert_eq!(req.confidence_target_bps, 8000);
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.requirement_count, 1);
+
+    // Wrong append index rejected (expect 179 = RequirementIndexMismatch).
+    let (req1_pk, _) = task_requirement_pda(&task_id, 1);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(1); // skip 0→1 already used; 1 is correct after count=1, use wrong: try index 5
+    data.push(255); // CAPABILITY_ANY
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.push(0);
+    data.extend_from_slice(b"\x00\x00");
+    data.extend_from_slice(&0u32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    // currently count=1 so req_index=1 is valid; flip to wrong index 3
+    data[8] = 3; // overwrite req_index byte after discriminator
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_requirement_pda(&task_id, 3).0, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6179, "wrong req_index must fail");
+
+    // assign_task_validator (requester assigns a validator)
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator failed");
+
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let mut data = discriminator("global", "assign_task_validator").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("assign_task_validator failed");
+
+    let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
+    assert_eq!(assignment.task_id, task_id);
+    assert_eq!(assignment.validator, validator.pubkey());
+    assert_eq!(assignment.requester, payer.pubkey());
+    assert_eq!(assignment.assigned_by, payer.pubkey());
+    assert_eq!(
+        assignment.status,
+        verification_task::assignment_status::ASSIGNED
+    );
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 1);
+    assert_eq!(task.status, verification_task::task_status::ASSIGNED);
+
+    // Second assignment when required_validators=1 → 177 TaskAlreadyAssigned.
+    let other = Keypair::new();
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_assignment_pda(&task_id, &other.pubkey()).0, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(other.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "assign_task_validator").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6177, "second assign when full must fail");
+
+    // Self-assignment rejected → 178.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_assignment_pda(&task_id, &payer.pubkey()).0, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "assign_task_validator").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6178, "self-assign must fail");
+
+    // Non-requester cannot assign → 175.
+    // Use a fresh target wallet: validator's assignment PDA already exists,
+    // and init would fail (Custom(0)) before the requester constraint runs.
+    let stranger_target = Keypair::new();
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(
+                    task_assignment_pda(&task_id, &stranger_target.pubkey()).0,
+                    false,
+                ),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(stranger_target.pubkey(), false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "assign_task_validator").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6175, "non-requester assign must fail");
+
+    // Assigned validator submits PASS → task COMPLETED.
+    let mut data = discriminator("global", "submit_task_result").to_vec();
+    data.extend_from_slice(&task_id);
+    data.push(verification_task::task_outcome::PASS);
+    data.extend_from_slice(&[42u8; 32]);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_task_result failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.status, verification_task::task_status::COMPLETED);
+    assert_eq!(task.outcome, verification_task::task_outcome::PASS);
+    assert_eq!(task.result_hash, [42u8; 32]);
+    assert_eq!(task.result_count, 1);
+    assert!(task.completed_at > 0);
+
+    let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
+    assert_eq!(
+        assignment.status,
+        verification_task::assignment_status::SUBMITTED
+    );
+    assert!(assignment.submitted_at > 0);
+
+    // Double-submit rejected → 174 TaskAlreadyFinalized.
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "submit_task_result").to_vec();
+                d.extend_from_slice(&task_id);
+                d.push(verification_task::task_outcome::FAIL);
+                d.extend_from_slice(&[0u8; 32]);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6174, "double submit must fail");
+
+    // Cancel completed task → 174.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "cancel_task").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6174, "cancel completed task must fail");
+}
+
+#[tokio::test]
+async fn phase3_claim_then_submit_and_cancel_guards() {
+    use terra_registry::verification_task::{self, TaskAssignment, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let subject = Pubkey::new_unique();
+    let task_id = [8u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    // Create with required_validators = 1.
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::REMOTE,
+        0,
+        deadline,
+        &[1u8; 32],
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create failed");
+
+    // Past-deadline create rejected → 172.
+    let past_id = [9u8; 32];
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pda(&past_id).0, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_task_data(
+                &past_id,
+                &subject,
+                verification_task::task_class::REMOTE,
+                0,
+                clock.unix_timestamp - 10,
+                &[0u8; 32],
+                1,
+            ),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6172, "deadline in past must fail");
+
+    // Invalid task class → 169.
+    let bad_class_id = [10u8; 32];
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pda(&bad_class_id).0, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: create_task_data(&bad_class_id, &subject, 99, 0, deadline, &[0u8; 32], 1),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6169, "invalid class must fail");
+
+    // Validator claims open task.
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund failed");
+
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let mut data = discriminator("global", "claim_task").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("claim_task failed");
+
+    let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
+    assert_eq!(assignment.assigned_by, validator.pubkey());
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 1);
+    assert_eq!(task.status, verification_task::task_status::ASSIGNED);
+
+    // Stranger cannot cancel → 175.
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "cancel_task").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6175, "non-requester cancel must fail");
+
+    // Requester cancels incomplete task.
+    let mut data = discriminator("global", "cancel_task").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("cancel_task failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.status, verification_task::task_status::CANCELLED);
+
+    // Claim cancelled task with a *fresh* validator (first claim already
+    // created an assignment PDA for `validator`; init would fail first).
+    let other = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &other.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund other failed");
+    let res = process(
+        &mut ctx,
+        &other,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_assignment_pda(&task_id, &other.pubkey()).0, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(other.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "claim_task").to_vec();
+                d.extend_from_slice(&task_id);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6174, "claim cancelled task must fail");
+}

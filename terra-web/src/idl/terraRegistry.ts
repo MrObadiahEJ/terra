@@ -190,6 +190,103 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "add_task_requirement",
+      "discriminator": [
+        181,
+        37,
+        124,
+        255,
+        238,
+        152,
+        220,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "requirement",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "req_index",
+          "type": "u8"
+        },
+        {
+          "name": "capability_code",
+          "type": "u8"
+        },
+        {
+          "name": "min_reputation",
+          "type": "u16"
+        },
+        {
+          "name": "min_tier",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "radius_m",
+          "type": "u32"
+        },
+        {
+          "name": "center_lat_e7",
+          "type": "i32"
+        },
+        {
+          "name": "center_lon_e7",
+          "type": "i32"
+        },
+        {
+          "name": "independence_bps",
+          "type": "u16"
+        },
+        {
+          "name": "confidence_target_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "add_third_validator",
       "discriminator": [
         106,
@@ -675,6 +772,103 @@ export const terraRegistry: Idl = {
       "args": [
         {
           "name": "new_geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "assign_task_validator",
+      "discriminator": [
+        217,
+        224,
+        198,
+        65,
+        216,
+        139,
+        13,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -1297,6 +1491,58 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "cancel_task",
+      "discriminator": [
+        69,
+        228,
+        134,
+        187,
+        134,
+        105,
+        238,
+        48
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "cast_quorum_vote",
       "discriminator": [
         27,
@@ -1577,6 +1823,100 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "claim_task",
+      "discriminator": [
+        49,
+        222,
+        219,
+        238,
+        155,
+        68,
+        221,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "close_verification_session",
@@ -2461,6 +2801,91 @@ export const terraRegistry: Idl = {
         },
         {
           "name": "threshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "create_verification_task",
+      "discriminator": [
+        117,
+        19,
+        108,
+        104,
+        139,
+        244,
+        142,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "subject",
+          "type": "pubkey"
+        },
+        {
+          "name": "task_class",
+          "type": "u8"
+        },
+        {
+          "name": "reward_lamports",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        },
+        {
+          "name": "description_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "required_validators",
           "type": "u8"
         }
       ]
@@ -9917,6 +10342,109 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "submit_task_result",
+      "discriminator": [
+        39,
+        108,
+        74,
+        4,
+        66,
+        125,
+        157,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              },
+              {
+                "kind": "account",
+                "path": "assignment.validator",
+                "account": "TaskAssignment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "outcome",
+          "type": "u8"
+        },
+        {
+          "name": "result_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_verification_attestation",
       "discriminator": [
         104,
@@ -12124,6 +12652,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "TaskAssignment",
+      "discriminator": [
+        89,
+        239,
+        95,
+        144,
+        182,
+        35,
+        47,
+        254
+      ]
+    },
+    {
+      "name": "TaskRequirement",
+      "discriminator": [
+        70,
+        172,
+        186,
+        172,
+        160,
+        127,
+        79,
+        134
+      ]
+    },
+    {
       "name": "ThresholdCredential",
       "discriminator": [
         217,
@@ -12329,6 +12883,19 @@ export const terraRegistry: Idl = {
         195,
         243,
         254
+      ]
+    },
+    {
+      "name": "VerificationTask",
+      "discriminator": [
+        96,
+        182,
+        137,
+        216,
+        62,
+        108,
+        74,
+        190
       ]
     },
     {
@@ -13504,6 +14071,58 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "TaskAssigned",
+      "discriminator": [
+        67,
+        8,
+        87,
+        59,
+        111,
+        91,
+        204,
+        170
+      ]
+    },
+    {
+      "name": "TaskCancelled",
+      "discriminator": [
+        158,
+        101,
+        220,
+        187,
+        16,
+        141,
+        141,
+        64
+      ]
+    },
+    {
+      "name": "TaskRequirementAdded",
+      "discriminator": [
+        210,
+        120,
+        31,
+        247,
+        164,
+        100,
+        118,
+        172
+      ]
+    },
+    {
+      "name": "TaskResultSubmitted",
+      "discriminator": [
+        138,
+        65,
+        217,
+        42,
+        15,
+        246,
+        83,
+        32
+      ]
+    },
+    {
       "name": "UnbondingInitiated",
       "discriminator": [
         119,
@@ -13826,6 +14445,19 @@ export const terraRegistry: Idl = {
         6,
         135,
         151
+      ]
+    },
+    {
+      "name": "VerificationTaskCreated",
+      "discriminator": [
+        225,
+        37,
+        127,
+        148,
+        192,
+        238,
+        23,
+        87
       ]
     },
     {
@@ -14700,6 +15332,71 @@ export const terraRegistry: Idl = {
       "code": 6168,
       "name": "SelfRelationshipEdge",
       "msg": "Self-relationship edges are not allowed"
+    },
+    {
+      "code": 6169,
+      "name": "InvalidTaskClass",
+      "msg": "Invalid task class"
+    },
+    {
+      "code": 6170,
+      "name": "InvalidTaskStatus",
+      "msg": "Invalid task status"
+    },
+    {
+      "code": 6171,
+      "name": "InvalidTaskOutcome",
+      "msg": "Invalid task outcome"
+    },
+    {
+      "code": 6172,
+      "name": "TaskDeadlinePassed",
+      "msg": "Task deadline has passed"
+    },
+    {
+      "code": 6173,
+      "name": "TaskNotOpen",
+      "msg": "Task is not open for assignment"
+    },
+    {
+      "code": 6174,
+      "name": "TaskAlreadyFinalized",
+      "msg": "Task is already finalized"
+    },
+    {
+      "code": 6175,
+      "name": "NotTaskRequester",
+      "msg": "Signer is not the task requester"
+    },
+    {
+      "code": 6176,
+      "name": "NotTaskAssignee",
+      "msg": "Signer is not an assigned validator for this task"
+    },
+    {
+      "code": 6177,
+      "name": "TaskAlreadyAssigned",
+      "msg": "Task already has the required number of assignments"
+    },
+    {
+      "code": 6178,
+      "name": "SelfTaskAssignment",
+      "msg": "Requester cannot be assigned to their own task"
+    },
+    {
+      "code": 6179,
+      "name": "RequirementIndexMismatch",
+      "msg": "Requirement index must append sequentially"
+    },
+    {
+      "code": 6180,
+      "name": "InvalidTaskRequirement",
+      "msg": "Invalid task requirement field or task id"
+    },
+    {
+      "code": 6181,
+      "name": "TaskRequirementsFull",
+      "msg": "Task has reached the maximum number of requirements"
     }
   ],
   "types": [
@@ -19530,6 +20227,301 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "TaskAssigned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "assigned_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskAssignment",
+      "docs": [
+        "Selected validator for a task (requester assignment or self-claim).",
+        "",
+        "PDA: `[\"task_assignment\", task_id, validator]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "docs": [
+              "Assigned validator wallet."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "docs": [
+              "Requester wallet that created the task (audit trail)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "assigned_by",
+            "docs": [
+              "Who performed the assignment: requester = assign, validator = claim."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "One of `assignment_status`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "assigned_at",
+            "type": "i64"
+          },
+          {
+            "name": "submitted_at",
+            "docs": [
+              "0 until `submit_task_result`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskRequirement",
+      "docs": [
+        "One row of eligibility / evidence constraints for a task.",
+        "",
+        "PDA: `[\"task_requirement\", task_id, req_index]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "req_index",
+            "docs": [
+              "Append-only index (0, 1, \u2026 requirement_count-1)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "capability_code",
+            "docs": [
+              "Required capability (`capability_code`) or `CAPABILITY_ANY`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "min_reputation",
+            "docs": [
+              "Minimum legacy `ValidatorReputation.reputation_score` (0 = none)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_tier",
+            "docs": [
+              "Minimum `ValidatorProfile.tier` (0 = any)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "docs": [
+              "ISO 3166-1 alpha-2 as two bytes; `[0,0]` = any jurisdiction."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "radius_m",
+            "docs": [
+              "Max distance from center in meters; 0 = no geographic constraint."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "center_lat_e7",
+            "docs": [
+              "Geographic center (degrees * 1e7) when `radius_m > 0`."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "center_lon_e7",
+            "type": "i32"
+          },
+          {
+            "name": "independence_bps",
+            "docs": [
+              "Preferred independence (relationship-graph) threshold in bps (0 = none)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "confidence_target_bps",
+            "docs": [
+              "Minimum confidence the result should target (0\u201310000 bps)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskRequirementAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "req_index",
+            "type": "u8"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "min_reputation",
+            "type": "u16"
+          },
+          {
+            "name": "min_tier",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskResultSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "result_count",
+            "type": "u8"
+          },
+          {
+            "name": "completed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "ThresholdCredential",
       "type": {
         "kind": "struct",
@@ -21198,6 +22190,189 @@ export const terraRegistry: Idl = {
           {
             "name": "expires_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationTask",
+      "docs": [
+        "First-class work unit (requester, subject, class, reward, deadline).",
+        "",
+        "PDA: `[\"task\", task_id]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "docs": [
+              "Client-provided unique id (e.g. SHA-256 of the task statement)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "docs": [
+              "Who created and funds the task (pays rent; Phase 8 escrow source)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "docs": [
+              "What the task is about \u2014 claim, parcel, identity, or other account.",
+              "Not constrained to one program (migration map: claims become subjects)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "task_class",
+            "docs": [
+              "One of `task_class`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "One of `task_status`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "reward_lamports",
+            "docs": [
+              "Reward in lamports recorded for Phase 8 distribution (0 = unfunded)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "Unix ts after which the task cannot be claimed/assigned/submitted."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "description_hash",
+            "docs": [
+              "sha256 of off-chain task description / requirements narrative."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requirement_count",
+            "docs": [
+              "Number of `TaskRequirement` rows (append-only via req_index)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "assigned_count",
+            "docs": [
+              "Number of `TaskAssignment` rows created."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required_validators",
+            "docs": [
+              "How many submitted results are needed to complete (1..=MAX_TASK_VALIDATORS)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "result_count",
+            "docs": [
+              "How many results have been submitted so far."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "outcome",
+            "docs": [
+              "One of `task_outcome` (PENDING until first result)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "result_hash",
+            "docs": [
+              "Canonical hash of the aggregated result / report."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "docs": [
+              "0 until COMPLETED."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationTaskCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_class",
+            "type": "u8"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "required_validators",
+            "type": "u8"
           }
         ]
       }

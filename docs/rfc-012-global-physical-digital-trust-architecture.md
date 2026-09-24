@@ -1,6 +1,6 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
-**Status:** Accepted (Phases 0–2 complete on `dev`; Phases 3–10 pending)  
+**Status:** Accepted (Phases 0–3 complete on `dev`; Phases 4–10 pending)  
 **Created:** 2026-09-22  
 **Updated:** 2026-09-24  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
@@ -215,7 +215,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **0** | Architecture contract | **Done** | This RFC + migration map + structural tests (`rfc012_structure.rs` 21/21) |
 | **1** | Secure current core | **Done** | Succession/guardianship duplicate endorsements, unique validator sets, endorsement action binding, remaining_accounts ownership audit, canonical ownership (is_authorized_owner), admin constraints on jail/reputation/ZK/dispute/cross-border/guardian paths; escrow invariants — see SECURITY.md |
 | **2** | Generalize validator | **Complete** (2026-09-24) | `ValidatorProfile`/`Presence`/`Availability`/`Capability`/`RelationshipEdge` PDAs + 9 instructions, 5 accounts, 7 events, 9 errors; unit + BPF tests green; IDL 128/49/115/169 |
-| **3** | Introduce tasks | Pending | `Task → requirements → routing → assignment → verification → reward` |
+| **3** | Introduce tasks | **Complete** (2026-09-24) | `VerificationTask`/`TaskRequirement`/`TaskAssignment` PDAs + 6 instructions (create/add/assign/claim/submit/cancel), 3 accounts, 5 events, 13 errors; unit + BPF tests green; IDL 134/52/120/182 |
 | **4** | Introduce observations | Pending | Multi-source: phone, GNSS, drone, satellite, document, human |
 | **5** | Evidence/provenance | Pending | Separate subject / capture_device / submitter roles |
 | **6** | Dynamic routing | Pending | Capability + geography + availability + reputation + independence + randomness selection |
@@ -224,23 +224,25 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Phase 2 is complete on `dev` (2026-09-24). Before starting Phase 3 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 2 2026-09-24 it is 128/49/115/169 with A1 session-record accounts + Phase 2 validator-profile PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 3 is complete on `dev` (2026-09-24). Before starting Phase 4 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 3 2026-09-24 it is 134/52/120/182 with Phase 2 validator-profile PDAs + Phase 3 task PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
-## 8.1. Handoff: Phase 2 complete; how to start Phase 3
+## 8.1. Handoff: Phase 3 complete; how to start Phase 4
 
 **Already done (do not redo):** Phase 0 structural tests (`terra-core/programs/terra_registry/tests/rfc012_structure.rs`, 21 tests); Phase 1 unique-validator sets, endorsement action binding, remaining-accounts owner checks, admin constraints — verified list in `terra-core/SECURITY.md` “Phase 1 additions”.
 
 **Phase 2 delivered (2026-09-24):** `validator_profile.rs` module with `ValidatorProfile`, `ValidatorPresence`, `ValidatorAvailability`, `ValidatorCapability`, `ValidatorRelationshipEdge` accounts; instructions `init/update/set_tier` profile, `set_presence`, `set/suspend_availability`, `declare/admin_verify_capability`, `create_relationship_edge`; 6 lib unit tests + 4 BPF integration tests in `integration.rs` (`phase2_*`). Guards: self-init at tier NEW only, admin-only tier changes, SUSPENDED reserved for admin, VERIFIED/TRUSTED capability admin-only, self-edge rejected.
 
-**Immediate next actions for Phase 3:**
-1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 2 delivered `ValidatorProfile` etc. as PDAs while keeping `ValidatorRegistry` as an index; Phase 3 (tasks) should follow the same pattern.
-2. Checked-in IDL was refreshed in A2 (119/44/108/160) and Phase 2 (128/49/115/169); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+**Phase 3 delivered (2026-09-24):** `verification_task.rs` module with `VerificationTask` (seeds `["task", task_id]`), `TaskRequirement` (seeds `["task_requirement", task_id, req_index]`), `TaskAssignment` (seeds `["task_assignment", task_id, validator]`); 6 instructions `create_verification_task`, `add_task_requirement`, `assign_task_validator`, `claim_task`, `submit_task_result`, `cancel_task`; 5 events; 13 errors appended after `SelfRelationshipEdge`; 6 lib unit tests + 2 BPF integration tests (`phase3_*`). Task classes PHYSICAL/REMOTE/DOCUMENTARY/COMPUTATIONAL/HYBRID; statuses OPEN/ASSIGNED/IN_PROGRESS/COMPLETED/CANCELLED/EXPIRED; outcomes PASS/FAIL/INCONCLUSIVE. `reward_lamports` is recorded on the task (escrow/distribution deferred to Phase 8). Full multi-factor routing remains Phase 6 — Phase 3 ships explicit requester assignment + first-come claim.
+
+**Immediate next actions for Phase 4:**
+1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 3 delivered task PDAs per the sketch; Phase 4 (observations) should follow the same pattern (subject / capture_device / submitter separation per §5).
+2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), and Phase 3 (134/52/120/182); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 
-**Phase order (next):** 3 (tasks) → 4 (observations) → 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
+**Phase order (next):** 4 (observations) → 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
 
 ---
 

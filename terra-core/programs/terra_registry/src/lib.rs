@@ -304,6 +304,7 @@ pub mod validator_profile;
 pub mod validator_registry;
 pub mod vault;
 pub mod verification;
+pub mod verification_task;
 pub mod world_registry;
 pub mod zk;
 
@@ -2131,6 +2132,86 @@ pub mod terra_registry {
         weight_bps: u16,
     ) -> Result<()> {
         validator_profile::create_validator_relationship_edge(ctx, edge_type, weight_bps)
+    }
+
+    // -----------------------------------------------------------------------
+    // Verification tasks (RFC-012 Phase 3)
+    // -----------------------------------------------------------------------
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_verification_task(
+        ctx: Context<CreateVerificationTask>,
+        task_id: [u8; 32],
+        subject: Pubkey,
+        task_class: u8,
+        reward_lamports: u64,
+        deadline: i64,
+        description_hash: [u8; 32],
+        required_validators: u8,
+    ) -> Result<()> {
+        verification_task::create_verification_task(
+            ctx,
+            task_id,
+            subject,
+            task_class,
+            reward_lamports,
+            deadline,
+            description_hash,
+            required_validators,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_task_requirement(
+        ctx: Context<AddTaskRequirement>,
+        req_index: u8,
+        capability_code: u8,
+        min_reputation: u16,
+        min_tier: u8,
+        jurisdiction: [u8; 2],
+        radius_m: u32,
+        center_lat_e7: i32,
+        center_lon_e7: i32,
+        independence_bps: u16,
+        confidence_target_bps: u16,
+    ) -> Result<()> {
+        verification_task::add_task_requirement(
+            ctx,
+            req_index,
+            capability_code,
+            min_reputation,
+            min_tier,
+            jurisdiction,
+            radius_m,
+            center_lat_e7,
+            center_lon_e7,
+            independence_bps,
+            confidence_target_bps,
+        )
+    }
+
+    pub fn assign_task_validator(
+        ctx: Context<AssignTaskValidator>,
+        task_id: [u8; 32],
+    ) -> Result<()> {
+        verification_task::assign_task_validator(ctx, task_id)
+    }
+
+    pub fn claim_task(ctx: Context<ClaimTask>, task_id: [u8; 32]) -> Result<()> {
+        verification_task::claim_task(ctx, task_id)
+    }
+
+    pub fn submit_task_result(
+        ctx: Context<SubmitTaskResult>,
+        task_id: [u8; 32],
+        outcome: u8,
+        result_hash: [u8; 32],
+    ) -> Result<()> {
+        verification_task::submit_task_result(ctx, task_id, outcome, result_hash)
+    }
+
+    pub fn cancel_task(ctx: Context<CancelTask>, task_id: [u8; 32]) -> Result<()> {
+        verification_task::cancel_task(ctx, task_id)
     }
 
     // -----------------------------------------------------------------------
@@ -4082,10 +4163,6 @@ pub struct SlashValidator<'info> {
 }
 
 // ---------------------------------------------------------------------------
-// Challenge / Audit contexts
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Validator profile contexts (RFC-012 Phase 2)
 // ---------------------------------------------------------------------------
 
@@ -4272,6 +4349,136 @@ pub struct CreateValidatorRelationshipEdge<'info> {
     #[account(mut)]
     pub from_wallet: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Verification task contexts (RFC-012 Phase 3)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(task_id: [u8; 32], _subject: Pubkey, _task_class: u8, _reward_lamports: u64, _deadline: i64, _description_hash: [u8; 32], _required_validators: u8)]
+pub struct CreateVerificationTask<'info> {
+    #[account(
+        init,
+        payer = requester,
+        space = 8 + verification_task::VerificationTask::INIT_SPACE,
+        seeds = [b"task", task_id.as_ref()],
+        bump,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(req_index: u8, _capability_code: u8, _min_reputation: u16, _min_tier: u8, _jurisdiction: [u8; 2], _radius_m: u32, _center_lat_e7: i32, _center_lon_e7: i32, _independence_bps: u16, _confidence_target_bps: u16)]
+pub struct AddTaskRequirement<'info> {
+    #[account(
+        init,
+        payer = requester,
+        space = 8 + verification_task::TaskRequirement::INIT_SPACE,
+        seeds = [
+            b"task_requirement",
+            task.task_id.as_ref(),
+            &[req_index],
+        ],
+        bump,
+    )]
+    pub requirement: Account<'info, verification_task::TaskRequirement>,
+    #[account(
+        mut,
+        seeds = [b"task", task.task_id.as_ref()],
+        bump,
+        constraint = task.requester == requester.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(_task_id: [u8; 32])]
+pub struct AssignTaskValidator<'info> {
+    #[account(
+        init,
+        payer = requester,
+        space = 8 + verification_task::TaskAssignment::INIT_SPACE,
+        seeds = [
+            b"task_assignment",
+            task.task_id.as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(
+        mut,
+        seeds = [b"task", task.task_id.as_ref()],
+        bump,
+        constraint = task.requester == requester.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    /// CHECK: wallet only needs to exist as a pubkey target; assignment checks != requester in handler.
+    pub validator: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(_task_id: [u8; 32])]
+pub struct ClaimTask<'info> {
+    #[account(
+        init,
+        payer = validator,
+        space = 8 + verification_task::TaskAssignment::INIT_SPACE,
+        seeds = [
+            b"task_assignment",
+            task.task_id.as_ref(),
+            validator.key().as_ref(),
+        ],
+        bump,
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(mut, seeds = [b"task", task.task_id.as_ref()], bump)]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(_task_id: [u8; 32], _outcome: u8, _result_hash: [u8; 32])]
+pub struct SubmitTaskResult<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"task_assignment",
+            task.task_id.as_ref(),
+            assignment.validator.as_ref(),
+        ],
+        bump,
+        constraint = assignment.task_id == task.task_id @ TerraError::NotTaskAssignee,
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(mut, seeds = [b"task", task.task_id.as_ref()], bump)]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    pub validator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(_task_id: [u8; 32])]
+pub struct CancelTask<'info> {
+    #[account(
+        mut,
+        seeds = [b"task", task.task_id.as_ref()],
+        bump,
+        constraint = task.requester == requester.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    pub requester: Signer<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -5136,6 +5343,57 @@ pub struct ValidatorRelationshipEdgeCreated {
 }
 
 // ---------------------------------------------------------------------------
+// Verification task events (RFC-012 Phase 3)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct VerificationTaskCreated {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub requester: Pubkey,
+    pub subject: Pubkey,
+    pub task_class: u8,
+    pub deadline: i64,
+    pub required_validators: u8,
+}
+
+#[event]
+pub struct TaskRequirementAdded {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub req_index: u8,
+    pub capability_code: u8,
+    pub min_reputation: u16,
+    pub min_tier: u8,
+}
+
+#[event]
+pub struct TaskAssigned {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub assigned_by: Pubkey,
+}
+
+#[event]
+pub struct TaskResultSubmitted {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub outcome: u8,
+    pub result_count: u8,
+    pub completed: bool,
+}
+
+#[event]
+pub struct TaskCancelled {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub requester: Pubkey,
+    pub cancelled_at: i64,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -5694,6 +5952,34 @@ pub enum TerraError {
     InvalidEdgeType,
     #[msg("Self-relationship edges are not allowed")]
     SelfRelationshipEdge,
+
+    // RFC-012 Phase 3: verification tasks
+    #[msg("Invalid task class")]
+    InvalidTaskClass,
+    #[msg("Invalid task status")]
+    InvalidTaskStatus,
+    #[msg("Invalid task outcome")]
+    InvalidTaskOutcome,
+    #[msg("Task deadline has passed")]
+    TaskDeadlinePassed,
+    #[msg("Task is not open for assignment")]
+    TaskNotOpen,
+    #[msg("Task is already finalized")]
+    TaskAlreadyFinalized,
+    #[msg("Signer is not the task requester")]
+    NotTaskRequester,
+    #[msg("Signer is not an assigned validator for this task")]
+    NotTaskAssignee,
+    #[msg("Task already has the required number of assignments")]
+    TaskAlreadyAssigned,
+    #[msg("Requester cannot be assigned to their own task")]
+    SelfTaskAssignment,
+    #[msg("Requirement index must append sequentially")]
+    RequirementIndexMismatch,
+    #[msg("Invalid task requirement field or task id")]
+    InvalidTaskRequirement,
+    #[msg("Task has reached the maximum number of requirements")]
+    TaskRequirementsFull,
 }
 
 #[cfg(test)]

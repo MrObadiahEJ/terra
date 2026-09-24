@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo check (workspace)",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["check", "--workspace"],
+            "options": {
+                "cwd": "${workspaceFolder}/terra-core",
+                "env": {
+                    "CARGO_TARGET_DIR": "${workspaceFolder}/terra-core/target/rust-analyzer"
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": ["$rustc"],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "test-fast (registry lib + clippy)",
+            "type": "shell",
+            "command": "make",
+            "args": ["test-fast"],
+            "options": {
+                "cwd": "${workspaceFolder}/terra-core"
+            },
+            "group": "test",
+            "problemMatcher": ["$rustc"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        }
+    ]
+}

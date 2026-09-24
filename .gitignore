@@ -43,6 +43,8 @@ tmp/screenshots/
 # --- Editor / OS ---
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
 .idea/
 *.swp
 .DS_Store

@@ -1,0 +1,51 @@
+{
+    // Permanent rust-analyzer setup for terra (weak machine friendly).
+    // Opens this folder → indexing + cargo check on save, without locking
+    // the same target/ as opencode's cargo build (separate CARGO_TARGET_DIR).
+
+    // Always on for this workspace (re-enable if you turned the extension off).
+    "rust-analyzer.enabled": true,
+    "rust-analyzer.linkedProjects": [
+        "terra-core/Cargo.toml"
+    ],
+
+    // Indexing / navigation: on. Diagnostics refresh on save only (not every keystroke).
+    "rust-analyzer.checkOnSave": true,
+    "rust-analyzer.check.command": "check",
+    "rust-analyzer.diagnostics.enable": true,
+
+    // CPU/RAM savers (4 cores / ~8 GB):
+    // build scripts + proc-macro expansion re-run constantly and thrash Anchor workspaces.
+    // Turn these back on only if you need deeper macro-aware navigation.
+    "rust-analyzer.cargo.buildScripts.enable": false,
+    "rust-analyzer.procMacro.enable": false,
+    "rust-analyzer.inlayHints.enabled": false,
+
+    // Keep rust-analyzer off the shared target/ so my cargo build/test never
+    // blocks on "Waiting for file lock on package cache" and vice versa.
+    "rust-analyzer.server.extraEnv": {
+        "CARGO_TARGET_DIR": "${workspaceFolder}/terra-core/target/rust-analyzer"
+    },
+
+    // Don't watch the 18 GB target tree or node_modules (major UI/CPU drain).
+    "files.watcherExclude": {
+        "**/terra-core/target/**": true,
+        "**/terra-web/node_modules/**": true,
+        "**/terra-core/node_modules/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true
+    },
+    "search.exclude": {
+        "**/terra-core/target": true,
+        "**/terra-web/node_modules": true,
+        "**/terra-core/node_modules": true
+    },
+
+    // Rust formatting stays with cargo fmt (make / CI), not editor-on-save.
+    "[rust]": {
+        "editor.formatOnSave": false,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.rust-analyzer": "never"
+        }
+    }
+}
