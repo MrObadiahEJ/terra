@@ -9455,6 +9455,125 @@
       ]
     },
     {
+      "name": "route_task",
+      "discriminator": [
+        10,
+        69,
+        178,
+        125,
+        217,
+        194,
+        194,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "arg",
+                "path": "_chosen"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requirement"
+        },
+        {
+          "name": "chosen",
+          "docs": [
+            "handler against candidate PDAs in remaining_accounts."
+          ]
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "req_index",
+          "type": "u8"
+        },
+        {
+          "name": "candidates",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "chosen",
+          "type": "pubkey"
+        },
+        {
+          "name": "competitor_count",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "set_quorum_config",
       "discriminator": [
         10,
@@ -14632,6 +14751,19 @@
       ]
     },
     {
+      "name": "TaskRouted",
+      "discriminator": [
+        180,
+        115,
+        100,
+        224,
+        93,
+        113,
+        123,
+        103
+      ]
+    },
+    {
       "name": "UnbondingInitiated",
       "discriminator": [
         119,
@@ -15931,6 +16063,26 @@
       "code": 6186,
       "name": "EvidenceManifestFull",
       "msg": "Evidence manifest has reached the maximum number of artifacts"
+    },
+    {
+      "code": 6187,
+      "name": "ValidatorNotEligible",
+      "msg": "Validator failed multi-factor eligibility filters"
+    },
+    {
+      "code": 6188,
+      "name": "NotRouteWinner",
+      "msg": "Chosen candidate is not the randomized route winner"
+    },
+    {
+      "code": 6189,
+      "name": "TooManyRouteCandidates",
+      "msg": "Too many route candidates or invalid competitor count"
+    },
+    {
+      "code": 6190,
+      "name": "RouteAccountMismatch",
+      "msg": "Route remaining_accounts do not match candidate list"
     }
   ],
   "types": [
@@ -21452,6 +21604,47 @@
           {
             "name": "completed",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskRouted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "req_index",
+            "type": "u8"
+          },
+          {
+            "name": "eligible_count",
+            "type": "u16"
+          },
+          {
+            "name": "competitor_count",
+            "type": "u16"
+          },
+          {
+            "name": "draw_bps",
+            "type": "u16"
           }
         ]
       }

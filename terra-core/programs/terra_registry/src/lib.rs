@@ -299,6 +299,7 @@ pub mod ipfs_docs;
 pub mod observation_v2;
 pub mod quorum;
 pub mod recovery;
+pub mod routing;
 pub mod staking;
 pub mod subdivision;
 pub mod time_bound;
@@ -2285,6 +2286,29 @@ pub mod terra_registry {
             provenance,
             content_hash,
             storage_reference,
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Dynamic routing (RFC-012 Phase 6)
+    // -----------------------------------------------------------------------
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn route_task(
+        ctx: Context<RouteTask>,
+        task_id: [u8; 32],
+        req_index: u8,
+        candidates: Vec<Pubkey>,
+        chosen: Pubkey,
+        competitor_count: u16,
+    ) -> Result<()> {
+        routing::route_task(
+            ctx,
+            task_id,
+            req_index,
+            candidates,
+            chosen,
+            competitor_count,
         )
     }
 
@@ -4659,6 +4683,51 @@ pub struct AddEvidenceArtifact<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic routing contexts (RFC-012 Phase 6)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(task_id: [u8; 32], req_index: u8, _candidates: Vec<Pubkey>, _chosen: Pubkey, _competitor_count: u16)]
+pub struct RouteTask<'info> {
+    #[account(
+        init,
+        payer = requester,
+        space = 8 + verification_task::TaskAssignment::INIT_SPACE,
+        seeds = [
+            b"task_assignment",
+            task_id.as_ref(),
+            _chosen.as_ref(),
+        ],
+        bump,
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(
+        mut,
+        seeds = [b"task", task_id.as_ref()],
+        bump,
+        constraint = task.task_id == task_id @ TerraError::InvalidTaskRequirement,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(
+        seeds = [
+            b"task_requirement",
+            task_id.as_ref(),
+            &[req_index],
+        ],
+        bump,
+        constraint = requirement.task_id == task_id @ TerraError::InvalidTaskRequirement,
+        constraint = requirement.req_index == req_index @ TerraError::InvalidTaskRequirement,
+    )]
+    pub requirement: Account<'info, verification_task::TaskRequirement>,
+    /// CHECK: chosen is a wallet pubkey only; eligibility is verified in the
+    /// handler against candidate PDAs in remaining_accounts.
+    pub chosen: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -5612,6 +5681,21 @@ pub struct EvidenceArtifactAdded {
 }
 
 // ---------------------------------------------------------------------------
+// Dynamic routing events (RFC-012 Phase 6)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct TaskRouted {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub req_index: u8,
+    pub eligible_count: u16,
+    pub competitor_count: u16,
+    pub draw_bps: u16,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -6212,6 +6296,16 @@ pub enum TerraError {
     EvidenceIndexMismatch,
     #[msg("Evidence manifest has reached the maximum number of artifacts")]
     EvidenceManifestFull,
+
+    // RFC-012 Phase 6: dynamic routing
+    #[msg("Validator failed multi-factor eligibility filters")]
+    ValidatorNotEligible,
+    #[msg("Chosen candidate is not the randomized route winner")]
+    NotRouteWinner,
+    #[msg("Too many route candidates or invalid competitor count")]
+    TooManyRouteCandidates,
+    #[msg("Route remaining_accounts do not match candidate list")]
+    RouteAccountMismatch,
 }
 
 #[cfg(test)]

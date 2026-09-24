@@ -1,3 +1,6 @@
+// Auto-generated from terra_registry.json — DO NOT EDIT
+import type { Idl } from "@coral-xyz/oxn";
+
 export const terraRegistry: Idl = {
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
   "metadata": {
@@ -499,7 +502,7 @@ export const terraRegistry: Idl = {
         {
           "name": "admin_signer",
           "docs": [
-            "Admin signer — required in bootstrap mode, ignored in peer-consensus",
+            "Admin signer \u2014 required in bootstrap mode, ignored in peer-consensus",
             "(the endorsement account carries authority instead)."
           ],
           "writable": true,
@@ -661,7 +664,7 @@ export const terraRegistry: Idl = {
         {
           "name": "authority",
           "docs": [
-            "Court authority or designated adjudicator — must be registry admin."
+            "Court authority or designated adjudicator \u2014 must be registry admin."
           ],
           "signer": true
         }
@@ -1094,7 +1097,7 @@ export const terraRegistry: Idl = {
         "",
         "**DEPRECATED**: Use `create_claim` in the verification pipeline instead.",
         "This instruction remains for backward compatibility with existing",
-        "attestations. New attestations should use `Claim → Evidence → Observation`.",
+        "attestations. New attestations should use `Claim \u2192 Evidence \u2192 Observation`.",
         "",
         "`validators` holds the public keys of the (possibly several) parties",
         "who must sign off on the transaction; `required` is how many signatures",
@@ -5845,7 +5848,7 @@ export const terraRegistry: Idl = {
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -9455,6 +9458,125 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "route_task",
+      "discriminator": [
+        10,
+        69,
+        178,
+        125,
+        217,
+        194,
+        194,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "arg",
+                "path": "_chosen"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requirement"
+        },
+        {
+          "name": "chosen",
+          "docs": [
+            "handler against candidate PDAs in remaining_accounts."
+          ]
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "req_index",
+          "type": "u8"
+        },
+        {
+          "name": "candidates",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "chosen",
+          "type": "pubkey"
+        },
+        {
+          "name": "competitor_count",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "set_quorum_config",
       "discriminator": [
         10,
@@ -11954,7 +12076,7 @@ export const terraRegistry: Idl = {
           "name": "treasury",
           "docs": [
             "Treasury PDA receiving slashed lamports. Constrained to a deterministic",
-            "PDA derived from the authority registry — no one can redirect funds to",
+            "PDA derived from the authority registry \u2014 no one can redirect funds to",
             "an arbitrary wallet."
           ],
           "writable": true,
@@ -14632,6 +14754,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "TaskRouted",
+      "discriminator": [
+        180,
+        115,
+        100,
+        224,
+        93,
+        113,
+        123,
+        103
+      ]
+    },
+    {
       "name": "UnbondingInitiated",
       "discriminator": [
         119,
@@ -15345,7 +15480,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6069,
       "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received — seller cannot accept"
+      "msg": "Full deposit not yet received \u2014 seller cannot accept"
     },
     {
       "code": 6070,
@@ -15360,12 +15495,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6072,
       "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired — cannot cancel"
+      "msg": "Buyer grace period has expired \u2014 cannot cancel"
     },
     {
       "code": 6073,
       "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired — escrow not stale"
+      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
     },
     {
       "code": 6074,
@@ -15500,12 +15635,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6100,
       "name": "StakeAlreadyActive",
-      "msg": "Stake is already active — cannot deposit again"
+      "msg": "Stake is already active \u2014 cannot deposit again"
     },
     {
       "code": 6101,
       "name": "UnbondingInProgress",
-      "msg": "Unbonding is in progress — cannot deposit or withdraw"
+      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
     },
     {
       "code": 6102,
@@ -15620,7 +15755,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6124,
       "name": "ProgramPaused",
-      "msg": "Program is paused — state-changing operations are frozen"
+      "msg": "Program is paused \u2014 state-changing operations are frozen"
     },
     {
       "code": 6125,
@@ -15931,6 +16066,26 @@ export const terraRegistry: Idl = {
       "code": 6186,
       "name": "EvidenceManifestFull",
       "msg": "Evidence manifest has reached the maximum number of artifacts"
+    },
+    {
+      "code": 6187,
+      "name": "ValidatorNotEligible",
+      "msg": "Validator failed multi-factor eligibility filters"
+    },
+    {
+      "code": 6188,
+      "name": "NotRouteWinner",
+      "msg": "Chosen candidate is not the randomized route winner"
+    },
+    {
+      "code": 6189,
+      "name": "TooManyRouteCandidates",
+      "msg": "Too many route candidates or invalid competitor count"
+    },
+    {
+      "code": 6190,
+      "name": "RouteAccountMismatch",
+      "msg": "Route remaining_accounts do not match candidate list"
     }
   ],
   "types": [
@@ -16024,13 +16179,13 @@ export const terraRegistry: Idl = {
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
         "**DEPRECATED**: This parcel-centric attestation model is superseded by the",
-        "verification pipeline (`Claim → Evidence → Observation → VerificationAttestation`).",
+        "verification pipeline (`Claim \u2192 Evidence \u2192 Observation \u2192 VerificationAttestation`).",
         "Existing accounts remain valid for backward compatibility, but new attestations",
         "should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)",
         "is provided to transition legacy attestations into the new model.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
-        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
+        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -16559,7 +16714,7 @@ export const terraRegistry: Idl = {
           {
             "name": "required_attestations",
             "docs": [
-              "Quorum threshold — number of attestations needed to verify."
+              "Quorum threshold \u2014 number of attestations needed to verify."
             ],
             "type": "u8"
           },
@@ -17238,7 +17393,7 @@ export const terraRegistry: Idl = {
           {
             "name": "status",
             "docs": [
-              "Current dispute status (FILED → FROZEN → ADJUDICATED → EXECUTED)."
+              "Current dispute status (FILED \u2192 FROZEN \u2192 ADJUDICATED \u2192 EXECUTED)."
             ],
             "type": "u8"
           },
@@ -17273,7 +17428,7 @@ export const terraRegistry: Idl = {
             "docs": [
               "Validators that actually co-signed (recorded at freeze/adjudicate).",
               "Unlike `validators` (declared at filing), this is on-chain proof of",
-              "who testified — events alone are not reliably indexable."
+              "who testified \u2014 events alone are not reliably indexable."
             ],
             "type": {
               "array": [
@@ -18038,14 +18193,14 @@ export const terraRegistry: Idl = {
           {
             "name": "source",
             "docs": [
-              "Capture source — one of `observation_source` (reused for provenance richness)."
+              "Capture source \u2014 one of `observation_source` (reused for provenance richness)."
             ],
             "type": "u8"
           },
           {
             "name": "provenance",
             "docs": [
-              "Provenance — one of `observation_provenance`."
+              "Provenance \u2014 one of `observation_provenance`."
             ],
             "type": "u8"
           },
@@ -18064,7 +18219,7 @@ export const terraRegistry: Idl = {
           {
             "name": "storage_reference",
             "docs": [
-              "IPFS CID, URL, or content address (≤128 bytes)."
+              "IPFS CID, URL, or content address (\u2264128 bytes)."
             ],
             "type": "string"
           },
@@ -18603,7 +18758,7 @@ export const terraRegistry: Idl = {
         "",
         "This is the foundation for replacing raw wallet ownership (`Parcel.owner`)",
         "with identity-centric ownership. Rather than a wallet pubkey holding a right,",
-        "the Identity PDA is the holder — making rights portable across wallets.",
+        "the Identity PDA is the holder \u2014 making rights portable across wallets.",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`.",
         "One IdentityRights per (identity, parcel, kind) is allowed."
@@ -19258,7 +19413,7 @@ export const terraRegistry: Idl = {
         "",
         "PDA: `[\"observation_v2\", task_id, observer, nonce]`",
         "",
-        "Roles (Design Rule 7): `subject` ≠ `capture_device` ≠ `observer`",
+        "Roles (Design Rule 7): `subject` \u2260 `capture_device` \u2260 `observer`",
         "(submitter). A document owned by Alice (`subject`), photographed on",
         "Bob's phone (`capture_device`), submitted by Charlie (`observer`)."
       ],
@@ -19294,7 +19449,7 @@ export const terraRegistry: Idl = {
           {
             "name": "subject",
             "docs": [
-              "What is observed — claim, parcel, identity, or other account key."
+              "What is observed \u2014 claim, parcel, identity, or other account key."
             ],
             "type": "pubkey"
           },
@@ -19365,7 +19520,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence",
             "docs": [
-              "Confidence 0–100."
+              "Confidence 0\u2013100."
             ],
             "type": "u8"
           },
@@ -19693,7 +19848,7 @@ export const terraRegistry: Idl = {
       "docs": [
         "A parcel of land.",
         "",
-        "**DEPRECATED: `owner` field** — Ownership should be expressed through",
+        "**DEPRECATED: `owner` field** \u2014 Ownership should be expressed through",
         "`IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct",
         "`owner` wallet field. The `is_authorized_owner()` function supports both",
         "paths. New code should prefer the IdentityRights path. The `owner` field",
@@ -21306,7 +21461,7 @@ export const terraRegistry: Idl = {
           {
             "name": "req_index",
             "docs": [
-              "Append-only index (0, 1, … requirement_count-1)."
+              "Append-only index (0, 1, \u2026 requirement_count-1)."
             ],
             "type": "u8"
           },
@@ -21371,7 +21526,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence_target_bps",
             "docs": [
-              "Minimum confidence the result should target (0–10000 bps)."
+              "Minimum confidence the result should target (0\u201310000 bps)."
             ],
             "type": "u16"
           },
@@ -21452,6 +21607,47 @@ export const terraRegistry: Idl = {
           {
             "name": "completed",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskRouted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "req_index",
+            "type": "u8"
+          },
+          {
+            "name": "eligible_count",
+            "type": "u16"
+          },
+          {
+            "name": "competitor_count",
+            "type": "u16"
+          },
+          {
+            "name": "draw_bps",
+            "type": "u16"
           }
         ]
       }
@@ -21597,7 +21793,7 @@ export const terraRegistry: Idl = {
           {
             "name": "is_active",
             "docs": [
-              "Soft flag — set to false by admin to forcibly exclude a validator from",
+              "Soft flag \u2014 set to false by admin to forcibly exclude a validator from",
               "quorum without removing them from the registry."
             ],
             "type": "bool"
@@ -22007,7 +22203,7 @@ export const terraRegistry: Idl = {
     {
       "name": "ValidatorPresence",
       "docs": [
-        "Dynamic geographic presence — timestamped, confidence-scored, expiring.",
+        "Dynamic geographic presence \u2014 timestamped, confidence-scored, expiring.",
         "",
         "Never treat as immutable identity. PDA: `[\"validator_presence\", wallet]`"
       ],
@@ -22021,7 +22217,7 @@ export const terraRegistry: Idl = {
           {
             "name": "latitude_e7",
             "docs": [
-              "Latitude in degrees * 1e7 (i32) — compact fixed-point."
+              "Latitude in degrees * 1e7 (i32) \u2014 compact fixed-point."
             ],
             "type": "i32"
           },
@@ -22049,7 +22245,7 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence_bps",
             "docs": [
-              "Confidence in this presence fix (0–10000 bps)."
+              "Confidence in this presence fix (0\u201310000 bps)."
             ],
             "type": "u16"
           },
@@ -22101,7 +22297,7 @@ export const terraRegistry: Idl = {
     {
       "name": "ValidatorProfile",
       "docs": [
-        "Core validator profile — identity + tier attributes (not location-bound).",
+        "Core validator profile \u2014 identity + tier attributes (not location-bound).",
         "",
         "PDA: `[\"validator_profile\", wallet]`"
       ],
@@ -22111,7 +22307,7 @@ export const terraRegistry: Idl = {
           {
             "name": "wallet",
             "docs": [
-              "The validator's wallet (mobile participant — NOT a region)."
+              "The validator's wallet (mobile participant \u2014 NOT a region)."
             ],
             "type": "pubkey"
           },
@@ -22137,7 +22333,7 @@ export const terraRegistry: Idl = {
           {
             "name": "note",
             "docs": [
-              "Free-form operator note (device class, org, …) — not used for selection."
+              "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
             ],
             "type": "string"
           },
@@ -22252,7 +22448,7 @@ export const terraRegistry: Idl = {
               "Emergency pause flag. When true, all pausable subsystem instructions",
               "(staking, cross-border, guardian, zk, escrow, dispute) reject",
               "state-changing calls. Core parcel/identity operations authorized by",
-              "individual owners are unaffected — the admin stops processing via",
+              "individual owners are unaffected \u2014 the admin stops processing via",
               "off-chain policy."
             ],
             "type": "bool"
@@ -22280,7 +22476,7 @@ export const terraRegistry: Idl = {
       "docs": [
         "Directed relationship graph edge (endorsement / co-validation / infra).",
         "",
-        "Correlation ≠ fraud — used for review, not auto-punishment (RFC-012 §6.12).",
+        "Correlation \u2260 fraud \u2014 used for review, not auto-punishment (RFC-012 \u00a76.12).",
         "PDA: `[\"validator_edge\", from, to, edge_type]`"
       ],
       "type": {
@@ -22304,7 +22500,7 @@ export const terraRegistry: Idl = {
           {
             "name": "weight_bps",
             "docs": [
-              "Optional strength (0–10000 bps); default 10000 for binary endorsement."
+              "Optional strength (0\u201310000 bps); default 10000 for binary endorsement."
             ],
             "type": "u16"
           },
@@ -23161,7 +23357,7 @@ export const terraRegistry: Idl = {
           {
             "name": "subject",
             "docs": [
-              "What the task is about — claim, parcel, identity, or other account.",
+              "What the task is about \u2014 claim, parcel, identity, or other account.",
               "Not constrained to one program (migration map: claims become subjects)."
             ],
             "type": "pubkey"
@@ -23320,7 +23516,7 @@ export const terraRegistry: Idl = {
           {
             "name": "admin",
             "docs": [
-              "Global founder — temporary sole authority during bootstrap phase."
+              "Global founder \u2014 temporary sole authority during bootstrap phase."
             ],
             "type": "pubkey"
           },

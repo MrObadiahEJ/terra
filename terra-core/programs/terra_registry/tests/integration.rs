@@ -24952,3 +24952,416 @@ async fn phase5_evidence_guards() {
     let manifest: EvidenceManifest = read_account(&ctx, manifest_pk).await;
     assert_eq!(manifest.artifact_count, 0);
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 6 — dynamic routing (route_task)
+// ---------------------------------------------------------------------------
+
+fn route_task_data(
+    task_id: &[u8; 32],
+    req_index: u8,
+    candidates: &[Pubkey],
+    chosen: &Pubkey,
+    competitor_count: u16,
+) -> Vec<u8> {
+    let mut data = discriminator("global", "route_task").to_vec();
+    data.extend_from_slice(task_id);
+    data.push(req_index);
+    data.extend_from_slice(&(candidates.len() as u32).to_le_bytes());
+    for c in candidates {
+        data.extend_from_slice(c.as_ref());
+    }
+    data.extend_from_slice(chosen.as_ref());
+    data.extend_from_slice(&competitor_count.to_le_bytes());
+    data
+}
+
+#[tokio::test]
+async fn phase6_route_single_candidate_assigns() {
+    use terra_registry::validator_profile::{self, ValidatorAvailability, ValidatorProfile};
+    use terra_registry::verification_task::{self, TaskAssignment, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator");
+
+    // Init validator profile + AVAILABLE.
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile");
+
+    let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    // Create task + requirement (CAPABILITY_ANY, no geo).
+    let subject = Pubkey::new_unique();
+    let task_id = [42u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        1_000_000,
+        deadline,
+        &[1u8; 32],
+        1, // required_validators
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task");
+
+    let (req_pk, _) = task_requirement_pda(&task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0); // req_index
+    data.push(terra_registry::verification_task::CAPABILITY_ANY);
+    data.extend_from_slice(&0u16.to_le_bytes()); // min_reputation
+    data.push(0); // min_tier
+    data.extend_from_slice(&[0u8; 2]); // jurisdiction any
+    data.extend_from_slice(&0u32.to_le_bytes()); // radius_m = 0 (no geo)
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes()); // independence_bps
+    data.extend_from_slice(&8000u16.to_le_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add requirement");
+
+    // route_task: single candidate → always wins.
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    // remaining: profile, availability, reputation-missing (use avail as stand-in → deser fail → score 0)
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                // remaining_accounts
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false), // fake reputation → deser fail → 0
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("route_task failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 1);
+    assert_eq!(task.status, verification_task::task_status::ASSIGNED);
+
+    let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
+    assert_eq!(assignment.task_id, task_id);
+    assert_eq!(assignment.validator, validator.pubkey());
+    assert_eq!(
+        assignment.status,
+        verification_task::assignment_status::ASSIGNED
+    );
+
+    // Read-back profile/availability sanity.
+    let profile: ValidatorProfile = read_account(&ctx, profile_pk).await;
+    assert_eq!(profile.wallet, validator.pubkey());
+    let av: ValidatorAvailability = read_account(&ctx, avail_pk).await;
+    assert_eq!(av.status, validator_profile::availability_status::AVAILABLE);
+}
+
+#[tokio::test]
+async fn phase6_route_guards() {
+    use terra_registry::validator_profile::{self};
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    // Profile + AVAILABLE (needed for happy attempts and for ineligible flip).
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile");
+
+    let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    let subject = Pubkey::new_unique();
+    let task_id = [43u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        0,
+        deadline,
+        &[2u8; 32],
+        2, // allow two assigns so guards can retry after failures
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task");
+
+    let (req_pk, _) = task_requirement_pda(&task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0);
+    data.push(terra_registry::verification_task::CAPABILITY_ANY);
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.push(0);
+    data.extend_from_slice(&[0u8; 2]);
+    data.extend_from_slice(&0u32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&8000u16.to_le_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add requirement");
+
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let route_accounts = |remaining: Vec<AccountMeta>| {
+        let mut accounts = vec![
+            AccountMeta::new(assign_pk, false),
+            AccountMeta::new(task_pk, false),
+            AccountMeta::new_readonly(req_pk, false),
+            AccountMeta::new_readonly(validator.pubkey(), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ];
+        accounts.extend(remaining);
+        accounts
+    };
+
+    // Empty candidates → 6189.
+    let data = route_task_data(&task_id, 0, &[], &validator.pubkey(), 1);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: route_accounts(vec![]),
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6189, "empty candidates must fail");
+
+    // chosen not in candidates → 6188.
+    let other = Pubkey::new_unique();
+    let data = route_task_data(&task_id, 0, &[other], &validator.pubkey(), 1);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: route_accounts(vec![]),
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6188, "chosen not in candidates must fail");
+
+    // Wrong remaining_accounts count → 6190.
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            // only 2 accounts instead of stride 3
+            accounts: route_accounts(vec![
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+            ]),
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6190, "wrong remaining length must fail");
+
+    // Flip availability to OFFLINE → ineligible → 6187.
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::OFFLINE);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set offline");
+
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: route_accounts(vec![
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+            ]),
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6187, "offline validator must be ineligible");
+
+    // Sanity: task still unassigned after all failures.
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 0);
+}

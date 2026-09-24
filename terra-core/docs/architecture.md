@@ -11,14 +11,15 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-24, Phase 5): `terra_registry` — 137 instructions, 55 `#[account]` types, 123 events, 187 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-24, Phase 6): `terra_registry` — 138 instructions, 55 `#[account]` types, 124 events, 191 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (187 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (191 codes)
 ├── evidence_manifest.rs     # RFC-012 Phase 5 evidence manifest/artifacts
+├── routing.rs               # RFC-012 Phase 6 multi-factor dynamic routing
 ├── observation_v2.rs         # RFC-012 Phase 4 multi-source ObservationV2
 ├── verification_task.rs      # RFC-012 Phase 3 task PDAs
 ├── cross_border.rs           # Cross-border jurisdiction + identity binding
@@ -237,7 +238,7 @@ EXECUTE (after timelock + endorsements)
 
 ## Error Codes
 
-- `terra_registry`: **187** custom codes in `TerraError` (starts at Anchor 6000; ends with `EvidenceManifestFull`).
+- `terra_registry`: **191** custom codes in `TerraError` (starts at Anchor 6000; ends with `RouteAccountMismatch`).
 - `terra_identity`: **29** custom codes in `IdentityError` (starts at 6000; ends with `DuplicateValidator`).
 
 ## Constants
@@ -278,7 +279,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 137/55/123/187 as of Phase 5, 2026-09-24).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 138/55/124/191 as of Phase 6, 2026-09-24).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

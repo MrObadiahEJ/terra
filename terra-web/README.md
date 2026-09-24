@@ -45,8 +45,8 @@ changing `terra-core/programs/terra_registry`, regenerate from the repo:
 cd ../terra-core && make idl
 ```
 
-**Synced:** checked-in IDL matches source as of Phase 5 (2026-09-24): **137
-instructions / 55 accounts / 123 events / 187 errors**. Re-run `make idl`
+**Synced:** checked-in IDL matches source as of Phase 6 (2026-09-24): **138
+instructions / 55 accounts / 124 events / 191 errors**. Re-run `make idl`
 (and re-sync `src/idl/` types) before shipping client changes that depend on
 new instructions, accounts, events, or error codes.
 
