@@ -10342,6 +10342,167 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "submit_observation_v2",
+      "discriminator": [
+        255,
+        214,
+        31,
+        189,
+        240,
+        91,
+        185,
+        152
+      ],
+      "accounts": [
+        {
+          "name": "observation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "account",
+                "path": "observer"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "observer",
+          "docs": [
+            "fields on ObservationV2 capture subject/capture_device separation."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "subject",
+          "type": "pubkey"
+        },
+        {
+          "name": "capture_device",
+          "type": "pubkey"
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "provenance",
+          "type": "u8"
+        },
+        {
+          "name": "location",
+          "type": {
+            "array": [
+              "i64",
+              2
+            ]
+          }
+        },
+        {
+          "name": "observed_at",
+          "type": "i64"
+        },
+        {
+          "name": "findings_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "confidence",
+          "type": "u8"
+        },
+        {
+          "name": "signature_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_task_result",
       "discriminator": [
         39,
@@ -12522,6 +12683,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ObservationV2",
+      "discriminator": [
+        194,
+        12,
+        252,
+        52,
+        247,
+        150,
+        119,
+        195
+      ]
+    },
+    {
       "name": "Observer",
       "discriminator": [
         82,
@@ -13574,6 +13748,19 @@ export const terraRegistry: Idl = {
         235,
         203,
         188
+      ]
+    },
+    {
+      "name": "ObservationV2Submitted",
+      "discriminator": [
+        220,
+        139,
+        72,
+        84,
+        9,
+        67,
+        34,
+        81
       ]
     },
     {
@@ -15397,6 +15584,16 @@ export const terraRegistry: Idl = {
       "code": 6181,
       "name": "TaskRequirementsFull",
       "msg": "Task has reached the maximum number of requirements"
+    },
+    {
+      "code": 6182,
+      "name": "InvalidObservationSource",
+      "msg": "Invalid observation source"
+    },
+    {
+      "code": 6183,
+      "name": "InvalidObservationProvenance",
+      "msg": "Invalid observation provenance"
     }
   ],
   "types": [
@@ -18498,6 +18695,192 @@ export const terraRegistry: Idl = {
           {
             "name": "confidence",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObservationV2",
+      "docs": [
+        "Multi-source observation of a task subject.",
+        "",
+        "PDA: `[\"observation_v2\", task_id, observer, nonce]`",
+        "",
+        "Roles (Design Rule 7): `subject` \u2260 `capture_device` \u2260 `observer`",
+        "(submitter). A document owned by Alice (`subject`), photographed on",
+        "Bob's phone (`capture_device`), submitted by Charlie (`observer`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "docs": [
+              "Task this observation supports."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "observer",
+            "docs": [
+              "Submitting wallet (PDA seed). May differ from `capture_device`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Unique nonce per (task_id, observer). PDA seed."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "subject",
+            "docs": [
+              "What is observed \u2014 claim, parcel, identity, or other account key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "capture_device",
+            "docs": [
+              "Device that captured the raw signal / image (may equal observer)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "One of `observation_source`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "docs": [
+              "One of `observation_provenance`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "location",
+            "docs": [
+              "Lat/lon * 1e7; `[0,0]` = no location (document / remote)."
+            ],
+            "type": {
+              "array": [
+                "i64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "observed_at",
+            "docs": [
+              "When the phenomenon was observed (device clock / capture time)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "findings_hash",
+            "docs": [
+              "sha256 of findings / structured observation payload."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "evidence_hash",
+            "docs": [
+              "sha256 of evidence pre-image (manifest root; Phase 5 expands)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "confidence",
+            "docs": [
+              "Confidence 0\u2013100."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "signature_hash",
+            "docs": [
+              "sha256 of signed observation envelope (device or submitter signature)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObservationV2Submitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "observation",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "observer",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "capture_device",
+            "type": "pubkey"
+          },
+          {
+            "name": "source",
+            "type": "u8"
+          },
+          {
+            "name": "provenance",
+            "type": "u8"
+          },
+          {
+            "name": "confidence",
+            "type": "u8"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
           }
         ]
       }

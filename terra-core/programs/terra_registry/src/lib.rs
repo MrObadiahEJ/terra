@@ -295,6 +295,7 @@ pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
 pub mod ipfs_docs;
+pub mod observation_v2;
 pub mod quorum;
 pub mod recovery;
 pub mod staking;
@@ -2212,6 +2213,43 @@ pub mod terra_registry {
 
     pub fn cancel_task(ctx: Context<CancelTask>, task_id: [u8; 32]) -> Result<()> {
         verification_task::cancel_task(ctx, task_id)
+    }
+
+    // -----------------------------------------------------------------------
+    // Observations (RFC-012 Phase 4)
+    // -----------------------------------------------------------------------
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_observation_v2(
+        ctx: Context<SubmitObservationV2>,
+        task_id: [u8; 32],
+        nonce: u16,
+        subject: Pubkey,
+        capture_device: Pubkey,
+        source: u8,
+        provenance: u8,
+        location: [i64; 2],
+        observed_at: i64,
+        findings_hash: [u8; 32],
+        evidence_hash: [u8; 32],
+        confidence: u8,
+        signature_hash: [u8; 32],
+    ) -> Result<()> {
+        observation_v2::submit_observation_v2(
+            ctx,
+            task_id,
+            nonce,
+            subject,
+            capture_device,
+            source,
+            provenance,
+            location,
+            observed_at,
+            findings_hash,
+            evidence_hash,
+            confidence,
+            signature_hash,
+        )
     }
 
     // -----------------------------------------------------------------------
@@ -4482,6 +4520,39 @@ pub struct CancelTask<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Observation contexts (RFC-012 Phase 4)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(task_id: [u8; 32], nonce: u16)]
+pub struct SubmitObservationV2<'info> {
+    #[account(
+        init,
+        payer = observer,
+        space = 8 + observation_v2::ObservationV2::INIT_SPACE,
+        seeds = [
+            b"observation_v2",
+            task_id.as_ref(),
+            observer.key().as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub observation: Account<'info, observation_v2::ObservationV2>,
+    #[account(
+        seeds = [b"task", task_id.as_ref()],
+        bump,
+        constraint = task.task_id == task_id @ TerraError::InvalidTaskRequirement,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    /// CHECK: observer is only a wallet pubkey (signer + rent payer); role
+    /// fields on ObservationV2 capture subject/capture_device separation.
+    #[account(mut)]
+    pub observer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -5394,6 +5465,23 @@ pub struct TaskCancelled {
 }
 
 // ---------------------------------------------------------------------------
+// Observation events (RFC-012 Phase 4)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ObservationV2Submitted {
+    pub observation: Pubkey,
+    pub task_id: [u8; 32],
+    pub observer: Pubkey,
+    pub subject: Pubkey,
+    pub capture_device: Pubkey,
+    pub source: u8,
+    pub provenance: u8,
+    pub confidence: u8,
+    pub nonce: u16,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -5980,6 +6068,12 @@ pub enum TerraError {
     InvalidTaskRequirement,
     #[msg("Task has reached the maximum number of requirements")]
     TaskRequirementsFull,
+
+    // RFC-012 Phase 4: multi-source observations
+    #[msg("Invalid observation source")]
+    InvalidObservationSource,
+    #[msg("Invalid observation provenance")]
+    InvalidObservationProvenance,
 }
 
 #[cfg(test)]

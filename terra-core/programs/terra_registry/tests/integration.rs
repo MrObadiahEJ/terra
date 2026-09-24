@@ -23935,3 +23935,555 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
     .await;
     assert_custom_error(res, 6174, "claim cancelled task must fail");
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 4 — multi-source observations (ObservationV2)
+// ---------------------------------------------------------------------------
+
+fn observation_v2_pda(task_id: &[u8; 32], observer: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"observation_v2",
+            task_id.as_ref(),
+            observer.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn create_task_data_simple(
+    task_id: &[u8; 32],
+    subject: &Pubkey,
+    task_class: u8,
+    deadline: i64,
+    required_validators: u8,
+) -> Vec<u8> {
+    create_task_data(
+        task_id,
+        subject,
+        task_class,
+        0,
+        deadline,
+        &[1u8; 32],
+        required_validators,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn observation_v2_data(
+    task_id: &[u8; 32],
+    nonce: u16,
+    subject: &Pubkey,
+    capture_device: &Pubkey,
+    source: u8,
+    provenance: u8,
+    location: [i64; 2],
+    observed_at: i64,
+    findings_hash: &[u8; 32],
+    evidence_hash: &[u8; 32],
+    confidence: u8,
+    signature_hash: &[u8; 32],
+) -> Vec<u8> {
+    let mut data = discriminator("global", "submit_observation_v2").to_vec();
+    data.extend_from_slice(task_id);
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(subject.as_ref());
+    data.extend_from_slice(capture_device.as_ref());
+    data.push(source);
+    data.push(provenance);
+    data.extend_from_slice(&location[0].to_le_bytes());
+    data.extend_from_slice(&location[1].to_le_bytes());
+    data.extend_from_slice(&observed_at.to_le_bytes());
+    data.extend_from_slice(findings_hash);
+    data.extend_from_slice(evidence_hash);
+    data.push(confidence);
+    data.extend_from_slice(signature_hash);
+    data
+}
+
+#[tokio::test]
+async fn phase4_submit_multi_source_observations_and_read_back() {
+    use terra_registry::observation_v2::{self, ObservationV2};
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let subject_acct = Pubkey::new_unique();
+    let task_id = [11u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    // Create an open task.
+    let data = create_task_data_simple(
+        &task_id,
+        &subject_acct,
+        verification_task::task_class::REMOTE,
+        deadline,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task failed");
+
+    // Fund a dedicated observer wallet.
+    let observer = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &observer.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund observer failed");
+
+    // Submit PHONE observation (nonce 0) with subject ≠ capture_device ≠ observer.
+    let subject_role = Pubkey::new_unique(); // e.g. Alice's document/parcel key
+    let capture_device = Pubkey::new_unique(); // Bob's phone device key
+    let nonce0: u16 = 0;
+    let (obs0_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce0);
+    let observed_at = clock.unix_timestamp;
+    let data = observation_v2_data(
+        &task_id,
+        nonce0,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::PHONE,
+        observation_v2::observation_provenance::DEVICE_GNSS,
+        [387_500_000, 121_500_000],
+        observed_at,
+        &[10u8; 32],
+        &[11u8; 32],
+        85,
+        &[12u8; 32],
+    );
+    process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs0_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_observation_v2 PHONE failed");
+
+    let obs: ObservationV2 = read_account(&ctx, obs0_pk).await;
+    assert_eq!(obs.task_id, task_id);
+    assert_eq!(obs.observer, observer.pubkey());
+    assert_eq!(obs.nonce, nonce0);
+    assert_eq!(obs.subject, subject_role);
+    assert_eq!(obs.capture_device, capture_device);
+    assert_ne!(obs.subject, obs.capture_device);
+    assert_ne!(obs.capture_device, obs.observer);
+    assert_ne!(obs.subject, obs.observer);
+    assert_eq!(obs.source, observation_v2::observation_source::PHONE);
+    assert_eq!(
+        obs.provenance,
+        observation_v2::observation_provenance::DEVICE_GNSS
+    );
+    assert_eq!(obs.location, [387_500_000, 121_500_000]);
+    assert_eq!(obs.observed_at, observed_at);
+    assert_eq!(obs.findings_hash, [10u8; 32]);
+    assert_eq!(obs.evidence_hash, [11u8; 32]);
+    assert_eq!(obs.confidence, 85);
+    assert_eq!(obs.signature_hash, [12u8; 32]);
+    assert!(obs.created_at > 0);
+
+    // Submit DOCUMENT observation (nonce 1) — no location [0,0].
+    let doc_subject = Pubkey::new_unique();
+    let nonce1: u16 = 1;
+    let (obs1_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce1);
+    let data = observation_v2_data(
+        &task_id,
+        nonce1,
+        &doc_subject,
+        &observer.pubkey(), // document on observer's device
+        observation_v2::observation_source::DOCUMENT,
+        observation_v2::observation_provenance::SELF_REPORTED,
+        [0, 0],
+        observed_at,
+        &[20u8; 32],
+        &[21u8; 32],
+        50,
+        &[22u8; 32],
+    );
+    process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs1_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_observation_v2 DOCUMENT failed");
+
+    let obs1: ObservationV2 = read_account(&ctx, obs1_pk).await;
+    assert_eq!(obs1.source, observation_v2::observation_source::DOCUMENT);
+    assert_eq!(obs1.location, [0, 0]);
+    assert_eq!(obs1.confidence, 50);
+    assert_eq!(obs1.nonce, nonce1);
+
+    // Submit DRONE observation from a second observer (multi-source independence).
+    let observer2 = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &observer2.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund observer2 failed");
+
+    let drone_device = Pubkey::new_unique();
+    let nonce_a: u16 = 0;
+    let (obs_a_pk, _) = observation_v2_pda(&task_id, &observer2.pubkey(), nonce_a);
+    let data = observation_v2_data(
+        &task_id,
+        nonce_a,
+        &subject_role,
+        &drone_device,
+        observation_v2::observation_source::DRONE,
+        observation_v2::observation_provenance::MULTI_DEVICE,
+        [387_500_001, 121_500_001],
+        observed_at,
+        &[30u8; 32],
+        &[31u8; 32],
+        92,
+        &[32u8; 32],
+    );
+    process(
+        &mut ctx,
+        &observer2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_a_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_observation_v2 DRONE failed");
+
+    let obs_a: ObservationV2 = read_account(&ctx, obs_a_pk).await;
+    assert_eq!(obs_a.source, observation_v2::observation_source::DRONE);
+    assert_eq!(obs_a.observer, observer2.pubkey());
+    assert_eq!(obs_a.subject, subject_role);
+    assert_eq!(obs_a.capture_device, drone_device);
+    assert_eq!(
+        obs_a.provenance,
+        observation_v2::observation_provenance::MULTI_DEVICE
+    );
+}
+
+#[tokio::test]
+async fn phase4_observation_guards() {
+    use terra_registry::observation_v2::{self, ObservationV2};
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let subject_acct = Pubkey::new_unique();
+    let task_id = [12u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+
+    let data = create_task_data_simple(
+        &task_id,
+        &subject_acct,
+        verification_task::task_class::REMOTE,
+        deadline,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task failed");
+
+    let observer = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &observer.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund observer failed");
+
+    let subject_role = Pubkey::new_unique();
+    let capture_device = Pubkey::new_unique();
+    let observed_at = clock.unix_timestamp;
+
+    // Invalid source (99) → 6182.
+    let nonce = 0u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        99, // invalid source
+        observation_v2::observation_provenance::SELF_REPORTED,
+        [0, 0],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        50,
+        &[3u8; 32],
+    );
+    let res = process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6182, "invalid source must fail");
+
+    // Invalid provenance (99) → 6183. Fresh nonce (init may not have happened).
+    let nonce = 1u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::GNSS,
+        99, // invalid provenance
+        [0, 0],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        50,
+        &[3u8; 32],
+    );
+    let res = process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6183, "invalid provenance must fail");
+
+    // Confidence 101 → 6135 InvalidConfidence.
+    let nonce = 2u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::HUMAN,
+        observation_v2::observation_provenance::SELF_REPORTED,
+        [0, 0],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        101,
+        &[3u8; 32],
+    );
+    let res = process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6135, "confidence 101 must fail");
+
+    // Bad location → 6163 InvalidPresenceFix.
+    let nonce = 3u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::GNSS,
+        observation_v2::observation_provenance::DEVICE_GNSS,
+        [900_000_001, 0],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        50,
+        &[3u8; 32],
+    );
+    let res = process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6163, "bad location must fail");
+
+    // Happy path: valid observation succeeds.
+    let nonce = 4u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::SATELLITE,
+        observation_v2::observation_provenance::SATELLITE_CONFIRMED,
+        [387_500_000, 121_500_000],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        99,
+        &[3u8; 32],
+    );
+    process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("valid satellite observation failed");
+
+    let obs: ObservationV2 = read_account(&ctx, obs_pk).await;
+    assert_eq!(obs.source, observation_v2::observation_source::SATELLITE);
+    assert_eq!(obs.nonce, nonce);
+
+    // Cancel the task, then observation → 6174 TaskAlreadyFinalized.
+    let mut data = discriminator("global", "cancel_task").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("cancel_task failed");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.status, verification_task::task_status::CANCELLED);
+
+    let nonce = 5u16;
+    let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
+    let data = observation_v2_data(
+        &task_id,
+        nonce,
+        &subject_role,
+        &capture_device,
+        observation_v2::observation_source::HUMAN,
+        observation_v2::observation_provenance::SELF_REPORTED,
+        [0, 0],
+        observed_at,
+        &[1u8; 32],
+        &[2u8; 32],
+        40,
+        &[3u8; 32],
+    );
+    let res = process(
+        &mut ctx,
+        &observer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(obs_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(observer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6174, "observe cancelled task must fail");
+}

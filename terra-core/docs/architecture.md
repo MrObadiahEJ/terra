@@ -11,13 +11,15 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-24, Phase 3): `terra_registry` — 134 instructions, 52 `#[account]` types, 120 events, 182 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-24, Phase 4): `terra_registry` — 135 instructions, 53 `#[account]` types, 121 events, 184 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (160 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (184 codes)
+├── observation_v2.rs         # RFC-012 Phase 4 multi-source ObservationV2
+├── verification_task.rs      # RFC-012 Phase 3 task PDAs
 ├── cross_border.rs           # Cross-border jurisdiction + identity binding
 ├── dispute.rs                # Parcel dispute filing, freeze, adjudicate, execute
 ├── escrow.rs                 # Parcel escrow (create, deposit, accept, settle, cancel)
@@ -115,6 +117,30 @@ terra_identity/
 | `JurisdictionBinding` | `["cross_border_identity", jurisdiction_key, identity_hash]` | Identity binding |
 | `CrossBorderVerification` | `["cross_border_verification", binding]` | Cross-border verification |
 
+### RFC-012 Phase 2 — Validator Profiles
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `ValidatorProfile` | `["validator_profile", wallet]` | Tier / jurisdiction / metadata |
+| `ValidatorPresence` | `["validator_presence", wallet]` | Mobile presence fix |
+| `ValidatorAvailability` | `["validator_availability", wallet]` | Online / offline / busy |
+| `ValidatorCapability` | `["validator_capability", wallet, capability_code]` | Declared / verified capability |
+| `ValidatorRelationshipEdge` | `["validator_edge", from, to, edge_type]` | Independence graph |
+
+### RFC-012 Phase 3 — Verification Tasks
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `VerificationTask` | `["task", task_id]` | First-class work unit |
+| `TaskRequirement` | `["task_requirement", task_id, req_index]` | Eligibility / evidence constraints |
+| `TaskAssignment` | `["task_assignment", task_id, validator]` | Selected validator |
+
+### RFC-012 Phase 4 — Multi-Source Observations
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `ObservationV2` | `["observation_v2", task_id, observer, nonce]` | Subject / capture_device / observer roles + source + provenance |
+
 ### Identity Program
 
 | Account | Program | Description |
@@ -203,7 +229,7 @@ EXECUTE (after timelock + endorsements)
 
 ## Error Codes
 
-- `terra_registry`: **160** custom codes in `TerraError` (starts at Anchor 6000; ends with `DuplicateValidator`).
+- `terra_registry`: **184** custom codes in `TerraError` (starts at Anchor 6000; ends with `InvalidObservationProvenance`).
 - `terra_identity`: **29** custom codes in `IdentityError` (starts at 6000; ends with `DuplicateValidator`).
 
 ## Constants
@@ -244,7 +270,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 134/52/120/182 as of Phase 3, 2026-09-24).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 135/53/121/184 as of Phase 4, 2026-09-24).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

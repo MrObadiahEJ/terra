@@ -1,6 +1,6 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
-**Status:** Accepted (Phases 0–3 complete on `dev`; Phases 4–10 pending)  
+**Status:** Accepted (Phases 0–4 complete on `dev`; Phases 5–10 pending)  
 **Created:** 2026-09-22  
 **Updated:** 2026-09-24  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
@@ -216,19 +216,19 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **1** | Secure current core | **Done** | Succession/guardianship duplicate endorsements, unique validator sets, endorsement action binding, remaining_accounts ownership audit, canonical ownership (is_authorized_owner), admin constraints on jail/reputation/ZK/dispute/cross-border/guardian paths; escrow invariants — see SECURITY.md |
 | **2** | Generalize validator | **Complete** (2026-09-24) | `ValidatorProfile`/`Presence`/`Availability`/`Capability`/`RelationshipEdge` PDAs + 9 instructions, 5 accounts, 7 events, 9 errors; unit + BPF tests green; IDL 128/49/115/169 |
 | **3** | Introduce tasks | **Complete** (2026-09-24) | `VerificationTask`/`TaskRequirement`/`TaskAssignment` PDAs + 6 instructions (create/add/assign/claim/submit/cancel), 3 accounts, 5 events, 13 errors; unit + BPF tests green; IDL 134/52/120/182 |
-| **4** | Introduce observations | Pending | Multi-source: phone, GNSS, drone, satellite, document, human |
-| **5** | Evidence/provenance | Pending | Separate subject / capture_device / submitter roles |
+| **4** | Introduce observations | **Complete** (2026-09-24) | `ObservationV2` PDA (seeds `["observation_v2", task_id, observer, nonce]`) + `submit_observation_v2`; multi-source PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; provenance SELF_REPORTED…SATELLITE_CONFIRMED; subject/capture_device/observer role separation; 1 account, 1 instruction, 1 event, 2 errors; 4 unit + 2 BPF tests; IDL 135/53/121/184 |
+| **5** | Evidence/provenance | Pending | `EvidenceManifest`/`EvidenceArtifact` + richer provenance flows |
 | **6** | Dynamic routing | Pending | Capability + geography + availability + reputation + independence + randomness selection |
 | **7** | Reputation governance | Pending | Fraud report → review → random independent committee → decision → capability downgrade → appeal → rehabilitation |
 | **8** | Economic/resource layer | Pending | Task cost → escrow → rewards → infrastructure → coverage subsidy |
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Phase 3 is complete on `dev` (2026-09-24). Before starting Phase 4 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 3 2026-09-24 it is 134/52/120/182 with Phase 2 validator-profile PDAs + Phase 3 task PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 4 is complete on `dev` (2026-09-24). Before starting Phase 5 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 4 2026-09-24 it is 135/53/121/184 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
-## 8.1. Handoff: Phase 3 complete; how to start Phase 4
+## 8.1. Handoff: Phase 4 complete; how to start Phase 5
 
 **Already done (do not redo):** Phase 0 structural tests (`terra-core/programs/terra_registry/tests/rfc012_structure.rs`, 21 tests); Phase 1 unique-validator sets, endorsement action binding, remaining-accounts owner checks, admin constraints — verified list in `terra-core/SECURITY.md` “Phase 1 additions”.
 
@@ -236,13 +236,15 @@ Phase 3 is complete on `dev` (2026-09-24). Before starting Phase 4 on a clean ch
 
 **Phase 3 delivered (2026-09-24):** `verification_task.rs` module with `VerificationTask` (seeds `["task", task_id]`), `TaskRequirement` (seeds `["task_requirement", task_id, req_index]`), `TaskAssignment` (seeds `["task_assignment", task_id, validator]`); 6 instructions `create_verification_task`, `add_task_requirement`, `assign_task_validator`, `claim_task`, `submit_task_result`, `cancel_task`; 5 events; 13 errors appended after `SelfRelationshipEdge`; 6 lib unit tests + 2 BPF integration tests (`phase3_*`). Task classes PHYSICAL/REMOTE/DOCUMENTARY/COMPUTATIONAL/HYBRID; statuses OPEN/ASSIGNED/IN_PROGRESS/COMPLETED/CANCELLED/EXPIRED; outcomes PASS/FAIL/INCONCLUSIVE. `reward_lamports` is recorded on the task (escrow/distribution deferred to Phase 8). Full multi-factor routing remains Phase 6 — Phase 3 ships explicit requester assignment + first-come claim.
 
-**Immediate next actions for Phase 4:**
-1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 3 delivered task PDAs per the sketch; Phase 4 (observations) should follow the same pattern (subject / capture_device / submitter separation per §5).
-2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), and Phase 3 (134/52/120/182); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+**Phase 4 delivered (2026-09-24):** `observation_v2.rs` module with `ObservationV2` account (PDA seeds `["observation_v2", task_id, observer, nonce]`); instruction `submit_observation_v2` (permissionless; observer pays rent); `observation_source` PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; `observation_provenance` SELF_REPORTED/DEVICE_GNSS/MULTI_DEVICE/LOCAL_VALIDATORS/SURVEY_GRADE/SATELLITE_CONFIRMED; subject / capture_device / observer independent roles (Design Rule 7); event `ObservationV2Submitted`; errors `InvalidObservationSource` (6182), `InvalidObservationProvenance` (6183); 4 lib unit tests + 2 BPF integration tests (`phase4_*`). Legacy claim-bound `Observation` remains (migration map §9 — dual path until Phase 5 evidence layers).
+
+**Immediate next actions for Phase 5:**
+1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 4 delivered ObservationV2 per the sketch; Phase 5 should add `EvidenceManifest` + `EvidenceArtifact` PDAs (`["evidence_manifest", task_id, nonce]`, `["evidence_artifact", manifest, artifact_index]`) and richer provenance wiring.
+2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), and Phase 4 (135/53/121/184); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 
-**Phase order (next):** 4 (observations) → 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
+**Phase order (next):** 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
 
 ---
 
