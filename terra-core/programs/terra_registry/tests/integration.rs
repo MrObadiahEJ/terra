@@ -26091,3 +26091,862 @@ async fn phase7_upheld_demotes_not_jails() {
     let still: CapabilityRestriction = read_account(&ctx, restriction_pk).await;
     assert_eq!(still.status, restriction_status::ACTIVE);
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 8 — task economics (quote → escrow → reward → refund)
+// ---------------------------------------------------------------------------
+
+fn fee_policy_pda() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"fee_policy"], &PROGRAM_ID)
+}
+
+fn coverage_incentive_pda() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"coverage_incentive"], &PROGRAM_ID)
+}
+
+fn resource_quote_pda(task_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"resource_quote", task_id.as_ref()], &PROGRAM_ID)
+}
+
+fn task_escrow_pda(task_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"task_escrow", task_id.as_ref()], &PROGRAM_ID)
+}
+
+fn task_escrow_vault_pda(escrow: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"task_escrow_vault", escrow.as_ref()], &PROGRAM_ID)
+}
+
+fn task_treasury_pda() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"task_treasury"], &PROGRAM_ID)
+}
+
+fn reward_allocation_pda(task_id: &[u8; 32], validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"reward_allocation", task_id.as_ref(), validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+fn set_fee_policy_ix(fee_pk: Pubkey, admin: Pubkey, fee_bps: u16) -> Instruction {
+    let mut data = discriminator("global", "set_fee_policy").to_vec();
+    data.extend_from_slice(&fee_bps.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(fee_pk, false),
+            AccountMeta::new_readonly(registry_pda().0, false),
+            AccountMeta::new(admin, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn set_coverage_incentive_ix(
+    cov_pk: Pubkey,
+    admin: Pubkey,
+    demand: u16,
+    deficit: u16,
+    difficulty: u16,
+    strategic: u16,
+    max_subsidy: u16,
+) -> Instruction {
+    let mut data = discriminator("global", "set_coverage_incentive").to_vec();
+    data.extend_from_slice(&demand.to_le_bytes());
+    data.extend_from_slice(&deficit.to_le_bytes());
+    data.extend_from_slice(&difficulty.to_le_bytes());
+    data.extend_from_slice(&strategic.to_le_bytes());
+    data.extend_from_slice(&max_subsidy.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(cov_pk, false),
+            AccountMeta::new_readonly(registry_pda().0, false),
+            AccountMeta::new(admin, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+fn quote_task_resources_ix(
+    task_pk: Pubkey,
+    quote_pk: Pubkey,
+    quoter: Pubkey,
+    cost: u64,
+) -> Instruction {
+    let mut data = discriminator("global", "quote_task_resources").to_vec();
+    data.extend_from_slice(&cost.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(task_pk, false),
+            AccountMeta::new(quote_pk, false),
+            AccountMeta::new(quoter, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fund_task_escrow_ix(
+    task_pk: Pubkey,
+    quote_pk: Pubkey,
+    fee_pk: Pubkey,
+    escrow_pk: Pubkey,
+    vault_pk: Pubkey,
+    treasury_pk: Pubkey,
+    requester: Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(task_pk, false),
+            AccountMeta::new_readonly(quote_pk, false),
+            AccountMeta::new_readonly(fee_pk, false),
+            AccountMeta::new(escrow_pk, false),
+            AccountMeta::new(vault_pk, false),
+            AccountMeta::new(treasury_pk, false),
+            AccountMeta::new(requester, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "fund_task_escrow").to_vec(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn claim_task_reward_ix(
+    task_pk: Pubkey,
+    assign_pk: Pubkey,
+    escrow_pk: Pubkey,
+    vault_pk: Pubkey,
+    cov_pk: Pubkey,
+    allocation_pk: Pubkey,
+    treasury_pk: Pubkey,
+    validator: Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(task_pk, false),
+            AccountMeta::new(assign_pk, false),
+            AccountMeta::new(escrow_pk, false),
+            AccountMeta::new(vault_pk, false),
+            AccountMeta::new_readonly(cov_pk, false),
+            AccountMeta::new(allocation_pk, false),
+            AccountMeta::new(treasury_pk, false),
+            AccountMeta::new(validator, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "claim_task_reward").to_vec(),
+    }
+}
+
+fn refund_task_escrow_ix(
+    task_pk: Pubkey,
+    escrow_pk: Pubkey,
+    vault_pk: Pubkey,
+    requester: Pubkey,
+) -> Instruction {
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(task_pk, false),
+            AccountMeta::new(escrow_pk, false),
+            AccountMeta::new(vault_pk, false),
+            AccountMeta::new(requester, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: discriminator("global", "refund_task_escrow").to_vec(),
+    }
+}
+
+/// Create task + quote + fund with standard params (fee 100 bps must be set).
+async fn phase8_fund_task(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    task_id: &[u8; 32],
+    reward: u64,
+    resource_cost: u64,
+) -> Pubkey {
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let subject = Pubkey::new_unique();
+    let (task_pk, _) = task_pda(task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let data = create_task_data(
+        task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        reward,
+        clock.unix_timestamp + 3600,
+        &[7u8; 32],
+        1,
+    );
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("phase8 create task failed");
+    let _: VerificationTask = read_account(ctx, task_pk).await;
+
+    let (quote_pk, _) = resource_quote_pda(task_id);
+    process(
+        ctx,
+        payer,
+        quote_task_resources_ix(task_pk, quote_pk, payer.pubkey(), resource_cost),
+    )
+    .await
+    .expect("phase8 quote failed");
+
+    let (escrow_pk, _) = task_escrow_pda(task_id);
+    let (vault_pk, _) = task_escrow_vault_pda(&escrow_pk);
+    let (treasury_pk, _) = task_treasury_pda();
+    let (fee_pk, _) = fee_policy_pda();
+    process(
+        ctx,
+        payer,
+        fund_task_escrow_ix(
+            task_pk,
+            quote_pk,
+            fee_pk,
+            escrow_pk,
+            vault_pk,
+            treasury_pk,
+            payer.pubkey(),
+        ),
+    )
+    .await
+    .expect("phase8 fund failed");
+    escrow_pk
+}
+
+#[tokio::test]
+async fn phase8_policies_quote_fund_and_guards() {
+    use terra_registry::task_economics::{self, CoverageIncentive, FeePolicy, ResourceQuote};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    let (fee_pk, _) = fee_policy_pda();
+    let (cov_pk, _) = coverage_incentive_pda();
+
+    // Fee above 10% → 6206.
+    let res = process(
+        &mut ctx,
+        &payer,
+        set_fee_policy_ix(fee_pk, payer.pubkey(), 1_001),
+    )
+    .await;
+    assert_custom_error(res, 6206, "fee above max must fail");
+
+    // Coverage factor above 5000 → 6208.
+    let res = process(
+        &mut ctx,
+        &payer,
+        set_coverage_incentive_ix(cov_pk, payer.pubkey(), 5_001, 0, 0, 0, 0),
+    )
+    .await;
+    assert_custom_error(res, 6208, "coverage factor above max must fail");
+
+    // Valid coverage policy (fee policy still missing for the fund test).
+    process(
+        &mut ctx,
+        &payer,
+        set_coverage_incentive_ix(cov_pk, payer.pubkey(), 100, 50, 25, 400, 500),
+    )
+    .await
+    .expect("set_coverage_incentive failed");
+    let cov: CoverageIncentive = read_account(&ctx, cov_pk).await;
+    assert_eq!(cov.authority, payer.pubkey());
+    assert_eq!(cov.demand_bps, 100);
+    assert_eq!(cov.deficit_bps, 50);
+    assert_eq!(cov.difficulty_bps, 25);
+    assert_eq!(cov.strategic_bps, 400);
+    assert_eq!(cov.max_subsidy_bps, 500);
+
+    // Create the task (reward 2_000_000) and quote resources (500_000).
+    let task_id = [51u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let data = create_task_data(
+        &task_id,
+        &Pubkey::new_unique(),
+        terra_registry::verification_task::task_class::PHYSICAL,
+        2_000_000,
+        clock.unix_timestamp + 3600,
+        &[3u8; 32],
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task failed");
+
+    // Non-requester cannot quote → 6175.
+    let stranger = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund stranger");
+    let (quote_pk, _) = resource_quote_pda(&task_id);
+    let res = process(
+        &mut ctx,
+        &stranger,
+        quote_task_resources_ix(task_pk, quote_pk, stranger.pubkey(), 100_000),
+    )
+    .await;
+    assert_custom_error(res, 6175, "non-requester quote must fail");
+
+    // Requester quotes → read back.
+    process(
+        &mut ctx,
+        &payer,
+        quote_task_resources_ix(task_pk, quote_pk, payer.pubkey(), 500_000),
+    )
+    .await
+    .expect("quote failed");
+    let quote: ResourceQuote = read_account(&ctx, quote_pk).await;
+    assert_eq!(quote.task_id, task_id);
+    assert_eq!(quote.task, task_pk);
+    assert_eq!(quote.quoter, payer.pubkey());
+    assert_eq!(quote.resource_cost, 500_000);
+
+    // Second quote → 6210.
+    let res = process(
+        &mut ctx,
+        &payer,
+        quote_task_resources_ix(task_pk, quote_pk, payer.pubkey(), 1),
+    )
+    .await;
+    assert_custom_error(res, 6210, "double quote must fail");
+
+    // Fund before the fee policy exists → 6207.
+    let (escrow_pk, _) = task_escrow_pda(&task_id);
+    let (vault_pk, _) = task_escrow_vault_pda(&escrow_pk);
+    let (treasury_pk, _) = task_treasury_pda();
+    let res = process(
+        &mut ctx,
+        &payer,
+        fund_task_escrow_ix(
+            task_pk,
+            quote_pk,
+            fee_pk,
+            escrow_pk,
+            vault_pk,
+            treasury_pk,
+            payer.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6207, "missing fee policy must fail");
+
+    // Non-requester fund → 6175 (before any handler logic).
+    let res = process(
+        &mut ctx,
+        &stranger,
+        fund_task_escrow_ix(
+            task_pk,
+            quote_pk,
+            fee_pk,
+            escrow_pk,
+            vault_pk,
+            treasury_pk,
+            stranger.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6175, "non-requester fund must fail");
+
+    // Now the admin sets a valid fee policy (100 bps = 1%).
+    process(
+        &mut ctx,
+        &payer,
+        set_fee_policy_ix(fee_pk, payer.pubkey(), 100),
+    )
+    .await
+    .expect("set_fee_policy failed");
+    let fp: FeePolicy = read_account(&ctx, fee_pk).await;
+    assert_eq!(fp.authority, payer.pubkey());
+    assert_eq!(fp.fee_bps, 100);
+
+    // Non-admin cannot update policies → 6010 NotAuthorized.
+    let res = process(
+        &mut ctx,
+        &stranger,
+        set_fee_policy_ix(fee_pk, stranger.pubkey(), 100),
+    )
+    .await;
+    assert_custom_error(res, 6010, "non-admin set_fee_policy must fail");
+
+    // Seed the treasury so the fee is charged (an empty treasury would
+    // waive sub-rent-exempt dust fees — covered in phase8_refund_paths).
+    let (treasury_pk, _) = task_treasury_pda();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &treasury_pk, 10_000_000),
+    )
+    .await
+    .expect("seed treasury");
+
+    // Fund succeeds: amount = 2_000_000 + 500_000; fee = 1% of 2_500_000.
+    process(
+        &mut ctx,
+        &payer,
+        fund_task_escrow_ix(
+            task_pk,
+            quote_pk,
+            fee_pk,
+            escrow_pk,
+            vault_pk,
+            treasury_pk,
+            payer.pubkey(),
+        ),
+    )
+    .await
+    .expect("fund failed");
+    let escrow: task_economics::TaskEscrow = read_account(&ctx, escrow_pk).await;
+    assert_eq!(escrow.task_id, task_id);
+    assert_eq!(escrow.task, task_pk);
+    assert_eq!(escrow.requester, payer.pubkey());
+    assert_eq!(escrow.vault, vault_pk);
+    assert_eq!(escrow.amount, 2_500_000);
+    assert_eq!(escrow.fee_paid, 25_000);
+    assert_eq!(escrow.released, 0);
+    assert_eq!(escrow.released_count, 0);
+    assert_eq!(escrow.status, task_economics::task_escrow_status::FUNDED);
+
+    assert_eq!(
+        ctx.banks_client.get_balance(vault_pk).await.unwrap(),
+        2_500_000
+    );
+    assert_eq!(
+        ctx.banks_client.get_balance(treasury_pk).await.unwrap(),
+        10_000_000 + 25_000
+    );
+
+    // Second fund → 6212.
+    let res = process(
+        &mut ctx,
+        &payer,
+        fund_task_escrow_ix(
+            task_pk,
+            quote_pk,
+            fee_pk,
+            escrow_pk,
+            vault_pk,
+            treasury_pk,
+            payer.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6212, "double fund must fail");
+}
+
+#[tokio::test]
+async fn phase8_claim_reward_with_subsidy() {
+    use terra_registry::task_economics::{self, RewardAllocation, TaskEscrow};
+    use terra_registry::verification_task::{self, TaskAssignment, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    let (fee_pk, _) = fee_policy_pda();
+    let (cov_pk, _) = coverage_incentive_pda();
+    let (treasury_pk, _) = task_treasury_pda();
+
+    process(
+        &mut ctx,
+        &payer,
+        set_fee_policy_ix(fee_pk, payer.pubkey(), 100),
+    )
+    .await
+    .expect("set_fee_policy failed");
+    process(
+        &mut ctx,
+        &payer,
+        set_coverage_incentive_ix(cov_pk, payer.pubkey(), 500, 500, 500, 4_000, 5_000),
+    )
+    .await
+    .expect("set_coverage_incentive failed");
+
+    // Seed the treasury so the fee from funding isn't the only subsidy source.
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &treasury_pk, 10_000_000),
+    )
+    .await
+    .expect("seed treasury");
+
+    // Task: reward 1_000_000, no extra resource cost.
+    let task_id = [52u8; 32];
+    let escrow_pk = phase8_fund_task(&mut ctx, &payer, &task_id, 1_000_000, 0).await;
+    let (task_pk, _) = task_pda(&task_id);
+    let (quote_pk, _) = resource_quote_pda(&task_id);
+    let (vault_pk, _) = task_escrow_vault_pda(&escrow_pk);
+    let _ = quote_pk;
+
+    // Assigned validator.
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator");
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let mut data = discriminator("global", "assign_task_validator").to_vec();
+    data.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("assign failed");
+
+    let (allocation_pk, _) = reward_allocation_pda(&task_id, &validator.pubkey());
+
+    // Claim before completion → 6213.
+    let res = process(
+        &mut ctx,
+        &validator,
+        claim_task_reward_ix(
+            task_pk,
+            assign_pk,
+            escrow_pk,
+            vault_pk,
+            cov_pk,
+            allocation_pk,
+            treasury_pk,
+            validator.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6213, "claim before completion must fail");
+
+    // Non-assignee claim → 6176 NotTaskAssignee (their own allocation PDA
+    // so the seeds constraint passes and the assignee constraint fires).
+    let stranger = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund stranger");
+    let (stranger_alloc, _) = reward_allocation_pda(&task_id, &stranger.pubkey());
+    let res = process(
+        &mut ctx,
+        &stranger,
+        claim_task_reward_ix(
+            task_pk,
+            assign_pk,
+            escrow_pk,
+            vault_pk,
+            cov_pk,
+            stranger_alloc,
+            treasury_pk,
+            stranger.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6176, "non-assignee claim must fail");
+
+    // Validator submits PASS → task COMPLETED.
+    let mut data = discriminator("global", "submit_task_result").to_vec();
+    data.extend_from_slice(&task_id);
+    data.push(verification_task::task_outcome::PASS);
+    data.extend_from_slice(&[44u8; 32]);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit failed");
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.status, verification_task::task_status::COMPLETED);
+
+    // Claim: base = 1_000_000; subsidy bps = min(500+500+500×1+4000, 5000)
+    // = 5000 (clamp) → 500_000 from the treasury (10M seed + 10k fee).
+    let validator_before = ctx
+        .banks_client
+        .get_balance(validator.pubkey())
+        .await
+        .unwrap();
+    let treasury_before = ctx.banks_client.get_balance(treasury_pk).await.unwrap();
+    process(
+        &mut ctx,
+        &validator,
+        claim_task_reward_ix(
+            task_pk,
+            assign_pk,
+            escrow_pk,
+            vault_pk,
+            cov_pk,
+            allocation_pk,
+            treasury_pk,
+            validator.pubkey(),
+        ),
+    )
+    .await
+    .expect("claim failed");
+
+    let alloc: RewardAllocation = read_account(&ctx, allocation_pk).await;
+    assert_eq!(alloc.task_id, task_id);
+    assert_eq!(alloc.task, task_pk);
+    assert_eq!(alloc.validator, validator.pubkey());
+    assert_eq!(alloc.base_paid, 1_000_000);
+    assert_eq!(alloc.subsidy_paid, 500_000);
+    assert_eq!(alloc.total_paid, 1_500_000);
+    assert!(alloc.created_at > 0);
+
+    let escrow: TaskEscrow = read_account(&ctx, escrow_pk).await;
+    assert_eq!(escrow.released, 1_000_000);
+    assert_eq!(escrow.released_count, 1);
+    assert_eq!(escrow.status, task_economics::task_escrow_status::RELEASED);
+
+    let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
+    assert_eq!(
+        assignment.status,
+        verification_task::assignment_status::RELEASED
+    );
+
+    // Vault drained; treasury paid exactly the subsidy.
+    assert_eq!(ctx.banks_client.get_balance(vault_pk).await.unwrap(), 0);
+    let treasury_after = ctx.banks_client.get_balance(treasury_pk).await.unwrap();
+    assert_eq!(treasury_before - treasury_after, 500_000);
+
+    // Validator received base + subsidy, minus the tx fee and the rent for
+    // their own RewardAllocation account (paid at init by the validator).
+    let validator_after = ctx
+        .banks_client
+        .get_balance(validator.pubkey())
+        .await
+        .unwrap();
+    let allocation_rent = ctx.banks_client.get_balance(allocation_pk).await.unwrap();
+    let delta = validator_after as i64 - validator_before as i64;
+    assert_eq!(delta, 1_500_000 - 5_000 - allocation_rent as i64);
+
+    // Double claim → 6216 RewardAlreadyClaimed.
+    let res = process(
+        &mut ctx,
+        &validator,
+        claim_task_reward_ix(
+            task_pk,
+            assign_pk,
+            escrow_pk,
+            vault_pk,
+            cov_pk,
+            allocation_pk,
+            treasury_pk,
+            validator.pubkey(),
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6216, "double claim must fail");
+}
+
+#[tokio::test]
+async fn phase8_refund_paths() {
+    use terra_registry::task_economics::{self, TaskEscrow};
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    let (fee_pk, _) = fee_policy_pda();
+    process(
+        &mut ctx,
+        &payer,
+        set_fee_policy_ix(fee_pk, payer.pubkey(), 100),
+    )
+    .await
+    .expect("set_fee_policy failed");
+
+    // --- Task A: refund while active → 6217, then cancel → refund works. ---
+    let task_a = [53u8; 32];
+    let escrow_a = phase8_fund_task(&mut ctx, &payer, &task_a, 800_000, 200_000).await;
+    let (task_a_pk, _) = task_pda(&task_a);
+    let (vault_a, _) = task_escrow_vault_pda(&escrow_a);
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        refund_task_escrow_ix(task_a_pk, escrow_a, vault_a, payer.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6217, "refund of active task must fail");
+
+    // Dust fee waived: empty treasury cannot receive a sub-rent-exempt fee.
+    let escrow_a_state: TaskEscrow = read_account(&ctx, escrow_a).await;
+    assert_eq!(escrow_a_state.fee_paid, 0);
+    assert_eq!(escrow_a_state.amount, 1_000_000);
+
+    // Cancel → refund allowed.
+    let mut data = discriminator("global", "cancel_task").to_vec();
+    data.extend_from_slice(&task_a);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_a_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("cancel failed");
+
+    let requester_before = ctx.banks_client.get_balance(payer.pubkey()).await.unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        refund_task_escrow_ix(task_a_pk, escrow_a, vault_a, payer.pubkey()),
+    )
+    .await
+    .expect("refund after cancel failed");
+    let escrow: TaskEscrow = read_account(&ctx, escrow_a).await;
+    assert_eq!(escrow.status, task_economics::task_escrow_status::REFUNDED);
+    assert_eq!(ctx.banks_client.get_balance(vault_a).await.unwrap(), 0);
+    // Vault returned in full (one signature fee deducted from requester).
+    let requester_after = ctx.banks_client.get_balance(payer.pubkey()).await.unwrap();
+    assert_eq!(requester_after - requester_before, 1_000_000 - 5_000);
+
+    // Second refund → 6215 (status no longer FUNDED).
+    let res = process(
+        &mut ctx,
+        &payer,
+        refund_task_escrow_ix(task_a_pk, escrow_a, vault_a, payer.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6215, "double refund must fail");
+
+    // --- Task B: completed but claim window open → 6218. ---
+    let task_b = [54u8; 32];
+    let escrow_b = phase8_fund_task(&mut ctx, &payer, &task_b, 1_200_000, 0).await;
+    let (task_b_pk, _) = task_pda(&task_b);
+    let (vault_b, _) = task_escrow_vault_pda(&escrow_b);
+
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator");
+    let (assign_b, _) = task_assignment_pda(&task_b, &validator.pubkey());
+    let mut data = discriminator("global", "assign_task_validator").to_vec();
+    data.extend_from_slice(&task_b);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_b, false),
+                AccountMeta::new(task_b_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("assign failed");
+
+    let mut data = discriminator("global", "submit_task_result").to_vec();
+    data.extend_from_slice(&task_b);
+    data.push(verification_task::task_outcome::PASS);
+    data.extend_from_slice(&[45u8; 32]);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_b, false),
+                AccountMeta::new(task_b_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit failed");
+    let task_b_state: VerificationTask = read_account(&ctx, task_b_pk).await;
+    assert_eq!(
+        task_b_state.status,
+        verification_task::task_status::COMPLETED
+    );
+
+    // Claim window (7 days) just started → refund blocked.
+    let res = process(
+        &mut ctx,
+        &payer,
+        refund_task_escrow_ix(task_b_pk, escrow_b, vault_b, payer.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6218, "refund inside claim window must fail");
+}

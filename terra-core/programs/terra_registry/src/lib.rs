@@ -303,6 +303,7 @@ pub mod recovery;
 pub mod routing;
 pub mod staking;
 pub mod subdivision;
+pub mod task_economics;
 pub mod time_bound;
 pub mod validator_profile;
 pub mod validator_registry;
@@ -2370,6 +2371,51 @@ pub mod terra_registry {
 
     pub fn rehabilitate_restriction(ctx: Context<RehabilitateRestriction>) -> Result<()> {
         fraud_governance::rehabilitate_restriction(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Task economics (RFC-012 Phase 8)
+    // -----------------------------------------------------------------------
+
+    pub fn set_fee_policy(ctx: Context<SetFeePolicy>, fee_bps: u16) -> Result<()> {
+        task_economics::set_fee_policy(ctx, fee_bps)
+    }
+
+    pub fn set_coverage_incentive(
+        ctx: Context<SetCoverageIncentive>,
+        demand_bps: u16,
+        deficit_bps: u16,
+        difficulty_bps: u16,
+        strategic_bps: u16,
+        max_subsidy_bps: u16,
+    ) -> Result<()> {
+        task_economics::set_coverage_incentive(
+            ctx,
+            demand_bps,
+            deficit_bps,
+            difficulty_bps,
+            strategic_bps,
+            max_subsidy_bps,
+        )
+    }
+
+    pub fn quote_task_resources(
+        ctx: Context<QuoteTaskResources>,
+        resource_cost: u64,
+    ) -> Result<()> {
+        task_economics::quote_task_resources(ctx, resource_cost)
+    }
+
+    pub fn fund_task_escrow(ctx: Context<FundTaskEscrow>) -> Result<()> {
+        task_economics::fund_task_escrow(ctx)
+    }
+
+    pub fn claim_task_reward(ctx: Context<ClaimTaskReward>) -> Result<()> {
+        task_economics::claim_task_reward(ctx)
+    }
+
+    pub fn refund_task_escrow(ctx: Context<RefundTaskEscrow>) -> Result<()> {
+        task_economics::refund_task_escrow(ctx)
     }
 
     // -----------------------------------------------------------------------
@@ -5092,6 +5138,177 @@ pub struct RehabilitateRestriction<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Task economics contexts (RFC-012 Phase 8)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct SetFeePolicy<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + task_economics::FeePolicy::INIT_SPACE,
+        seeds = [b"fee_policy"],
+        bump,
+    )]
+    pub fee_policy: Account<'info, task_economics::FeePolicy>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetCoverageIncentive<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + task_economics::CoverageIncentive::INIT_SPACE,
+        seeds = [b"coverage_incentive"],
+        bump,
+    )]
+    pub coverage_incentive: Account<'info, task_economics::CoverageIncentive>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct QuoteTaskResources<'info> {
+    #[account(
+        constraint = task.requester == quoter.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(
+        init_if_needed,
+        payer = quoter,
+        space = 8 + task_economics::ResourceQuote::INIT_SPACE,
+        seeds = [b"resource_quote", task.task_id.as_ref()],
+        bump,
+    )]
+    pub quote: Account<'info, task_economics::ResourceQuote>,
+    #[account(mut)]
+    pub quoter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FundTaskEscrow<'info> {
+    #[account(
+        constraint = task.requester == requester.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    /// CHECK: resource quote PDA — manually deserialized (custom missing error).
+    #[account(seeds = [b"resource_quote", task.task_id.as_ref()], bump)]
+    pub quote: UncheckedAccount<'info>,
+    /// CHECK: fee policy PDA — manually deserialized (custom missing error).
+    #[account(seeds = [b"fee_policy"], bump)]
+    pub fee_policy: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = requester,
+        space = 8 + task_economics::TaskEscrow::INIT_SPACE,
+        seeds = [b"task_escrow", task.task_id.as_ref()],
+        bump,
+    )]
+    pub task_escrow: Account<'info, task_economics::TaskEscrow>,
+    /// CHECK: escrow vault PDA — holds funded lamports.
+    #[account(
+        mut,
+        seeds = [b"task_escrow_vault", task_escrow.key().as_ref()],
+        bump,
+    )]
+    pub vault: UncheckedAccount<'info>,
+    /// CHECK: protocol treasury PDA — receives fees, pays coverage subsidies.
+    #[account(mut, seeds = [b"task_treasury"], bump)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimTaskReward<'info> {
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(
+        mut,
+        seeds = [
+            b"task_assignment",
+            task.task_id.as_ref(),
+            assignment.validator.as_ref(),
+        ],
+        bump,
+        constraint = assignment.task_id == task.task_id @ TerraError::NotTaskAssignee,
+        constraint = assignment.validator == validator.key() @ TerraError::NotTaskAssignee,
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(
+        mut,
+        seeds = [b"task_escrow", task.task_id.as_ref()],
+        bump,
+        constraint = task_escrow.task == task.key() @ TerraError::EscrowNotFunded,
+    )]
+    pub task_escrow: Account<'info, task_economics::TaskEscrow>,
+    /// CHECK: escrow vault PDA — debited via invoke_signed.
+    #[account(
+        mut,
+        seeds = [b"task_escrow_vault", task_escrow.key().as_ref()],
+        bump,
+    )]
+    pub vault: UncheckedAccount<'info>,
+    /// CHECK: coverage-incentive PDA — manually deserialized (custom missing error).
+    #[account(seeds = [b"coverage_incentive"], bump)]
+    pub coverage_incentive: UncheckedAccount<'info>,
+    #[account(
+        init_if_needed,
+        payer = validator,
+        space = 8 + task_economics::RewardAllocation::INIT_SPACE,
+        seeds = [b"reward_allocation", task.task_id.as_ref(), validator.key().as_ref()],
+        bump,
+    )]
+    pub reward_allocation: Account<'info, task_economics::RewardAllocation>,
+    /// CHECK: protocol treasury PDA — pays the coverage subsidy via invoke_signed.
+    #[account(mut, seeds = [b"task_treasury"], bump)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub validator: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RefundTaskEscrow<'info> {
+    #[account(
+        constraint = task.requester == requester.key() @ TerraError::NotTaskRequester,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(
+        mut,
+        seeds = [b"task_escrow", task.task_id.as_ref()],
+        bump,
+        constraint = task_escrow.task == task.key() @ TerraError::EscrowNotFunded,
+    )]
+    pub task_escrow: Account<'info, task_economics::TaskEscrow>,
+    /// CHECK: escrow vault PDA — debited via invoke_signed.
+    #[account(
+        mut,
+        seeds = [b"task_escrow_vault", task_escrow.key().as_ref()],
+        bump,
+    )]
+    pub vault: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -6135,6 +6352,63 @@ pub struct CapabilityRestrictionLifted {
 }
 
 // ---------------------------------------------------------------------------
+// Task economics events (RFC-012 Phase 8)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct FeePolicySet {
+    pub authority: Pubkey,
+    pub fee_bps: u16,
+}
+
+#[event]
+pub struct CoverageIncentiveSet {
+    pub authority: Pubkey,
+    pub demand_bps: u16,
+    pub deficit_bps: u16,
+    pub difficulty_bps: u16,
+    pub strategic_bps: u16,
+    pub max_subsidy_bps: u16,
+}
+
+#[event]
+pub struct TaskResourcesQuoted {
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub quoter: Pubkey,
+    pub resource_cost: u64,
+}
+
+#[event]
+pub struct TaskEscrowFunded {
+    pub escrow: Pubkey,
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub requester: Pubkey,
+    pub amount: u64,
+    pub fee_paid: u64,
+}
+
+#[event]
+pub struct TaskRewardClaimed {
+    pub allocation: Pubkey,
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub base_paid: u64,
+    pub subsidy_paid: u64,
+}
+
+#[event]
+pub struct TaskEscrowRefunded {
+    pub escrow: Pubkey,
+    pub task: Pubkey,
+    pub task_id: [u8; 32],
+    pub requester: Pubkey,
+    pub amount: u64,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -6777,6 +7051,36 @@ pub enum TerraError {
     RehabTooEarly,
     #[msg("Active capability restriction blocks this route")]
     CapabilityRestricted,
+
+    // Task economics (RFC-012 Phase 8)
+    #[msg("Protocol fee exceeds the maximum allowed bps")]
+    InvalidFeeBps,
+    #[msg("Fee policy has not been initialized")]
+    FeePolicyNotInitialized,
+    #[msg("Invalid coverage incentive parameters")]
+    InvalidCoverageParams,
+    #[msg("Coverage incentive has not been initialized")]
+    CoverageIncentiveNotInitialized,
+    #[msg("A resource quote already exists for this task")]
+    QuoteAlreadyExists,
+    #[msg("Resource quote is missing for this task")]
+    ResourceQuoteMissing,
+    #[msg("Task escrow is already funded")]
+    EscrowAlreadyFunded,
+    #[msg("Task is not completed")]
+    TaskNotCompleted,
+    #[msg("Validator has not submitted a result for this task")]
+    AssignmentNotSubmitted,
+    #[msg("Task escrow is not funded or already fully released")]
+    EscrowNotFunded,
+    #[msg("This validator already claimed the task reward")]
+    RewardAlreadyClaimed,
+    #[msg("Task is still active — escrow is not refundable")]
+    EscrowNotRefundable,
+    #[msg("Claim window for this completed task is still open")]
+    ClaimWindowNotClosed,
+    #[msg("No refundable lamports remain in the escrow vault")]
+    NothingToRefund,
 }
 
 #[cfg(test)]

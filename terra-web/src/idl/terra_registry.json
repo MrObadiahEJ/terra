@@ -2189,6 +2189,230 @@
       ]
     },
     {
+      "name": "claim_task_reward",
+      "discriminator": [
+        105,
+        212,
+        24,
+        245,
+        14,
+        124,
+        23,
+        131
+      ],
+      "accounts": [
+        {
+          "name": "task"
+        },
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              },
+              {
+                "kind": "account",
+                "path": "assignment.validator",
+                "account": "TaskAssignment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "coverage_incentive",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  105,
+                  110,
+                  99,
+                  101,
+                  110,
+                  116,
+                  105,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reward_allocation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  97,
+                  108,
+                  108,
+                  111,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_verification_session",
       "discriminator": [
         188,
@@ -5324,6 +5548,176 @@
       "args": []
     },
     {
+      "name": "fund_task_escrow",
+      "discriminator": [
+        129,
+        231,
+        7,
+        54,
+        11,
+        67,
+        185,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "task"
+        },
+        {
+          "name": "quote",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "generate_ownership_root",
       "discriminator": [
         111,
@@ -7743,6 +8137,71 @@
       ]
     },
     {
+      "name": "quote_task_resources",
+      "discriminator": [
+        185,
+        225,
+        105,
+        50,
+        115,
+        131,
+        246,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "task"
+        },
+        {
+          "name": "quote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  111,
+                  117,
+                  114,
+                  99,
+                  101,
+                  95,
+                  113,
+                  117,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quoter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "resource_cost",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "reactivate_observer",
       "discriminator": [
         31,
@@ -8437,6 +8896,97 @@
             "The session opener, registry admin, or a registered validator must sign."
           ],
           "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "refund_task_escrow",
+      "discriminator": [
+        67,
+        95,
+        34,
+        100,
+        202,
+        45,
+        223,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "task"
+        },
+        {
+          "name": "task_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task.task_id",
+                "account": "VerificationTask"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_escrow"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -10326,6 +10876,196 @@
         },
         {
           "name": "competitor_count",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_coverage_incentive",
+      "discriminator": [
+        240,
+        111,
+        147,
+        207,
+        54,
+        63,
+        188,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "coverage_incentive",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  118,
+                  101,
+                  114,
+                  97,
+                  103,
+                  101,
+                  95,
+                  105,
+                  110,
+                  99,
+                  101,
+                  110,
+                  116,
+                  105,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "demand_bps",
+          "type": "u16"
+        },
+        {
+          "name": "deficit_bps",
+          "type": "u16"
+        },
+        {
+          "name": "difficulty_bps",
+          "type": "u16"
+        },
+        {
+          "name": "strategic_bps",
+          "type": "u16"
+        },
+        {
+          "name": "max_subsidy_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_fee_policy",
+      "discriminator": [
+        91,
+        32,
+        224,
+        109,
+        147,
+        98,
+        71,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "fee_policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_bps",
           "type": "u16"
         }
       ]
@@ -13751,6 +14491,19 @@
       ]
     },
     {
+      "name": "CoverageIncentive",
+      "discriminator": [
+        122,
+        104,
+        101,
+        154,
+        189,
+        178,
+        207,
+        110
+      ]
+    },
+    {
       "name": "CredentialNullifier",
       "discriminator": [
         242,
@@ -13878,6 +14631,19 @@
         17,
         31,
         5
+      ]
+    },
+    {
+      "name": "FeePolicy",
+      "discriminator": [
+        98,
+        183,
+        86,
+        160,
+        232,
+        222,
+        82,
+        45
       ]
     },
     {
@@ -14076,6 +14842,19 @@
       ]
     },
     {
+      "name": "ResourceQuote",
+      "discriminator": [
+        12,
+        173,
+        242,
+        254,
+        102,
+        42,
+        31,
+        5
+      ]
+    },
+    {
       "name": "ReviewCase",
       "discriminator": [
         91,
@@ -14086,6 +14865,19 @@
         51,
         53,
         93
+      ]
+    },
+    {
+      "name": "RewardAllocation",
+      "discriminator": [
+        126,
+        230,
+        173,
+        145,
+        43,
+        165,
+        30,
+        112
       ]
     },
     {
@@ -14151,6 +14943,19 @@
         35,
         47,
         254
+      ]
+    },
+    {
+      "name": "TaskEscrow",
+      "discriminator": [
+        209,
+        72,
+        197,
+        54,
+        17,
+        55,
+        3,
+        187
       ]
     },
     {
@@ -14585,6 +15390,19 @@
       ]
     },
     {
+      "name": "CoverageIncentiveSet",
+      "discriminator": [
+        49,
+        181,
+        252,
+        116,
+        211,
+        58,
+        238,
+        115
+      ]
+    },
+    {
       "name": "CredentialIssued",
       "discriminator": [
         194,
@@ -14920,6 +15738,19 @@
         1,
         245,
         201
+      ]
+    },
+    {
+      "name": "FeePolicySet",
+      "discriminator": [
+        201,
+        223,
+        52,
+        122,
+        8,
+        112,
+        188,
+        98
       ]
     },
     {
@@ -15742,6 +16573,32 @@
       ]
     },
     {
+      "name": "TaskEscrowFunded",
+      "discriminator": [
+        212,
+        62,
+        115,
+        234,
+        122,
+        182,
+        18,
+        251
+      ]
+    },
+    {
+      "name": "TaskEscrowRefunded",
+      "discriminator": [
+        148,
+        42,
+        136,
+        67,
+        153,
+        136,
+        73,
+        19
+      ]
+    },
+    {
       "name": "TaskRequirementAdded",
       "discriminator": [
         210,
@@ -15755,6 +16612,19 @@
       ]
     },
     {
+      "name": "TaskResourcesQuoted",
+      "discriminator": [
+        80,
+        109,
+        170,
+        72,
+        46,
+        159,
+        229,
+        116
+      ]
+    },
+    {
       "name": "TaskResultSubmitted",
       "discriminator": [
         138,
@@ -15765,6 +16635,19 @@
         246,
         83,
         32
+      ]
+    },
+    {
+      "name": "TaskRewardClaimed",
+      "discriminator": [
+        185,
+        139,
+        195,
+        109,
+        20,
+        19,
+        161,
+        24
       ]
     },
     {
@@ -17175,6 +18058,76 @@
       "code": 6205,
       "name": "CapabilityRestricted",
       "msg": "Active capability restriction blocks this route"
+    },
+    {
+      "code": 6206,
+      "name": "InvalidFeeBps",
+      "msg": "Protocol fee exceeds the maximum allowed bps"
+    },
+    {
+      "code": 6207,
+      "name": "FeePolicyNotInitialized",
+      "msg": "Fee policy has not been initialized"
+    },
+    {
+      "code": 6208,
+      "name": "InvalidCoverageParams",
+      "msg": "Invalid coverage incentive parameters"
+    },
+    {
+      "code": 6209,
+      "name": "CoverageIncentiveNotInitialized",
+      "msg": "Coverage incentive has not been initialized"
+    },
+    {
+      "code": 6210,
+      "name": "QuoteAlreadyExists",
+      "msg": "A resource quote already exists for this task"
+    },
+    {
+      "code": 6211,
+      "name": "ResourceQuoteMissing",
+      "msg": "Resource quote is missing for this task"
+    },
+    {
+      "code": 6212,
+      "name": "EscrowAlreadyFunded",
+      "msg": "Task escrow is already funded"
+    },
+    {
+      "code": 6213,
+      "name": "TaskNotCompleted",
+      "msg": "Task is not completed"
+    },
+    {
+      "code": 6214,
+      "name": "AssignmentNotSubmitted",
+      "msg": "Validator has not submitted a result for this task"
+    },
+    {
+      "code": 6215,
+      "name": "EscrowNotFunded",
+      "msg": "Task escrow is not funded or already fully released"
+    },
+    {
+      "code": 6216,
+      "name": "RewardAlreadyClaimed",
+      "msg": "This validator already claimed the task reward"
+    },
+    {
+      "code": 6217,
+      "name": "EscrowNotRefundable",
+      "msg": "Task is still active — escrow is not refundable"
+    },
+    {
+      "code": 6218,
+      "name": "ClaimWindowNotClosed",
+      "msg": "Claim window for this completed task is still open"
+    },
+    {
+      "code": 6219,
+      "name": "NothingToRefund",
+      "msg": "No refundable lamports remain in the escrow vault"
     }
   ],
   "types": [
@@ -18161,6 +19114,94 @@
               "Admin wallet approved to create this country's ValidatorRegistry."
             ],
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CoverageIncentive",
+      "docs": [
+        "Global coverage-incentive parameters.",
+        "",
+        "PDA: `[\"coverage_incentive\"]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "demand_bps",
+            "docs": [
+              "Baseline demand contribution (bps)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "deficit_bps",
+            "docs": [
+              "Coverage-deficit contribution (bps)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "difficulty_bps",
+            "docs": [
+              "Base difficulty contribution; scaled ×required_validators (cap 4)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "strategic_bps",
+            "docs": [
+              "Strategic-importance contribution for strategic task classes."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_subsidy_bps",
+            "docs": [
+              "Hard cap applied after summing all contributions."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CoverageIncentiveSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "demand_bps",
+            "type": "u16"
+          },
+          {
+            "name": "deficit_bps",
+            "type": "u16"
+          },
+          {
+            "name": "difficulty_bps",
+            "type": "u16"
+          },
+          {
+            "name": "strategic_bps",
+            "type": "u16"
+          },
+          {
+            "name": "max_subsidy_bps",
+            "type": "u16"
           }
         ]
       }
@@ -19631,6 +20672,53 @@
           },
           {
             "name": "nonce",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeePolicy",
+      "docs": [
+        "Global protocol fee rules.",
+        "",
+        "PDA: `[\"fee_policy\"]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Wallet allowed to update (registry admin during bootstrap)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
+            "docs": [
+              "Protocol fee in bps, charged on top of every task escrow funding."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeePolicySet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_bps",
             "type": "u16"
           }
         ]
@@ -22017,6 +23105,53 @@
       }
     },
     {
+      "name": "ResourceQuote",
+      "docs": [
+        "Requester's estimated resource cost for a task (travel, materials, …).",
+        "",
+        "PDA: `[\"resource_quote\", task_id]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "task",
+            "docs": [
+              "Task account this quote belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "quoter",
+            "docs": [
+              "Requester wallet that quoted."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "resource_cost",
+            "docs": [
+              "Estimated resource cost in lamports (funded alongside the reward)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ReviewCase",
       "docs": [
         "Independent review of a FraudReport by a random well-reputed committee.",
@@ -22070,6 +23205,58 @@
           },
           {
             "name": "decided_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardAllocation",
+      "docs": [
+        "Distribution record for one validator's claim on a task escrow.",
+        "",
+        "PDA: `[\"reward_allocation\", task_id, validator]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_paid",
+            "docs": [
+              "Base share paid from the escrow vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "subsidy_paid",
+            "docs": [
+              "Coverage subsidy paid from the treasury."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_paid",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
             "type": "i64"
           }
         ]
@@ -22958,6 +24145,160 @@
       }
     },
     {
+      "name": "TaskEscrow",
+      "docs": [
+        "Locked funds for a verification task.",
+        "",
+        "PDA: `[\"task_escrow\", task_id]` — vault PDA: `[\"task_escrow_vault\", escrow]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "docs": [
+              "Vault PDA holding the funded lamports."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Total funded for distribution (reward + resource cost)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fee_paid",
+            "docs": [
+              "Protocol fee paid to the treasury at funding time."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "released",
+            "docs": [
+              "Base rewards paid out so far."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "released_count",
+            "docs": [
+              "How many validator shares have been claimed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "One of `task_escrow_status`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "funded_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskEscrowFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee_paid",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskEscrowRefunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "TaskRequirement",
       "docs": [
         "One row of eligibility / evidence constraints for a task.",
@@ -23093,6 +24434,35 @@
       }
     },
     {
+      "name": "TaskResourcesQuoted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "quoter",
+            "type": "pubkey"
+          },
+          {
+            "name": "resource_cost",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "TaskResultSubmitted",
       "type": {
         "kind": "struct",
@@ -23125,6 +24495,43 @@
           {
             "name": "completed",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskRewardClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allocation",
+            "type": "pubkey"
+          },
+          {
+            "name": "task",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_paid",
+            "type": "u64"
+          },
+          {
+            "name": "subsidy_paid",
+            "type": "u64"
           }
         ]
       }
