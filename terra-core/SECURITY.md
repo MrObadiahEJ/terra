@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-14 (original audit); **updated:** 2026-09-24  
 **Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4)  
-**Auditor:** Automated review (opencode); Phase 1 + A1 remediation + A2 IDL regen applied on `dev`
+**Auditor:** Automated review (opencode); Phase 1 + A1 remediation + A2 IDL regen + A3 test/CI baseline applied on `dev`
 
 ---
 

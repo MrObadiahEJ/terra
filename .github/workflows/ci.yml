@@ -33,8 +33,20 @@ jobs:
         run: cargo clippy -- -D warnings
         working-directory: terra-core
 
-      - name: Unit tests
+      - name: Unit tests (registry lib)
         run: cargo test -p terra-registry --lib
+        working-directory: terra-core
+
+      - name: Unit tests (identity lib)
+        run: cargo test -p terra-identity --lib
+        working-directory: terra-core
+
+      - name: RFC-012 structural tests
+        run: cargo test -p terra-registry --test rfc012_structure
+        working-directory: terra-core
+
+      - name: Geo engine tests
+        run: cargo test -p terra-geo
         working-directory: terra-core
 
   api-tests:

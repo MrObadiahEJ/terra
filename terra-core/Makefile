@@ -1,4 +1,4 @@
-.PHONY: build test lint deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-fast lint deploy deploy-devnet deploy-mainnet clean idl
 
 # Build all programs
 build:
@@ -12,6 +12,16 @@ test:
 lint:
 	cargo fmt -- --check
 	cargo clippy --workspace --all-targets -- -D warnings
+
+# Fast baseline for constrained machines (mirrors CI lib/unit jobs; skips BPF)
+test-fast:
+	cargo fmt --all -- --check
+	cargo clippy -- -D warnings
+	cargo test -p terra-registry --lib
+	cargo test -p terra-identity --lib
+	cargo test -p terra-registry --test rfc012_structure
+	cargo test -p terra-geo
+	cargo test -p terra-api
 
 # Auto-fix lint issues
 fix:

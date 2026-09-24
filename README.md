@@ -33,10 +33,11 @@ green on `dev` (fmt, `clippy -D warnings`, registry lib unit tests, API unit
 tests incl. live-PostGIS migration run, `tsc --noEmit`).
 
 **Phase 0 (RFC-012 architecture contract)**, **Phase 1 (security hardening)**,
-**A1 (security residuals)**, and **A2 (IDL regeneration)** are complete: unique
-validator sets, endorsement action binding, account-ownership checks on
-`remaining_accounts` loaders, admin/authority constraints, M-2/C-4/L-1
-session-audit guards, and checked-in IDL synced to source (119/44/108/160).
+**A1 (security residuals)**, **A2 (IDL regeneration)**, and **A3 (test/CI
+baseline)** are complete: unique validator sets, endorsement action binding,
+account-ownership checks on `remaining_accounts` loaders, admin/authority
+constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL synced to source
+(119/44/108/160), and CI covers registry/identity lib + rfc012 + geo + API.
 See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 Verified tests on `dev` (2026-09-24):
@@ -49,6 +50,10 @@ Verified tests on `dev` (2026-09-24):
 | `terra-identity` integration (BPF) | 18 |
 | `terra-api` unit tests | 73 |
 | `terra-geo` unit tests | 4 |
+
+CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
+(+PostGIS migrations), and `tsc --noEmit`. Identity BPF (18) and the long-form
+registry BPF suite (269) are run locally / on demand.
 
 Registry BPF integration suite (`tests/integration.rs`, 269 tests) is maintained
 but not re-run on constrained CI/dev machines (full `cargo test -p terra-registry`
@@ -69,7 +74,7 @@ before shipping client changes after any program edit.
 This repo is self-describing for a new contributor or agent — read in order:
 
 1. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160). Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
 3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
 4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
 5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–1 done; **next phase is Phase 2** (generalize validator); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
@@ -321,6 +326,7 @@ pnpm dev
 - [x] Full verification (BPF execution, live-DB smoke, contract cross-checks)
 - [x] RFC-012 Phase 0 — architecture contract + structural tests
 - [x] RFC-012 Phase 1 — security hardening (unique validator sets, endorsement binding, ownership checks, admin constraints)
+- [x] Tier A1–A3 — security residuals, IDL regen, test/CI baseline (2026-09-24)
 - [ ] Devnet deployment (see checklist above)
 - [ ] Phase 5 — legal 3D/air-rights layer
 - [ ] Phase 6 — country config layer (tenure types, multi-authority)

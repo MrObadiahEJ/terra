@@ -243,7 +243,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 - RFC-012 Phase 0 (contract + `rfc012_structure` 21 tests) and Phase 1 (unique validator sets, endorsement binding, ownership checks, admin constraints) — see SECURITY.md and RFC-012 §8.
 
 **Next work (do not skip order):**
-1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2.
+1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
 2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 119/44/108/160 as of A2, 2026-09-24).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.

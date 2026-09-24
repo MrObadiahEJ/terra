@@ -226,7 +226,7 @@ Immutable audit entries for tracking system events.
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF audit tests 2/2, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (269) is maintained but not re-run on constrained machines.
+Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF audit tests 2/2, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (269) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
 
 ## Current Status (as of 2026-09-24)
 
@@ -235,6 +235,7 @@ Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/
 - RFC-012 **Phase 0** (architecture contract + `rfc012_structure` tests) and **Phase 1** (security hardening: unique validator sets, endorsement action binding, `remaining_accounts` ownership checks, admin constraints) — details in [SECURITY.md](SECURITY.md).
 - **A1 security residuals** (2026-09-24): M-2 foreign-entity audit guard, C-4 session-record signers + registry, L-1 `dec_rights_count`; unit + BPF tests green.
 - **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; `make idl`/`build.sh` now use `anchor idl build -p …`.
+- **A3 test/CI baseline** (2026-09-24): fixed `StoredArtifact` API test compile break; CI runs identity lib + rfc012 + geo; `make test-fast` for constrained machines.
 - PostGIS mirror API (23 routes, migrations `0001`…`0024`) + geo-engine + workspace CI green on `dev`.
 
 **Open / next (in priority order):**

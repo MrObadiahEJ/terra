@@ -232,8 +232,9 @@ mod tests {
         // Content hash must be SHA-256 of the data.
         let expected_hash: [u8; 32] = sha2::Sha256::digest(data).into();
         assert_eq!(artifact.content_hash, expected_hash);
-        assert_eq!(artifact.content_type, "text/plain");
+        // content_type is recorded by the upload route (DB column), not StoredArtifact.
         assert_eq!(artifact.size_bytes, data.len() as u64);
+        assert_eq!(artifact.backend_name, "local");
 
         // Storage ref must be a relative path under a date directory.
         assert!(artifact.storage_ref.contains("test.txt"));
