@@ -32,7 +32,7 @@ Anchor programs + PostGIS mirror + REST API + frontend client + IDL, with CI
 green on `dev` (fmt, `clippy -D warnings`, registry lib unit tests, API unit
 tests incl. live-PostGIS migration run, `tsc --noEmit`).
 
-**Phase 0 (RFC-012 architecture contract)**, **Phase 1 (security hardening)**,
+**Phase 0 (RFC-012 architecture contract)**, **Phase 1 (security hardening)**, **Phase 2 (generalized validator PDAs)**,
 **A1 (security residuals)**, **A2 (IDL regeneration)**, and **A3 (test/CI
 baseline)** are complete: unique validator sets, endorsement action binding,
 account-ownership checks on `remaining_accounts` loaders, admin/authority
@@ -44,7 +44,7 @@ Verified tests on `dev` (2026-09-24):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 62 |
+| `terra-registry` lib unit tests | 68 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 18 |
@@ -53,9 +53,9 @@ Verified tests on `dev` (2026-09-24):
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and `tsc --noEmit`. Identity BPF (18) and the long-form
-registry BPF suite (269) are run locally / on demand.
+registry BPF suite (275) are run locally / on demand.
 
-Registry BPF integration suite (`tests/integration.rs`, 269 tests) is maintained
+Registry BPF integration suite (`tests/integration.rs`, 275 tests) is maintained
 but not re-run on constrained CI/dev machines (full `cargo test -p terra-registry`
 exceeds practical time budgets); it is the long-form regression suite for all
 instruction happy paths and guard rails.
@@ -77,7 +77,7 @@ This repo is self-describing for a new contributor or agent — read in order:
 2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
 3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
 4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
-5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–1 done; **next phase is Phase 2** (generalize validator); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
+5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–2 done; **next phase is Phase 3** (tasks); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
 6. Individual specs `docs/rfc-003`…`rfc-011` each end with a **Handoff — status & next steps** footer (implementation location, open items, when to run which tests / `make idl`).
 
 Do not invent instruction/account/event/error counts or test totals — regenerate
@@ -247,7 +247,7 @@ createdb -h localhost -p 5433 -U terra terra_dev
 ```bash
 cd terra-core
 cargo check -p terra-registry            # on-chain program (native)
-cargo test -p terra-registry --lib       # 62 unit tests
+cargo test -p terra-registry --lib       # 68 unit tests
 cargo test -p terra-identity --lib       # 6 unit tests
 cargo test -p terra-api                  # 73 API unit tests
 DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
@@ -263,7 +263,7 @@ Build the BPF program (manifest parsing issue in Anchor requires direct
 cd terra-core
 cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
 cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
-# Long-form registry BPF suite (269 tests; heavy — needs built SBF + time):
+# Long-form registry BPF suite (275 tests; heavy — needs built SBF + time):
 cargo test -p terra-registry --test integration -- --test-threads=1
 # Identity BPF suite (18 tests):
 cargo test -p terra-identity --test integration
@@ -287,11 +287,11 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 62/62 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 68/68 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 18/18 |
-| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 269 (maintained; run when machine/time allow) |
+| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 275 (maintained; run when machine/time allow) |
 | Unit (API validation logic) | `cargo test -p terra-api` | 73/73 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 4/4 |
 | Migrations on real PostGIS 16 | CI service + local scratch instance | 24/24 apply |
@@ -331,7 +331,8 @@ pnpm dev
 - [ ] Phase 5 — legal 3D/air-rights layer
 - [ ] Phase 6 — country config layer (tenure types, multi-authority)
 - [ ] Phase 7/8 — regional expansion → global platform
-- [ ] RFC-012 Phases 2–10 — generalized validator, tasks, multi-source observations, dynamic routing, reputation governance, economics, infrastructure, cross-border privacy
+- [x] RFC-012 Phase 2 — generalized validator PDAs (2026-09-24): profile/presence/availability/capability/relationship-edge, IDL 128/49/115/169
+- [ ] RFC-012 Phases 3–10 — tasks, multi-source observations, dynamic routing, reputation governance, economics, infrastructure, cross-border privacy
 
 ---
 

@@ -226,7 +226,7 @@ Immutable audit entries for tracking system events.
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF audit tests 2/2, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (269) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-24): registry lib 68/68, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 tests 4/4, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (275) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
 
 ## Current Status (as of 2026-09-24)
 
