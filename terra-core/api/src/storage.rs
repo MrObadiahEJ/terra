@@ -28,7 +28,7 @@ impl StorageBackend {
         content_type: &str,
         data: &[u8],
     ) -> Result<StoredArtifact> {
-    let content_hash: [u8; 32] = Sha256::digest(data).into();
+        let content_hash: [u8; 32] = Sha256::digest(data).into();
 
         match self {
             StorageBackend::Local { root } => store_local(root, filename, content_type, data)
@@ -91,8 +91,8 @@ async fn store_local(
 // ---------------------------------------------------------------------------
 
 pub fn from_env() -> Result<StorageBackend> {
-    let root = std::env::var("EVIDENCE_STORAGE_DIR")
-        .unwrap_or_else(|_| "/tmp/terra-evidence".to_string());
+    let root =
+        std::env::var("EVIDENCE_STORAGE_DIR").unwrap_or_else(|_| "/tmp/terra-evidence".to_string());
     let root = PathBuf::from(root);
     std::fs::create_dir_all(&root).context("creating evidence storage root")?;
     tracing::info!(root = %root.display(), "evidence storage: local filesystem");

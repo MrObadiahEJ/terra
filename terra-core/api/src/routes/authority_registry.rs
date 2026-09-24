@@ -101,7 +101,11 @@ async fn list_registries(
     let rows: Vec<AuthorityRegistry> = sqlx::query_as(REGISTRY_SELECT)
         .fetch_all(&state.pool)
         .await?;
-    Ok(Json(rows.into_iter().map(AuthorityRegistryView::from_row).collect()))
+    Ok(Json(
+        rows.into_iter()
+            .map(AuthorityRegistryView::from_row)
+            .collect(),
+    ))
 }
 
 async fn get_registry(
@@ -141,7 +145,10 @@ async fn create_registry(
     .bind(&req.validators)
     .fetch_one(&state.pool)
     .await?;
-    Ok((StatusCode::CREATED, Json(AuthorityRegistryView::from_row(row))))
+    Ok((
+        StatusCode::CREATED,
+        Json(AuthorityRegistryView::from_row(row)),
+    ))
 }
 
 async fn add_validator(

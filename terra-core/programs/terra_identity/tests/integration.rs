@@ -116,11 +116,7 @@ async fn read_account<T: AccountDeserialize>(ctx: &ProgramTestContext, key: Pubk
 // Instruction builders
 // ---------------------------------------------------------------------------
 
-fn bind_identity_ix(
-    identity_hash: &[u8; 32],
-    recovery: &Pubkey,
-    owner: &Pubkey,
-) -> Instruction {
+fn bind_identity_ix(identity_hash: &[u8; 32], recovery: &Pubkey, owner: &Pubkey) -> Instruction {
     let (pk, _) = identity_pda(identity_hash);
     let mut data = discriminator("global", "bind_identity").to_vec();
     data.extend_from_slice(identity_hash);
@@ -287,10 +283,7 @@ fn revoke_guardianship_ix(
     }
 }
 
-fn execute_revoke_guardianship_ix(
-    identity: &Pubkey,
-    new_owner: &Keypair,
-) -> Instruction {
+fn execute_revoke_guardianship_ix(identity: &Pubkey, new_owner: &Keypair) -> Instruction {
     let data = discriminator("global", "execute_revoke_guardianship").to_vec();
     Instruction {
         program_id: PROGRAM_ID,
@@ -325,7 +318,9 @@ fn is_guardianship_kind_works() {
     assert!(!is_guardianship_kind(succession_kind::RECOVERY));
     assert!(!is_guardianship_kind(succession_kind::TRANSFER));
     assert!(is_guardianship_kind(succession_kind::GUARDIANSHIP));
-    assert!(is_guardianship_kind(succession_kind::COURT_APPOINTED_GUARDIAN));
+    assert!(is_guardianship_kind(
+        succession_kind::COURT_APPOINTED_GUARDIAN
+    ));
 }
 
 #[test]
@@ -425,12 +420,20 @@ async fn succession_request_endorse_claim_ok() {
     // Two validators.
     let v1 = Keypair::new();
     let v2 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -484,7 +487,11 @@ async fn succession_request_endorse_claim_ok() {
     assert_eq!(succ_after_v2.validations_count, 2);
 
     // Fast-forward past grace period (7 days = 604800s).
-    let clock = ctx.banks_client.get_sysvar::<solana_sdk::sysvar::clock::Clock>().await.unwrap();
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
     ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
         slot: clock.slot + 1_000_000,
         epoch_start_timestamp: clock.unix_timestamp + 604800 + 1,
@@ -524,9 +531,13 @@ async fn succession_cancel_ok() {
     .expect("bind_identity failed");
 
     let v1 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -579,9 +590,13 @@ async fn succession_unauthorized_requester_fails() {
 
     let v1 = Keypair::new();
     let attacker = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &attacker.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &attacker.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -621,12 +636,20 @@ async fn succession_wrong_validator_endorsement_fails() {
 
     let v1 = Keypair::new();
     let v2_not_listed = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2_not_listed.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v2_not_listed.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -681,15 +704,27 @@ async fn guardianship_request_ok() {
     let v1 = Keypair::new();
     let v2 = Keypair::new();
     let v3 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000))
-        .await
-        .unwrap();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v3.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v3.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let guardian = Keypair::new();
     let case_hash = [7u8; 32];
@@ -730,9 +765,13 @@ async fn guardianship_revoke_and_execute_ok() {
     let guardian_owner = Keypair::new();
     let (identity_pk, _) = identity_pda(&id_hash);
 
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &guardian_owner.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &guardian_owner.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     process(
         &mut ctx,
@@ -744,9 +783,13 @@ async fn guardianship_revoke_and_execute_ok() {
 
     // Recovery requests revocation.
     let new_owner = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &new_owner.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &new_owner.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     // Actually call as recovery.
     process_with(
@@ -778,7 +821,11 @@ async fn guardianship_revoke_and_execute_ok() {
     assert!(result.is_err(), "execute before timelock should fail");
 
     // Fast-forward past timelock (48h = 172800s).
-    let clock = ctx.banks_client.get_sysvar::<solana_sdk::sysvar::clock::Clock>().await.unwrap();
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
     ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
         slot: clock.slot + 1_000_000,
         epoch_start_timestamp: clock.unix_timestamp + 172800 + 1,
@@ -819,9 +866,13 @@ async fn guardianship_scope_notes_too_long_fails() {
     .expect("bind_identity failed");
 
     let v1 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let guardian = Keypair::new();
     let case_hash = [10u8; 32];
@@ -863,9 +914,13 @@ async fn guardianship_empty_case_hash_fails() {
     .expect("bind_identity failed");
 
     let v1 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let guardian = Keypair::new();
     let zero_hash = [0u8; 32];
@@ -910,9 +965,13 @@ async fn succession_duplicate_validators_fails() {
     .expect("bind_identity failed");
 
     let v1 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -956,12 +1015,20 @@ async fn succession_duplicate_endorsement_fails() {
 
     let v1 = Keypair::new();
     let v2 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v2.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let successor = Keypair::new();
 
@@ -1025,9 +1092,13 @@ async fn guardianship_duplicate_validators_fails() {
     .expect("bind_identity failed");
 
     let v1 = Keypair::new();
-    process(&mut ctx, &payer, fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000))
-        .await
-        .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &v1.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
 
     let guardian = Keypair::new();
     let case_hash = [7u8; 32];

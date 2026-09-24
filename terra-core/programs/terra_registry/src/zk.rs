@@ -407,10 +407,7 @@ pub fn request_credential(
 
 pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
     let request = &mut ctx.accounts.credential_request;
-    require!(
-        !request.finalized,
-        TerraError::AlreadyEndorsedRotation
-    );
+    require!(!request.finalized, TerraError::AlreadyEndorsedRotation);
 
     let signer_key = ctx.accounts.validator_signer.key();
     let registry = &ctx.accounts.registry;
@@ -431,23 +428,17 @@ pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
         request_hash: request.request_hash,
         signer: signer_key,
         signers_count: request.signers.len() as u8,
-        required: crate::validator_registry::consensus_required(
-            registry.validators.len() as u8,
-        ),
+        required: crate::validator_registry::consensus_required(registry.validators.len() as u8,),
     });
     Ok(())
 }
 
 pub fn finalize_credential(ctx: &mut Context<super::FinalizeCredential>) -> Result<()> {
     let request = &mut ctx.accounts.credential_request;
-    require!(
-        !request.finalized,
-        TerraError::AlreadyEndorsedRotation
-    );
+    require!(!request.finalized, TerraError::AlreadyEndorsedRotation);
 
     let registry = &ctx.accounts.registry;
-    let required =
-        crate::validator_registry::consensus_required(registry.validators.len() as u8);
+    let required = crate::validator_registry::consensus_required(registry.validators.len() as u8);
     require!(
         request.signers.len() as u8 >= required,
         TerraError::InsufficientEndorsements
@@ -521,14 +512,10 @@ pub fn verify_credential(
     );
 
     let credential = &mut ctx.accounts.threshold_credential;
-    require!(
-        !credential.consumed,
-        TerraError::AlreadyEndorsedRotation
-    );
+    require!(!credential.consumed, TerraError::AlreadyEndorsedRotation);
 
     let registry = &ctx.accounts.registry;
-    let required =
-        crate::validator_registry::consensus_required(registry.validators.len() as u8);
+    let required = crate::validator_registry::consensus_required(registry.validators.len() as u8);
     require!(
         credential.signer_count >= required,
         TerraError::InsufficientEndorsements
@@ -543,7 +530,8 @@ pub fn verify_credential(
 
     let nullifier = &mut ctx.accounts.nullifier_record;
     require!(
-        nullifier.nullifier_hash == [0u8; 32] || nullifier.nullifier_hash != credential.nullifier_hash,
+        nullifier.nullifier_hash == [0u8; 32]
+            || nullifier.nullifier_hash != credential.nullifier_hash,
         TerraError::AlreadyEndorsedRotation
     );
 

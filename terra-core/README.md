@@ -218,7 +218,7 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 59 | Guards, quorum, staking, subdivision, zk, … |
+| terra-registry lib | 62 | Guards, quorum, staking, subdivision, zk, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 18 | BPF happy paths + guard rails |
@@ -226,18 +226,20 @@ Immutable audit entries for tracking system events.
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-23): registry lib 59/59, identity lib 6/6, rfc012 21/21, identity BPF 18/18, API 73/73, geo 4/4; `cargo fmt` + `clippy -D warnings` clean; both programs `cargo build-sbf` OK. Registry BPF suite (269) is maintained but not re-run on constrained machines.
+Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF audit tests 2/2, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (A2). Full registry BPF suite (269) is maintained but not re-run on constrained machines.
 
-## Current Status (as of 2026-09-23)
+## Current Status (as of 2026-09-24)
 
 **Done:**
 - All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).
 - RFC-012 **Phase 0** (architecture contract + `rfc012_structure` tests) and **Phase 1** (security hardening: unique validator sets, endorsement action binding, `remaining_accounts` ownership checks, admin constraints) — details in [SECURITY.md](SECURITY.md).
+- **A1 security residuals** (2026-09-24): M-2 foreign-entity audit guard, C-4 session-record signers + registry, L-1 `dec_rights_count`; unit + BPF tests green.
+- **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; `make idl`/`build.sh` now use `anchor idl build -p …`.
 - PostGIS mirror API (23 routes, migrations `0001`…`0024`) + geo-engine + workspace CI green on `dev`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: M-2 (audit entity owner), L-1 (`rights_count` guard), C-4 residual (session recorder signer).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` currently lags source (74/23/58/120 vs 118/47/108/160).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of A2 (119/44/108/160, 2026-09-24).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).

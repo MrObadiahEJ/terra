@@ -124,7 +124,9 @@ pub fn record_attestation_outcome(
     // Auto-jail if reputation drops below 2000 bps (20%).
     if rep.reputation_score < 2000 {
         rep.status = validator_status::JAILED;
-        rep.jailed_until = Clock::get()?.unix_timestamp.saturating_add(JAIL_DURATION_SECS);
+        rep.jailed_until = Clock::get()?
+            .unix_timestamp
+            .saturating_add(JAIL_DURATION_SECS);
 
         emit!(crate::ValidatorJailed {
             validator: rep.validator,
@@ -167,7 +169,10 @@ pub fn unjail_validator(ctx: Context<crate::UnjailValidator>) -> Result<()> {
     );
 
     let now = Clock::get()?.unix_timestamp;
-    require!(now >= rep.jailed_until, TerraError::SettlementNotYetEffective);
+    require!(
+        now >= rep.jailed_until,
+        TerraError::SettlementNotYetEffective
+    );
 
     rep.status = validator_status::ACTIVE;
     rep.jailed_until = 0;
@@ -195,14 +200,16 @@ pub fn slash_validator(ctx: Context<crate::SlashValidator>, reputation_penalty: 
     if new_score == 0 {
         rep.status = validator_status::SLASHED;
 
-        emit!(crate::ValidatorSlashed {
+        emit!(crate::ReputationSlashed {
             validator: rep.validator,
             reputation_score: 0,
             slashed_at: rep.updated_at,
         });
     } else if new_score < 2000 {
         rep.status = validator_status::JAILED;
-        rep.jailed_until = Clock::get()?.unix_timestamp.saturating_add(JAIL_DURATION_SECS);
+        rep.jailed_until = Clock::get()?
+            .unix_timestamp
+            .saturating_add(JAIL_DURATION_SECS);
 
         emit!(crate::ValidatorJailed {
             validator: rep.validator,

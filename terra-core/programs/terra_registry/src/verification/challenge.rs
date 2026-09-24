@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 
-use crate::verification::session::{VerificationSession, session_status};
+use crate::verification::session::{session_status, VerificationSession};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
@@ -29,10 +29,7 @@ fn try_load_session<'info>(
 ) -> Result<Option<(Pubkey, VerificationSession)>> {
     for acc in remaining_accounts {
         // Verify account is owned by this program to prevent injection.
-        require!(
-            acc.owner == &crate::ID,
-            TerraError::NotAuthorized
-        );
+        require!(acc.owner == &crate::ID, TerraError::NotAuthorized);
         let data = acc.try_borrow_data()?;
         // Skip accounts that are too small to be a valid Anchor account.
         if data.len() < 8 {
@@ -153,10 +150,7 @@ pub fn file_challenge(
 ///
 /// When the challenge resolves (UPHELD or OVERTURNED), any active
 /// VerificationSession for this claim is transitioned accordingly.
-pub fn vote_challenge(
-    ctx: Context<crate::VoteChallenge>,
-    vote_uphold: bool,
-) -> Result<()> {
+pub fn vote_challenge(ctx: Context<crate::VoteChallenge>, vote_uphold: bool) -> Result<()> {
     let challenge = &mut ctx.accounts.challenge;
     require!(
         challenge.status == challenge_status::FILED

@@ -18,9 +18,13 @@ fix:
 	cargo fmt
 	cargo clippy --workspace --all-targets --fix --allow-dirty
 
-# Generate IDLs only
+# Generate IDLs only (stdout JSON → target/idl; workspace `anchor build`
+# pulls host-only deps via api/geo members and can fail on getrandom/SBF)
 idl:
-	anchor build --skip-lint
+	mkdir -p target/idl
+	anchor idl build --skip-lint -p terra_registry > target/idl/terra_registry.json
+	anchor idl build --skip-lint -p terra_identity > target/idl/terra_identity.json
+	@ls -lh target/idl/*.json
 
 # Deploy to devnet
 deploy-devnet:

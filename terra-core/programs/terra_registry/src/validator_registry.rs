@@ -725,7 +725,10 @@ pub fn confirm_nomination(ctx: Context<super::ConfirmNomination>) -> Result<()> 
     // Validation phase — read-only checks against nomination and registry.
     {
         let nomination = &ctx.accounts.nomination;
-        require!(!nomination.finalized, super::TerraError::AlreadyEndorsedRotation);
+        require!(
+            !nomination.finalized,
+            super::TerraError::AlreadyEndorsedRotation
+        );
         let registry = &ctx.accounts.registry;
 
         require!(

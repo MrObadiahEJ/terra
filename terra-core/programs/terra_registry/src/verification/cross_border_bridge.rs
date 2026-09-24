@@ -46,9 +46,7 @@ pub struct CrossBorderVerification {
 /// Link a JurisdictionBinding to a VerificationSession. Creates a
 /// CrossBorderVerification account. Only callable if the binding exists
 /// and is not revoked.
-pub fn link_cross_border_to_session(
-    ctx: Context<crate::LinkCrossBorderToSession>,
-) -> Result<()> {
+pub fn link_cross_border_to_session(ctx: Context<crate::LinkCrossBorderToSession>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let cross_border = &mut ctx.accounts.cross_border_verification;
     cross_border.binding = ctx.accounts.binding.key();
@@ -74,9 +72,7 @@ pub fn link_cross_border_to_session(
 
 /// Mark a cross-border verification as verified. Only callable by the
 /// original linker or the registry admin.
-pub fn verify_cross_border(
-    ctx: Context<crate::VerifyCrossBorder>,
-) -> Result<()> {
+pub fn verify_cross_border(ctx: Context<crate::VerifyCrossBorder>) -> Result<()> {
     let cross_border = &mut ctx.accounts.cross_border_verification;
     require!(
         cross_border.status == cross_border_verification_status::PENDING,
@@ -98,9 +94,7 @@ pub fn verify_cross_border(
 }
 
 /// Revoke a cross-border verification. Only callable by the registry admin.
-pub fn revoke_cross_border(
-    ctx: Context<crate::RevokeCrossBorder>,
-) -> Result<()> {
+pub fn revoke_cross_border(ctx: Context<crate::RevokeCrossBorder>) -> Result<()> {
     let cross_border = &mut ctx.accounts.cross_border_verification;
     require!(
         cross_border.status == cross_border_verification_status::PENDING

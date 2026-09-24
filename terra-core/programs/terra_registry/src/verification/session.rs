@@ -109,9 +109,7 @@ impl VerificationSession {
     pub fn is_terminal(status: u8) -> bool {
         matches!(
             status,
-            session_status::CLOSED
-                | session_status::TIMED_OUT
-                | session_status::CHALLENGED
+            session_status::CLOSED | session_status::TIMED_OUT | session_status::CHALLENGED
         )
     }
 }
@@ -142,7 +140,7 @@ pub fn open_verification_session(
     let zero_key = Pubkey::default();
     require!(
         tracker.active_session == zero_key,
-        TerraError::InvalidClaimStatus  // reuse: session already active
+        TerraError::InvalidClaimStatus // reuse: session already active
     );
 
     // Resolve quorum from QuorumConfig or fall back to defaults.

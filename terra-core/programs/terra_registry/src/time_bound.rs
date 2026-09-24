@@ -180,7 +180,12 @@ pub fn grant_conditional_right(
     notes: String,
 ) -> Result<()> {
     let parcel = &mut ctx.accounts.parcel;
-    crate::is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+    crate::is_authorized_owner(
+        parcel.owner,
+        parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.owner.key(),
+    )?;
     require!(
         rights_kind <= crate::right_kind::MAX,
         TerraError::InvalidRightKind

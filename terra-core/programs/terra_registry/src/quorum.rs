@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*;
 use anchor_lang::prelude::AccountInfo;
+use anchor_lang::prelude::*;
 
-use crate::{MAX_VALIDATORS, TerraError};
+use crate::{TerraError, MAX_VALIDATORS};
 
 /// Count unique non-default pubkeys in a declared validator set.
 ///
@@ -13,9 +13,7 @@ use crate::{MAX_VALIDATORS, TerraError};
 /// unique validator can ever sign — which would make thresholds unreachable
 /// and corrupt quorum accounting.
 #[allow(clippy::result_unit_err)]
-pub fn count_unique_validators(
-    validators: &[Pubkey],
-) -> std::result::Result<usize, ()> {
+pub fn count_unique_validators(validators: &[Pubkey]) -> std::result::Result<usize, ()> {
     let mut unique: Vec<Pubkey> = Vec::with_capacity(validators.len());
     for &v in validators.iter() {
         if v == Pubkey::default() {

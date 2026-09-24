@@ -199,7 +199,10 @@ async fn list_nullifiers(
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/requests", get(list_credential_requests).post(create_credential_request))
+        .route(
+            "/requests",
+            get(list_credential_requests).post(create_credential_request),
+        )
         .route("/finalize", post(finalize_credential))
         .route("/", get(list_credentials))
         .route("/{credential_pubkey}", get(get_credential))

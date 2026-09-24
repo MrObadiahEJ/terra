@@ -163,10 +163,7 @@ pub fn is_authorized_owner(
     for acc in remaining_accounts.iter() {
         // Verify account is owned by the terra_identity program to prevent
         // fake accounts matching the data layout.
-        require!(
-            acc.owner == &terra_identity::ID,
-            TerraError::NotAuthorized
-        );
+        require!(acc.owner == &terra_identity::ID, TerraError::NotAuthorized);
 
         let data = acc.try_borrow_data()?;
         if data.len() < 8 {
@@ -198,19 +195,38 @@ pub fn is_authorized_owner(
                 TerraError::NotAuthorized
             );
             let id_data = identity_acc.try_borrow_data()?;
-            let slice_id = if id_data.len() >= 8 { &id_data[8..] } else { &id_data };
-            let identity: Identity =
-                anchor_lang::AnchorDeserialize::try_from_slice(slice_id)
-                    .map_err(|_| error!(TerraError::IdentityMismatch))?;
-            require!(
-                identity.owner == signer_key,
-                TerraError::IdentityMismatch
-            );
+            let slice_id = if id_data.len() >= 8 {
+                &id_data[8..]
+            } else {
+                &id_data
+            };
+            let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice_id)
+                .map_err(|_| error!(TerraError::IdentityMismatch))?;
+            require!(identity.owner == signer_key, TerraError::IdentityMismatch);
             return Ok(());
         }
     }
 
     Err(error!(TerraError::NotOwner))
+}
+
+/// Decrement `rights_count` with an explicit underflow guard (L-1).
+/// Returns `RightsLimitExceeded` if the counter is already 0 instead of
+/// saturating, so a desynced counter fails loudly rather than drifting.
+pub fn dec_rights_count(count: u8) -> Result<u8> {
+    count
+        .checked_sub(1)
+        .ok_or_else(|| error!(TerraError::RightsLimitExceeded))
+}
+
+/// Whether `signer` may record evidence/observations on a verification
+/// session: the opener, the registry admin, or a registered validator (C-4).
+pub fn is_session_recorder(
+    opened_by: Pubkey,
+    signer: Pubkey,
+    registry: &validator_registry::ValidatorRegistry,
+) -> bool {
+    signer == opened_by || signer == registry.admin || registry.validators.contains(&signer)
 }
 
 /// Maximum number of validators that can approve a single attestation.
@@ -275,20 +291,20 @@ pub use terra_identity::state::Identity;
 /// The canonical `#[account]` definition lives in the `terra_identity` program.
 pub use terra_identity::state::Succession;
 
-pub mod validator_registry;
 pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
 pub mod ipfs_docs;
 pub mod quorum;
+pub mod recovery;
 pub mod staking;
 pub mod subdivision;
 pub mod time_bound;
+pub mod validator_registry;
 pub mod vault;
-pub mod world_registry;
-pub mod recovery;
-pub mod zk;
 pub mod verification;
+pub mod world_registry;
+pub mod zk;
 
 // ---------------------------------------------------------------------------
 // Vault instruction contexts (RFC-003)
@@ -827,7 +843,12 @@ pub mod terra_registry {
     /// Transfer ownership of a parcel. Only the current owner can sign.
     pub fn transfer_parcel(ctx: Context<TransferParcel>) -> Result<()> {
         let parcel = &mut ctx.accounts.parcel;
-        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        )?;
 
         let from = parcel.owner;
         let to = ctx.accounts.new_owner.key();
@@ -844,7 +865,12 @@ pub mod terra_registry {
 
     /// Update a parcel's status (e.g. for-sale). Owner-only.
     pub fn update_status(ctx: Context<UpdateStatus>, status: u8) -> Result<()> {
-        is_authorized_owner(ctx.accounts.parcel.owner, ctx.accounts.parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+        is_authorized_owner(
+            ctx.accounts.parcel.owner,
+            ctx.accounts.parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        )?;
         require!(status <= parcel_status::MAX, TerraError::InvalidStatus);
 
         let parcel = &mut ctx.accounts.parcel;
@@ -866,7 +892,12 @@ pub mod terra_registry {
         notes: String,
     ) -> Result<()> {
         let parcel = &mut ctx.accounts.parcel;
-        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        )?;
         require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
         require!(nonce == parcel.rights_count, TerraError::InvalidNonce);
         require!(
@@ -924,11 +955,9 @@ pub mod terra_registry {
         });
 
         let parcel = &mut ctx.accounts.parcel;
-        require!(
-            parcel.rights_count > 0,
-            TerraError::RightsLimitExceeded
-        );
-        parcel.rights_count = parcel.rights_count.saturating_sub(1);
+        // Explicit guard: refuse underflow instead of saturating, so a
+        // desynced counter surfaces as an error rather than drifting to 0.
+        parcel.rights_count = dec_rights_count(parcel.rights_count)?;
         Ok(())
     }
 
@@ -998,10 +1027,7 @@ pub mod terra_registry {
     }
 
     /// Revoke an identity-based right. The original granter may revoke.
-    pub fn revoke_identity_right(
-        ctx: Context<RevokeIdentityRight>,
-        rights_kind: u8,
-    ) -> Result<()> {
+    pub fn revoke_identity_right(ctx: Context<RevokeIdentityRight>, rights_kind: u8) -> Result<()> {
         require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
 
         let ir = &ctx.accounts.identity_rights;
@@ -1032,7 +1058,12 @@ pub mod terra_registry {
         flags: u16,
         access_hash: [u8; 32],
     ) -> Result<()> {
-        is_authorized_owner(ctx.accounts.parcel.owner, ctx.accounts.parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+        is_authorized_owner(
+            ctx.accounts.parcel.owner,
+            ctx.accounts.parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        )?;
         require!(
             flags & !infra_flag::ALL == 0,
             TerraError::InvalidInfrastructureFlags
@@ -1076,7 +1107,12 @@ pub mod terra_registry {
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
         // Only the parcel owner (or program authority) may create attestations.
-        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.authority.key(),
+        )?;
         require!(
             !specifier.iter().all(|b| *b == 0),
             TerraError::EmptySpecifier
@@ -1120,12 +1156,21 @@ pub mod terra_registry {
     /// owner wallet matches.
     pub fn attach_parcel(ctx: Context<AttachParcel>) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.owner.key())?;
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.owner.key(),
+        )?;
         // Read identity from UncheckedAccount — owned by terra_identity program.
         let identity_info = &ctx.accounts.identity;
         let identity_data = identity_info.try_borrow_data()?;
         // Skip the 8-byte Anchor discriminator added by the terra_identity program.
-        let slice = if identity_data.len() >= 8 { &identity_data[8..] } else { &identity_data };
+        let slice = if identity_data.len() >= 8 {
+            &identity_data[8..]
+        } else {
+            &identity_data
+        };
         let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
             .map_err(|_| error!(TerraError::IdentityMismatch))?;
         require!(
@@ -1153,7 +1198,12 @@ pub mod terra_registry {
         new_validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        is_authorized_owner(parcel.owner, parcel.key(), ctx.remaining_accounts, ctx.accounts.authority.key())?;
+        is_authorized_owner(
+            parcel.owner,
+            parcel.key(),
+            ctx.remaining_accounts,
+            ctx.accounts.authority.key(),
+        )?;
         require!(
             ctx.accounts.attestation.parcel == parcel.key(),
             TerraError::AttestationMismatch
@@ -1335,17 +1385,11 @@ pub mod terra_registry {
         world_registry::allocate_country(ctx, country_code, approved_admin)
     }
 
-    pub fn request_genesis(
-        ctx: Context<RequestGenesis>,
-        country_code: [u8; 2],
-    ) -> Result<()> {
+    pub fn request_genesis(ctx: Context<RequestGenesis>, country_code: [u8; 2]) -> Result<()> {
         world_registry::request_genesis(ctx, country_code)
     }
 
-    pub fn confirm_genesis(
-        ctx: Context<ConfirmGenesis>,
-        confirmer_country: [u8; 2],
-    ) -> Result<()> {
+    pub fn confirm_genesis(ctx: Context<ConfirmGenesis>, confirmer_country: [u8; 2]) -> Result<()> {
         world_registry::confirm_genesis(ctx, confirmer_country)
     }
 
@@ -1392,7 +1436,10 @@ pub mod terra_registry {
         validator_registry::add_validator(ctx, validator)
     }
 
-    pub fn bootstrap_self_proclaim(ctx: Context<BootstrapSelfProclaim>, country_code: [u8; 2]) -> Result<()> {
+    pub fn bootstrap_self_proclaim(
+        ctx: Context<BootstrapSelfProclaim>,
+        country_code: [u8; 2],
+    ) -> Result<()> {
         validator_registry::bootstrap_self_proclaim(ctx, country_code)
     }
 
@@ -1412,7 +1459,14 @@ pub mod terra_registry {
         country_code: [u8; 2],
         recent_blockhash: [u8; 32],
     ) -> Result<()> {
-        validator_registry::nominate_validator(ctx, candidate, documents_hash, location_hash, country_code, recent_blockhash)
+        validator_registry::nominate_validator(
+            ctx,
+            candidate,
+            documents_hash,
+            location_hash,
+            country_code,
+            recent_blockhash,
+        )
     }
 
     pub fn confirm_nomination(ctx: Context<ConfirmNomination>) -> Result<()> {
@@ -1423,7 +1477,10 @@ pub mod terra_registry {
         validator_registry::propose_validator(ctx, validator)
     }
 
-    pub fn propose_validator_removal(ctx: Context<ProposeValidator>, validator: Pubkey) -> Result<()> {
+    pub fn propose_validator_removal(
+        ctx: Context<ProposeValidator>,
+        validator: Pubkey,
+    ) -> Result<()> {
         validator_registry::propose_removal(ctx, validator)
     }
 
@@ -1852,7 +1909,14 @@ pub mod terra_registry {
         parcel_type: u8,
         region: [u8; 2],
     ) -> Result<()> {
-        verification::claim::create_claim(ctx, claim_id, claim_type, statement_hash, parcel_type, region)
+        verification::claim::create_claim(
+            ctx,
+            claim_id,
+            claim_type,
+            statement_hash,
+            parcel_type,
+            region,
+        )
     }
 
     pub fn add_evidence(
@@ -1862,7 +1926,13 @@ pub mod terra_registry {
         storage_reference: String,
         observed_at: i64,
     ) -> Result<()> {
-        verification::evidence::add_evidence(ctx, evidence_type, content_hash, storage_reference, observed_at)
+        verification::evidence::add_evidence(
+            ctx,
+            evidence_type,
+            content_hash,
+            storage_reference,
+            observed_at,
+        )
     }
 
     pub fn submit_observation(
@@ -1873,7 +1943,14 @@ pub mod terra_registry {
         confidence: u8,
         signature_hash: [u8; 32],
     ) -> Result<()> {
-        verification::observation::submit_observation(ctx, location, method, findings_hash, confidence, signature_hash)
+        verification::observation::submit_observation(
+            ctx,
+            location,
+            method,
+            findings_hash,
+            confidence,
+            signature_hash,
+        )
     }
 
     pub fn submit_verification_attestation(
@@ -1961,10 +2038,7 @@ pub mod terra_registry {
         verification::reputation::unjail_validator(ctx)
     }
 
-    pub fn slash_validator(
-        ctx: Context<SlashValidator>,
-        reputation_penalty: u16,
-    ) -> Result<()> {
+    pub fn slash_validator(ctx: Context<SlashValidator>, reputation_penalty: u16) -> Result<()> {
         verification::reputation::slash_validator(ctx, reputation_penalty)
     }
 
@@ -2008,10 +2082,7 @@ pub mod terra_registry {
     // Observer registry
     // -----------------------------------------------------------------------
 
-    pub fn register_observer(
-        ctx: Context<RegisterObserver>,
-        identity: Pubkey,
-    ) -> Result<()> {
+    pub fn register_observer(ctx: Context<RegisterObserver>, identity: Pubkey) -> Result<()> {
         verification::observer::register_observer(ctx, identity)
     }
 
@@ -2047,9 +2118,7 @@ pub mod terra_registry {
     // Cross-border verification bridge
     // -----------------------------------------------------------------------
 
-    pub fn link_cross_border_to_session(
-        ctx: Context<LinkCrossBorderToSession>,
-    ) -> Result<()> {
+    pub fn link_cross_border_to_session(ctx: Context<LinkCrossBorderToSession>) -> Result<()> {
         verification::cross_border_bridge::link_cross_border_to_session(ctx)
     }
 
@@ -2073,17 +2142,21 @@ pub mod terra_registry {
         to_status: u8,
         metadata_hash: [u8; 32],
     ) -> Result<()> {
-        verification::audit_trail::record_audit_entry(ctx, sequence, action, from_status, to_status, metadata_hash)
+        verification::audit_trail::record_audit_entry(
+            ctx,
+            sequence,
+            action,
+            from_status,
+            to_status,
+            metadata_hash,
+        )
     }
 
     // -----------------------------------------------------------------------
     // Quorum voting
     // -----------------------------------------------------------------------
 
-    pub fn cast_quorum_vote(
-        ctx: Context<CastQuorumVote>,
-        vote_choice: u8,
-    ) -> Result<()> {
+    pub fn cast_quorum_vote(ctx: Context<CastQuorumVote>, vote_choice: u8) -> Result<()> {
         verification::quorum_voting::cast_quorum_vote(ctx, vote_choice)
     }
 
@@ -2267,7 +2340,6 @@ pub struct Attest<'info> {
     pub system_program: Program<'info, System>,
 }
 
-
 #[derive(Accounts)]
 pub struct AttachParcel<'info> {
     #[account(
@@ -2280,7 +2352,6 @@ pub struct AttachParcel<'info> {
     pub identity: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
 }
-
 
 #[derive(Accounts)]
 pub struct RotateValidators<'info> {
@@ -2298,7 +2369,6 @@ pub struct RotateValidators<'info> {
     pub attestation: Account<'info, Attestation>,
     pub authority: Signer<'info>,
 }
-
 
 #[derive(Accounts)]
 #[instruction(case_hash: [u8; 32])]
@@ -3752,7 +3822,16 @@ pub struct RecordSessionEvidence<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
-    /// The session opener or a registered validator must sign.
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// The session opener, registry admin, or a registered validator must sign.
+    #[account(
+        constraint = is_session_recorder(
+            session.opened_by,
+            signer.key(),
+            &registry,
+        ) @ TerraError::NotAuthorized,
+    )]
     pub signer: Signer<'info>,
 }
 
@@ -3764,7 +3843,16 @@ pub struct RecordSessionObservation<'info> {
         bump,
     )]
     pub session: Account<'info, verification::VerificationSession>,
-    /// The session opener or a registered validator must sign.
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// The session opener, registry admin, or a registered validator must sign.
+    #[account(
+        constraint = is_session_recorder(
+            session.opened_by,
+            signer.key(),
+            &registry,
+        ) @ TerraError::NotAuthorized,
+    )]
     pub signer: Signer<'info>,
 }
 
@@ -3784,6 +3872,17 @@ pub struct RecordSessionAttestation<'info> {
         constraint = session_tracker.active_session == session.key(),
     )]
     pub session_tracker: Account<'info, verification::ClaimSessionTracker>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    /// The session opener, registry admin, or a registered validator must sign.
+    #[account(
+        constraint = is_session_recorder(
+            session.opened_by,
+            signer.key(),
+            &registry,
+        ) @ TerraError::NotAuthorized,
+    )]
+    pub signer: Signer<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -4163,6 +4262,9 @@ pub struct RecordAuditEntry<'info> {
     )]
     pub audit_entry: Account<'info, verification::AuditEntry>,
     /// CHECK: the entity being audited (claim, session, challenge, etc.).
+    /// Must be an account owned by this program so arbitrary keys cannot
+    /// pollute the audit log (M-2).
+    #[account(constraint = entity.owner == &crate::ID @ TerraError::NotAuthorized)]
     pub entity: UncheckedAccount<'info>,
     #[account(mut)]
     pub actor: Signer<'info>,
@@ -4683,8 +4785,10 @@ pub struct ValidatorUnjailed {
     pub unjailed_at: i64,
 }
 
+/// Reputation slash (score hits 0). Distinct from staking `ValidatorSlashed`
+/// so Anchor IDL event discriminators stay unique.
 #[event]
-pub struct ValidatorSlashed {
+pub struct ReputationSlashed {
     pub validator: Pubkey,
     pub reputation_score: u16,
     pub slashed_at: i64,
@@ -5295,5 +5399,38 @@ mod prep_hook_tests {
     fn succession_kind_rejects_out_of_range() {
         let invalid = succession_kind::MAX + 1;
         assert!(invalid > succession_kind::MAX);
+    }
+
+    #[test]
+    fn dec_rights_count_decrements() {
+        assert_eq!(dec_rights_count(1).unwrap(), 0);
+        assert_eq!(dec_rights_count(5).unwrap(), 4);
+    }
+
+    #[test]
+    fn dec_rights_count_rejects_zero() {
+        let err = dec_rights_count(0).unwrap_err();
+        assert_eq!(err, error!(TerraError::RightsLimitExceeded));
+    }
+
+    #[test]
+    fn session_recorder_allows_opener_admin_validator() {
+        let opener = Pubkey::new_unique();
+        let admin = Pubkey::new_unique();
+        let validator = Pubkey::new_unique();
+        let stranger = Pubkey::new_unique();
+        let registry = validator_registry::ValidatorRegistry {
+            admin,
+            validators: vec![validator],
+            required_endorsements: 0,
+            paused: false,
+            version: 0,
+            created_at: 0,
+            updated_at: 0,
+        };
+        assert!(is_session_recorder(opener, opener, &registry));
+        assert!(is_session_recorder(opener, admin, &registry));
+        assert!(is_session_recorder(opener, validator, &registry));
+        assert!(!is_session_recorder(opener, stranger, &registry));
     }
 }

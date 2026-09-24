@@ -171,7 +171,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_registries).post(create_registry))
         .route("/{pubkey}", get(get_registry))
-        .route("/{pubkey}/allocations", get(list_allocations).post(create_allocation))
+        .route(
+            "/{pubkey}/allocations",
+            get(list_allocations).post(create_allocation),
+        )
         .route("/genesis-requests", get(list_genesis_requests))
         .route("/genesis-requests/{country_code}", get(get_genesis_request))
 }

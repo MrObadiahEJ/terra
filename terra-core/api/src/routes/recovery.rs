@@ -153,7 +153,13 @@ async fn get_injection(
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/activities", get(list_activities).post(upsert_activity))
-        .route("/activities/{registry_pubkey}/{validator_pubkey}", get(get_activity))
-        .route("/emergency-injections", get(list_injections).post(queue_injection))
+        .route(
+            "/activities/{registry_pubkey}/{validator_pubkey}",
+            get(get_activity),
+        )
+        .route(
+            "/emergency-injections",
+            get(list_injections).post(queue_injection),
+        )
         .route("/emergency-injections/{id}", get(get_injection))
 }

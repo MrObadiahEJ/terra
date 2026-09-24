@@ -1,7 +1,7 @@
 pub mod bind_identity;
-pub mod succession;
 pub mod guardianship;
+pub mod succession;
 
 pub use bind_identity::*;
-pub use succession::*;
 pub use guardianship::*;
+pub use succession::*;

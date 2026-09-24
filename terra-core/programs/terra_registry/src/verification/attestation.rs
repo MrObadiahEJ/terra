@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 use solana_program::hash::hashv;
 
-use crate::verification::reputation::{ValidatorReputation, validator_status};
+use crate::verification::reputation::{validator_status, ValidatorReputation};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
@@ -49,16 +49,11 @@ fn load_reputation<'info>(
     remaining_accounts: &[AccountInfo<'info>],
     validator: &Pubkey,
 ) -> Result<ValidatorReputation> {
-    let (pda, _) = Pubkey::find_program_address(
-        &[b"validator_reputation", validator.as_ref()],
-        &crate::ID,
-    );
+    let (pda, _) =
+        Pubkey::find_program_address(&[b"validator_reputation", validator.as_ref()], &crate::ID);
     for acc in remaining_accounts {
         if acc.key == &pda {
-            require!(
-                acc.owner == &crate::ID,
-                TerraError::MissingReputation
-            );
+            require!(acc.owner == &crate::ID, TerraError::MissingReputation);
             let data = acc.try_borrow_data()?;
             let account = ValidatorReputation::try_deserialize(&mut &data[..])?;
             return Ok(account);

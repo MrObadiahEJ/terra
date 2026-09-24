@@ -17,7 +17,8 @@ fn rfc012_path() -> std::path::PathBuf {
     // terra-core/programs/terra_registry -> repo root docs/
     // Also handle running from repo root directly.
     let candidates = [
-        base.join("../../..").join("docs/rfc-012-global-physical-digital-trust-architecture.md"),
+        base.join("../../..")
+            .join("docs/rfc-012-global-physical-digital-trust-architecture.md"),
         base.join("docs/rfc-012-global-physical-digital-trust-architecture.md"),
         base.join("../docs/rfc-012-global-physical-digital-trust-architecture.md"),
     ];
@@ -46,7 +47,11 @@ fn load_rfc012() -> String {
 #[test]
 fn rfc012_exists_and_is_nonempty() {
     let content = load_rfc012();
-    assert!(content.len() > 2000, "RFC-012 too short: {} bytes", content.len());
+    assert!(
+        content.len() > 2000,
+        "RFC-012 too short: {} bytes",
+        content.len()
+    );
 }
 
 #[test]
@@ -97,7 +102,14 @@ fn rfc012_contains_required_sections() {
 #[test]
 fn rfc012_entity_catalog_contains_identity_domain() {
     let content = load_rfc012();
-    for entity in ["Identity", "LegalSubject", "Organization", "DeviceIdentity", "Credential", "ZKProof"] {
+    for entity in [
+        "Identity",
+        "LegalSubject",
+        "Organization",
+        "DeviceIdentity",
+        "Credential",
+        "ZKProof",
+    ] {
         assert!(content.contains(entity), "missing entity: {}", entity);
     }
 }
@@ -113,7 +125,11 @@ fn rfc012_entity_catalog_contains_validator_domain() {
         "ValidatorReputation",
         "ValidatorRelationship",
     ] {
-        assert!(content.contains(entity), "missing validator entity: {}", entity);
+        assert!(
+            content.contains(entity),
+            "missing validator entity: {}",
+            entity
+        );
     }
 }
 
@@ -143,15 +159,29 @@ fn rfc012_entity_catalog_contains_observation_evidence_domain() {
         "EvidenceArtifact",
         "EvidenceManifest",
     ] {
-        assert!(content.contains(entity), "missing observation/evidence entity: {}", entity);
+        assert!(
+            content.contains(entity),
+            "missing observation/evidence entity: {}",
+            entity
+        );
     }
 }
 
 #[test]
 fn rfc012_entity_catalog_contains_registry_domain() {
     let content = load_rfc012();
-    for entity in ["Parcel", "SpatialAsset", "OwnershipRight", "LandRight", "GeometryVersion"] {
-        assert!(content.contains(entity), "missing registry entity: {}", entity);
+    for entity in [
+        "Parcel",
+        "SpatialAsset",
+        "OwnershipRight",
+        "LandRight",
+        "GeometryVersion",
+    ] {
+        assert!(
+            content.contains(entity),
+            "missing registry entity: {}",
+            entity
+        );
     }
 }
 
@@ -197,7 +227,10 @@ fn rfc012_design_rules_cover_multifactor_selection() {
 #[test]
 fn rfc012_design_rules_cover_timeout_not_fraud() {
     let content = load_rfc012();
-    assert!(content.contains("Timeout ≠ fraud"), "missing timeout≠fraud rule");
+    assert!(
+        content.contains("Timeout ≠ fraud"),
+        "missing timeout≠fraud rule"
+    );
 }
 
 #[test]
@@ -266,7 +299,9 @@ fn rfc012_migration_map_covers_current_core_entities() {
 fn rfc012_migration_map_references_dual_write_or_bridge() {
     let content = load_rfc012();
     assert!(
-        content.contains("Dual-write") || content.contains("dual-write") || content.contains("bridge"),
+        content.contains("Dual-write")
+            || content.contains("dual-write")
+            || content.contains("bridge"),
         "migration should mention dual-write or bridge strategy"
     );
 }
@@ -320,7 +355,10 @@ fn rfc012_pda_sketch_covers_phase2_entities() {
 #[test]
 fn rfc012_phases_cover_0_through_10() {
     let content = load_rfc012();
-    for phase in ["**0**", "**1**", "**2**", "**3**", "**4**", "**5**", "**6**", "**7**", "**8**", "**9**", "**10**"] {
+    for phase in [
+        "**0**", "**1**", "**2**", "**3**", "**4**", "**5**", "**6**", "**7**", "**8**", "**9**",
+        "**10**",
+    ] {
         assert!(content.contains(phase), "missing phase {}", phase);
     }
 }

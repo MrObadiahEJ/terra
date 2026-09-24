@@ -221,9 +221,11 @@ pub async fn bind_identity(
         // address is public data readable by anyone.
         signed
             .verify_wallet(&current_owner, "POST", "/api/v1/identities")
-            .map_err(|_| AppError::unauthorized(
-                "identity exists: caller must sign with the current owner wallet's private key",
-            ))?;
+            .map_err(|_| {
+                AppError::unauthorized(
+                    "identity exists: caller must sign with the current owner wallet's private key",
+                )
+            })?;
     }
 
     let row = sqlx::query_as::<_, IdentityRow>(

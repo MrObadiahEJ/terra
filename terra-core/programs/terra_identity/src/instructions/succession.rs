@@ -14,7 +14,10 @@ pub fn request_succession(
     required_validations: u8,
     validators: [Pubkey; MAX_VALIDATORS],
 ) -> Result<()> {
-    require!(successor != Pubkey::default(), IdentityError::EmptySuccessor);
+    require!(
+        successor != Pubkey::default(),
+        IdentityError::EmptySuccessor
+    );
     require!(
         kind <= succession_kind::MAX,
         IdentityError::InvalidSuccessionKind
@@ -208,13 +211,9 @@ pub fn claim_succession(ctx: Context<crate::ClaimSuccession>) -> Result<()> {
         // Skip 8-byte Anchor discriminator, then read the Parcel fields.
         // Parcel layout: id(32) + owner(32) + name(String) + ...
         let slice = &data[8..];
-        let parcel: crate::state::Parcel =
-            anchor_lang::AnchorDeserialize::try_from_slice(slice)
-                .map_err(|_| error!(IdentityError::ParcelDeserializeFailed))?;
-        require!(
-            parcel.owner == previous,
-            IdentityError::ParcelOwnerMismatch
-        );
+        let parcel: crate::state::Parcel = anchor_lang::AnchorDeserialize::try_from_slice(slice)
+            .map_err(|_| error!(IdentityError::ParcelDeserializeFailed))?;
+        require!(parcel.owner == previous, IdentityError::ParcelOwnerMismatch);
         drop(data);
         // Write the new owner into the parcel account data at the owner offset
         // (8 discriminator + 32 id = offset 40).

@@ -13,16 +13,16 @@ pub mod identities;
 pub mod ipfs_docs;
 pub mod parcels;
 pub mod pilot_zones;
+pub mod recovery;
 pub mod rights;
 pub mod spatial;
 pub mod staking;
 pub mod subdivision;
+pub mod threshold_credentials;
 pub mod tx_prep;
 pub mod vaults;
-pub mod zk_proofs;
 pub mod world_registry;
-pub mod recovery;
-pub mod threshold_credentials;
+pub mod zk_proofs;
 
 pub use crate::state::AppState;
 

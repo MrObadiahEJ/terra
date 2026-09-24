@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::verification::observer::{Observer, observer_status};
+use crate::verification::observer::{observer_status, Observer};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------

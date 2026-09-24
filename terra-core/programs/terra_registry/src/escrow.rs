@@ -227,16 +227,10 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
     let transfer_amount = escrow.amount.min(vault_lamports);
 
     let escrow_key = escrow.key();
-    let (vault_pda, bump) = Pubkey::find_program_address(
-        &[b"escrow_vault", escrow_key.as_ref()],
-        &crate::ID,
-    );
+    let (vault_pda, bump) =
+        Pubkey::find_program_address(&[b"escrow_vault", escrow_key.as_ref()], &crate::ID);
     let bump_seed = [bump];
-    let signer_seeds: &[&[u8]] = &[
-        b"escrow_vault",
-        escrow_key.as_ref(),
-        &bump_seed,
-    ];
+    let signer_seeds: &[&[u8]] = &[b"escrow_vault", escrow_key.as_ref(), &bump_seed];
 
     let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
         &vault_pda,
@@ -335,16 +329,10 @@ pub fn cancel_escrow(ctx: Context<super::CancelEscrow>) -> Result<()> {
         let return_amount = deposit_amount.min(vault_lamports);
 
         let escrow_key = ctx.accounts.escrow_record.key();
-        let (vault_pda, bump) = Pubkey::find_program_address(
-            &[b"escrow_vault", escrow_key.as_ref()],
-            &crate::ID,
-        );
+        let (vault_pda, bump) =
+            Pubkey::find_program_address(&[b"escrow_vault", escrow_key.as_ref()], &crate::ID);
         let bump_seed = [bump];
-        let signer_seeds: &[&[u8]] = &[
-            b"escrow_vault",
-            escrow_key.as_ref(),
-            &bump_seed,
-        ];
+        let signer_seeds: &[&[u8]] = &[b"escrow_vault", escrow_key.as_ref(), &bump_seed];
 
         let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
             &vault_pda,
@@ -413,16 +401,10 @@ pub fn mutual_cancel_escrow(ctx: Context<super::MutualCancelEscrow>) -> Result<(
         let return_amount = deposit_amount.min(vault_lamports);
 
         let escrow_key = ctx.accounts.escrow_record.key();
-        let (vault_pda, bump) = Pubkey::find_program_address(
-            &[b"escrow_vault", escrow_key.as_ref()],
-            &crate::ID,
-        );
+        let (vault_pda, bump) =
+            Pubkey::find_program_address(&[b"escrow_vault", escrow_key.as_ref()], &crate::ID);
         let bump_seed = [bump];
-        let signer_seeds: &[&[u8]] = &[
-            b"escrow_vault",
-            escrow_key.as_ref(),
-            &bump_seed,
-        ];
+        let signer_seeds: &[&[u8]] = &[b"escrow_vault", escrow_key.as_ref(), &bump_seed];
 
         let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
             &vault_pda,

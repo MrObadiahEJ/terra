@@ -28,10 +28,7 @@ pub fn migrate_attestation_to_claim(
         claim_type <= crate::verification::claim::claim_type::MAX,
         TerraError::InvalidClaimType
     );
-    require!(
-        !claim_id.iter().all(|b| *b == 0),
-        TerraError::EmptyClaimId
-    );
+    require!(!claim_id.iter().all(|b| *b == 0), TerraError::EmptyClaimId);
 
     let now = Clock::get()?.unix_timestamp;
     let claim = &mut ctx.accounts.claim;

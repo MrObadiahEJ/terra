@@ -72,10 +72,7 @@ pub fn add_evidence(
         !storage_reference.is_empty(),
         TerraError::EmptyStorageReference
     );
-    require!(
-        storage_reference.len() <= 128,
-        TerraError::NotesTooLong
-    );
+    require!(storage_reference.len() <= 128, TerraError::NotesTooLong);
 
     let claim = &ctx.accounts.claim;
     require!(

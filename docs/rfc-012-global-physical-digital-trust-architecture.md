@@ -224,7 +224,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Before starting Phase 2 on a clean checkout, also clear SECURITY.md mainnet blockers (M-2, L-1, C-4 residual) and run `make idl` so the client IDL matches source — see §8.1.
+Before starting Phase 2 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of A2 2026-09-24 it is 119/44/108/160 with A1 session-record accounts) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
@@ -234,7 +234,7 @@ Before starting Phase 2 on a clean checkout, also clear SECURITY.md mainnet bloc
 
 **Immediate next actions before/while starting Phase 2:**
 1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 2 deliverable is `Validator` as a PDA with capability/presence/availability/relationship edges, while keeping `ValidatorRegistry` as an index.
-2. Close open SECURITY.md items M-2, L-1, C-4 residual if touching those instructions.
+2. Checked-in IDL was refreshed in A2 (119/44/108/160); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 

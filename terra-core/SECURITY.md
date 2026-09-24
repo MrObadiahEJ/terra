@@ -1,8 +1,8 @@
 # Terra Registry Security Audit Report
 
-**Date:** 2026-09-14 (original audit); **updated:** 2026-09-23  
+**Date:** 2026-09-14 (original audit); **updated:** 2026-09-24  
 **Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4)  
-**Auditor:** Automated review (opencode); Phase 1 remediation applied on `dev`
+**Auditor:** Automated review (opencode); Phase 1 + A1 remediation + A2 IDL regen applied on `dev`
 
 ---
 
@@ -12,10 +12,10 @@
 |----------|----------|----------|-------------------|
 | Critical | 9 | 0 | 9 |
 | High | 3 | 0 | 3 |
-| Medium | 4 | 1 (M-2 residual) | 3 |
-| Low | 3 | 2 (L-1, L-3 residual) | 1 |
+| Medium | 4 | 0 | 4 |
+| Low | 3 | 1 (L-3 residual) | 2 |
 
-**Phase 0 / Phase 1** (RFC-012) closed the original Critical and High findings and most Medium/Low items. Remaining items are residual/low-impact and documented below.
+**Phase 0 / Phase 1 / A1** (RFC-012) closed the original Critical and High findings and all Medium findings; L-1 closed in A1. Remaining item is a cosmetic error-variant residual (L-3).
 
 ---
 
@@ -35,9 +35,9 @@ All three contexts now have `authority: Signer` with `constraint = authority.key
 
 `authority: Signer` constrained to `registry.admin`.
 
-### C-4: No signer on `RecordSessionEvidence` / `RecordSessionObservation` — FIXED (residual: signer role not fully constrained)
+### C-4: No signer on `RecordSessionEvidence` / `RecordSessionObservation` — FIXED
 
-Both contexts now require `signer: Signer` (PDA-seeded session). The session is PDA-validated; the handler rejects terminal sessions. **Residual:** the signer is not yet required to equal `session.opened_by` or be a registry validator in the constraint — any wallet can increment counters on a non-terminal session if it passes the PDA. Treat as Medium residual (see M-2 pattern below for related session hygiene).
+Both contexts require `signer: Signer` constrained to the session opener, registry admin, or a registered validator via `is_session_recorder`. `RecordSessionAttestation` (which previously had **no** signer at all) uses the same constraint. The session is PDA-validated; the handler rejects terminal sessions.
 
 ### C-5: No authority check on `ResolveGuardianClaim` / `DisputeGuardianClaim` — FIXED
 
@@ -83,13 +83,11 @@ Both helpers (and `try_load_quorum_config`) now `require!(acc.owner == &crate::I
 
 `parcel` has `constraint = parcel.owner == keeper.key() @ TerraError::NotOwner`.
 
-### M-2: `RecordAuditEntry` entity is unconstrained — OPEN (Low practical impact)
+### M-2: `RecordAuditEntry` entity is unconstrained — FIXED (A1)
 
 **File:** `lib.rs` (`RecordAuditEntry`)
 
-`entity` is `UncheckedAccount` with no owner/PDA validation; any signer (`actor`) can create an audit entry for any entity key. The entry is append-only PDA-seeded (`audit_entry`, entity, sequence) so pollution is possible but not consensus-breaking.
-
-**Fix (optional):** validate `entity.owner == &crate::ID` (or expected program) and/or require `actor` to be a registered validator / admin / known actor set.
+`entity` now has `constraint = entity.owner == &crate::ID @ TerraError::NotAuthorized`. Only accounts owned by this program (claims, sessions, challenges, …) can be the subject of an audit entry; arbitrary system-owned keys are rejected.
 
 ### M-3: `CancelDispute` inconsistent parcel unfreeze — FIXED
 
@@ -103,11 +101,11 @@ Challenge deadline checks now use `TerraError::InvalidClaimStatus` (not `Settlem
 
 ## Low Findings
 
-### L-1: `rights_count` saturating_sub could desync — OPEN (Low)
+### L-1: `rights_count` saturating_sub could desync — FIXED (A1)
 
-**File:** `lib.rs` (~line 931)
+**File:** `lib.rs` (`revoke_right`)
 
-`require!(rights_count > 0)` then `saturating_sub(1)`. Underflow is prevented; drift only if a later close constraint fails in the same tx (currently atomic). Documented, not patched.
+Now uses `dec_rights_count` (`checked_sub` + `RightsLimitExceeded`) instead of `require!` + `saturating_sub`. A zero counter fails the instruction rather than silently staying at zero.
 
 ### L-2: Escrow vault lamports handling — ACCEPTED (reviewed)
 
@@ -131,11 +129,10 @@ Settle path caps transfer at `vault_lamports` and returns excess to buyer. Rent-
 
 For a fresh contributor/agent with no prior context: implement these against `dev`, add/adjust unit or BPF tests, keep `clippy -D warnings` green, then re-run the Verification table in the root README.
 
-1. **Before mainnet:** close M-2 (audit entity ownership), L-1 (explicit rights_count guard), and C-4 residual (constrain session recorder signer to opener/validator).
-2. **Before mainnet:** regenerate IDL from source (`make idl`); checked-in `terra-web/src/idl/terra_registry.json` may lag (source: 118 instr / 47 acc / 108 ev / 160 err).
-3. **Before mainnet:** governance reconfirm on RFC-005 staking (code path exists; original RFC cautioned against shipping without a decision).
-4. **Before mainnet:** ZK circuit choice + external audit (RFC-006/011) — proof verification is still opaque in `zk.rs`.
-5. **Ongoing:** fuzz instruction data validation; formal verification for ownership transfer, staking, escrow.
-6. **Ongoing:** re-audit after RFC-012 Phase 2+ introduces new PDAs (tasks, presence, multi-source observation) — see RFC-012 §8–§10.
+1. **Before mainnet:** checked-in `terra-web/src/idl/terra_registry.json` was refreshed in A2 (2026-09-24) to 119 instr / 44 acc / 108 ev / 160 err (matches source). A1 session-record account lists (`registry` + role-constrained `signer`) are included. Re-run `make idl` after any future program edit before client deploy.
+2. **Before mainnet:** governance reconfirm on RFC-005 staking (code path exists; original RFC cautioned against shipping without a decision).
+3. **Before mainnet:** ZK circuit choice + external audit (RFC-006/011) — proof verification is still opaque in `zk.rs`.
+4. **Ongoing:** fuzz instruction data validation; formal verification for ownership transfer, staking, escrow.
+5. **Ongoing:** re-audit after RFC-012 Phase 2+ introduces new PDAs (tasks, presence, multi-source observation) — see RFC-012 §8–§10.
 
 Handoff map: root README “How to continue” → this file → `terra-core/README.md` Current Status → RFC-012 phase table.

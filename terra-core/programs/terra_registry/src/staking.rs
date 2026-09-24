@@ -98,7 +98,11 @@ pub fn compute_pattern_slash_bps(offenses: &[u8; 4], offense_kind: u8) -> Result
 
     // Number of distinct offense types with count > 0 (after this offense).
     let mut distinct_types: u8 = 0;
-    for (i, &offense_count) in offenses.iter().enumerate().take(offense_type::MAX as usize + 1) {
+    for (i, &offense_count) in offenses
+        .iter()
+        .enumerate()
+        .take(offense_type::MAX as usize + 1)
+    {
         let count = if i == offense_kind as usize {
             offense_count.saturating_add(1)
         } else {
@@ -986,40 +990,58 @@ mod tests {
     #[test]
     fn pattern_first_offense() {
         let offenses = [0, 0, 0, 0];
-        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_FIRST_OFFENSE_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 0).unwrap(),
+            PATTERN_FIRST_OFFENSE_BPS
+        );
     }
 
     #[test]
     fn pattern_same_type_repeat() {
         let offenses = [1, 0, 0, 0];
-        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_SAME_TYPE_REPEAT_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 0).unwrap(),
+            PATTERN_SAME_TYPE_REPEAT_BPS
+        );
     }
 
     #[test]
     fn pattern_multiple_types() {
         let offenses = [1, 1, 0, 0];
         // Reporting equivocation again: still 2 distinct types (equivocation + liveness).
-        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_MULTIPLE_TYPES_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 0).unwrap(),
+            PATTERN_MULTIPLE_TYPES_BPS
+        );
     }
 
     #[test]
     fn pattern_three_same_type() {
         let offenses = [2, 0, 0, 0];
         // 3rd equivocation → 3 of same type.
-        assert_eq!(compute_pattern_slash_bps(&offenses, 0).unwrap(), PATTERN_SAME_TYPE_THRESHOLD_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 0).unwrap(),
+            PATTERN_SAME_TYPE_THRESHOLD_BPS
+        );
     }
 
     #[test]
     fn pattern_four_total() {
         let offenses = [1, 1, 0, 0];
         // Reporting collusion (3rd type) → 3 distinct types = MAX.
-        assert_eq!(compute_pattern_slash_bps(&offenses, 2).unwrap(), PATTERN_MAX_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 2).unwrap(),
+            PATTERN_MAX_BPS
+        );
     }
 
     #[test]
     fn pattern_three_distinct_types() {
         let offenses = [1, 1, 0, 0];
         // Reporting collusion again → [1, 1, 1, 0] = 3 distinct types = MAX.
-        assert_eq!(compute_pattern_slash_bps(&offenses, 2).unwrap(), PATTERN_MAX_BPS);
+        assert_eq!(
+            compute_pattern_slash_bps(&offenses, 2).unwrap(),
+            PATTERN_MAX_BPS
+        );
     }
 }

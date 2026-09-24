@@ -86,10 +86,7 @@ pub fn create_claim(
     parcel_type: u8,
     region: [u8; 2],
 ) -> Result<()> {
-    require!(
-        !claim_id.iter().all(|b| *b == 0),
-        TerraError::EmptyClaimId
-    );
+    require!(!claim_id.iter().all(|b| *b == 0), TerraError::EmptyClaimId);
     require!(claim_type <= claim_type::MAX, TerraError::InvalidClaimType);
     require!(
         !statement_hash.iter().all(|b| *b == 0),

@@ -42,10 +42,7 @@ pub struct Observer {
 
 /// Register a new observer. Anyone may register (observer reputation is
 /// tracked by the community, not on-chain).
-pub fn register_observer(
-    ctx: Context<crate::RegisterObserver>,
-    identity: Pubkey,
-) -> Result<()> {
+pub fn register_observer(ctx: Context<crate::RegisterObserver>, identity: Pubkey) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let observer = &mut ctx.accounts.observer;
     observer.wallet = ctx.accounts.wallet.key();
@@ -66,9 +63,7 @@ pub fn register_observer(
 }
 
 /// Suspend an observer. Only the registry admin may suspend observers.
-pub fn suspend_observer(
-    ctx: Context<crate::SuspendObserver>,
-) -> Result<()> {
+pub fn suspend_observer(ctx: Context<crate::SuspendObserver>) -> Result<()> {
     let registry = &ctx.accounts.registry;
     require!(
         ctx.accounts.authority.key() == registry.admin,
@@ -94,9 +89,7 @@ pub fn suspend_observer(
 }
 
 /// Reactivate a suspended observer. Only the registry admin may reactivate.
-pub fn reactivate_observer(
-    ctx: Context<crate::ReactivateObserver>,
-) -> Result<()> {
+pub fn reactivate_observer(ctx: Context<crate::ReactivateObserver>) -> Result<()> {
     let registry = &ctx.accounts.registry;
     require!(
         ctx.accounts.authority.key() == registry.admin,

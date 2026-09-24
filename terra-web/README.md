@@ -45,10 +45,10 @@ changing `terra-core/programs/terra_registry`, regenerate from the repo:
 cd ../terra-core && make idl
 ```
 
-**Known lag:** checked-in IDL currently reflects an older program (≈74
-instructions / 23 accounts / 58 events / 120 errors) while source is **118 /
-47 / 108 / 160**. Always run `make idl` before shipping client changes that
-depend on new instructions, accounts, events, or error codes.
+**Synced:** checked-in IDL matches source as of A2 (2026-09-24): **119
+instructions / 44 accounts / 108 events / 160 errors**. Re-run `make idl`
+(and re-sync `src/idl/` types) before shipping client changes that depend on
+new instructions, accounts, events, or error codes.
 
 ## Current Status & Next Steps
 
@@ -56,7 +56,7 @@ depend on new instructions, accounts, events, or error codes.
 globe + Leaflet map, wallet adapter wiring, `tsc --noEmit` clean on `dev`.
 
 **Next (for anyone continuing without prior context):**
-1. Run `cd ../terra-core && make idl`, then re-sync `src/idl/` types — do not hand-edit the JSON.
+1. After program edits: `cd ../terra-core && make idl`, then re-sync `src/idl/` types (`terraRegistry.ts` is generated from `terra_registry.json`) — do not hand-edit the JSON.
 2. Wire wallet signing to the deployed program IDs (root README / `Anchor.toml`); no live devnet deployment yet.
 3. Extend pages/components against new API routes as RFC-012 Phase 2+ lands (23 routes today; list lives in `terra-core/api/src/routes/`).
 4. Keep `pnpm exec tsc --noEmit` and `pnpm lint` green (CI runs the typecheck).

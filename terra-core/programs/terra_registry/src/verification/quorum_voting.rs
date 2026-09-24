@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 
-use crate::verification::reputation::{ValidatorReputation, validator_status, MAX_REPUTATION};
+use crate::verification::reputation::{validator_status, ValidatorReputation, MAX_REPUTATION};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
@@ -76,17 +76,12 @@ fn try_load_reputation<'info>(
     remaining_accounts: &[AccountInfo<'info>],
     validator: &Pubkey,
 ) -> Result<Option<ValidatorReputation>> {
-    let (pda, _) = Pubkey::find_program_address(
-        &[b"validator_reputation", validator.as_ref()],
-        &crate::ID,
-    );
+    let (pda, _) =
+        Pubkey::find_program_address(&[b"validator_reputation", validator.as_ref()], &crate::ID);
     for acc in remaining_accounts {
         if acc.key == &pda {
             // Verify account is owned by this program to prevent injection.
-            require!(
-                acc.owner == &crate::ID,
-                TerraError::NotAuthorized
-            );
+            require!(acc.owner == &crate::ID, TerraError::NotAuthorized);
             let data = acc.try_borrow_data()?;
             let account = ValidatorReputation::try_deserialize(&mut &data[..])?;
             return Ok(Some(account));
@@ -104,10 +99,7 @@ fn try_load_reputation<'info>(
 /// If confirm_weight >= quorum_threshold, marks tally as resolved.
 ///
 /// One vote per validator per claim (enforced by PDA uniqueness).
-pub fn cast_quorum_vote(
-    ctx: Context<crate::CastQuorumVote>,
-    vote_choice: u8,
-) -> Result<()> {
+pub fn cast_quorum_vote(ctx: Context<crate::CastQuorumVote>, vote_choice: u8) -> Result<()> {
     require!(
         vote_choice <= quorum_vote_choice::MAX,
         TerraError::InvalidQuorumVoteChoice
@@ -115,9 +107,7 @@ pub fn cast_quorum_vote(
 
     // Reputation gating: reject jailed/slashed validators.
     let voter_key = ctx.accounts.voter.key();
-    if let Some(reputation) =
-        try_load_reputation(ctx.remaining_accounts, &voter_key)?
-    {
+    if let Some(reputation) = try_load_reputation(ctx.remaining_accounts, &voter_key)? {
         require!(
             reputation.status == validator_status::ACTIVE,
             TerraError::ValidatorJailed
@@ -127,8 +117,7 @@ pub fn cast_quorum_vote(
     let now = Clock::get()?.unix_timestamp;
 
     // Determine weight from ValidatorReputation or default to MAX_REPUTATION.
-    let weight = if let Some(reputation) =
-        try_load_reputation(ctx.remaining_accounts, &voter_key)?
+    let weight = if let Some(reputation) = try_load_reputation(ctx.remaining_accounts, &voter_key)?
     {
         reputation.reputation_score.min(MAX_REPUTATION)
     } else {
@@ -149,7 +138,8 @@ pub fn cast_quorum_vote(
     // Initialize tally on first vote if not yet initialized.
     if tally.total_votes == 0 {
         tally.claim = ctx.accounts.claim.key();
-        tally.quorum_threshold = ctx.accounts.claim.required_attestations as u16 * MAX_REPUTATION / 100;
+        tally.quorum_threshold =
+            ctx.accounts.claim.required_attestations as u16 * MAX_REPUTATION / 100;
         if tally.quorum_threshold == 0 {
             tally.quorum_threshold = 1;
         }
@@ -202,9 +192,7 @@ pub fn cast_quorum_vote(
 /// Finalize the quorum. If resolved (confirm_weight >= quorum_threshold),
 /// update the Claim status to VERIFIED. If dispute_weight exceeds confirm_weight,
 /// update the Claim status to REJECTED.
-pub fn finalize_quorum(
-    ctx: Context<crate::FinalizeQuorum>,
-) -> Result<()> {
+pub fn finalize_quorum(ctx: Context<crate::FinalizeQuorum>) -> Result<()> {
     let tally = &mut ctx.accounts.tally;
     require!(
         tally.resolved || tally.dispute_weight > tally.confirm_weight,

@@ -11,7 +11,7 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-23): `terra_registry` — 118 instructions, 47 `#[account]` types, 108 events, 160 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-24, A2): `terra_registry` — 119 instructions, 44 `#[account]` types, 108 events, 160 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
@@ -243,8 +243,8 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 - RFC-012 Phase 0 (contract + `rfc012_structure` 21 tests) and Phase 1 (unique validator sets, endorsement binding, ownership checks, admin constraints) — see SECURITY.md and RFC-012 §8.
 
 **Next work (do not skip order):**
-1. Security residuals before mainnet: M-2, L-1, C-4 (SECURITY.md Recommendations).
-2. `make idl` — refresh `terra-web/src/idl/` (currently lags 118/47/108/160 source).
+1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2.
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 119/44/108/160 as of A2, 2026-09-24).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

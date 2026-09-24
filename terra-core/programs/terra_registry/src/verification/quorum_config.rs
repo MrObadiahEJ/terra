@@ -59,7 +59,11 @@ pub fn set_quorum_config(
     config.required_attestations = required_attestations;
     config.required_confidence = required_confidence;
     config.set_by = ctx.accounts.admin.key();
-    config.created_at = if config.created_at == 0 { now } else { config.created_at };
+    config.created_at = if config.created_at == 0 {
+        now
+    } else {
+        config.created_at
+    };
     config.updated_at = now;
 
     emit!(crate::QuorumConfigSet {

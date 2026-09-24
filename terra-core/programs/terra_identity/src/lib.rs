@@ -5,11 +5,11 @@ use anchor_lang::prelude::*;
 declare_id!("68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4");
 
 pub mod constants;
-pub mod state;
 pub mod errors;
 pub mod events;
 pub mod helpers;
 pub mod instructions;
+pub mod state;
 
 pub use constants::*;
 
@@ -79,16 +79,11 @@ pub mod terra_identity_program {
         )
     }
 
-    pub fn revoke_guardianship(
-        ctx: Context<RevokeGuardianship>,
-        new_owner: Pubkey,
-    ) -> Result<()> {
+    pub fn revoke_guardianship(ctx: Context<RevokeGuardianship>, new_owner: Pubkey) -> Result<()> {
         instructions::guardianship::revoke_guardianship(ctx, new_owner)
     }
 
-    pub fn execute_revoke_guardianship(
-        ctx: Context<ExecuteRevokeGuardianship>,
-    ) -> Result<()> {
+    pub fn execute_revoke_guardianship(ctx: Context<ExecuteRevokeGuardianship>) -> Result<()> {
         instructions::guardianship::execute_revoke_guardianship(ctx)
     }
 }

@@ -44,7 +44,12 @@ impl SignedRequest {
     /// Verify the signature against a base58-encoded wallet address (Ed25519
     /// public key). This is the pattern used when the caller must prove
     /// ownership of a specific wallet, e.g. identity updates.
-    pub fn verify_wallet(&self, wallet_b58: &str, method: &str, path: &str) -> Result<(), AppError> {
+    pub fn verify_wallet(
+        &self,
+        wallet_b58: &str,
+        method: &str,
+        path: &str,
+    ) -> Result<(), AppError> {
         let pubkey_bytes = bs58::decode(wallet_b58)
             .into_vec()
             .map_err(|_| AppError::bad_request("invalid base58 wallet address"))?;

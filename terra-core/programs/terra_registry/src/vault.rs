@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::Identity;
+use anchor_lang::prelude::*;
 
 /// Deserialize an Identity account from an UncheckedAccount.
 /// The identity account is owned by the terra_identity program.

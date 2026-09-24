@@ -32,6 +32,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -76,6 +77,156 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "add_evidence",
+      "discriminator": [
+        205,
+        19,
+        129,
+        228,
+        117,
+        97,
+        33,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "evidence",
+          "writable": true
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "evidence_type",
+          "type": "u8"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
+        },
+        {
+          "name": "observed_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "add_second_validator",
+      "discriminator": [
+        117,
+        163,
+        217,
+        11,
+        213,
+        152,
+        156,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "sponsor",
+          "docs": [
+            "Must be validator #1 (the first validator in the registry)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "candidate"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "add_third_validator",
+      "discriminator": [
+        106,
+        119,
+        134,
+        212,
+        149,
+        208,
+        154,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "candidate"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "candidate",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "add_validator_to_registry",
       "discriminator": [
         117,
@@ -94,6 +245,10 @@ export const terraRegistry: Idl = {
         },
         {
           "name": "admin_signer",
+          "docs": [
+            "Admin signer \u2014 required in bootstrap mode, ignored in peer-consensus",
+            "(the endorsement account carries authority instead)."
+          ],
           "writable": true,
           "signer": true
         },
@@ -133,7 +288,7 @@ export const terraRegistry: Idl = {
                 "path": "registry"
               },
               {
-                "kind": "arg",
+                "kind": "account",
                 "path": "validator"
               }
             ]
@@ -169,14 +324,92 @@ export const terraRegistry: Idl = {
       "accounts": [
         {
           "name": "dispute",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "dispute.case_hash",
+                "account": "Dispute"
+              }
+            ]
+          }
         },
         {
           "name": "parcel",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "authority",
+          "docs": [
+            "Court authority or designated adjudicator \u2014 must be registry admin."
+          ],
           "signer": true
         }
       ],
@@ -188,6 +421,160 @@ export const terraRegistry: Idl = {
         {
           "name": "new_owner",
           "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "allocate_country",
+      "discriminator": [
+        110,
+        200,
+        50,
+        85,
+        16,
+        27,
+        168,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "world_registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "approved_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "amalgamate_parcels",
+      "discriminator": [
+        169,
+        18,
+        137,
+        101,
+        59,
+        136,
+        207,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "result_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "source_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "amalgamation_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  109,
+                  97,
+                  108,
+                  103,
+                  97,
+                  109,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result_parcel"
+              },
+              {
+                "kind": "account",
+                "path": "source_parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -234,30 +621,7 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "identity",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  100,
-                  101,
-                  110,
-                  116,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
-              }
-            ]
-          }
+          "name": "identity"
         },
         {
           "name": "owner",
@@ -271,6 +635,10 @@ export const terraRegistry: Idl = {
       "docs": [
         "Register an attestation that binds heavy off-chain data to this parcel",
         "and records the set of validator wallets required to validate it.",
+        "",
+        "**DEPRECATED**: Use `create_claim` in the verification pipeline instead.",
+        "This instruction remains for backward compatibility with existing",
+        "attestations. New attestations should use `Claim \u2192 Evidence \u2192 Observation`.",
         "",
         "`validators` holds the public keys of the (possibly several) parties",
         "who must sign off on the transaction; `required` is how many signatures",
@@ -403,7 +771,32 @@ export const terraRegistry: Idl = {
       "accounts": [
         {
           "name": "vault_record",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              }
+            ]
+          }
         },
         {
           "name": "subject"
@@ -439,35 +832,39 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "bind_identity",
-      "docs": [
-        "Bind a person (identified by a hashed credential) to a wallet the person",
-        "holds. `recovery` is a second wallet the person controls, for recovering",
-        "the identity if the main key is lost. The signer becomes `owner`.",
-        "",
-        "This is the root of the resolvable \"who owns this\" link: every on-chain",
-        "actor is ultimately a wallet, and this account binds that wallet to a",
-        "human without ever publishing the credential itself."
-      ],
+      "name": "bind_cross_border_identity",
       "discriminator": [
-        233,
-        223,
-        188,
-        85,
-        140,
+        221,
+        72,
+        207,
+        129,
+        248,
+        66,
         1,
-        204,
-        196
+        35
       ],
       "accounts": [
         {
-          "name": "identity",
+          "name": "binding",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
                   105,
                   100,
                   101,
@@ -479,6 +876,10 @@ export const terraRegistry: Idl = {
                 ]
               },
               {
+                "kind": "account",
+                "path": "jurisdiction"
+              },
+              {
                 "kind": "arg",
                 "path": "identity_hash"
               }
@@ -486,7 +887,14 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "owner",
+          "name": "identity"
+        },
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "prover",
           "writable": true,
           "signer": true
         },
@@ -497,7 +905,7 @@ export const terraRegistry: Idl = {
       ],
       "args": [
         {
-          "name": "identity_hash",
+          "name": "credential_commitment",
           "type": {
             "array": [
               "u8",
@@ -506,8 +914,69 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "recovery",
-          "type": "pubkey"
+          "name": "proof_data",
+          "type": "bytes"
+        },
+        {
+          "name": "nullifier_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "identity_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "bootstrap_self_proclaim",
+      "discriminator": [
+        150,
+        57,
+        45,
+        172,
+        227,
+        150,
+        140,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "candidate",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
         }
       ]
     },
@@ -526,11 +995,56 @@ export const terraRegistry: Idl = {
       "accounts": [
         {
           "name": "dispute",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "dispute.case_hash",
+                "account": "Dispute"
+              }
+            ]
+          }
         },
         {
           "name": "parcel",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
         },
         {
           "name": "signer",
@@ -561,6 +1075,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -583,6 +1098,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -675,50 +1191,220 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "cancel_succession",
-      "docs": [
-        "Cancel an in-flight succession. Only the current `owner` (or `recovery`",
-        "for a recovery passation) may cancel, and only before it is effective."
-      ],
+      "name": "cast_quorum_vote",
       "discriminator": [
-        206,
-        172,
-        126,
-        132,
-        252,
-        50,
-        143,
-        214
+        27,
+        98,
+        166,
+        85,
+        214,
+        186,
+        65,
+        210
       ],
       "accounts": [
         {
-          "name": "identity",
+          "name": "quorum_vote",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  105,
-                  100,
-                  101,
-                  110,
+                  113,
+                  117,
+                  111,
+                  114,
+                  117,
+                  109,
+                  95,
+                  118,
+                  111,
                   116,
-                  105,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  114,
+                  117,
+                  109,
+                  95,
                   116,
+                  97,
+                  108,
+                  108,
                   121
                 ]
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "claim"
               }
             ]
           }
         },
         {
-          "name": "succession",
+          "name": "claim",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "vote_choice",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "check_quorum_reachable",
+      "discriminator": [
+        236,
+        95,
+        184,
+        254,
+        87,
+        254,
+        2,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_rewards",
+      "discriminator": [
+        4,
+        144,
+        132,
+        71,
+        116,
+        23,
+        151,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -726,32 +1412,56 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   115,
-                  117,
-                  99,
-                  99,
+                  116,
+                  97,
+                  107,
                   101,
-                  115,
-                  115,
-                  105,
+                  95,
+                  112,
                   111,
-                  110
+                  111,
+                  108
                 ]
               },
               {
                 "kind": "account",
-                "path": "succession.identity",
-                "account": "Succession"
-              },
-              {
-                "kind": "account",
-                "path": "succession.successor",
-                "account": "Succession"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "signer",
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
           "writable": true,
           "signer": true
         },
@@ -763,62 +1473,40 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "claim_succession",
-      "docs": [
-        "Claim a passation once BOTH the grace period has elapsed AND the required",
-        "number of validators have endorsed it. The `successor` becomes the",
-        "identity's new owner. Any parcels the identity owned that are supplied",
-        "via `remaining_accounts` are re-pointed to the successor."
-      ],
+      "name": "close_verification_session",
       "discriminator": [
-        90,
-        253,
-        80,
-        136,
-        147,
-        71,
-        124,
-        7
+        188,
+        203,
+        38,
+        211,
+        250,
+        237,
+        66,
+        113
       ],
       "accounts": [
         {
-          "name": "identity",
+          "name": "session",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  105,
-                  100,
+                  118,
                   101,
-                  110,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
                   116,
                   105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
-              }
-            ]
-          }
-        },
-        {
-          "name": "succession",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
+                  111,
+                  110,
+                  95,
                   115,
-                  117,
-                  99,
-                  99,
                   101,
                   115,
                   115,
@@ -829,19 +1517,223 @@ export const terraRegistry: Idl = {
               },
               {
                 "kind": "account",
-                "path": "succession.identity",
-                "account": "Succession"
+                "path": "session.claim",
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "succession.successor",
-                "account": "Succession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
         },
         {
-          "name": "signer",
+          "name": "session_tracker",
+          "docs": [
+            "Must match the tracker for this claim."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110,
+                  95,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "opener",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "final_status",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "confirm_genesis",
+      "discriminator": [
+        116,
+        83,
+        231,
+        21,
+        73,
+        89,
+        137,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "genesis_request",
+          "writable": true
+        },
+        {
+          "name": "world_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  111,
+                  114,
+                  108,
+                  100,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "confirmer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "confirmer_country",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "confirm_nomination",
+      "discriminator": [
+        216,
+        43,
+        186,
+        199,
+        137,
+        98,
+        63,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "nomination",
+          "writable": true
+        },
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "confirmer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_claim",
+      "discriminator": [
+        71,
+        122,
+        43,
+        84,
+        240,
+        165,
+        215,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "claim_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "submitter",
           "writable": true,
           "signer": true
         },
@@ -850,7 +1742,43 @@ export const terraRegistry: Idl = {
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "claim_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "claim_type",
+          "type": "u8"
+        },
+        {
+          "name": "statement_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "parcel_type",
+          "type": "u8"
+        },
+        {
+          "name": "region",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "create_escrow",
@@ -874,6 +1802,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -896,6 +1825,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -961,6 +1891,136 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "create_guardian_claim",
+      "discriminator": [
+        220,
+        101,
+        157,
+        51,
+        139,
+        2,
+        93,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "guardian_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  117,
+                  97,
+                  114,
+                  100,
+                  105,
+                  97,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "guardian_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "create_registry",
       "discriminator": [
         210,
@@ -981,15 +2041,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -1015,6 +2075,93 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "create_stake_pool",
+      "discriminator": [
+        198,
+        175,
+        88,
+        63,
+        128,
+        43,
+        8,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reward_rate_bps",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "create_vault",
@@ -1108,6 +2255,58 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "create_world_registry",
+      "discriminator": [
+        124,
+        83,
+        32,
+        9,
+        197,
+        29,
+        115,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "world_registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  111,
+                  114,
+                  108,
+                  100,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "deposit_escrow",
       "discriminator": [
         226,
@@ -1129,6 +2328,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -1151,6 +2351,7 @@ export const terraRegistry: Idl = {
                 "kind": "const",
                 "value": [
                   101,
+                  115,
                   99,
                   114,
                   111,
@@ -1211,2629 +2412,6 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "dispute_escrow",
-      "discriminator": [
-        198,
-        174,
-        139,
-        70,
-        87,
-        79,
-        181,
-        139
-      ],
-      "accounts": [
-        {
-          "name": "escrow_record",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "dispute",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  105,
-                  115,
-                  112,
-                  117,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "case_hash"
-              }
-            ]
-          }
-        },
-        {
-          "name": "filer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "case_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "required",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "endorse_shard_rotation",
-      "discriminator": [
-        132,
-        217,
-        137,
-        226,
-        97,
-        88,
-        106,
-        72
-      ],
-      "accounts": [
-        {
-          "name": "rotation",
-          "writable": true
-        },
-        {
-          "name": "vault_record"
-        },
-        {
-          "name": "subject"
-        },
-        {
-          "name": "validator",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "endorse_succession",
-      "docs": [
-        "Record one validator's endorsement of a pending succession. The signing",
-        "validator must be in the succession's declared validator set; this bumps",
-        "`validations_count`. Each endorsement is an Ed25519 signature because the",
-        "validator signs this transaction with their wallet. Only meaningful",
-        "before the succession becomes effective (validations are then moot)."
-      ],
-      "discriminator": [
-        70,
-        125,
-        62,
-        184,
-        108,
-        245,
-        74,
-        100
-      ],
-      "accounts": [
-        {
-          "name": "identity",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  100,
-                  101,
-                  110,
-                  116,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
-              }
-            ]
-          }
-        },
-        {
-          "name": "succession",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  117,
-                  99,
-                  99,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "succession.identity",
-                "account": "Succession"
-              },
-              {
-                "kind": "account",
-                "path": "succession.successor",
-                "account": "Succession"
-              }
-            ]
-          }
-        },
-        {
-          "name": "validator",
-          "docs": [
-            "A declared local validator endorsing the passation (signs this tx)."
-          ],
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "endorse_validator_add",
-      "discriminator": [
-        42,
-        252,
-        185,
-        227,
-        148,
-        64,
-        141,
-        174
-      ],
-      "accounts": [
-        {
-          "name": "endorsement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  101,
-                  110,
-                  100,
-                  111,
-                  114,
-                  115,
-                  101,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "registry"
-              },
-              {
-                "kind": "account",
-                "path": "endorsement.proposed",
-                "account": "ValidatorEndorsement"
-              }
-            ]
-          }
-        },
-        {
-          "name": "registry"
-        },
-        {
-          "name": "endorser",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "execute_judgment",
-      "discriminator": [
-        78,
-        95,
-        78,
-        183,
-        3,
-        107,
-        42,
-        180
-      ],
-      "accounts": [
-        {
-          "name": "dispute",
-          "writable": true
-        },
-        {
-          "name": "parcel",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "execute_shard_rotation",
-      "discriminator": [
-        241,
-        227,
-        238,
-        115,
-        108,
-        210,
-        193,
-        101
-      ],
-      "accounts": [
-        {
-          "name": "rotation",
-          "writable": true
-        },
-        {
-          "name": "vault_record",
-          "writable": true
-        },
-        {
-          "name": "initiator",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "expire_escrow",
-      "discriminator": [
-        49,
-        150,
-        54,
-        201,
-        45,
-        106,
-        39,
-        175
-      ],
-      "accounts": [
-        {
-          "name": "escrow_record",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "caller",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "file_dispute",
-      "discriminator": [
-        210,
-        63,
-        221,
-        114,
-        212,
-        97,
-        195,
-        156
-      ],
-      "accounts": [
-        {
-          "name": "dispute",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  105,
-                  115,
-                  112,
-                  117,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "case_hash"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "writable": true
-        },
-        {
-          "name": "filer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program"
-        }
-      ],
-      "args": [
-        {
-          "name": "case_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "required",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "flip_to_consensus",
-      "discriminator": [
-        123,
-        232,
-        56,
-        243,
-        82,
-        102,
-        120,
-        239
-      ],
-      "accounts": [
-        {
-          "name": "registry",
-          "writable": true
-        },
-        {
-          "name": "admin_signer",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "freeze_parcel",
-      "discriminator": [
-        245,
-        48,
-        165,
-        183,
-        59,
-        143,
-        136,
-        149
-      ],
-      "accounts": [
-        {
-          "name": "dispute",
-          "writable": true
-        },
-        {
-          "name": "parcel",
-          "writable": true
-        },
-        {
-          "name": "validator",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "grant_conditional_right",
-      "discriminator": [
-        203,
-        9,
-        162,
-        219,
-        52,
-        15,
-        55,
-        80
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "rights",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  105,
-                  103,
-                  104,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "nonce"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
-          "name": "rights_kind",
-          "type": "u8"
-        },
-        {
-          "name": "holder",
-          "type": "pubkey"
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        },
-        {
-          "name": "condition_deadline",
-          "type": "i64"
-        },
-        {
-          "name": "condition_desc",
-          "type": "string"
-        },
-        {
-          "name": "grace_period_secs",
-          "type": "i64"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "grant_right",
-      "docs": [
-        "Grant a right on a parcel to `holder`. Owner-only.",
-        "",
-        "`nonce` must equal the parcel's current `rights_count`, which is",
-        "incremented so every right gets a unique PDA."
-      ],
-      "discriminator": [
-        147,
-        166,
-        175,
-        167,
-        132,
-        161,
-        76,
-        232
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "rights",
-          "writable": true
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
-          "name": "rights_kind",
-          "type": "u8"
-        },
-        {
-          "name": "holder",
-          "type": "pubkey"
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        },
-        {
-          "name": "notes",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "initiate_shard_rotation",
-      "discriminator": [
-        48,
-        48,
-        204,
-        149,
-        150,
-        34,
-        235,
-        97
-      ],
-      "accounts": [
-        {
-          "name": "rotation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116,
-                  95,
-                  115,
-                  104,
-                  97,
-                  114,
-                  100,
-                  95,
-                  114,
-                  111,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "vault_record"
-              },
-              {
-                "kind": "arg",
-                "path": "new_ciphertext_hash"
-              }
-            ]
-          }
-        },
-        {
-          "name": "vault_record",
-          "writable": true
-        },
-        {
-          "name": "initiator",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "new_ciphertext_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "new_shard_holders",
-          "type": {
-            "vec": "pubkey"
-          }
-        },
-        {
-          "name": "new_threshold",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "judicial_forfeiture",
-      "docs": [
-        "Force-transfer a parcel's ownership away from a non-compliant owner, per",
-        "a court order. This is deliberately heavier than a normal transfer:",
-        "at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must",
-        "sign this transaction themselves, and the order is bound to a",
-        "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
-        "",
-        "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
-        "government, or a court ruling that title passed to another person."
-      ],
-      "discriminator": [
-        34,
-        185,
-        214,
-        40,
-        233,
-        253,
-        255,
-        20
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "docs": [
-            "Relaying authority (court clerk / govt channel). Must NOT be the owner."
-          ],
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "case_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "new_owner",
-          "type": "pubkey"
-        },
-        {
-          "name": "threshold",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "ping_shard",
-      "discriminator": [
-        148,
-        232,
-        132,
-        244,
-        167,
-        20,
-        100,
-        215
-      ],
-      "accounts": [
-        {
-          "name": "vault_record",
-          "writable": true
-        },
-        {
-          "name": "validator",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "register_document",
-      "discriminator": [
-        108,
-        34,
-        153,
-        39,
-        82,
-        41,
-        133,
-        73
-      ],
-      "accounts": [
-        {
-          "name": "document",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  111,
-                  99,
-                  117,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "attestation"
-              },
-              {
-                "kind": "arg",
-                "path": "cid"
-              }
-            ]
-          }
-        },
-        {
-          "name": "attestation",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "account",
-                "path": "attestation.specifier",
-                "account": "Attestation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "registrant",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "cid",
-          "type": "string"
-        },
-        {
-          "name": "content_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "category",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "register_parcel",
-      "docs": [
-        "Register a new parcel on-chain. The signer becomes its owner.",
-        "",
-        "`id` is a caller-provided unique 32-byte identifier (e.g. a SHA-256 of",
-        "the parcel geometry). It is also the PDA seed, so it can never change."
-      ],
-      "discriminator": [
-        170,
-        232,
-        221,
-        44,
-        109,
-        149,
-        104,
-        207
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "name",
-          "type": "string"
-        },
-        {
-          "name": "geometry_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "remove_validator_from_registry",
-      "discriminator": [
-        62,
-        197,
-        103,
-        150,
-        26,
-        158,
-        116,
-        235
-      ],
-      "accounts": [
-        {
-          "name": "registry",
-          "writable": true
-        },
-        {
-          "name": "admin_signer",
-          "signer": true
-        },
-        {
-          "name": "endorsement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  101,
-                  110,
-                  100,
-                  111,
-                  114,
-                  115,
-                  101,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "registry"
-              },
-              {
-                "kind": "arg",
-                "path": "validator"
-              }
-            ]
-          }
-        },
-        {
-          "name": "validator"
-        }
-      ],
-      "args": [
-        {
-          "name": "validator",
-          "type": "pubkey"
-        }
-      ]
-    },
-    {
-      "name": "renew_right",
-      "discriminator": [
-        244,
-        248,
-        169,
-        165,
-        181,
-        112,
-        121,
-        237
-      ],
-      "accounts": [
-        {
-          "name": "rights",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  105,
-                  103,
-                  104,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "nonce"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "holder",
-          "signer": true
-        },
-        {
-          "name": "granter",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
-          "name": "new_expires_at",
-          "type": "i64"
-        },
-        {
-          "name": "new_notes",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "request_succession",
-      "docs": [
-        "Request a wallet passation (succession, recovery, or deliberate control",
-        "transfer). A Succession account is created and becomes effective only",
-        "after the grace period — within which the original owner can cancel.",
-        "",
-        "Authorized by the current `owner` for kind TRANSFER, or by the `owner`",
-        "OR the `recovery` wallet for kind RECOVERY/SUCCESSOR.",
-        "",
-        "`grace_secs` lets the requester choose the window (0 => default 30d),",
-        "clamped to [MIN, MAX]. `required_validations` is the number of declared",
-        "local validators that must endorse the passation before it can be",
-        "claimed (>= 1) — so a stolen wallet can't seize land alone.",
-        "`validators` declares the local-authority testifiers for this passation."
-      ],
-      "discriminator": [
-        239,
-        203,
-        74,
-        151,
-        24,
-        159,
-        159,
-        84
-      ],
-      "accounts": [
-        {
-          "name": "identity",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  105,
-                  100,
-                  101,
-                  110,
-                  116,
-                  105,
-                  116,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
-              }
-            ]
-          }
-        },
-        {
-          "name": "succession",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  117,
-                  99,
-                  99,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity"
-              },
-              {
-                "kind": "arg",
-                "path": "successor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "successor",
-          "type": "pubkey"
-        },
-        {
-          "name": "kind",
-          "type": "u8"
-        },
-        {
-          "name": "grace_secs",
-          "type": "i64"
-        },
-        {
-          "name": "required_validations",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "revoke_right",
-      "docs": [
-        "Revoke a previously granted right. The parcel owner or the original",
-        "granter may revoke. The account is closed and its lamports returned."
-      ],
-      "discriminator": [
-        209,
-        129,
-        92,
-        98,
-        174,
-        82,
-        72,
-        77
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "rights",
-          "writable": true
-        },
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "_nonce",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "rotate_validators",
-      "docs": [
-        "Replace the validator set on an attestation (the fix for dead/leaving",
-        "validators). Only the parcel owner may rotate. Bumps `version` so a",
-        "reconstituted set is provably newer, and resets `required`/`count`."
-      ],
-      "discriminator": [
-        98,
-        183,
-        54,
-        7,
-        187,
-        27,
-        218,
-        242
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "account",
-                "path": "attestation.specifier",
-                "account": "Attestation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "new_required",
-          "type": "u8"
-        },
-        {
-          "name": "new_validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "settle_escrow",
-      "discriminator": [
-        22,
-        135,
-        160,
-        194,
-        23,
-        186,
-        124,
-        110
-      ],
-      "accounts": [
-        {
-          "name": "escrow_record",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "escrow_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  99,
-                  114,
-                  111,
-                  119,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "escrow_record"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "seller",
-          "writable": true
-        },
-        {
-          "name": "buyer",
-          "writable": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "sweep_expired_rights",
-      "discriminator": [
-        174,
-        5,
-        49,
-        171,
-        174,
-        59,
-        28,
-        181
-      ],
-      "accounts": [
-        {
-          "name": "rights",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  105,
-                  103,
-                  104,
-                  116,
-                  115
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "nonce"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "keeper",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "nonce",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "transfer_parcel",
-      "docs": [
-        "Transfer ownership of a parcel. Only the current owner can sign."
-      ],
-      "discriminator": [
-        214,
-        120,
-        155,
-        187,
-        215,
-        201,
-        59,
-        129
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "signer": true
-        },
-        {
-          "name": "new_owner"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "update_infrastructure",
-      "docs": [
-        "Set the parcel's infrastructure flag bitmask together with the canonical",
-        "access digest produced by the off-chain validation engine. Owner-only.",
-        "",
-        "`access_hash` must be non-zero and match the digests the off-chain",
-        "engine derives for these flags on the parcel geometry."
-      ],
-      "discriminator": [
-        166,
-        23,
-        147,
-        198,
-        105,
-        63,
-        108,
-        237
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "flags",
-          "type": "u16"
-        },
-        {
-          "name": "access_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "update_status",
-      "docs": [
-        "Update a parcel's status (e.g. for-sale). Owner-only."
-      ],
-      "discriminator": [
-        147,
-        215,
-        74,
-        174,
-        55,
-        191,
-        42,
-        0
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "status",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "register_jurisdiction",
-      "discriminator": [
-        6,
-        255,
-        84,
-        162,
-        130,
-        198,
-        135,
-        7
-      ],
-      "accounts": [
-        {
-          "name": "jurisdiction",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  106,
-                  117,
-                  114,
-                  105,
-                  115,
-                  100,
-                  95,
-                  99,
-                  111,
-                  100,
-                  101
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "country_code"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "registry"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "country_code",
-          "type": {
-            "array": [
-              "u8",
-              16
-            ]
-          }
-        },
-        {
-          "name": "jurisdiction_name",
-          "type": "string"
-        },
-        {
-          "name": "credential_schema_cid",
-          "type": "string"
-        },
-        {
-          "name": "revocation_registry",
-          "type": "pubkey"
-        },
-        {
-          "name": "verification_key_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "algorithm_id",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "update_jurisdiction",
-      "discriminator": [
-        172,
-        83,
-        224,
-        77,
-        240,
-        153,
-        228,
-        24
-      ],
-      "accounts": [
-        {
-          "name": "jurisdiction",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "new_verification_key_hash",
-          "type": {
-            "option": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        },
-        {
-          "name": "new_revocation_registry",
-          "type": {
-            "option": "pubkey"
-          }
-        },
-        {
-          "name": "new_status",
-          "type": {
-            "option": "u8"
-          }
-        }
-      ]
-    },
-    {
-      "name": "bind_cross_border_identity",
-      "discriminator": [
-        221,
-        72,
-        207,
-        129,
-        248,
-        66,
-        1,
-        35
-      ],
-      "accounts": [
-        {
-          "name": "binding",
-          "writable": true
-        },
-        {
-          "name": "identity"
-        },
-        {
-          "name": "jurisdiction",
-          "writable": true
-        },
-        {
-          "name": "prover",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "credential_commitment",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "proof_data",
-          "type": {
-            "vec": "u8"
-          }
-        },
-        {
-          "name": "nullifier_nonce",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        }
-      ]
-    },
-    {
-      "name": "verify_jurisdiction_membership",
-      "discriminator": [
-        130,
-        50,
-        171,
-        217,
-        217,
-        92,
-        207,
-        78
-      ],
-      "accounts": [
-        {
-          "name": "binding",
-          "writable": true
-        },
-        {
-          "name": "jurisdiction"
-        },
-        {
-          "name": "identity"
-        },
-        {
-          "name": "validator",
-          "signer": true
-        },
-        {
-          "name": "registry"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "off_chain_nonce",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "revoke_jurisdictional_identity",
-      "discriminator": [
-        196,
-        187,
-        133,
-        202,
-        68,
-        24,
-        149,
-        40
-      ],
-      "accounts": [
-        {
-          "name": "binding",
-          "writable": true
-        },
-        {
-          "name": "jurisdiction"
-        },
-        {
-          "name": "identity"
-        },
-        {
-          "name": "authority",
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "reason",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "rebind_cross_border_identity",
-      "discriminator": [
-        144,
-        28,
-        210,
-        61,
-        36,
-        94,
-        44,
-        59
-      ],
-      "accounts": [
-        {
-          "name": "old_binding",
-          "writable": true
-        },
-        {
-          "name": "new_binding",
-          "writable": true
-        },
-        {
-          "name": "identity"
-        },
-        {
-          "name": "jurisdiction",
-          "writable": true
-        },
-        {
-          "name": "prover",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "credential_commitment",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "proof_data",
-          "type": {
-            "vec": "u8"
-          }
-        },
-        {
-          "name": "nullifier_nonce",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "expires_at",
-          "type": "i64"
-        }
-      ]
-    },
-    {
-      "name": "subdivide_parcel",
-      "discriminator": [
-        179,
-        231,
-        244,
-        173,
-        88,
-        234,
-        211,
-        172
-      ],
-      "accounts": [
-        {
-          "name": "original_parcel",
-          "writable": true
-        },
-        {
-          "name": "sub_parcel",
-          "writable": true
-        },
-        {
-          "name": "subdivision_record",
-          "writable": true
-        },
-        {
-          "name": "surveyor_attestation"
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "new_id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "new_name",
-          "type": "string"
-        },
-        {
-          "name": "new_geometry_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "specifier",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "amalgamate_parcels",
-      "discriminator": [
-        169,
-        18,
-        137,
-        101,
-        59,
-        136,
-        207,
-        162
-      ],
-      "accounts": [
-        {
-          "name": "result_parcel",
-          "writable": true
-        },
-        {
-          "name": "source_parcel",
-          "writable": true
-        },
-        {
-          "name": "amalgamation_record",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "new_geometry_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "migrate_rights",
-      "discriminator": [
-        81,
-        152,
-        160,
-        134,
-        189,
-        248,
-        189,
-        215
-      ],
-      "accounts": [
-        {
-          "name": "old_parcel",
-          "writable": true
-        },
-        {
-          "name": "new_parcel",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "migrate_attestations",
-      "discriminator": [
-        61,
-        112,
-        164,
-        122,
-        70,
-        246,
-        49,
-        209
-      ],
-      "accounts": [
-        {
-          "name": "old_parcel"
-        },
-        {
-          "name": "new_parcel"
-        },
-        {
-          "name": "old_attestation",
-          "writable": true
-        },
-        {
-          "name": "new_attestation",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "specifier",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "create_stake_pool",
-      "discriminator": [
-        198,
-        175,
-        88,
-        63,
-        128,
-        43,
-        8,
-        214
-      ],
-      "accounts": [
-        {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "stake_pool",
-          "writable": true,
-          "signer": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "reward_rate_bps",
-          "type": "u16"
-        }
-      ]
-    },
-    {
       "name": "deposit_stake",
       "discriminator": [
         160,
@@ -3853,15 +2431,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -3957,243 +2535,18 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "initiate_unbonding",
+      "name": "dismiss_report",
       "discriminator": [
-        75,
-        33,
-        161,
-        251,
-        137,
-        112,
-        71,
-        37
-      ],
-      "accounts": [
-        {
-          "name": "validator_stake",
-          "writable": true
-        },
-        {
-          "name": "stake_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
-        },
-        {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "validator",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "withdraw_stake",
-      "discriminator": [
-        153,
+        17,
+        115,
+        109,
+        189,
+        166,
         8,
-        22,
-        138,
-        105,
-        176,
-        87,
-        66
+        146,
+        58
       ],
       "accounts": [
-        {
-          "name": "validator_stake",
-          "writable": true
-        },
-        {
-          "name": "stake_pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
-        },
-        {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "validator",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "report_equivocation",
-      "discriminator": [
-        140,
-        250,
-        136,
-        199,
-        9,
-        49,
-        41,
-        16
-      ],
-      "accounts": [
-        {
-          "name": "stake_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
-        },
-        {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "offender_stake"
-        },
         {
           "name": "slashing_report",
           "writable": true,
@@ -4225,23 +2578,174 @@ export const terraRegistry: Idl = {
               },
               {
                 "kind": "account",
-                "path": "reporter"
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
               },
               {
-                "kind": "instruction",
-                "path": "evidence_hash",
-                "encoding": {
-                  "array": {
-                    "element": "u8",
-                    "length": 32
-                  }
-                }
+                "kind": "account",
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
               }
             ]
           }
         },
         {
           "name": "reporter",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "dispute_escrow",
+      "discriminator": [
+        198,
+        174,
+        139,
+        70,
+        87,
+        79,
+        181,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "escrow_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "case_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "filer",
           "writable": true,
           "signer": true
         },
@@ -4252,89 +2756,97 @@ export const terraRegistry: Idl = {
       ],
       "args": [
         {
-          "name": "evidence_hash",
+          "name": "case_hash",
           "type": {
-            "array": {
-              "element": "u8",
-              "length": 32
-            }
+            "array": [
+              "u8",
+              32
+            ]
           }
         },
         {
-          "name": "offense_details",
+          "name": "required",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
           "type": {
-            "array": {
-              "element": "u8",
-              "length": 64
-            }
+            "array": [
+              "pubkey",
+              8
+            ]
           }
         }
       ]
     },
     {
-      "name": "verify_and_slash",
+      "name": "dispute_guardian_claim",
       "discriminator": [
-        247,
-        117,
-        243,
-        191,
-        71,
         156,
-        117,
-        175
+        186,
+        18,
+        163,
+        25,
+        130,
+        148,
+        101
       ],
       "accounts": [
         {
-          "name": "slashing_report",
-          "writable": true
-        },
-        {
-          "name": "offender_stake",
-          "writable": true
-        },
-        {
-          "name": "stake_pool",
+          "name": "guardian_claim",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  116,
+                  103,
+                  117,
                   97,
-                  107,
-                  101,
+                  114,
+                  100,
+                  105,
+                  97,
+                  110,
                   95,
-                  112,
-                  111,
-                  111,
-                  108
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
                 ]
               },
               {
                 "kind": "account",
-                "path": "region_registry"
+                "path": "guardian_claim.claim",
+                "account": "GuardianClaim"
               }
             ]
           }
         },
         {
-          "name": "region_registry",
+          "name": "caller",
+          "docs": [
+            "Must be the original triggerer or registry admin."
+          ],
+          "signer": true
+        },
+        {
+          "name": "registry",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -4348,43 +2860,67 @@ export const terraRegistry: Idl = {
               }
             ]
           }
-        },
-        {
-          "name": "reporter",
-          "writable": true
-        },
-        {
-          "name": "treasury",
-          "writable": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "claim_rewards",
+      "name": "dispute_slashing",
       "discriminator": [
-        4,
-        144,
-        132,
-        71,
-        116,
-        23,
-        151,
-        80
+        119,
+        42,
+        202,
+        53,
+        178,
+        248,
+        69,
+        63
       ],
       "accounts": [
         {
-          "name": "validator_stake",
-          "writable": true
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
+              },
+              {
+                "kind": "account",
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
+              }
+            ]
+          }
         },
         {
           "name": "stake_pool",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -4416,15 +2952,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -4440,16 +2976,16 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "validator",
-          "writable": true,
+          "name": "offender",
           "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "appeal_reason",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "distribute_rewards",
@@ -4498,15 +3034,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -4539,200 +3075,176 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "dispute_slashing",
+      "name": "endorse_shard_rotation",
       "discriminator": [
-        119,
-        42,
-        202,
-        53,
-        178,
-        248,
-        69,
-        63
+        132,
+        217,
+        137,
+        226,
+        97,
+        88,
+        106,
+        72
       ],
       "accounts": [
         {
-          "name": "slashing_report",
+          "name": "rotation",
           "writable": true
         },
         {
-          "name": "stake_pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  97,
-                  107,
-                  101,
-                  95,
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
+          "name": "vault_record"
         },
         {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
+          "name": "subject"
         },
         {
-          "name": "offender",
+          "name": "validator",
           "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "appeal_reason",
-          "type": "string"
-        }
-      ]
+      "args": []
     },
     {
-      "name": "dismiss_report",
+      "name": "endorse_validator_add",
       "discriminator": [
-        17,
-        115,
-        109,
-        189,
-        166,
-        8,
-        146,
-        58
+        42,
+        252,
+        185,
+        227,
+        148,
+        64,
+        141,
+        174
       ],
       "accounts": [
         {
-          "name": "slashing_report",
-          "writable": true
-        },
-        {
-          "name": "stake_pool",
+          "name": "endorsement",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  115,
-                  116,
+                  118,
                   97,
-                  107,
-                  101,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
                   95,
-                  112,
+                  101,
+                  110,
+                  100,
                   111,
-                  111,
-                  108
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "region_registry"
-              }
-            ]
-          }
-        },
-        {
-          "name": "region_registry",
-          "pda": {
-            "seeds": [
+                "path": "registry"
+              },
               {
-                "kind": "const",
-                "value": [
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
+                "kind": "account",
+                "path": "endorsement.proposed",
+                "account": "ValidatorEndorsement"
               }
             ]
           }
         },
         {
-          "name": "reporter",
-          "writable": true
+          "name": "registry"
         },
         {
-          "name": "authority",
+          "name": "endorser",
           "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "request_court_guardianship",
+      "name": "execute_emergency_injection",
       "discriminator": [
-        161,
-        23,
-        136,
-        8,
-        139,
-        232,
-        131,
-        106
+        170,
+        146,
+        57,
+        202,
+        182,
+        243,
+        233,
+        187
       ],
       "accounts": [
         {
-          "name": "identity",
+          "name": "emergency_injection",
+          "writable": true
+        },
+        {
+          "name": "registry",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
+                  118,
+                  97,
+                  108,
                   105,
                   100,
-                  101,
-                  110,
+                  97,
                   116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_validator_activity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
                   105,
                   116,
                   121
@@ -4740,45 +3252,18 @@ export const terraRegistry: Idl = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "emergency_injection.candidate",
+                "account": "EmergencyInjection"
               }
             ]
           }
         },
         {
-          "name": "succession",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  117,
-                  99,
-                  99,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "identity"
-              },
-              {
-                "kind": "account",
-                "path": "successor"
-              }
-            ]
-          }
-        },
-        {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         },
@@ -4787,78 +3272,70 @@ export const terraRegistry: Idl = {
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "successor",
-          "type": "pubkey"
-        },
-        {
-          "name": "grace_secs",
-          "type": "i64"
-        },
-        {
-          "name": "required_validations",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        },
-        {
-          "name": "case_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "scope_notes",
-          "type": "string"
-        }
-      ]
+      "args": []
     },
     {
-      "name": "revoke_guardianship",
+      "name": "execute_judgment",
       "discriminator": [
-        168,
-        87,
-        239,
-        39,
-        65,
-        0,
-        155,
-        201
+        78,
+        95,
+        78,
+        183,
+        3,
+        107,
+        42,
+        180
       ],
       "accounts": [
         {
-          "name": "identity",
+          "name": "dispute",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  105,
                   100,
-                  101,
-                  110,
-                  116,
                   105,
+                  115,
+                  112,
+                  117,
                   116,
-                  121
+                  101
                 ]
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "dispute.case_hash",
+                "account": "Dispute"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
               }
             ]
           }
@@ -4870,15 +3347,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -4894,14 +3371,3862 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "revoker",
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute_shard_rotation",
+      "discriminator": [
+        241,
+        227,
+        238,
+        115,
+        108,
+        210,
+        193,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true
+        },
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "expire_escrow",
+      "discriminator": [
+        49,
+        150,
+        54,
+        201,
+        45,
+        106,
+        39,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "escrow_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "file_challenge",
+      "discriminator": [
+        200,
+        165,
+        22,
+        96,
+        219,
+        87,
+        83,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "challenge",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
+                  110,
+                  103,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim_account"
+              },
+              {
+                "kind": "account",
+                "path": "challenger"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim_account.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim_account.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "challenger",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "challenge_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "required_votes",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "file_dispute",
+      "discriminator": [
+        210,
+        63,
+        221,
+        114,
+        212,
+        97,
+        195,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "case_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "filer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "required",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalize_credential",
+      "discriminator": [
+        159,
+        151,
+        12,
+        193,
+        60,
+        47,
+        14,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "credential_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "threshold_credential",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  104,
+                  114,
+                  101,
+                  115,
+                  104,
+                  111,
+                  108,
+                  100,
+                  95,
+                  99,
+                  114,
+                  101,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_quorum",
+      "discriminator": [
+        150,
+        75,
+        200,
+        115,
+        28,
+        182,
+        119,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "tally",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  114,
+                  117,
+                  109,
+                  95,
+                  116,
+                  97,
+                  108,
+                  108,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "freeze_parcel",
+      "discriminator": [
+        245,
+        48,
+        165,
+        183,
+        59,
+        143,
+        136,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "dispute.case_hash",
+                "account": "Dispute"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "generate_ownership_root",
+      "discriminator": [
+        111,
+        202,
+        252,
+        133,
+        234,
+        141,
+        84,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "zone_set",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership_root",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112,
+                  95,
+                  114,
+                  111,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
           "signer": true
         }
       ],
       "args": [
         {
+          "name": "new_merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_snapshot_cid",
+          "type": "string"
+        },
+        {
+          "name": "new_snapshot_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "commitment_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "grant_conditional_right",
+      "discriminator": [
+        203,
+        9,
+        162,
+        219,
+        52,
+        15,
+        55,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        },
+        {
+          "name": "holder",
+          "type": "pubkey"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "condition_deadline",
+          "type": "i64"
+        },
+        {
+          "name": "condition_desc",
+          "type": "string"
+        },
+        {
+          "name": "grace_period_secs",
+          "type": "i64"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "grant_identity_right",
+      "docs": [
+        "Grant an identity-based right on a parcel. Only the parcel owner (or",
+        "current granter) may sign. The `identity` must be a valid Identity PDA",
+        "owned by the signer.",
+        "",
+        "Authorization: the granter must be either the legacy `parcel.owner` wallet",
+        "**or** the holder of an active OWNERSHIP IdentityRights for this parcel.",
+        "This enables identity-based ownership to grant sub-rights without",
+        "requiring the legacy wallet field.",
+        "",
+        "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`."
+      ],
+      "discriminator": [
+        36,
+        242,
+        147,
+        162,
+        0,
+        217,
+        216,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "identity_rights",
+          "writable": true
+        },
+        {
+          "name": "granter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "grant_right",
+      "docs": [
+        "Grant a right on a parcel to `holder`. Owner-only.",
+        "",
+        "`nonce` must equal the parcel's current `rights_count`, which is",
+        "incremented so every right gets a unique PDA."
+      ],
+      "discriminator": [
+        147,
+        166,
+        175,
+        167,
+        132,
+        161,
+        76,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        },
+        {
+          "name": "holder",
+          "type": "pubkey"
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "heartbeat",
+      "discriminator": [
+        202,
+        104,
+        56,
+        6,
+        240,
+        170,
+        63,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "activity_tracker",
+          "writable": true
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_validator_reputation",
+      "discriminator": [
+        199,
+        93,
+        127,
+        85,
+        145,
+        10,
+        252,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initiate_shard_rotation",
+      "discriminator": [
+        48,
+        48,
+        204,
+        149,
+        150,
+        34,
+        235,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "rotation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  115,
+                  104,
+                  97,
+                  114,
+                  100,
+                  95,
+                  114,
+                  111,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault_record"
+              },
+              {
+                "kind": "arg",
+                "path": "new_ciphertext_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_ciphertext_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_shard_holders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "new_threshold",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initiate_unbonding",
+      "discriminator": [
+        75,
+        33,
+        161,
+        251,
+        137,
+        112,
+        71,
+        37
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "invalidate_proof",
+      "discriminator": [
+        122,
+        166,
+        31,
+        119,
+        225,
+        47,
+        26,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "zone_set",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  122,
+                  111,
+                  110,
+                  101,
+                  95,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "stale_version",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "jail_validator",
+      "discriminator": [
+        234,
+        186,
+        36,
+        232,
+        160,
+        59,
+        184,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reputation.validator",
+                "account": "ValidatorReputation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "duration_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "judicial_forfeiture",
+      "docs": [
+        "Force-transfer a parcel's ownership away from a non-compliant owner, per",
+        "a court order. This is deliberately heavier than a normal transfer:",
+        "at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must",
+        "sign this transaction themselves, and the order is bound to a",
+        "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
+        "",
+        "This is how validators collectively inform the chain that land no longer",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
+        "government, or a court ruling that title passed to another person."
+      ],
+      "discriminator": [
+        34,
+        185,
+        214,
+        40,
+        233,
+        253,
+        255,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Relaying authority (court clerk / govt channel). Must NOT be the owner."
+          ],
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "new_owner",
           "type": "pubkey"
+        },
+        {
+          "name": "threshold",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "link_cross_border_to_session",
+      "discriminator": [
+        237,
+        10,
+        150,
+        195,
+        138,
+        70,
+        113,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "cross_border_verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "binding"
+              }
+            ]
+          }
+        },
+        {
+          "name": "binding"
+        },
+        {
+          "name": "claim",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              },
+              {
+                "kind": "account",
+                "path": "session.session_id",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "jurisdiction"
+        },
+        {
+          "name": "caller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrate_attestation_to_claim",
+      "docs": [
+        "Migrate a legacy attestation into a verification pipeline claim.",
+        "",
+        "**DEPRECATED**: This is a one-way bridge for migrating old attestations.",
+        "New attestations should use `create_claim` directly."
+      ],
+      "discriminator": [
+        105,
+        2,
+        248,
+        249,
+        243,
+        174,
+        50,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "attestation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "claim_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "claim_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "claim_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "migrate_attestations",
+      "discriminator": [
+        61,
+        112,
+        164,
+        122,
+        70,
+        246,
+        49,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "old_parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "old_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "new_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "old_attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "old_parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "specifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "new_parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "specifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "specifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "migrate_rights",
+      "discriminator": [
+        81,
+        152,
+        160,
+        134,
+        189,
+        248,
+        189,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "old_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "old_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "new_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mutual_cancel_escrow",
+      "discriminator": [
+        241,
+        12,
+        37,
+        171,
+        212,
+        236,
+        201,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "escrow_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow_record"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seller",
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "nominate_validator",
+      "discriminator": [
+        54,
+        117,
+        124,
+        157,
+        36,
+        153,
+        48,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "nomination",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  110,
+                  111,
+                  109,
+                  105,
+                  110,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "candidate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "sponsor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "candidate",
+          "type": "pubkey"
+        },
+        {
+          "name": "documents_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "location_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "recent_blockhash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_verification_session",
+      "discriminator": [
+        233,
+        132,
+        252,
+        194,
+        21,
+        120,
+        250,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              },
+              {
+                "kind": "arg",
+                "path": "session_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_tracker",
+          "docs": [
+            "Singleton guard: enforces single active session per claim."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110,
+                  95,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "opener",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "session_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "parcel_type",
+          "type": "u8"
+        },
+        {
+          "name": "region",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause_program",
+      "discriminator": [
+        91,
+        86,
+        253,
+        175,
+        66,
+        236,
+        172,
+        124
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "ping_shard",
+      "discriminator": [
+        148,
+        232,
+        132,
+        244,
+        167,
+        20,
+        100,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "vault_record",
+          "writable": true
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_validator",
+      "discriminator": [
+        177,
+        134,
+        171,
+        144,
+        175,
+        45,
+        190,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "propose_validator_removal",
+      "discriminator": [
+        217,
+        106,
+        65,
+        124,
+        51,
+        78,
+        35,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "queue_emergency_injection",
+      "discriminator": [
+        153,
+        11,
+        101,
+        155,
+        141,
+        4,
+        25,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "emergency_injection",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  109,
+                  101,
+                  114,
+                  103,
+                  101,
+                  110,
+                  99,
+                  121,
+                  95,
+                  105,
+                  110,
+                  106,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "candidate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "candidate",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "reactivate_observer",
+      "discriminator": [
+        31,
+        227,
+        195,
+        57,
+        233,
+        15,
+        184,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "observer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "observer.wallet",
+                "account": "Observer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rebind_cross_border_identity",
+      "discriminator": [
+        144,
+        28,
+        210,
+        61,
+        36,
+        94,
+        44,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "old_binding",
+          "writable": true
+        },
+        {
+          "name": "new_binding",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "jurisdiction"
+              },
+              {
+                "kind": "account",
+                "path": "old_binding.identity_hash",
+                "account": "JurisdictionBinding"
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "credential_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proof_data",
+          "type": "bytes"
+        },
+        {
+          "name": "nullifier_nonce",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "record_attestation_outcome",
+      "discriminator": [
+        61,
+        154,
+        146,
+        140,
+        172,
+        155,
+        47,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reputation.validator",
+                "account": "ValidatorReputation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "confirmed",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "record_audit_entry",
+      "discriminator": [
+        187,
+        75,
+        4,
+        88,
+        143,
+        90,
+        203,
+        144
+      ],
+      "accounts": [
+        {
+          "name": "audit_entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  100,
+                  105,
+                  116,
+                  95,
+                  101,
+                  110,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "entity"
+              },
+              {
+                "kind": "arg",
+                "path": "sequence"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entity",
+          "docs": [
+            "Must be an account owned by this program so arbitrary keys cannot",
+            "pollute the audit log (M-2)."
+          ]
+        },
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sequence",
+          "type": "u32"
+        },
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "from_status",
+          "type": "u8"
+        },
+        {
+          "name": "to_status",
+          "type": "u8"
+        },
+        {
+          "name": "metadata_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "record_session_attestation",
+      "discriminator": [
+        210,
+        151,
+        181,
+        21,
+        25,
+        112,
+        157,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              },
+              {
+                "kind": "account",
+                "path": "session.session_id",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_tracker",
+          "docs": [
+            "Must match the tracker for this claim (cleared when quorum reached)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110,
+                  95,
+                  116,
+                  114,
+                  97,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "docs": [
+            "The session opener, registry admin, or a registered validator must sign."
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "is_confirmatory",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "record_session_evidence",
+      "discriminator": [
+        251,
+        34,
+        251,
+        2,
+        160,
+        243,
+        29,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              },
+              {
+                "kind": "account",
+                "path": "session.session_id",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "docs": [
+            "The session opener, registry admin, or a registered validator must sign."
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_session_observation",
+      "discriminator": [
+        90,
+        81,
+        4,
+        66,
+        160,
+        144,
+        79,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "session.claim",
+                "account": "VerificationSession"
+              },
+              {
+                "kind": "account",
+                "path": "session.session_id",
+                "account": "VerificationSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "docs": [
+            "The session opener, registry admin, or a registered validator must sign."
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_document",
+      "docs": [
+        "Register an IPFS document anchor tied to an attestation.",
+        "",
+        "**DEPRECATED**: Use `add_evidence` in the verification pipeline instead."
+      ],
+      "discriminator": [
+        108,
+        34,
+        153,
+        39,
+        82,
+        41,
+        133,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "document",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  99,
+                  117,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attestation"
+              },
+              {
+                "kind": "arg",
+                "path": "cid"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "cid",
+          "type": "string"
+        },
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "category",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "register_jurisdiction",
+      "discriminator": [
+        6,
+        255,
+        84,
+        162,
+        130,
+        198,
+        135,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "jurisdiction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  117,
+                  114,
+                  105,
+                  115,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "country_code"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "jurisdiction_name",
+          "type": "string"
+        },
+        {
+          "name": "credential_schema_cid",
+          "type": "string"
+        },
+        {
+          "name": "revocation_registry",
+          "type": "pubkey"
+        },
+        {
+          "name": "verification_key_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "algorithm_id",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "register_observer",
+      "discriminator": [
+        95,
+        238,
+        80,
+        77,
+        247,
+        96,
+        2,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "observer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "identity",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "register_parcel",
+      "docs": [
+        "Register a new parcel on-chain. The signer becomes its owner.",
+        "",
+        "`id` is a caller-provided unique 32-byte identifier (e.g. a SHA-256 of",
+        "the parcel geometry). It is also the PDA seed, so it can never change."
+      ],
+      "discriminator": [
+        170,
+        232,
+        221,
+        44,
+        109,
+        149,
+        104,
+        207
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -4925,15 +7250,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -5034,21 +7359,2515 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "generate_ownership_root",
+      "name": "remove_validator_from_registry",
       "discriminator": [
-        111,
-        202,
-        252,
+        62,
+        197,
+        103,
+        150,
+        26,
+        158,
+        116,
+        235
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin_signer",
+          "signer": true
+        },
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "renew_right",
+      "discriminator": [
+        244,
+        248,
+        169,
+        165,
+        181,
+        112,
+        121,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder",
+          "docs": [
+            "Holder must sign."
+          ],
+          "signer": true
+        },
+        {
+          "name": "granter",
+          "docs": [
+            "Granter must co-sign (original granter or current parcel owner)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "new_expires_at",
+          "type": "i64"
+        },
+        {
+          "name": "new_notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "report_equivocation",
+      "discriminator": [
+        140,
+        250,
+        136,
+        199,
+        9,
+        49,
+        41,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "offender_stake",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
+              }
+            ]
+          }
+        },
+        {
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "reporter"
+              },
+              {
+                "kind": "arg",
+                "path": "evidence_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "offense_details",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "report_validator_offense",
+      "discriminator": [
+        26,
+        28,
+        132,
+        175,
+        77,
+        1,
+        72,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "stake_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "offender_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
+              }
+            ]
+          }
+        },
+        {
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "reporter"
+              },
+              {
+                "kind": "arg",
+                "path": "evidence_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "offense_kind",
+          "type": "u8"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "offense_details",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "request_credential",
+      "discriminator": [
+        250,
+        55,
+        225,
+        61,
+        98,
+        70,
+        116,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "credential_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "request_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry"
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "request_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "purpose",
+          "type": "string"
+        },
+        {
+          "name": "disclosure_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "request_genesis",
+      "discriminator": [
+        21,
+        184,
+        230,
+        139,
+        66,
+        62,
+        207,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "genesis_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  101,
+                  110,
+                  101,
+                  115,
+                  105,
+                  115,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "country_code"
+              }
+            ]
+          }
+        },
+        {
+          "name": "world_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  111,
+                  114,
+                  108,
+                  100,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "country_code",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "resolve_guardian_claim",
+      "discriminator": [
+        125,
+        182,
+        113,
+        121,
+        218,
+        93,
+        77,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "guardian_claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  117,
+                  97,
+                  114,
+                  100,
+                  105,
+                  97,
+                  110,
+                  95,
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "guardian_claim.claim",
+                "account": "GuardianClaim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "caller",
+          "docs": [
+            "Must be the original triggerer or registry admin."
+          ],
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_cross_border",
+      "discriminator": [
+        32,
+        235,
+        100,
+        117,
+        164,
+        172,
+        185,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "cross_border_verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cross_border_verification.binding",
+                "account": "CrossBorderVerification"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_identity_right",
+      "docs": [
+        "Revoke an identity-based right. The original granter may revoke."
+      ],
+      "discriminator": [
+        201,
+        116,
+        44,
         133,
+        73,
+        8,
+        192,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "identity_rights",
+          "writable": true
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "granter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rights_kind",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "revoke_jurisdictional_identity",
+      "discriminator": [
+        196,
+        187,
+        133,
+        202,
+        68,
+        24,
+        149,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "jurisdiction"
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "revoke_right",
+      "docs": [
+        "Revoke a previously granted right. The parcel owner or the original",
+        "granter may revoke. The account is closed and its lamports returned.",
+        "The parcel's rights counter is decremented so the freed nonce can be",
+        "reused by a future grant (safe: the old account no longer exists)."
+      ],
+      "discriminator": [
+        209,
+        129,
+        92,
+        98,
+        174,
+        82,
+        72,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "_nonce",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "rotate_validators",
+      "docs": [
+        "Replace the validator set on an attestation (the fix for dead/leaving",
+        "validators). Only the parcel owner may rotate. Bumps `version` so a",
+        "reconstituted set is provably newer, and resets `required`/`count`.",
+        "",
+        "**DEPRECATED**: Use the verification pipeline's validator management instead."
+      ],
+      "discriminator": [
+        98,
+        183,
+        54,
+        7,
+        187,
+        27,
+        218,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.specifier",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_required",
+          "type": "u8"
+        },
+        {
+          "name": "new_validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_quorum_config",
+      "discriminator": [
+        10,
+        126,
+        231,
+        106,
+        111,
+        196,
+        155,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "parcel_type",
+          "type": "u8"
+        },
+        {
+          "name": "region",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "required_attestations",
+          "type": "u8"
+        },
+        {
+          "name": "required_confidence",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "set_validator_active",
+      "discriminator": [
+        211,
+        189,
+        132,
+        233,
+        203,
+        244,
+        186,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "activity_tracker",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator",
+          "type": "pubkey"
+        },
+        {
+          "name": "is_active",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "settle_escrow",
+      "discriminator": [
+        22,
+        135,
+        160,
+        194,
+        23,
+        186,
+        124,
+        110
+      ],
+      "accounts": [
+        {
+          "name": "escrow_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow_record"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seller",
+          "docs": [
+            "Seller receives SOL."
+          ],
+          "writable": true
+        },
+        {
+          "name": "buyer",
+          "docs": [
+            "Buyer receives excess deposit."
+          ],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sign_credential",
+      "discriminator": [
+        43,
+        172,
+        154,
+        246,
+        116,
+        16,
+        67,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "credential_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator_signer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "slash_validator",
+      "discriminator": [
+        238,
+        57,
+        244,
+        40,
+        132,
+        82,
+        78,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reputation.validator",
+                "account": "ValidatorReputation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "reputation_penalty",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "subdivide_parcel",
+      "discriminator": [
+        179,
+        231,
+        244,
+        173,
+        88,
         234,
-        141,
-        84,
-        97
+        211,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "original_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "original_parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sub_parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "new_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subdivision_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  100,
+                  105,
+                  118,
+                  105,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "original_parcel"
+              },
+              {
+                "kind": "account",
+                "path": "sub_parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "surveyor_attestation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "original_parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "specifier"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_name",
+          "type": "string"
+        },
+        {
+          "name": "new_geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "specifier",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_observation",
+      "discriminator": [
+        109,
+        4,
+        22,
+        163,
+        138,
+        215,
+        205,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "observation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "location",
+          "type": {
+            "array": [
+              "i64",
+              2
+            ]
+          }
+        },
+        {
+          "name": "method",
+          "type": "u8"
+        },
+        {
+          "name": "findings_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "confidence",
+          "type": "u8"
+        },
+        {
+          "name": "signature_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "submit_verification_attestation",
+      "discriminator": [
+        104,
+        215,
+        200,
+        186,
+        150,
+        152,
+        120,
+        71
+      ],
+      "accounts": [
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "observation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "result",
+          "type": "u8"
+        },
+        {
+          "name": "confidence",
+          "type": "u8"
+        },
+        {
+          "name": "signature_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "suspend_observer",
+      "discriminator": [
+        187,
+        179,
+        16,
+        199,
+        129,
+        125,
+        242,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "observer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  98,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "observer.wallet",
+                "account": "Observer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sweep_expired_rights",
+      "discriminator": [
+        174,
+        5,
+        49,
+        171,
+        174,
+        59,
+        28,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "rights",
+          "writable": true
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "keeper",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "transfer_parcel",
+      "docs": [
+        "Transfer ownership of a parcel. Only the current owner can sign."
+      ],
+      "discriminator": [
+        214,
+        120,
+        155,
+        187,
+        215,
+        201,
+        59,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "new_owner"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unjail_validator",
+      "discriminator": [
+        239,
+        31,
+        221,
+        71,
+        167,
+        135,
+        130,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reputation.validator",
+                "account": "ValidatorReputation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unpause_program",
+      "discriminator": [
+        43,
+        162,
+        233,
+        92,
+        254,
+        62,
+        69,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_infrastructure",
+      "docs": [
+        "Set the parcel's infrastructure flag bitmask together with the canonical",
+        "access digest produced by the off-chain validation engine. Owner-only.",
+        "",
+        "`access_hash` must be non-zero and match the digests the off-chain",
+        "engine derives for these flags on the parcel geometry."
+      ],
+      "discriminator": [
+        166,
+        23,
+        147,
+        198,
+        105,
+        63,
+        108,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "flags",
+          "type": "u16"
+        },
+        {
+          "name": "access_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_jurisdiction",
+      "discriminator": [
+        172,
+        83,
+        224,
+        77,
+        240,
+        153,
+        228,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "jurisdiction",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_verification_key_hash",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "new_revocation_registry",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "new_status",
+          "type": {
+            "option": "u8"
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_status",
+      "docs": [
+        "Update a parcel's status (e.g. for-sale). Owner-only."
+      ],
+      "discriminator": [
+        147,
+        215,
+        74,
+        174,
+        55,
+        191,
+        42,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "parcel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_verification_key_hash",
+      "discriminator": [
+        139,
+        196,
+        35,
+        133,
+        144,
+        163,
+        88,
+        86
       ],
       "accounts": [
         {
           "name": "zone_set",
-          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -5104,36 +9923,556 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "authority",
           "signer": true
         }
       ],
       "args": [
         {
-          "name": "new_merkle_root",
+          "name": "new_verification_key_hash",
           "type": {
             "array": [
               "u8",
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "verify_and_slash",
+      "discriminator": [
+        247,
+        117,
+        243,
+        191,
+        71,
+        156,
+        117,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "slashing_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  108,
+                  97,
+                  115,
+                  104,
+                  105,
+                  110,
+                  103,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
+              },
+              {
+                "kind": "account",
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
+              }
+            ]
+          }
         },
         {
-          "name": "new_snapshot_cid",
-          "type": "string"
+          "name": "offender_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
+              }
+            ]
+          }
         },
         {
-          "name": "new_snapshot_hash",
+          "name": "stake_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "region_registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury PDA receiving slashed lamports. Constrained to a deterministic",
+            "PDA derived from the authority registry \u2014 no one can redirect funds to",
+            "an arbitrary wallet."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "region_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "verify_claim",
+      "discriminator": [
+        35,
+        121,
+        58,
+        82,
+        51,
+        132,
+        99,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "verify_credential",
+      "discriminator": [
+        139,
+        189,
+        60,
+        127,
+        32,
+        241,
+        162,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "threshold_credential",
+          "writable": true
+        },
+        {
+          "name": "nullifier_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  101,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "threshold_credential.nullifier_hash",
+                "account": "ThresholdCredential"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "prover",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proof_data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "verify_cross_border",
+      "discriminator": [
+        84,
+        43,
+        145,
+        123,
+        243,
+        248,
+        57,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "cross_border_verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "cross_border_verification.binding",
+                "account": "CrossBorderVerification"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "caller",
+          "docs": [
+            "Must be a registered validator or registry admin."
+          ],
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "verify_jurisdiction_membership",
+      "discriminator": [
+        130,
+        50,
+        171,
+        217,
+        217,
+        92,
+        207,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "jurisdiction"
+        },
+        {
+          "name": "identity"
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "off_chain_nonce",
           "type": {
             "array": [
               "u8",
               32
             ]
           }
-        },
-        {
-          "name": "commitment_count",
-          "type": "u32"
         }
       ]
     },
@@ -5238,6 +10577,10 @@ export const terraRegistry: Idl = {
         },
         {
           "name": "authority",
+          "docs": [
+            "Zone authority co-sign: every accepted proof is explicitly attested.",
+            "(Circuit-level verification is deferred to audit; see RFC-011.)"
+          ],
           "signer": true
         },
         {
@@ -5274,71 +10617,172 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "invalidate_proof",
+      "name": "vote_challenge",
       "discriminator": [
-        122,
-        166,
-        31,
-        119,
-        225,
-        47,
-        26,
-        193
+        198,
+        76,
+        44,
+        76,
+        134,
+        76,
+        143,
+        98
       ],
       "accounts": [
         {
-          "name": "zone_set",
+          "name": "challenge",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  122,
-                  111,
+                  99,
+                  104,
+                  97,
+                  108,
+                  108,
+                  101,
                   110,
-                  101,
-                  95,
-                  115,
-                  101,
-                  116
+                  103,
+                  101
                 ]
               },
               {
                 "kind": "account",
-                "path": "zone_set.zone_id",
-                "account": "ZoneSet"
+                "path": "challenge.claim",
+                "account": "Challenge"
+              },
+              {
+                "kind": "account",
+                "path": "challenge.challenger",
+                "account": "Challenge"
               }
             ]
           }
         },
         {
-          "name": "authority",
+          "name": "claim_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim_account.parcel",
+                "account": "Claim"
+              },
+              {
+                "kind": "account",
+                "path": "claim_account.claim_id",
+                "account": "Claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
           "signer": true
         }
       ],
       "args": [
         {
-          "name": "stale_version",
-          "type": "u32"
+          "name": "vote_uphold",
+          "type": "bool"
         }
       ]
     },
     {
-      "name": "report_validator_offense",
+      "name": "withdraw_stake",
       "discriminator": [
-        26,
-        28,
-        132,
-        175,
-        77,
-        1,
-        72,
+        153,
+        8,
+        22,
+        138,
+        105,
+        176,
+        87,
         66
       ],
       "accounts": [
         {
+          "name": "validator_stake",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stake_pool"
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
           "name": "stake_pool",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -5370,15 +10814,15 @@ export const terraRegistry: Idl = {
               {
                 "kind": "const",
                 "value": [
+                  118,
                   97,
-                  117,
+                  108,
+                  105,
+                  100,
+                  97,
                   116,
-                  104,
                   111,
                   114,
-                  105,
-                  116,
-                  121,
                   95,
                   114,
                   101,
@@ -5394,250 +10838,32 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "offender_stake",
-          "writable": true
-        },
-        {
-          "name": "slashing_report",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  108,
-                  97,
-                  115,
-                  104,
-                  105,
-                  110,
-                  103,
-                  95,
-                  114,
-                  101,
-                  112,
-                  111,
-                  114,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "stake_pool"
-              },
-              {
-                "kind": "account",
-                "path": "reporter"
-              },
-              {
-                "kind": "arg",
-                "path": "evidence_hash"
-              }
-            ]
-          }
-        },
-        {
-          "name": "reporter",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "offense_kind",
-          "type": "u8"
-        },
-        {
-          "name": "evidence_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "offense_details",
-          "type": {
-            "array": [
-              "u8",
-              64
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "propose_validator",
-      "discriminator": [
-        177,
-        134,
-        171,
-        144,
-        175,
-        45,
-        190,
-        62
-      ],
-      "accounts": [
-        {
-          "name": "registry",
-          "writable": true
-        },
-        {
-          "name": "endorsement",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  101,
-                  110,
-                  100,
-                  111,
-                  114,
-                  115,
-                  101,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "registry"
-              },
-              {
-                "kind": "account",
-                "path": "validator"
-              }
-            ]
-          }
-        },
-        {
-          "name": "validator"
-        },
-        {
-          "name": "proposer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
           "name": "validator",
-          "type": "pubkey"
-        }
-      ]
-    },
-    {
-      "name": "pause_program",
-      "discriminator": [
-        91,
-        86,
-        253,
-        175,
-        66,
-        236,
-        172,
-        124
-      ],
-      "accounts": [
-        {
-          "name": "registry",
-          "writable": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "admin",
-          "signer": true
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
-    },
-    {
-      "name": "unpause_program",
-      "discriminator": [
-        43,
-        162,
-        233,
-        92,
-        254,
-        62,
-        69,
-        58
-      ],
-      "accounts": [
-        {
-          "name": "registry",
-          "writable": true
-        },
-        {
-          "name": "admin",
-          "signer": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "update_verification_key_hash",
-      "discriminator": [
-        139,
-        196,
-        35,
-        133,
-        144,
-        163,
-        88,
-        86
-      ],
-      "accounts": [
-        {
-          "name": "zone_set"
-        },
-        {
-          "name": "ownership_root",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "new_verification_key_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
     }
   ],
   "accounts": [
+    {
+      "name": "AmalgamationRecord",
+      "discriminator": [
+        4,
+        242,
+        238,
+        37,
+        228,
+        163,
+        250,
+        90
+      ]
+    },
     {
       "name": "Attestation",
       "discriminator": [
@@ -5652,16 +10878,94 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "AuthorityRegistry",
+      "name": "AuditEntry",
       "discriminator": [
-        239,
-        214,
+        254,
+        88,
+        234,
+        107,
+        205,
+        16,
+        148,
+        113
+      ]
+    },
+    {
+      "name": "Challenge",
+      "discriminator": [
+        119,
+        250,
         161,
-        141,
-        212,
-        86,
-        122,
-        109
+        121,
+        119,
+        81,
+        22,
+        208
+      ]
+    },
+    {
+      "name": "Claim",
+      "discriminator": [
+        155,
+        70,
+        22,
+        176,
+        123,
+        215,
+        246,
+        102
+      ]
+    },
+    {
+      "name": "ClaimSessionTracker",
+      "discriminator": [
+        210,
+        191,
+        84,
+        140,
+        190,
+        184,
+        31,
+        247
+      ]
+    },
+    {
+      "name": "CredentialNullifier",
+      "discriminator": [
+        242,
+        184,
+        146,
+        110,
+        112,
+        48,
+        79,
+        197
+      ]
+    },
+    {
+      "name": "CredentialRequest",
+      "discriminator": [
+        13,
+        77,
+        28,
+        51,
+        251,
+        145,
+        231,
+        29
+      ]
+    },
+    {
+      "name": "CrossBorderVerification",
+      "discriminator": [
+        183,
+        6,
+        175,
+        22,
+        50,
+        174,
+        166,
+        63
       ]
     },
     {
@@ -5691,29 +10995,159 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "EmergencyInjection",
+      "discriminator": [
+        101,
+        247,
+        85,
+        71,
+        70,
+        156,
+        253,
+        173
+      ]
+    },
+    {
       "name": "EscrowRecord",
       "discriminator": [
-        45,
-        114,
-        133,
-        53,
+        174,
+        124,
+        167,
+        70,
+        91,
+        85,
+        212,
+        227
+      ]
+    },
+    {
+      "name": "Evidence",
+      "discriminator": [
+        160,
+        73,
+        93,
+        206,
+        99,
+        242,
+        62,
+        92
+      ]
+    },
+    {
+      "name": "GenesisRequest",
+      "discriminator": [
+        37,
         134,
-        81,
-        245,
+        94,
+        228,
+        116,
+        67,
+        108,
+        235
+      ]
+    },
+    {
+      "name": "GuardianClaim",
+      "discriminator": [
+        75,
+        164,
+        183,
+        31,
+        178,
+        231,
+        33,
+        133
+      ]
+    },
+    {
+      "name": "IdentityRights",
+      "discriminator": [
+        80,
+        133,
+        246,
+        210,
+        78,
+        97,
+        163,
+        46
+      ]
+    },
+    {
+      "name": "Jurisdiction",
+      "discriminator": [
+        151,
+        118,
+        212,
+        152,
+        149,
+        211,
+        87,
+        2
+      ]
+    },
+    {
+      "name": "JurisdictionBinding",
+      "discriminator": [
+        35,
+        9,
+        193,
+        178,
+        225,
+        246,
+        46,
+        21
+      ]
+    },
+    {
+      "name": "NullifierRecord",
+      "discriminator": [
+        56,
+        18,
+        57,
+        175,
+        69,
+        202,
+        189,
+        70
+      ]
+    },
+    {
+      "name": "Observation",
+      "discriminator": [
+        109,
+        190,
+        190,
+        95,
+        28,
+        172,
+        243,
         74
       ]
     },
     {
-      "name": "Identity",
+      "name": "Observer",
       "discriminator": [
-        58,
-        132,
-        5,
-        12,
-        176,
-        164,
-        85,
-        112
+        82,
+        255,
+        234,
+        217,
+        166,
+        201,
+        80,
+        72
+      ]
+    },
+    {
+      "name": "OwnershipRoot",
+      "discriminator": [
+        130,
+        74,
+        117,
+        24,
+        60,
+        232,
+        70,
+        225
       ]
     },
     {
@@ -5730,6 +11164,45 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "QuorumConfig",
+      "discriminator": [
+        20,
+        13,
+        136,
+        87,
+        137,
+        5,
+        77,
+        126
+      ]
+    },
+    {
+      "name": "QuorumTally",
+      "discriminator": [
+        224,
+        79,
+        255,
+        67,
+        22,
+        107,
+        98,
+        231
+      ]
+    },
+    {
+      "name": "QuorumVote",
+      "discriminator": [
+        6,
+        0,
+        156,
+        42,
+        100,
+        253,
+        158,
+        169
+      ]
+    },
+    {
       "name": "Rights",
       "discriminator": [
         79,
@@ -5743,16 +11216,68 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "Succession",
+      "name": "SlashingReport",
       "discriminator": [
-        51,
+        73,
+        176,
+        94,
+        36,
+        3,
+        159,
         87,
-        221,
-        243,
-        105,
-        19,
-        68,
-        109
+        218
+      ]
+    },
+    {
+      "name": "StakePool",
+      "discriminator": [
+        121,
+        34,
+        206,
+        21,
+        79,
+        127,
+        255,
+        28
+      ]
+    },
+    {
+      "name": "SubdivisionRecord",
+      "discriminator": [
+        9,
+        214,
+        108,
+        50,
+        166,
+        44,
+        134,
+        32
+      ]
+    },
+    {
+      "name": "ThresholdCredential",
+      "discriminator": [
+        217,
+        121,
+        146,
+        123,
+        84,
+        119,
+        65,
+        79
+      ]
+    },
+    {
+      "name": "ValidatorActivityTracker",
+      "discriminator": [
+        45,
+        51,
+        146,
+        237,
+        228,
+        13,
+        159,
+        133
       ]
     },
     {
@@ -5766,6 +11291,58 @@ export const terraRegistry: Idl = {
         8,
         203,
         25
+      ]
+    },
+    {
+      "name": "ValidatorNomination",
+      "discriminator": [
+        210,
+        142,
+        12,
+        155,
+        104,
+        210,
+        45,
+        94
+      ]
+    },
+    {
+      "name": "ValidatorRegistry",
+      "discriminator": [
+        168,
+        113,
+        195,
+        186,
+        62,
+        121,
+        163,
+        230
+      ]
+    },
+    {
+      "name": "ValidatorReputation",
+      "discriminator": [
+        151,
+        57,
+        248,
+        51,
+        14,
+        124,
+        177,
+        47
+      ]
+    },
+    {
+      "name": "ValidatorStake",
+      "discriminator": [
+        95,
+        210,
+        178,
+        207,
+        78,
+        5,
+        247,
+        29
       ]
     },
     {
@@ -5795,94 +11372,42 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "Jurisdiction",
+      "name": "VerificationAttestation",
       "discriminator": [
-        74,
-        117,
-        114,
-        105,
-        115,
-        100,
-        105,
-        99
+        231,
+        126,
+        92,
+        51,
+        84,
+        178,
+        81,
+        242
       ]
     },
     {
-      "name": "JurisdictionBinding",
+      "name": "VerificationSession",
       "discriminator": [
-        74,
-        66,
-        105,
-        110,
-        100,
-        105,
-        110,
-        103
+        247,
+        69,
+        199,
+        26,
+        112,
+        195,
+        243,
+        254
       ]
     },
     {
-      "name": "SubdivisionRecord",
+      "name": "WorldRegistry",
       "discriminator": [
-        83,
-        117,
-        98,
-        100,
-        105,
-        118,
-        82,
-        101
-      ]
-    },
-    {
-      "name": "AmalgamationRecord",
-      "discriminator": [
-        65,
-        109,
-        97,
-        108,
-        103,
-        82,
-        101,
-        99
-      ]
-    },
-    {
-      "name": "StakePool",
-      "discriminator": [
-        211,
-        213,
-        23,
-        123,
-        209,
-        203,
-        91,
-        148
-      ]
-    },
-    {
-      "name": "ValidatorStake",
-      "discriminator": [
-        77,
-        73,
-        111,
-        52,
-        172,
+        222,
+        41,
         153,
-        22,
-        33
-      ]
-    },
-    {
-      "name": "SlashingReport",
-      "discriminator": [
-        100,
-        200,
-        29,
-        139,
-        225,
-        78,
-        17,
-        34
+        93,
+        64,
+        60,
+        109,
+        27
       ]
     },
     {
@@ -5897,48 +11422,22 @@ export const terraRegistry: Idl = {
         98,
         77
       ]
-    },
-    {
-      "name": "OwnershipRoot",
-      "discriminator": [
-        130,
-        74,
-        117,
-        24,
-        60,
-        232,
-        70,
-        225
-      ]
-    },
-    {
-      "name": "NullifierRecord",
-      "discriminator": [
-        56,
-        18,
-        57,
-        175,
-        69,
-        202,
-        189,
-        70
-      ]
-    },
-    {
-      "name": "execute_revoke_guardianship",
-      "discriminator": [
-        119,
-        219,
-        6,
-        116,
-        49,
-        3,
-        167,
-        203
-      ]
     }
   ],
   "events": [
+    {
+      "name": "AttestationMigrated",
+      "discriminator": [
+        72,
+        105,
+        141,
+        47,
+        67,
+        143,
+        222,
+        127
+      ]
+    },
     {
       "name": "Attested",
       "discriminator": [
@@ -5953,45 +11452,228 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "ConsensusFlipped",
+      "name": "AuditEntryRecorded",
       "discriminator": [
+        216,
+        172,
+        160,
+        149,
+        136,
+        44,
+        191,
+        201
+      ]
+    },
+    {
+      "name": "ChallengeFiled",
+      "discriminator": [
+        76,
+        64,
+        122,
+        85,
+        174,
+        3,
+        91,
+        71
+      ]
+    },
+    {
+      "name": "ChallengeResolved",
+      "discriminator": [
+        100,
+        153,
+        38,
+        123,
+        172,
+        250,
+        166,
+        105
+      ]
+    },
+    {
+      "name": "ChallengeVoteRecorded",
+      "discriminator": [
+        154,
+        43,
+        244,
+        154,
+        63,
+        108,
+        57,
+        201
+      ]
+    },
+    {
+      "name": "ClaimCreated",
+      "discriminator": [
+        12,
+        137,
+        189,
+        74,
+        127,
+        86,
+        118,
+        130
+      ]
+    },
+    {
+      "name": "ClaimRejected",
+      "discriminator": [
+        108,
+        107,
+        44,
+        113,
+        45,
+        127,
+        6,
+        77
+      ]
+    },
+    {
+      "name": "ClaimVerified",
+      "discriminator": [
+        90,
+        196,
+        170,
+        218,
+        88,
+        102,
+        26,
+        4
+      ]
+    },
+    {
+      "name": "CountryAllocated",
+      "discriminator": [
+        194,
+        247,
+        216,
+        194,
+        79,
+        102,
+        241,
+        133
+      ]
+    },
+    {
+      "name": "CredentialIssued",
+      "discriminator": [
+        194,
+        216,
+        28,
+        159,
+        89,
+        29,
+        72,
+        177
+      ]
+    },
+    {
+      "name": "CredentialRequested",
+      "discriminator": [
+        240,
+        139,
+        197,
+        54,
+        209,
+        3,
+        199,
+        122
+      ]
+    },
+    {
+      "name": "CredentialSigned",
+      "discriminator": [
+        14,
+        163,
+        97,
+        76,
+        98,
+        144,
+        224,
+        42
+      ]
+    },
+    {
+      "name": "CredentialVerified",
+      "discriminator": [
+        242,
+        32,
+        25,
+        117,
+        249,
+        65,
+        220,
+        214
+      ]
+    },
+    {
+      "name": "CrossBorderIdentityBound",
+      "discriminator": [
+        19,
+        25,
+        251,
+        19,
+        198,
+        99,
+        75,
+        217
+      ]
+    },
+    {
+      "name": "CrossBorderIdentityRebound",
+      "discriminator": [
+        7,
+        57,
+        174,
+        104,
+        169,
+        253,
+        101,
+        121
+      ]
+    },
+    {
+      "name": "CrossBorderLinked",
+      "discriminator": [
+        85,
+        22,
+        30,
+        5,
+        176,
+        226,
+        48,
+        33
+      ]
+    },
+    {
+      "name": "CrossBorderRevoked",
+      "discriminator": [
+        56,
+        162,
         138,
-        151,
-        228,
-        234,
-        58,
-        84,
-        243,
-        252
+        171,
+        244,
+        65,
+        209,
+        11
+      ]
+    },
+    {
+      "name": "CrossBorderVerified",
+      "discriminator": [
+        22,
+        74,
+        185,
+        189,
+        26,
+        183,
+        146,
+        214
       ]
     },
     {
       "name": "DisputeAdjudicated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "dispute",
-            "type": "pubkey"
-          },
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "outcome",
-            "type": "u8"
-          },
-          {
-            "name": "new_owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "adjudicated_at",
-            "type": "i64"
-          }
-        ]
-      },
       "discriminator": [
         181,
         107,
@@ -6005,23 +11687,6 @@ export const terraRegistry: Idl = {
     },
     {
       "name": "DisputeCancelled",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "dispute",
-            "type": "pubkey"
-          },
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "cancelled_by",
-            "type": "pubkey"
-          }
-        ]
-      },
       "discriminator": [
         38,
         80,
@@ -6035,40 +11700,6 @@ export const terraRegistry: Idl = {
     },
     {
       "name": "DisputeFiled",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "dispute",
-            "type": "pubkey"
-          },
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "filed_by",
-            "type": "pubkey"
-          },
-          {
-            "name": "case_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "required",
-            "type": "u8"
-          },
-          {
-            "name": "count",
-            "type": "u8"
-          }
-        ]
-      },
       "discriminator": [
         201,
         119,
@@ -6094,107 +11725,250 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "EmergencyInjectionExecuted",
+      "discriminator": [
+        66,
+        71,
+        186,
+        169,
+        177,
+        166,
+        226,
+        229
+      ]
+    },
+    {
+      "name": "EmergencyInjectionQueued",
+      "discriminator": [
+        85,
+        13,
+        68,
+        71,
+        13,
+        119,
+        229,
+        206
+      ]
+    },
+    {
+      "name": "EquivocationReported",
+      "discriminator": [
+        136,
+        91,
+        235,
+        5,
+        219,
+        141,
+        157,
+        248
+      ]
+    },
+    {
       "name": "EscrowAccepted",
       "discriminator": [
-        200,
-        252,
-        7,
-        33,
-        218,
-        254,
+        129,
+        122,
         76,
-        223
+        235,
+        127,
+        11,
+        32,
+        165
       ]
     },
     {
       "name": "EscrowCancelled",
       "discriminator": [
-        157,
-        85,
-        67,
-        133,
-        20,
-        236,
-        121,
-        55
+        98,
+        241,
+        195,
+        122,
+        213,
+        0,
+        162,
+        161
       ]
     },
     {
       "name": "EscrowCreated",
       "discriminator": [
-        229,
-        15,
-        198,
-        152,
-        53,
-        35,
-        17,
-        82
+        70,
+        127,
+        105,
+        102,
+        92,
+        97,
+        7,
+        173
       ]
     },
     {
       "name": "EscrowDeposited",
       "discriminator": [
-        55,
-        195,
-        133,
-        252,
-        38,
-        210,
-        199,
-        56
+        28,
+        193,
+        105,
+        27,
+        40,
+        101,
+        65,
+        211
       ]
     },
     {
       "name": "EscrowDisputed",
       "discriminator": [
+        132,
+        73,
         81,
-        72,
-        185,
-        233,
-        173,
-        76,
-        107,
-        3
+        200,
+        177,
+        51,
+        128,
+        18
       ]
     },
     {
       "name": "EscrowExpired",
       "discriminator": [
-        175,
-        86,
-        185,
-        37,
-        146,
-        105,
-        106,
-        0
+        189,
+        22,
+        170,
+        250,
+        75,
+        218,
+        58,
+        112
       ]
     },
     {
       "name": "EscrowSettled",
       "discriminator": [
-        154,
-        154,
-        7,
-        40,
-        233,
-        155,
-        242,
-        24
+        97,
+        27,
+        150,
+        55,
+        203,
+        179,
+        173,
+        23
       ]
     },
     {
-      "name": "IdentityBound",
+      "name": "EvidenceAdded",
       "discriminator": [
-        183,
+        124,
+        213,
+        122,
+        98,
+        248,
+        253,
+        235,
+        89
+      ]
+    },
+    {
+      "name": "GenesisConfirmed",
+      "discriminator": [
+        216,
+        113,
+        83,
+        241,
+        163,
+        230,
+        0,
+        236
+      ]
+    },
+    {
+      "name": "GenesisFinalized",
+      "discriminator": [
+        95,
+        88,
+        165,
+        229,
+        106,
+        30,
+        73,
+        160
+      ]
+    },
+    {
+      "name": "GenesisRequested",
+      "discriminator": [
+        117,
+        141,
+        248,
+        2,
+        9,
+        205,
+        148,
+        122
+      ]
+    },
+    {
+      "name": "GuardianClaimCreated",
+      "discriminator": [
+        101,
+        249,
+        220,
+        104,
+        98,
+        79,
+        23,
+        165
+      ]
+    },
+    {
+      "name": "GuardianClaimDisputed",
+      "discriminator": [
+        54,
+        233,
+        20,
+        187,
+        63,
+        136,
+        17,
+        35
+      ]
+    },
+    {
+      "name": "GuardianClaimResolved",
+      "discriminator": [
+        80,
+        117,
+        102,
+        68,
         169,
-        144,
-        11,
-        110,
-        67,
-        103,
-        46
+        247,
+        166,
+        106
+      ]
+    },
+    {
+      "name": "IdentityRightGranted",
+      "discriminator": [
+        35,
+        127,
+        165,
+        2,
+        72,
+        121,
+        16,
+        185
+      ]
+    },
+    {
+      "name": "IdentityRightRevoked",
+      "discriminator": [
+        73,
+        23,
+        31,
+        237,
+        100,
+        111,
+        70,
+        123
       ]
     },
     {
@@ -6212,43 +11986,6 @@ export const terraRegistry: Idl = {
     },
     {
       "name": "JudgmentExecuted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "dispute",
-            "type": "pubkey"
-          },
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "outcome",
-            "type": "u8"
-          },
-          {
-            "name": "new_owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "block_time",
-            "type": "i64"
-          },
-          {
-            "name": "proof_hash",
-            "docs": [
-              "SHA-256 hash of the submitted proof bytes for auditability."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      },
       "discriminator": [
         142,
         230,
@@ -6258,6 +11995,136 @@ export const terraRegistry: Idl = {
         105,
         52,
         48
+      ]
+    },
+    {
+      "name": "JurisdictionIdentityRevoked",
+      "discriminator": [
+        38,
+        53,
+        194,
+        162,
+        49,
+        0,
+        25,
+        163
+      ]
+    },
+    {
+      "name": "JurisdictionMembershipVerified",
+      "discriminator": [
+        18,
+        92,
+        32,
+        71,
+        68,
+        180,
+        181,
+        9
+      ]
+    },
+    {
+      "name": "JurisdictionRegistered",
+      "discriminator": [
+        128,
+        39,
+        215,
+        134,
+        189,
+        176,
+        106,
+        245
+      ]
+    },
+    {
+      "name": "JurisdictionUpdated",
+      "discriminator": [
+        231,
+        40,
+        254,
+        68,
+        169,
+        51,
+        157,
+        55
+      ]
+    },
+    {
+      "name": "NominationConfirmed",
+      "discriminator": [
+        231,
+        5,
+        164,
+        206,
+        158,
+        29,
+        183,
+        191
+      ]
+    },
+    {
+      "name": "ObservationSubmitted",
+      "discriminator": [
+        108,
+        255,
+        169,
+        65,
+        60,
+        235,
+        203,
+        188
+      ]
+    },
+    {
+      "name": "ObserverRegistered",
+      "discriminator": [
+        33,
+        248,
+        190,
+        137,
+        191,
+        38,
+        49,
+        56
+      ]
+    },
+    {
+      "name": "ObserverStatusChanged",
+      "discriminator": [
+        144,
+        198,
+        36,
+        100,
+        48,
+        176,
+        191,
+        203
+      ]
+    },
+    {
+      "name": "OwnershipProofVerified",
+      "discriminator": [
+        133,
+        80,
+        213,
+        132,
+        28,
+        110,
+        139,
+        191
+      ]
+    },
+    {
+      "name": "OwnershipRootUpdated",
+      "discriminator": [
+        194,
+        16,
+        79,
+        126,
+        75,
+        137,
+        150,
+        54
       ]
     },
     {
@@ -6288,23 +12155,6 @@ export const terraRegistry: Idl = {
     },
     {
       "name": "ParcelFrozen",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "dispute",
-            "type": "pubkey"
-          },
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "frozen_at",
-            "type": "i64"
-          }
-        ]
-      },
       "discriminator": [
         1,
         224,
@@ -6330,6 +12180,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ParcelSubdivided",
+      "discriminator": [
+        226,
+        169,
+        51,
+        12,
+        208,
+        85,
+        159,
+        177
+      ]
+    },
+    {
       "name": "ParcelTransferred",
       "discriminator": [
         242,
@@ -6343,6 +12206,110 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ParcelsAmalgamated",
+      "discriminator": [
+        223,
+        144,
+        63,
+        29,
+        48,
+        176,
+        253,
+        74
+      ]
+    },
+    {
+      "name": "ProgramPaused",
+      "discriminator": [
+        247,
+        9,
+        236,
+        38,
+        105,
+        35,
+        112,
+        115
+      ]
+    },
+    {
+      "name": "ProgramUnpaused",
+      "discriminator": [
+        193,
+        183,
+        146,
+        52,
+        180,
+        17,
+        21,
+        26
+      ]
+    },
+    {
+      "name": "ProofVersionInvalidated",
+      "discriminator": [
+        218,
+        103,
+        154,
+        148,
+        120,
+        25,
+        121,
+        128
+      ]
+    },
+    {
+      "name": "QuorumConfigSet",
+      "discriminator": [
+        127,
+        51,
+        134,
+        210,
+        179,
+        235,
+        221,
+        116
+      ]
+    },
+    {
+      "name": "QuorumReachabilityChecked",
+      "discriminator": [
+        50,
+        201,
+        111,
+        245,
+        128,
+        167,
+        112,
+        240
+      ]
+    },
+    {
+      "name": "QuorumReached",
+      "discriminator": [
+        234,
+        207,
+        54,
+        50,
+        183,
+        135,
+        255,
+        213
+      ]
+    },
+    {
+      "name": "QuorumVoteCast",
+      "discriminator": [
+        102,
+        60,
+        79,
+        169,
+        52,
+        132,
+        255,
+        227
+      ]
+    },
+    {
       "name": "RegistryCreated",
       "discriminator": [
         155,
@@ -6353,6 +12320,58 @@ export const terraRegistry: Idl = {
         185,
         234,
         132
+      ]
+    },
+    {
+      "name": "ReportDismissed",
+      "discriminator": [
+        181,
+        63,
+        248,
+        138,
+        116,
+        100,
+        43,
+        164
+      ]
+    },
+    {
+      "name": "ReputationSlashed",
+      "discriminator": [
+        171,
+        140,
+        27,
+        238,
+        91,
+        224,
+        11,
+        6
+      ]
+    },
+    {
+      "name": "RewardsClaimed",
+      "discriminator": [
+        75,
+        98,
+        88,
+        18,
+        219,
+        112,
+        88,
+        121
+      ]
+    },
+    {
+      "name": "RewardsDistributed",
+      "discriminator": [
+        11,
+        43,
+        154,
+        0,
+        229,
+        9,
+        116,
+        85
       ]
     },
     {
@@ -6371,14 +12390,14 @@ export const terraRegistry: Idl = {
     {
       "name": "RightRenewed",
       "discriminator": [
+        55,
+        0,
+        155,
+        253,
+        159,
+        84,
         186,
-        128,
-        14,
-        167,
-        173,
-        10,
-        165,
-        153
+        197
       ]
     },
     {
@@ -6397,14 +12416,40 @@ export const terraRegistry: Idl = {
     {
       "name": "RightStatusTransition",
       "discriminator": [
-        30,
-        111,
-        208,
-        91,
-        21,
-        227,
-        169,
-        171
+        75,
+        178,
+        7,
+        36,
+        17,
+        198,
+        215,
+        153
+      ]
+    },
+    {
+      "name": "RightsMigrated",
+      "discriminator": [
+        105,
+        144,
+        146,
+        255,
+        89,
+        164,
+        49,
+        238
+      ]
+    },
+    {
+      "name": "RightsMigrationComplete",
+      "discriminator": [
+        244,
+        52,
+        186,
+        231,
+        72,
+        181,
+        101,
+        90
       ]
     },
     {
@@ -6473,55 +12518,81 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "SuccessionCancelled",
+      "name": "SlashingAppealed",
       "discriminator": [
-        67,
-        67,
-        101,
+        40,
+        35,
+        123,
+        102,
+        1,
+        153,
+        139,
+        77
+      ]
+    },
+    {
+      "name": "StakeDeposited",
+      "discriminator": [
+        69,
+        152,
+        144,
+        109,
+        232,
+        34,
+        225,
+        19
+      ]
+    },
+    {
+      "name": "StakePoolCreated",
+      "discriminator": [
+        80,
+        44,
         243,
+        249,
+        137,
+        72,
+        229,
+        122
+      ]
+    },
+    {
+      "name": "StakeWithdrawn",
+      "discriminator": [
+        33,
+        120,
+        159,
+        58,
+        140,
+        255,
+        174,
+        79
+      ]
+    },
+    {
+      "name": "UnbondingInitiated",
+      "discriminator": [
+        119,
+        120,
+        72,
+        229,
+        146,
         100,
-        8,
-        158,
-        53
+        18,
+        106
       ]
     },
     {
-      "name": "SuccessionClaimed",
+      "name": "ValidatorActiveSet",
       "discriminator": [
-        27,
-        211,
-        3,
-        154,
-        93,
-        191,
-        66,
-        212
-      ]
-    },
-    {
-      "name": "SuccessionEndorsed",
-      "discriminator": [
-        207,
-        163,
-        114,
-        67,
-        56,
-        134,
-        119,
-        241
-      ]
-    },
-    {
-      "name": "SuccessionRequested",
-      "discriminator": [
-        212,
-        119,
-        41,
-        85,
-        179,
-        61,
-        206,
-        98
+        140,
+        223,
+        60,
+        104,
+        129,
+        217,
+        250,
+        227
       ]
     },
     {
@@ -6551,6 +12622,45 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ValidatorJailed",
+      "discriminator": [
+        219,
+        171,
+        53,
+        20,
+        142,
+        121,
+        114,
+        72
+      ]
+    },
+    {
+      "name": "ValidatorNominated",
+      "discriminator": [
+        112,
+        168,
+        111,
+        7,
+        169,
+        135,
+        174,
+        211
+      ]
+    },
+    {
+      "name": "ValidatorNominationFinalized",
+      "discriminator": [
+        102,
+        105,
+        161,
+        233,
+        236,
+        57,
+        36,
+        155
+      ]
+    },
+    {
       "name": "ValidatorRemoved",
       "discriminator": [
         133,
@@ -6561,6 +12671,45 @@ export const terraRegistry: Idl = {
         209,
         70,
         130
+      ]
+    },
+    {
+      "name": "ValidatorReputationInitialized",
+      "discriminator": [
+        214,
+        137,
+        171,
+        142,
+        137,
+        238,
+        192,
+        175
+      ]
+    },
+    {
+      "name": "ValidatorSlashed",
+      "discriminator": [
+        1,
+        160,
+        99,
+        18,
+        25,
+        42,
+        5,
+        213
+      ]
+    },
+    {
+      "name": "ValidatorUnjailed",
+      "discriminator": [
+        100,
+        182,
+        102,
+        226,
+        19,
+        221,
+        91,
+        59
       ]
     },
     {
@@ -6603,359 +12752,68 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "StakePoolCreated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "region_registry",
-            "type": "pubkey"
-          },
-          {
-            "name": "reward_rate_bps",
-            "type": "u16"
-          }
-        ]
-      },
+      "name": "VerificationAttestationSubmitted",
       "discriminator": [
-        80,
-        44,
-        243,
-        249,
-        137,
-        72,
-        229,
-        122
-      ]
-    },
-    {
-      "name": "StakeDeposited",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      },
-      "discriminator": [
-        69,
-        152,
-        144,
-        109,
-        232,
-        34,
-        225,
-        19
-      ]
-    },
-    {
-      "name": "UnbondingInitiated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      },
-      "discriminator": [
-        119,
-        120,
-        72,
-        229,
-        146,
-        100,
-        18,
-        106
-      ]
-    },
-    {
-      "name": "StakeWithdrawn",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      },
-      "discriminator": [
-        33,
-        120,
-        159,
-        58,
-        140,
-        255,
-        174,
-        79
-      ]
-    },
-    {
-      "name": "EquivocationReported",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "evidence_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      },
-      "discriminator": [
-        136,
-        91,
-        235,
-        5,
-        219,
-        141,
-        157,
-        248
-      ]
-    },
-    {
-      "name": "ValidatorSlashed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "slash_amount",
-            "type": "u64"
-          },
-          {
-            "name": "slash_bps",
-            "type": "u16"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          }
-        ]
-      },
-      "discriminator": [
-        1,
-        160,
-        99,
-        18,
-        25,
-        42,
-        5,
-        213
-      ]
-    },
-    {
-      "name": "RewardsClaimed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      },
-      "discriminator": [
-        75,
-        98,
-        88,
-        18,
-        219,
-        112,
-        88,
-        121
-      ]
-    },
-    {
-      "name": "RewardsDistributed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "period_reward",
-            "type": "u64"
-          },
-          {
-            "name": "total_staked",
-            "type": "u64"
-          }
-        ]
-      },
-      "discriminator": [
-        11,
-        43,
-        154,
-        0,
-        229,
-        9,
-        116,
-        85
-      ]
-    },
-    {
-      "name": "SlashingAppealed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "appeal_reason",
-            "type": "string"
-          }
-        ]
-      },
-      "discriminator": [
-        40,
-        35,
-        123,
-        102,
-        1,
-        153,
-        139,
-        77
-      ]
-    },
-    {
-      "name": "ReportDismissed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          }
-        ]
-      },
-      "discriminator": [
-        181,
+        67,
+        110,
+        129,
+        218,
+        46,
+        207,
         63,
-        248,
-        138,
-        116,
-        100,
-        43,
-        164
+        162
       ]
     },
     {
-      "name": "CourtGuardianshipRequested",
+      "name": "VerificationKeyUpdated",
       "discriminator": [
-        140,
-        90,
-        60,
-        187,
-        33,
-        145,
-        99,
-        93
+        186,
+        219,
+        161,
+        35,
+        204,
+        1,
+        3,
+        207
       ]
     },
     {
-      "name": "GuardianshipRevoked",
+      "name": "VerificationSessionClosed",
       "discriminator": [
-        128,
-        41,
-        40,
-        28,
-        37,
-        45,
-        126,
-        221
+        63,
+        201,
+        50,
+        148,
+        176,
+        169,
+        203,
+        132
       ]
     },
     {
-      "name": "GuardianshipRevocationRequested",
+      "name": "VerificationSessionOpened",
       "discriminator": [
-        78,
-        209,
-        237,
-        197,
-        250,
-        152,
-        126,
-        7
+        97,
+        6,
+        127,
+        245,
+        102,
+        6,
+        135,
+        151
+      ]
+    },
+    {
+      "name": "WorldRegistryCreated",
+      "discriminator": [
+        18,
+        158,
+        240,
+        20,
+        48,
+        170,
+        173,
+        200
       ]
     },
     {
@@ -6969,45 +12827,6 @@ export const terraRegistry: Idl = {
         159,
         212,
         6
-      ]
-    },
-    {
-      "name": "OwnershipRootUpdated",
-      "discriminator": [
-        194,
-        16,
-        79,
-        126,
-        75,
-        137,
-        150,
-        54
-      ]
-    },
-    {
-      "name": "OwnershipProofVerified",
-      "discriminator": [
-        133,
-        80,
-        213,
-        132,
-        28,
-        110,
-        139,
-        191
-      ]
-    },
-    {
-      "name": "ProofVersionInvalidated",
-      "discriminator": [
-        218,
-        103,
-        154,
-        148,
-        120,
-        25,
-        121,
-        128
       ]
     }
   ],
@@ -7360,7 +13179,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6069,
       "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received — seller cannot accept"
+      "msg": "Full deposit not yet received \u2014 seller cannot accept"
     },
     {
       "code": 6070,
@@ -7375,12 +13194,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6072,
       "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired — cannot cancel"
+      "msg": "Buyer grace period has expired \u2014 cannot cancel"
     },
     {
       "code": 6073,
       "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired — escrow not stale"
+      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
     },
     {
       "code": 6074,
@@ -7515,12 +13334,12 @@ export const terraRegistry: Idl = {
     {
       "code": 6100,
       "name": "StakeAlreadyActive",
-      "msg": "Stake is already active — cannot deposit again"
+      "msg": "Stake is already active \u2014 cannot deposit again"
     },
     {
       "code": 6101,
       "name": "UnbondingInProgress",
-      "msg": "Unbonding is in progress — cannot deposit or withdraw"
+      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
     },
     {
       "code": 6102,
@@ -7593,35 +13412,324 @@ export const terraRegistry: Idl = {
       "msg": "No validator endorsement proposal exists for this candidate"
     },
     {
-      "code": 6115,
-      "name": "ProgramPaused",
-      "msg": "Program is paused — state-changing operations are frozen"
+      "code": 6116,
+      "name": "WrongOnboardingStage",
+      "msg": "Wrong onboarding stage for this bootstrap operation"
     },
     {
-      "code": 6116,
+      "code": 6117,
+      "name": "SponsorCannotConfirm",
+      "msg": "Sponsor cannot confirm their own nomination"
+    },
+    {
+      "code": 6118,
+      "name": "InvalidCountryCode",
+      "msg": "Invalid ISO 3166-1 alpha-2 country code"
+    },
+    {
+      "code": 6119,
+      "name": "CountryAlreadyAllocated",
+      "msg": "Country code has already been allocated"
+    },
+    {
+      "code": 6120,
+      "name": "CountryNotAllocated",
+      "msg": "Country is not allocated to this admin"
+    },
+    {
+      "code": 6121,
+      "name": "ConfirmersNotDiverseEnough",
+      "msg": "Genesis confirmers are not from enough distinct countries"
+    },
+    {
+      "code": 6122,
+      "name": "EmergencyTimelockNotElapsed",
+      "msg": "Emergency injection timelock has not yet elapsed"
+    },
+    {
+      "code": 6123,
+      "name": "InsufficientEndorsements",
+      "msg": "Insufficient validator endorsements for threshold credential"
+    },
+    {
+      "code": 6124,
+      "name": "ProgramPaused",
+      "msg": "Program is paused \u2014 state-changing operations are frozen"
+    },
+    {
+      "code": 6125,
       "name": "ProgramNotPaused",
       "msg": "Program is not paused"
     },
     {
-      "code": 6117,
+      "code": 6126,
       "name": "ProgramAlreadyPaused",
       "msg": "Program is already paused"
     },
     {
-      "code": 6118,
+      "code": 6127,
       "name": "GuardianshipAlreadyActive",
       "msg": "A revocation request is already pending for this identity"
+    },
+    {
+      "code": 6128,
+      "name": "EmptyClaimId",
+      "msg": "Claim id cannot be all zeros"
+    },
+    {
+      "code": 6129,
+      "name": "InvalidClaimType",
+      "msg": "Invalid claim type"
+    },
+    {
+      "code": 6130,
+      "name": "EmptyStatementHash",
+      "msg": "Statement hash is required"
+    },
+    {
+      "code": 6131,
+      "name": "InvalidClaimStatus",
+      "msg": "Invalid claim status for this operation"
+    },
+    {
+      "code": 6132,
+      "name": "NotClaimSubmitter",
+      "msg": "Only the claim submitter can add evidence"
+    },
+    {
+      "code": 6133,
+      "name": "InvalidEvidenceType",
+      "msg": "Invalid evidence type"
+    },
+    {
+      "code": 6134,
+      "name": "EmptyStorageReference",
+      "msg": "Storage reference is required"
+    },
+    {
+      "code": 6135,
+      "name": "InvalidConfidence",
+      "msg": "Confidence must be between 0 and 100"
+    },
+    {
+      "code": 6136,
+      "name": "InvalidAttestationResult",
+      "msg": "Invalid attestation result"
+    },
+    {
+      "code": 6137,
+      "name": "QuorumNotReached",
+      "msg": "Attestation quorum not yet reached"
+    },
+    {
+      "code": 6138,
+      "name": "ClaimAlreadyVerified",
+      "msg": "Claim already verified"
+    },
+    {
+      "code": 6139,
+      "name": "InvalidRequiredAttestations",
+      "msg": "Required attestations must be at least 1"
+    },
+    {
+      "code": 6140,
+      "name": "InvalidSessionStatus",
+      "msg": "Session is not in a valid state for this operation"
+    },
+    {
+      "code": 6141,
+      "name": "ValidatorNotActive",
+      "msg": "Validator is not active"
+    },
+    {
+      "code": 6142,
+      "name": "ChallengeAlreadyResolved",
+      "msg": "Challenge has already been resolved"
+    },
+    {
+      "code": 6143,
+      "name": "InvalidQuorumConfig",
+      "msg": "Quorum configuration is invalid"
+    },
+    {
+      "code": 6144,
+      "name": "ValidatorJailed",
+      "msg": "Validator is jailed or slashed and cannot attest"
+    },
+    {
+      "code": 6145,
+      "name": "ObserverNotActive",
+      "msg": "Observer is not active"
+    },
+    {
+      "code": 6146,
+      "name": "ObserverNotSuspended",
+      "msg": "Observer is not suspended"
+    },
+    {
+      "code": 6147,
+      "name": "InvalidGuardianType",
+      "msg": "Invalid guardian type"
+    },
+    {
+      "code": 6148,
+      "name": "InvalidGuardianClaimStatus",
+      "msg": "Invalid guardian claim status"
+    },
+    {
+      "code": 6149,
+      "name": "InvalidCrossBorderStatus",
+      "msg": "Invalid cross-border verification status"
+    },
+    {
+      "code": 6150,
+      "name": "InvalidAuditAction",
+      "msg": "Invalid audit action"
+    },
+    {
+      "code": 6151,
+      "name": "InvalidQuorumVoteChoice",
+      "msg": "Invalid quorum vote choice"
+    },
+    {
+      "code": 6152,
+      "name": "QuorumAlreadyResolved",
+      "msg": "Quorum already resolved"
+    },
+    {
+      "code": 6153,
+      "name": "IdentityRightsAlreadyExists",
+      "msg": "Identity rights account already exists for this identity/parcel/kind"
+    },
+    {
+      "code": 6154,
+      "name": "IdentityRightsNotFound",
+      "msg": "Identity rights not found or inactive"
+    },
+    {
+      "code": 6155,
+      "name": "NotDesignatedOffender",
+      "msg": "Signer is not the designated offender"
+    },
+    {
+      "code": 6156,
+      "name": "WrongEndorsementAction",
+      "msg": "Endorsement action does not match the requested governance operation"
+    },
+    {
+      "code": 6157,
+      "name": "MissingReputation",
+      "msg": "Validator reputation account must be provided for attestation"
+    },
+    {
+      "code": 6158,
+      "name": "AttestationDigestMismatch",
+      "msg": "Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence"
+    },
+    {
+      "code": 6159,
+      "name": "DuplicateValidator",
+      "msg": "Duplicate validator in the declared validator set"
     }
   ],
   "types": [
+    {
+      "name": "AmalgamationRecord",
+      "docs": [
+        "One record per source parcel being merged into a result parcel.",
+        "",
+        "PDA seed: `[\"amalgamation\", result_parcel, source_parcel]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "result_parcel",
+            "docs": [
+              "The merged result parcel's PDA key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "source_parcel",
+            "docs": [
+              "A source parcel being merged in."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "source_geometry_hash",
+            "docs": [
+              "Source's geometry hash at time of amalgamation."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "result_geometry_hash",
+            "docs": [
+              "Result's geometry hash."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rights_merged",
+            "docs": [
+              "Whether rights from this source have been merged."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "initiated_by",
+            "docs": [
+              "Wallet that initiated the amalgamation."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "docs": [
+              "When merge finished (0 if in progress)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "0=Pending, 1=Completed, 2=Failed."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "Attestation",
       "docs": [
         "An on-chain attestation that binds a set of off-chain documents/data to a",
         "parcel and records *who* (which wallets) must validate a transaction.",
         "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload — actual",
-        "documents and per-validator Ed25519 signatures — lives off-chain, but it is",
+        "**DEPRECATED**: This parcel-centric attestation model is superseded by the",
+        "verification pipeline (`Claim \u2192 Evidence \u2192 Observation \u2192 VerificationAttestation`).",
+        "Existing accounts remain valid for backward compatibility, but new attestations",
+        "should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)",
+        "is provided to transition legacy attestations into the new model.",
+        "",
+        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
+        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
         "anchored here by `content_hash`, and each validator's public key is recorded",
         "so that any signature can be independently verified against this list."
       ],
@@ -7679,6 +13787,14 @@ export const terraRegistry: Idl = {
             "type": "u8"
           },
           {
+            "name": "document_count",
+            "docs": [
+              "Number of IPFS documents anchored to this attestation (capped by",
+              "MAX_DOCUMENTS_PER_ATTESTATION in register_document)."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "created_at",
             "type": "i64"
           },
@@ -7694,10 +13810,39 @@ export const terraRegistry: Idl = {
                 8
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AttestationMigrated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_parcel",
+            "type": "pubkey"
           },
           {
-            "name": "document_count",
-            "type": "u8"
+            "name": "new_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "specifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -7741,23 +13886,61 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "Identity",
+      "name": "AuditEntry",
       "docs": [
-        "Binds a person (via a hashed identity credential) to a wallet the person",
-        "actually holds, plus a recovery wallet. This is the resolvable on-chain link",
-        "behind \"who owns this.\" A provisioned wallet is exported to the person; the",
-        "program only ever sees the public keys.",
+        "Append-only audit log of all verification state transitions.",
         "",
-        "PDA: `[\"identity\", identity_hash]`."
+        "PDA: `[\"audit_entry\", entity, sequence_bytes]`"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity_hash",
+            "name": "entity",
             "docs": [
-              "32-byte hash over the person's identity credential (e.g. national ID),",
-              "so the credential itself never lives on-chain."
+              "The entity this audit entry is about (claim, session, challenge, etc.)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "docs": [
+              "Monotonic sequence number for this entity."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "docs": [
+              "Type of transition (see audit_action constants)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "from_status",
+            "docs": [
+              "Previous status value."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "to_status",
+            "docs": [
+              "New status value."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "docs": [
+              "Who triggered the transition."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_hash",
+            "docs": [
+              "Optional metadata hash (sha-256 of additional context)."
             ],
             "type": {
               "array": [
@@ -7767,26 +13950,317 @@ export const terraRegistry: Idl = {
             }
           },
           {
-            "name": "owner",
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuditEntryRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "audit_entry",
+            "type": "pubkey"
+          },
+          {
+            "name": "entity",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "from_status",
+            "type": "u8"
+          },
+          {
+            "name": "to_status",
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Challenge",
+      "docs": [
+        "An on-chain challenge to a verified claim. Anyone may challenge a",
+        "verified claim by providing evidence. Validators review and vote.",
+        "",
+        "PDA: `[\"challenge\", claim, challenger]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
             "docs": [
-              "The active wallet acting on behalf of this identity."
+              "The claim being challenged."
             ],
             "type": "pubkey"
           },
           {
-            "name": "recovery",
+            "name": "challenger",
             "docs": [
-              "A separate wallet the person also controls (backup / recovery). Used to",
-              "request a recovery passation if the main key is lost."
+              "Who filed the challenge."
             ],
             "type": "pubkey"
           },
           {
-            "name": "parcel_count",
+            "name": "challenge_hash",
             "docs": [
-              "Number of parcels currently owned by this identity."
+              "SHA-256 of the off-chain challenge document / evidence."
             ],
-            "type": "u16"
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current challenge status."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "uphold_votes",
+            "docs": [
+              "Number of validators who voted to uphold."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "overturn_votes",
+            "docs": [
+              "Number of validators who voted to overturn."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required_votes",
+            "docs": [
+              "Required votes to resolve."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "voters",
+            "docs": [
+              "Validators who voted (deduplication record)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "review_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChallengeFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "challenge",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "challenger",
+            "type": "pubkey"
+          },
+          {
+            "name": "challenge_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "review_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChallengeResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "challenge",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChallengeVoteRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "challenge",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote_uphold",
+            "type": "bool"
+          },
+          {
+            "name": "uphold_votes",
+            "type": "u8"
+          },
+          {
+            "name": "overturn_votes",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Claim",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim_id",
+            "docs": [
+              "Unique claim identifier (caller-provided, e.g. SHA-256 of the statement)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "parcel",
+            "docs": [
+              "The parcel this claim is about."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "claim_type",
+            "docs": [
+              "Type of claim (see claim_type constants)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "docs": [
+              "Participant who submitted the claim."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status (see claim_status constants)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "statement_hash",
+            "docs": [
+              "sha-256 hash of the off-chain claim statement / document."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "docs": [
+              "Monotonic version counter. Incremented on status transitions."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "evidence_count",
+            "docs": [
+              "Number of evidence items attached to this claim."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "observation_count",
+            "docs": [
+              "Number of observations submitted for this claim."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "attestation_count",
+            "docs": [
+              "Number of attestations submitted for this claim."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required_attestations",
+            "docs": [
+              "Quorum threshold \u2014 number of attestations needed to verify."
+            ],
+            "type": "u8"
           },
           {
             "name": "created_at",
@@ -7795,28 +14269,178 @@ export const terraRegistry: Idl = {
           {
             "name": "updated_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
           },
           {
-            "name": "pending_revocation",
-            "docs": [
-              "When true, a recovery wallet has requested revocation but the timelock",
-              "has not yet expired."
-            ],
-            "type": "bool"
+            "name": "parcel",
+            "type": "pubkey"
           },
           {
-            "name": "revoke_after",
+            "name": "claim_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "claim_type",
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "statement_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimRejected",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "reason",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimSessionTracker",
+      "docs": [
+        "Singleton guard PDA that tracks which session is currently active for a",
+        "given claim. Prevents opening multiple concurrent verification sessions",
+        "for the same claim.",
+        "",
+        "PDA: `[\"claim_session_tracker\", claim_key]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
             "docs": [
-              "Unix timestamp after which a pending revocation may be executed."
+              "The claim this tracker belongs to."
             ],
+            "type": "pubkey"
+          },
+          {
+            "name": "active_session",
+            "docs": [
+              "The currently active session (zero key = no active session)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Bump seed for deterministic derivation."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim_type",
+            "type": "u8"
+          },
+          {
+            "name": "attestation_count",
+            "type": "u8"
+          },
+          {
+            "name": "verified_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CountryAllocated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "world_registry",
+            "type": "pubkey"
           },
           {
-            "name": "pending_new_owner",
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "approved_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CountryAllocation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "country_code",
             "docs": [
-              "Wallet that was designated as the new owner when revoke_guardianship",
-              "was called. The execute_revoke_guardianship handler enforces this",
-              "matches the signer, preventing front-running by a different wallet."
+              "ISO 3166-1 alpha-2 country code."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "approved_admin",
+            "docs": [
+              "Admin wallet approved to create this country's ValidatorRegistry."
             ],
             "type": "pubkey"
           }
@@ -7824,12 +14448,249 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "IdentityBound",
+      "name": "CredentialIssued",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity",
+            "name": "credential_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "signer_count",
+            "type": "u8"
+          },
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "issued_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CredentialNullifier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "credential",
+            "type": "pubkey"
+          },
+          {
+            "name": "consumed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CredentialRequest",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "credential",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CredentialRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CredentialSigned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "signers_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CredentialVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "credential_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          },
+          {
+            "name": "proof_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderIdentityBound",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
             "type": "pubkey"
           },
           {
@@ -7842,12 +14703,1447 @@ export const terraRegistry: Idl = {
             }
           },
           {
-            "name": "owner",
+            "name": "jurisdiction",
             "type": "pubkey"
           },
           {
-            "name": "recovery",
+            "name": "bound_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderIdentityRebound",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_binding",
             "type": "pubkey"
+          },
+          {
+            "name": "new_binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "bound_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderLinked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cross_border_verification",
+            "type": "pubkey"
+          },
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "linked_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cross_border_verification",
+            "type": "pubkey"
+          },
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "revoked_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderVerification",
+      "docs": [
+        "Bridges cross-border identity bindings into the verification pipeline.",
+        "",
+        "PDA: `[\"cross_border_verification\", binding]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
+            "docs": [
+              "The JurisdictionBinding account being verified."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "docs": [
+              "Associated Claim (if any)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "docs": [
+              "Associated VerificationSession (if any)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "jurisdiction",
+            "docs": [
+              "The Jurisdiction account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status (0=pending, 1=verified, 2=revoked)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "verified_by",
+            "docs": [
+              "Who verified this binding."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cross_border_verification",
+            "type": "pubkey"
+          },
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dispute",
+      "docs": [
+        "An on-chain dispute record bound to a parcel.",
+        "",
+        "PDA: `[\"dispute\", parcel, case_hash]`. The `case_hash` is a SHA-256 over",
+        "the off-chain court document or complaint, anchoring evidence immutably."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "docs": [
+              "The parcel under dispute."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "filed_by",
+            "docs": [
+              "The wallet that filed the dispute."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "docs": [
+              "SHA-256 of the off-chain court document / complaint."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current dispute status (FILED \u2192 FROZEN \u2192 ADJUDICATED \u2192 EXECUTED)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "docs": [
+              "Required validator co-signatures to advance this dispute."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "declared_count",
+            "docs": [
+              "Number of validators declared at filing time (NOT actual signatures collected)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "validators",
+            "docs": [
+              "Declared validator set for this dispute."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "present_validators",
+            "docs": [
+              "Validators that actually co-signed (recorded at freeze/adjudicate).",
+              "Unlike `validators` (declared at filing), this is on-chain proof of",
+              "who testified \u2014 events alone are not reliably indexable."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "present_count",
+            "docs": [
+              "How many entries of `present_validators` are populated."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "filed_at",
+            "type": "i64"
+          },
+          {
+            "name": "frozen_at",
+            "type": "i64"
+          },
+          {
+            "name": "adjudicated_at",
+            "type": "i64"
+          },
+          {
+            "name": "outcome",
+            "docs": [
+              "Outcome of adjudication (OWNER_WINS or OWNER_LOSES). Set at adjudication."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "docs": [
+              "New owner if outcome is OWNER_LOSES. Set at adjudication."
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeAdjudicated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "adjudicated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "filed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "declared_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentAnchor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "docs": [
+              "The attestation this document belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "docs": [
+              "IPFS CID v1 of the document."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "docs": [
+              "SHA-256 of the document bytes (integrity check)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "docs": [
+              "Document category (e.g. \"deed\", \"survey\", \"photo\")."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "docs": [
+              "Who registered this document."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DocumentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "cid",
+            "type": "string"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "type": "string"
+          },
+          {
+            "name": "registered_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyInjection",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "docs": [
+              "The ValidatorRegistry this injection targets."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "requested_by",
+            "docs": [
+              "Admin who queued the injection."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "docs": [
+              "Validator public key to inject."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "execute_after",
+            "docs": [
+              "Unix timestamp after which the injection can be executed."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "docs": [
+              "True once executed."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyInjectionExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          },
+          {
+            "name": "executed_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_validator_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyInjectionQueued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          },
+          {
+            "name": "requested_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "execute_after",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EquivocationReported",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "settle_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "deposit_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowDisputed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "filer",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowExpired",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "expired_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowRecord",
+      "docs": [
+        "An on-chain escrow record for a parcel sale.",
+        "",
+        "PDA seed: `[\"escrow\", parcel_key]`. One escrow per parcel."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "docs": [
+              "The parcel being sold."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "docs": [
+              "Wallet of the seller (must match parcel.owner)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "docs": [
+              "Wallet of the buyer (set at creation)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Sale price in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deposit_amount",
+            "docs": [
+              "Amount deposited so far by buyer."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vault",
+            "docs": [
+              "Vault PDA holding deposited SOL."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current escrow status."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "deposited_at",
+            "type": "i64"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "settle_deadline",
+            "docs": [
+              "accepted_at + SETTLEMENT_WINDOW_SECS"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "cancel_deadline",
+            "docs": [
+              "created_at + CANCEL_WINDOW_SECS"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "dispute_case_hash",
+            "docs": [
+              "Case hash if dispute filed (0 if none)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "escrow",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Evidence",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "docs": [
+              "The claim this evidence supports."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Monotonic nonce within the claim (0, 1, 2, ...)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "docs": [
+              "Participant who submitted this evidence."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence_type",
+            "docs": [
+              "Type of evidence (see evidence_type constants)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "content_hash",
+            "docs": [
+              "sha-256 hash of the off-chain evidence content."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_reference",
+            "docs": [
+              "Storage reference (IPFS CID, URL, or content address)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "observed_at",
+            "docs": [
+              "When the evidence was originally observed (off-chain), if applicable."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvidenceAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "evidence",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u8"
+          },
+          {
+            "name": "evidence_type",
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GenesisConfirmation",
+      "docs": [
+        "Record of a cross-country genesis confirmation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "docs": [
+              "Validator who confirmed."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "docs": [
+              "Country code of the confirming validator."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GenesisConfirmed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "world_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "confirmer",
+            "type": "pubkey"
+          },
+          {
+            "name": "confirmer_country",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "confirmations_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GenesisFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "world_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "confirmations",
+            "type": "u8"
+          },
+          {
+            "name": "distinct_countries",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GenesisRequest",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "country_code",
+            "docs": [
+              "The country being genesis'd."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "requested_by",
+            "docs": [
+              "Admin requesting genesis (must match allocation)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "confirmations",
+            "docs": [
+              "Confirmations from validators of other countries."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "GenesisConfirmation"
+                }
+              }
+            }
+          },
+          {
+            "name": "finalized",
+            "docs": [
+              "True once quorum and diversity requirements are met."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GenesisRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "world_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "requested_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianClaim",
+      "docs": [
+        "Bridge between the guardian/court system and the verification pipeline.",
+        "When a guardianship event occurs (e.g. court-ordered guardianship via",
+        "`terra_identity`), a GuardianClaim can be created to link that event",
+        "into the verification pipeline.",
+        "",
+        "PDA: `[\"guardian_claim\", claim]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "docs": [
+              "The associated Claim account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "docs": [
+              "The identity under guardianship."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "triggered_by",
+            "docs": [
+              "Who triggered the guardianship (court/guardian wallet)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "docs": [
+              "SHA-256 of the court case document."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "guardian_type",
+            "docs": [
+              "Guardian type (0=court, 1=council, 2=emergency)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status (0=pending, 1=active, 2=resolved, 3=disputed)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianClaimCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "guardian_claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "triggered_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "guardian_type",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianClaimDisputed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "guardian_claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianClaimResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "guardian_claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRightGranted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRightRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityRights",
+      "docs": [
+        "An identity-based right that links an Identity PDA to a Parcel.",
+        "",
+        "This is the foundation for replacing raw wallet ownership (`Parcel.owner`)",
+        "with identity-centric ownership. Rather than a wallet pubkey holding a right,",
+        "the Identity PDA is the holder \u2014 making rights portable across wallets.",
+        "",
+        "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`.",
+        "One IdentityRights per (identity, parcel, kind) is allowed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "docs": [
+              "The Identity PDA that holds this right."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "docs": [
+              "The parcel this right applies to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "docs": [
+              "Right kind (OWNERSHIP, USAGE, EASEMENT, etc.)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "granter",
+            "docs": [
+              "Who granted this right (must be the current owner or granter)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix timestamp; 0 means no expiration."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "ACTIVE, EXPIRED, REVOKED."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "notes",
+            "type": "string"
           }
         ]
       }
@@ -7878,7 +16174,830 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "JudgmentExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": "u8"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "executed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Jurisdiction",
+      "docs": [
+        "A registered jurisdiction (country/zone) in the cross-border identity system.",
+        "",
+        "PDA seed: `[\"jurisdiction\", country_code]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "country_code",
+            "docs": [
+              "ISO 3166-1 alpha-2 padded to 16 bytes (e.g. b\"KE\\x00...\" for Kenya)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "The jurisdiction authority wallet (issues/revokes credentials)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "jurisdiction_name",
+            "docs": [
+              "Human-readable name (max 64 chars)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "credential_schema_cid",
+            "docs": [
+              "IPFS CID of the W3C Verifiable Credential schema."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "revocation_registry",
+            "docs": [
+              "On-chain or oracle reference for revocation checks."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "verification_key_hash",
+            "docs": [
+              "SHA-256 of the ZK verification key for this jurisdiction's circuit."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "algorithm_id",
+            "docs": [
+              "0 = Groth16, 1 = FRI-STARK."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "0 = Active, 1 = Suspended, 2 = Withdrawn."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionBinding",
+      "docs": [
+        "Binds a person (via identity_hash) to a jurisdiction with a ZK proof.",
+        "",
+        "PDA seed: `[\"cross_border_identity\", jurisdiction_key, identity_hash]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity_hash",
+            "docs": [
+              "The identity_hash from the existing Identity account."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "jurisdiction_key",
+            "docs": [
+              "The Jurisdiction PDA this binding belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "credential_commitment",
+            "docs": [
+              "Pedersen commitment to the credential."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nullifier",
+            "docs": [
+              "Derived nullifier to prevent double-binding and proof reuse."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "proof_data",
+            "docs": [
+              "The serialized ZK proof (max 512 bytes)."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "proof_version",
+            "docs": [
+              "Version of the proof circuit (for future upgrades)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "algorithm_id",
+            "docs": [
+              "0 = Groth16, 1 = FRI-STARK."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "revoked",
+            "docs": [
+              "Whether this binding has been revoked."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "revoked_at",
+            "docs": [
+              "Timestamp of revocation (0 if not revoked)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "revoked_by",
+            "docs": [
+              "Who revoked this binding."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bound_at",
+            "docs": [
+              "When the binding was created."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Optional expiry (0 = no expiry)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "verified",
+            "docs": [
+              "Whether a validator has attested this binding's proof off-chain.",
+              "Binding is a permissionless *claim*; only verified bindings should be",
+              "relied upon (circuit verification is deferred to audit; see RFC-006)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "verified_by",
+            "docs": [
+              "Validator that last verified this binding."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "docs": [
+              "Monotonic counter, bumped on re-verification."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionIdentityRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "revoked_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionMembershipVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "algorithm_id",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "jurisdiction",
+            "type": "pubkey"
+          },
+          {
+            "name": "updated_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NominationConfirmed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          },
+          {
+            "name": "confirmer",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_physical",
+            "type": "bool"
+          },
+          {
+            "name": "confirmations_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NullifierRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "root_version",
+            "type": "u32"
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "proof_purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          },
+          {
+            "name": "proof_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Observation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "docs": [
+              "The claim this observation is about."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "docs": [
+              "Validator who made this observation."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "observed_at",
+            "docs": [
+              "When the observation was made."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "location",
+            "docs": [
+              "Location of observation (encoded as latitude/longitude i64 pair, or 0,0)."
+            ],
+            "type": {
+              "array": [
+                "i64",
+                2
+              ]
+            }
+          },
+          {
+            "name": "method",
+            "docs": [
+              "Method used for observation (e.g. 0=visual, 1=GPS, 2=survey, 3=document review)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "findings_hash",
+            "docs": [
+              "Free-form findings hash (sha-256 of detailed findings document)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "confidence",
+            "docs": [
+              "Confidence level (0-100)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "signature_hash",
+            "docs": [
+              "sha-256 of the signed observation payload (for signature verification)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObservationSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "observation",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "method",
+            "type": "u8"
+          },
+          {
+            "name": "confidence",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Observer",
+      "docs": [
+        "An on-chain observer (non-validator participant) who can submit",
+        "observations for claims.",
+        "",
+        "PDA: `[\"observer\", wallet]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "docs": [
+              "The observer's wallet pubkey."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "docs": [
+              "Optional linked identity (e.g. from terra_identity program)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status (ACTIVE, SUSPENDED)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "total_observations",
+            "docs": [
+              "Total observations submitted."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "confirmed_observations",
+            "docs": [
+              "Observations that were confirmed by quorum."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObserverRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "observer",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ObserverStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "observer",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipProofVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "root_version",
+            "type": "u32"
+          },
+          {
+            "name": "proof_purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipRoot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "commitment_count",
+            "type": "u32"
+          },
+          {
+            "name": "algorithm_id",
+            "type": "u8"
+          },
+          {
+            "name": "snapshot_cid",
+            "type": "string"
+          },
+          {
+            "name": "snapshot_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority_signature",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "verification_key_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnershipRootUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "commitment_count",
+            "type": "u32"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Parcel",
+      "docs": [
+        "A parcel of land.",
+        "",
+        "**DEPRECATED: `owner` field** \u2014 Ownership should be expressed through",
+        "`IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct",
+        "`owner` wallet field. The `is_authorized_owner()` function supports both",
+        "paths. New code should prefer the IdentityRights path. The `owner` field",
+        "is retained for backward compatibility and will be removed in a future",
+        "major version once all existing accounts have migrated."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
@@ -7893,6 +17012,10 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "owner",
+            "docs": [
+              "**DEPRECATED**: Use `IdentityRights(OWNERSHIP)` instead.",
+              "Retained for backward compatibility. See `is_authorized_owner()`."
+            ],
             "type": "pubkey"
           },
           {
@@ -8005,6 +17128,26 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "ParcelFrozen",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ParcelRegistered",
       "type": {
         "kind": "struct",
@@ -8020,6 +17163,35 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelSubdivided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "sub_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_geometry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "initiated_by",
             "type": "pubkey"
           }
         ]
@@ -8051,6 +17223,524 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "ParcelsAmalgamated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "result_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_geometry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "initiated_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramPaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "paused_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramUnpaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "unpaused_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofVersionInvalidated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "zone_set",
+            "type": "pubkey"
+          },
+          {
+            "name": "stale_version",
+            "type": "u32"
+          },
+          {
+            "name": "current_version",
+            "type": "u32"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumConfig",
+      "docs": [
+        "On-chain quorum configuration. Defines how many attestations and what",
+        "confidence level are required to verify a claim of a given type, in",
+        "a given region. Global defaults can be overridden per-type or per-region.",
+        "",
+        "PDA: `[\"quorum_config\", parcel_type, region]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel_type",
+            "docs": [
+              "Parcel type this config applies to (0 = global default)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "region",
+            "docs": [
+              "Region this config applies to ([0,0] = global default)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "required_attestations",
+            "docs": [
+              "Number of attestations required."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required_confidence",
+            "docs": [
+              "Minimum confidence level (0-100) required from each attestation."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "set_by",
+            "docs": [
+              "Who set this config."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel_type",
+            "type": "u8"
+          },
+          {
+            "name": "region",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "required_attestations",
+            "type": "u8"
+          },
+          {
+            "name": "required_confidence",
+            "type": "u8"
+          },
+          {
+            "name": "set_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumReachabilityChecked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_validators",
+            "type": "u8"
+          },
+          {
+            "name": "active_count",
+            "type": "u8"
+          },
+          {
+            "name": "required_endorsements",
+            "type": "u8"
+          },
+          {
+            "name": "quorum_reachable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumReached",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "confirm_weight",
+            "type": "u16"
+          },
+          {
+            "name": "quorum_threshold",
+            "type": "u16"
+          },
+          {
+            "name": "total_votes",
+            "type": "u8"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumTally",
+      "docs": [
+        "Aggregated quorum tally for a claim.",
+        "",
+        "PDA: `[\"quorum_tally\", claim]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "docs": [
+              "The claim this tally is for."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_weight",
+            "docs": [
+              "Total weight of all votes."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "confirm_weight",
+            "docs": [
+              "Weight of confirm votes."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "dispute_weight",
+            "docs": [
+              "Weight of dispute votes."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "abstain_weight",
+            "docs": [
+              "Weight of abstain votes."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "total_votes",
+            "docs": [
+              "Total number of votes cast."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "quorum_threshold",
+            "docs": [
+              "Required weight to pass quorum."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "resolved",
+            "docs": [
+              "Whether quorum has been resolved."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumVote",
+      "docs": [
+        "A weighted vote cast by a validator on a claim.",
+        "",
+        "PDA: `[\"quorum_vote\", claim, voter]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "docs": [
+              "The claim being voted on."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "docs": [
+              "The validator casting the vote."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "docs": [
+              "Vote choice (0=confirm, 1=dispute, 2=abstain)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "weight",
+            "docs": [
+              "Reputation-based weight at time of vote (min(reputation_score, 10000))."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "stake_amount",
+            "docs": [
+              "SOL staked at time of vote (if applicable, 0 otherwise)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          },
+          {
+            "name": "weight",
+            "type": "u16"
+          },
+          {
+            "name": "confirm_weight",
+            "type": "u16"
+          },
+          {
+            "name": "dispute_weight",
+            "type": "u16"
+          },
+          {
+            "name": "total_votes",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RegistryCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportDismissed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReputationSlashed",
+      "docs": [
+        "Reputation slash (score hits 0). Distinct from staking `ValidatorSlashed`",
+        "so Anchor IDL event discriminators stay unique."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "reputation_score",
+            "type": "u16"
+          },
+          {
+            "name": "slashed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardsDistributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "period_reward",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "RightGranted",
       "type": {
         "kind": "struct",
@@ -8071,6 +17761,42 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "RightRenewed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_rights",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "granter",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "new_expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "RightRevoked",
       "type": {
         "kind": "struct",
@@ -8086,6 +17812,42 @@ export const terraRegistry: Idl = {
           {
             "name": "holder",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightStatusTransition",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_status",
+            "type": "u8"
+          },
+          {
+            "name": "new_status",
+            "type": "u8"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
           }
         ]
       }
@@ -8137,6 +17899,68 @@ export const terraRegistry: Idl = {
           {
             "name": "notes",
             "type": "string"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Time-bound credential status (RFC-009): ACTIVE, EXPIRING, EXPIRED, GRACE, RENEWED, REVOKED."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "grace_period_secs",
+            "docs": [
+              "Grace period in seconds after expiry (0 = no grace). Set at grant time."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsMigrated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_kind",
+            "type": "u8"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RightsMigrationComplete",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "old_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "type": "u8"
           }
         ]
       }
@@ -8287,145 +18111,132 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "Succession",
+      "name": "SlashingAppealed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "appeal_reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SlashingReport",
       "docs": [
-        "An in-flight passation of wallet control, gated by BOTH a configurable grace",
-        "period AND a minimum number of validator endorsements (so a stolen wallet",
-        "can't seize land) before it can be claimed.",
+        "One record per slashing report.",
         "",
-        "PDA: `[\"succession\", identity, successor]`."
+        "PDA seed: `[\"slashing_report\", stake_pool_key, reporter_key, evidence_hash]`."
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity",
+            "name": "stake_pool",
             "docs": [
-              "The Identity whose control is being passed."
+              "StakePool key."
             ],
             "type": "pubkey"
           },
           {
-            "name": "successor",
+            "name": "reporter",
             "docs": [
-              "The wallet that will take over once gated."
+              "Wallet that filed the report."
             ],
             "type": "pubkey"
           },
           {
-            "name": "kind",
+            "name": "evidence_hash",
             "docs": [
-              "succession_kind."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "requested_at",
-            "type": "i64"
-          },
-          {
-            "name": "effective_at",
-            "docs": [
-              "effective = requested_at + grace_secs. Claim only allowed after this",
-              "AND validations_count >= required."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "grace_secs",
-            "docs": [
-              "Configurable per-request grace (0 => DEFAULT_SUCCESSION_GRACE_SECS)."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "required",
-            "docs": [
-              "Number of validator endorsements required before claim (>= MIN, <= count)."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "validations_count",
-            "docs": [
-              "Number of endorsements collected so far."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "validators",
-            "docs": [
-              "Declared local-authority validator set acting as testifiers."
+              "SHA-256 of the evidence payload."
             ],
             "type": {
               "array": [
-                "pubkey",
-                8
+                "u8",
+                32
               ]
             }
+          },
+          {
+            "name": "offender",
+            "docs": [
+              "Validator accused of misbehavior."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "offense_type",
+            "docs": [
+              "0=equivocation, 1=liveness, 2=collusion."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "offense_details",
+            "docs": [
+              "Bounded details (e.g., two conflicting parcel hashes)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "reporter_bond",
+            "docs": [
+              "SOL bonded by reporter (for false-report penalty)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "0=Pending, 1=Verified, 2=Slashed, 3=Appealed, 4=Rejected, 5=Dismissed."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "filed_at",
+            "docs": [
+              "When the report was filed."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "appeal_deadline",
+            "docs": [
+              "filed_at + APPEAL_WINDOW_SECS."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "docs": [
+              "When the report was resolved (0 if pending)."
+            ],
+            "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "SuccessionCancelled",
+      "name": "StakeDeposited",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity",
-            "type": "pubkey"
-          },
-          {
-            "name": "successor",
-            "type": "pubkey"
-          },
-          {
-            "name": "kind",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SuccessionClaimed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "identity",
-            "type": "pubkey"
-          },
-          {
-            "name": "from",
-            "type": "pubkey"
-          },
-          {
-            "name": "to",
-            "type": "pubkey"
-          },
-          {
-            "name": "kind",
-            "type": "u8"
-          },
-          {
-            "name": "parcels_repointed",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SuccessionEndorsed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "identity",
-            "type": "pubkey"
-          },
-          {
-            "name": "successor",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -8433,7 +18244,413 @@ export const terraRegistry: Idl = {
             "type": "pubkey"
           },
           {
-            "name": "validations_count",
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakePool",
+      "docs": [
+        "One stake pool per region, derived from the ValidatorRegistry key.",
+        "",
+        "PDA seed: `[\"stake_pool\", region_registry_key]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "region_registry",
+            "docs": [
+              "ValidatorRegistry key for this region."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_staked",
+            "docs": [
+              "Total SOL staked across all validators (lamports)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reward_rate_bps",
+            "docs": [
+              "Annual reward rate in basis points (e.g., 500 = 5%)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "accumulated_rewards",
+            "docs": [
+              "Total rewards accrued but not yet distributed (lamports)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reward_per_token_stored",
+            "docs": [
+              "Global reward-per-token accumulator, scaled by REWARD_PRECISION (1e9).",
+              "When distribute_rewards fires: rpt += period_reward * PRECISION / total_staked.",
+              "Validators claim: (rpt - stake.rpt_paid) * staked_amount / PRECISION."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_reward_distribution",
+            "docs": [
+              "Timestamp of last reward distribution."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "slash_count",
+            "docs": [
+              "Total slashing events executed."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakePoolCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_rate_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubdivisionRecord",
+      "docs": [
+        "One record per sub-parcel, linking it back to the original parcel.",
+        "",
+        "PDA seed: `[\"subdivision\", original_parcel, sub_parcel]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "original_parcel",
+            "docs": [
+              "The parent parcel's PDA key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "sub_parcel",
+            "docs": [
+              "The child sub-parcel's PDA key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "original_geometry_hash",
+            "docs": [
+              "Parent's geometry hash at time of subdivision."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "new_geometry_hash",
+            "docs": [
+              "Child's geometry hash."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "surveyor_attestation",
+            "docs": [
+              "Attestation PDA that recorded surveyor sign-off."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rights_migrated",
+            "docs": [
+              "Whether rights have been migrated to the sub-parcel."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "attestations_migrated",
+            "docs": [
+              "Whether attestations have been migrated."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "initiated_by",
+            "docs": [
+              "Wallet that initiated the subdivision."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "docs": [
+              "When migration finished (0 if in progress)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "0=Pending, 1=Completed, 2=Failed."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThresholdCredential",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "credential_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "prover",
+            "type": "pubkey"
+          },
+          {
+            "name": "purpose",
+            "type": "string"
+          },
+          {
+            "name": "disclosure_type",
+            "type": "u8"
+          },
+          {
+            "name": "region_registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "aggregate_signature",
+            "type": "bytes"
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "signer_count",
+            "type": "u8"
+          },
+          {
+            "name": "nullifier_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "consumed",
+            "type": "bool"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "issued_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnbondingInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorActiveSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "set_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorActivityTracker",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "docs": [
+              "The ValidatorRegistry this tracker belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "docs": [
+              "The validator whose activity is tracked."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "last_active",
+            "docs": [
+              "Unix timestamp of last recorded activity (heartbeat or signed tx)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Soft flag \u2014 set to false by admin to forcibly exclude a validator from",
+              "quorum without removing them from the registry."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposed",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorser",
+            "type": "pubkey"
+          },
+          {
+            "name": "endorsements_count",
             "type": "u8"
           },
           {
@@ -8444,36 +18661,530 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "SuccessionRequested",
+      "name": "ValidatorEndorsement",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity",
+            "name": "registry",
+            "docs": [
+              "The registry this endorsement applies to."
+            ],
             "type": "pubkey"
           },
           {
-            "name": "successor",
+            "name": "proposed",
+            "docs": [
+              "The validator pubkey being proposed (target of the action)."
+            ],
             "type": "pubkey"
           },
           {
-            "name": "kind",
+            "name": "action",
+            "docs": [
+              "P0-2: governance action this endorsement authorizes (ADD or REMOVE)."
+            ],
             "type": "u8"
           },
           {
-            "name": "grace_secs",
-            "type": "i64"
+            "name": "endorsers",
+            "docs": [
+              "Validators who endorsed this proposal."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
           },
           {
             "name": "required",
+            "docs": [
+              "Required endorsements to approve."
+            ],
             "type": "u8"
           },
           {
-            "name": "count",
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorJailed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "reputation_score",
+            "type": "u16"
+          },
+          {
+            "name": "jailed_until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorNominated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "sponsor",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          },
+          {
+            "name": "assigned_physical_confirmer",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorNomination",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "docs": [
+              "The registry this nomination applies to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "country_code",
+            "docs": [
+              "Country code (ISO 3166-1 alpha-2)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "sponsor",
+            "docs": [
+              "Existing validator who nominated the candidate."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "docs": [
+              "Wallet being nominated for validator status."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "documents_hash",
+            "docs": [
+              "SHA-256 of the candidate's identity documents."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "location_hash",
+            "docs": [
+              "SHA-256 of a witness location report (never raw GPS)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "assigned_physical_confirmer",
+            "docs": [
+              "Randomly selected physical confirmer (set at nomination time via",
+              "deterministic seed, NOT sponsor's choice)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "confirmers",
+            "docs": [
+              "Validators who have confirmed (max NOMINATION_CONFIRMATIONS)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "finalized",
+            "docs": [
+              "True once 3 confirmations are collected and candidate is added."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorNominationFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          },
+          {
+            "name": "confirmers",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Bootstrap admin who can add validators unilaterally in bootstrap mode."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validators",
+            "docs": [
+              "Current list of registered validators."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required_endorsements",
+            "docs": [
+              "Minimum endorsements needed for new additions in peer-consensus mode.",
+              "Recomputed on every validator count change; not read from storage for",
+              "authorization decisions."
+            ],
             "type": "u8"
           },
           {
-            "name": "effective_at",
+            "name": "paused",
+            "docs": [
+              "Emergency pause flag. When true, all pausable subsystem instructions",
+              "(staking, cross-border, guardian, zk, escrow, dispute) reject",
+              "state-changing calls. Core parcel/identity operations authorized by",
+              "individual owners are unaffected \u2014 the admin stops processing via",
+              "off-chain policy."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "version",
+            "docs": [
+              "Monotonic counter bumped on each change."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "mode",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorReputation",
+      "docs": [
+        "Tracks an individual validator's reputation and performance metrics.",
+        "",
+        "PDA: `[\"validator_reputation\", validator]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "docs": [
+              "The validator's pubkey."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current status (ACTIVE, JAILED, SLASHED)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "total_attestations",
+            "docs": [
+              "Total attestations submitted."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "confirmed_attestations",
+            "docs": [
+              "Attestations that were confirmed by quorum."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "disputed_attestations",
+            "docs": [
+              "Attestations that were disputed/challenged."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "reputation_score",
+            "docs": [
+              "Reputation score in basis points (0 = slashed, 10000 = perfect)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "jailed_until",
+            "docs": [
+              "Timestamp when the validator was jailed (0 if not jailed)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "challenges_received",
+            "docs": [
+              "Total number of successful challenges against this validator."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "challenges_raised",
+            "docs": [
+              "Total number of challenges raised by this validator."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorReputationInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "initialized_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorSlashed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "offender",
+            "type": "pubkey"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slash_bps",
+            "type": "u16"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorStake",
+      "docs": [
+        "One record per validator per region.",
+        "",
+        "PDA seed: `[\"validator_stake\", stake_pool_key, validator_key]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "docs": [
+              "StakePool key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "docs": [
+              "Validator's Ed25519 pubkey."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "staked_amount",
+            "docs": [
+              "Current stake in lamports."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "unbonding_amount",
+            "docs": [
+              "Amount in unbonding period."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "unbonding_starts_at",
+            "docs": [
+              "When unbonding began (0 if not unbonding)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "reward_per_token_paid",
+            "docs": [
+              "Snapshot of the pool's reward_per_token_stored at the time of last",
+              "claim or deposit. Claimable = (pool.rpt - self.rpt_paid) * staked / PRECISION."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rewards_accrued",
+            "docs": [
+              "Rewards accumulated but not yet claimed (legacy field, kept for compat)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "slash_history",
+            "docs": [
+              "Number of past slashing events (for graduated severity)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "offenses",
+            "docs": [
+              "Recent offense flags: [equivocation, liveness, collusion, unused]."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorUnjailed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "unjailed_at",
             "type": "i64"
           }
         ]
@@ -8716,156 +19427,82 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "AuthorityRegistry",
+      "name": "VerificationAttestation",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "admin",
+            "name": "claim",
+            "docs": [
+              "The claim being attested."
+            ],
             "type": "pubkey"
           },
           {
-            "name": "validators",
-            "type": {
-              "vec": "pubkey"
-            }
+            "name": "validator",
+            "docs": [
+              "Validator submitting this attestation."
+            ],
+            "type": "pubkey"
           },
           {
-            "name": "mode",
+            "name": "observation",
+            "docs": [
+              "The observation this attestation is based on."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "result",
+            "docs": [
+              "Attestation result (confirmed, disputed, unable_to_verify)."
+            ],
             "type": "u8"
           },
           {
-            "name": "paused",
-            "type": "bool"
+            "name": "confidence",
+            "docs": [
+              "Confidence level (0-100)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "signature_hash",
+            "docs": [
+              "sha-256 of the signed attestation payload."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "created_at",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ConsensusFlipped",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registry",
-            "type": "pubkey"
           },
           {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "required_endorsements",
-            "type": "u8"
-          },
-          {
-            "name": "validator_count",
+            "name": "protocol_version",
+            "docs": [
+              "Protocol version for audit trail."
+            ],
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "DocumentAnchor",
+      "name": "VerificationAttestationSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
           {
             "name": "attestation",
-            "type": "pubkey"
-          },
-          {
-            "name": "cid",
-            "type": "string"
-          },
-          {
-            "name": "content_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "category",
-            "type": "string"
-          },
-          {
-            "name": "registered_by",
-            "type": "pubkey"
-          },
-          {
-            "name": "registered_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DocumentRegistered",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "attestation",
-            "type": "pubkey"
-          },
-          {
-            "name": "cid",
-            "type": "string"
-          },
-          {
-            "name": "content_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "category",
-            "type": "string"
-          },
-          {
-            "name": "registered_by",
-            "type": "pubkey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RegistryCreated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registry",
-            "type": "pubkey"
-          },
-          {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "mode",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ValidatorAdded",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registry",
             "type": "pubkey"
           },
           {
@@ -8873,35 +19510,15 @@ export const terraRegistry: Idl = {
             "type": "pubkey"
           },
           {
-            "name": "added_by",
-            "type": "pubkey"
-          },
-          {
-            "name": "mode",
+            "name": "result",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ValidatorEndorsed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "registry",
-            "type": "pubkey"
           },
           {
-            "name": "proposed",
-            "type": "pubkey"
+            "name": "confidence",
+            "type": "u8"
           },
           {
-            "name": "endorser",
-            "type": "pubkey"
-          },
-          {
-            "name": "endorsements_count",
+            "name": "attestation_count",
             "type": "u8"
           },
           {
@@ -8912,66 +19529,67 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "ValidatorEndorsement",
+      "name": "VerificationKeyUpdated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "registry",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "proposed",
-            "type": "pubkey"
-          },
-          {
-            "name": "endorsers",
+            "name": "old_hash",
             "type": {
-              "vec": "pubkey"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
-            "name": "added_at",
+            "name": "new_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "updated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ValidatorRemoved",
+      "name": "VerificationSession",
+      "docs": [
+        "A stateful session that tracks a claim through its full verification",
+        "lifecycle. Links evidence, observations, and attestations. Manages",
+        "timeout and quorum progression.",
+        "",
+        "PDA: `[\"verification_session\", claim, session_id]`"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "registry",
+            "name": "claim",
+            "docs": [
+              "The claim being verified."
+            ],
             "type": "pubkey"
           },
           {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "mode",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Dispute",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "filed_by",
-            "type": "pubkey"
-          },
-          {
-            "name": "case_hash",
+            "name": "session_id",
+            "docs": [
+              "Unique session identifier (caller-provided)."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -8981,99 +19599,63 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "status",
-            "type": "u8"
-          },
-          {
-            "name": "required",
-            "type": "u8"
-          },
-          {
-            "name": "count",
-            "type": "u8"
-          },
-          {
-            "name": "validators",
-            "type": {
-              "array": [
-                "pubkey",
-                8
-              ]
-            }
-          },
-          {
-            "name": "filed_at",
-            "type": "i64"
-          },
-          {
-            "name": "frozen_at",
-            "type": "i64"
-          },
-          {
-            "name": "adjudicated_at",
-            "type": "i64"
-          },
-          {
-            "name": "outcome",
-            "type": "u8"
-          },
-          {
-            "name": "new_owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "present_validators",
-            "type": {
-              "array": [
-                "pubkey",
-                8
-              ]
-            }
-          },
-          {
-            "name": "present_count",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "StakePool",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "region_registry",
-            "type": "pubkey"
-          },
-          {
-            "name": "total_staked",
-            "type": "u64"
-          },
-          {
-            "name": "reward_rate_bps",
-            "type": "u16"
-          },
-          {
-            "name": "accumulated_rewards",
-            "type": "u64"
-          },
-          {
-            "name": "reward_per_token_stored",
             "docs": [
-              "Global reward-per-token accumulator, scaled by REWARD_PRECISION (1e9)."
+              "Current session status."
             ],
-            "type": "u64"
+            "type": "u8"
           },
           {
-            "name": "last_reward_distribution",
-            "type": "i64"
+            "name": "opened_by",
+            "docs": [
+              "Participant who opened the session."
+            ],
+            "type": "pubkey"
           },
           {
-            "name": "slash_count",
-            "type": "u32"
+            "name": "evidence_count",
+            "docs": [
+              "Number of evidence items attached."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "observation_count",
+            "docs": [
+              "Number of observations submitted."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "attestation_count",
+            "docs": [
+              "Number of confirmatory attestations."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "dispute_count",
+            "docs": [
+              "Number of disconfirmatory attestations."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required_attestations",
+            "docs": [
+              "Required attestations for quorum."
+            ],
+            "type": "u8"
           },
           {
             "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "closed_at",
             "type": "i64"
           },
           {
@@ -9084,80 +19666,44 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "ValidatorStake",
+      "name": "VerificationSessionClosed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stake_pool",
+            "name": "session",
             "type": "pubkey"
           },
           {
-            "name": "validator",
+            "name": "claim",
             "type": "pubkey"
           },
           {
-            "name": "staked_amount",
-            "type": "u64"
-          },
-          {
-            "name": "unbonding_amount",
-            "type": "u64"
-          },
-          {
-            "name": "unbonding_starts_at",
-            "type": "i64"
-          },
-          {
-            "name": "reward_per_token_paid",
-            "docs": [
-              "Snapshot of the pool's reward_per_token_stored at last claim/deposit."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "rewards_accrued",
-            "type": "u64"
-          },
-          {
-            "name": "slash_history",
+            "name": "status",
             "type": "u8"
           },
           {
-            "name": "offenses",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          },
-          {
-            "name": "updated_at",
+            "name": "closed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "SlashingReport",
+      "name": "VerificationSessionOpened",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stake_pool",
+            "name": "session",
             "type": "pubkey"
           },
           {
-            "name": "reporter",
+            "name": "claim",
             "type": "pubkey"
           },
           {
-            "name": "evidence_hash",
+            "name": "session_id",
             "type": {
               "array": [
                 "u8",
@@ -9166,257 +19712,64 @@ export const terraRegistry: Idl = {
             }
           },
           {
-            "name": "offender",
+            "name": "opened_by",
             "type": "pubkey"
           },
           {
-            "name": "offense_type",
-            "type": "u8"
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WorldRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Global founder \u2014 temporary sole authority during bootstrap phase."
+            ],
+            "type": "pubkey"
           },
           {
-            "name": "offense_details",
+            "name": "allocations",
+            "docs": [
+              "Country allocations: which admin is approved to create a registry",
+              "for which country code."
+            ],
             "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "reporter_bond",
-            "type": "u64"
-          },
-          {
-            "name": "status",
-            "type": "u8"
-          },
-          {
-            "name": "filed_at",
-            "type": "i64"
-          },
-          {
-            "name": "appeal_deadline",
-            "type": "i64"
-          },
-          {
-            "name": "resolved_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "StakePoolCreated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "region_registry",
-            "type": "pubkey"
-          },
-          {
-            "name": "reward_rate_bps",
-            "type": "u16"
-          }
-        ]
-      }
-    },
-    {
-      "name": "StakeDeposited",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UnbondingInitiated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "StakeWithdrawn",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "EquivocationReported",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "evidence_hash",
-            "type": {
-              "array": {
-                "element": "u8",
-                "length": 32
+              "vec": {
+                "defined": {
+                  "name": "CountryAllocation"
+                }
               }
             }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ValidatorSlashed",
+      "name": "WorldRegistryCreated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stake_pool",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "slash_amount",
-            "type": "u64"
-          },
-          {
-            "name": "slash_bps",
-            "type": "u16"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RewardsClaimed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RewardsDistributed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "period_reward",
-            "type": "u64"
-          },
-          {
-            "name": "total_staked",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SlashingAppealed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
-            "type": "pubkey"
-          },
-          {
-            "name": "appeal_reason",
-            "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReportDismissed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stake_pool",
-            "type": "pubkey"
-          },
-          {
-            "name": "reporter",
-            "type": "pubkey"
-          },
-          {
-            "name": "offender",
+            "name": "admin",
             "type": "pubkey"
           }
         ]
@@ -9455,192 +19808,6 @@ export const terraRegistry: Idl = {
       }
     },
     {
-      "name": "OwnershipRoot",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "zone_set",
-            "type": "pubkey"
-          },
-          {
-            "name": "merkle_root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "version",
-            "type": "u32"
-          },
-          {
-            "name": "commitment_count",
-            "type": "u32"
-          },
-          {
-            "name": "algorithm_id",
-            "type": "u8"
-          },
-          {
-            "name": "snapshot_cid",
-            "type": "string"
-          },
-          {
-            "name": "snapshot_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "authority_signature",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "verification_key_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          },
-          {
-            "name": "updated_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "NullifierRecord",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "nullifier_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "zone_set",
-            "type": "pubkey"
-          },
-          {
-            "name": "root_version",
-            "type": "u32"
-          },
-          {
-            "name": "prover",
-            "type": "pubkey"
-          },
-          {
-            "name": "proof_purpose",
-            "type": "string"
-          },
-          {
-            "name": "disclosure_type",
-            "type": "u8"
-          },
-          {
-            "name": "block_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "CourtGuardianshipRequested",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "identity",
-            "type": "pubkey"
-          },
-          {
-            "name": "successor",
-            "type": "pubkey"
-          },
-          {
-            "name": "grace_secs",
-            "type": "i64"
-          },
-          {
-            "name": "required",
-            "type": "u8"
-          },
-          {
-            "name": "count",
-            "type": "u8"
-          },
-          {
-            "name": "effective_at",
-            "type": "i64"
-          },
-          {
-            "name": "case_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "scope_notes",
-            "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "GuardianshipRevoked",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "identity",
-            "type": "pubkey"
-          },
-          {
-            "name": "previous_guardian",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "revoked_by",
-            "type": "pubkey"
-          },
-          {
-            "name": "block_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
       "name": "ZoneSetRegistered",
       "type": {
         "kind": "struct",
@@ -9663,104 +19830,6 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "created_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OwnershipRootUpdated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "zone_set",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_merkle_root",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "version",
-            "type": "u32"
-          },
-          {
-            "name": "commitment_count",
-            "type": "u32"
-          },
-          {
-            "name": "block_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OwnershipProofVerified",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "nullifier_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "zone_set",
-            "type": "pubkey"
-          },
-          {
-            "name": "root_version",
-            "type": "u32"
-          },
-          {
-            "name": "proof_purpose",
-            "type": "string"
-          },
-          {
-            "name": "disclosure_type",
-            "type": "u8"
-          },
-          {
-            "name": "prover",
-            "type": "pubkey"
-          },
-          {
-            "name": "block_time",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ProofVersionInvalidated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "zone_set",
-            "type": "pubkey"
-          },
-          {
-            "name": "stale_version",
-            "type": "u32"
-          },
-          {
-            "name": "current_version",
-            "type": "u32"
-          },
-          {
-            "name": "block_time",
             "type": "i64"
           }
         ]

@@ -107,9 +107,7 @@ pub fn create_guardian_claim(
 
 /// Resolve a guardian claim. Only callable by the original triggerer or
 /// the registry admin. Transitions status to RESOLVED.
-pub fn resolve_guardian_claim(
-    ctx: Context<crate::ResolveGuardianClaim>,
-) -> Result<()> {
+pub fn resolve_guardian_claim(ctx: Context<crate::ResolveGuardianClaim>) -> Result<()> {
     let guardian_claim = &mut ctx.accounts.guardian_claim;
     require!(
         guardian_claim.status == guardian_claim_status::PENDING
@@ -132,9 +130,7 @@ pub fn resolve_guardian_claim(
 
 /// Dispute a guardian claim. Only callable by the identity's owner or
 /// recovery wallet. Transitions status to DISPUTED.
-pub fn dispute_guardian_claim(
-    ctx: Context<crate::DisputeGuardianClaim>,
-) -> Result<()> {
+pub fn dispute_guardian_claim(ctx: Context<crate::DisputeGuardianClaim>) -> Result<()> {
     let guardian_claim = &mut ctx.accounts.guardian_claim;
     require!(
         guardian_claim.status == guardian_claim_status::PENDING

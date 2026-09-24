@@ -53,10 +53,7 @@ pub fn heartbeat(ctx: &mut Context<super::Heartbeat>) -> Result<()> {
     let tracker = &mut ctx.accounts.activity_tracker;
     let registry = &ctx.accounts.registry;
 
-    require!(
-        tracker.registry == registry.key(),
-        TerraError::NotValidator
-    );
+    require!(tracker.registry == registry.key(), TerraError::NotValidator);
     require!(
         registry.validators.contains(&ctx.accounts.validator.key()),
         TerraError::NotValidator
@@ -148,7 +145,9 @@ pub fn queue_emergency_injection(
 }
 
 /// Execute a queued emergency injection after the timelock has elapsed.
-pub fn execute_emergency_injection(ctx: &mut Context<super::ExecuteEmergencyInjection>) -> Result<()> {
+pub fn execute_emergency_injection(
+    ctx: &mut Context<super::ExecuteEmergencyInjection>,
+) -> Result<()> {
     let injection = &mut ctx.accounts.emergency_injection;
     require!(!injection.executed, TerraError::AlreadyEndorsedRotation);
     require!(

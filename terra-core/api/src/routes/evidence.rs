@@ -66,10 +66,7 @@ pub async fn upload_evidence(
     {
         if let Some(name) = field.name() {
             if name == "file" {
-                filename = field
-                    .file_name()
-                    .unwrap_or("unknown")
-                    .to_string();
+                filename = field.file_name().unwrap_or("unknown").to_string();
                 content_type = field
                     .content_type()
                     .unwrap_or("application/octet-stream")
@@ -230,10 +227,7 @@ mod tests {
         };
 
         let data = b"hello terra evidence";
-        let artifact = backend
-            .store("test.txt", "text/plain", data)
-            .await
-            .unwrap();
+        let artifact = backend.store("test.txt", "text/plain", data).await.unwrap();
 
         // Content hash must be SHA-256 of the data.
         let expected_hash: [u8; 32] = sha2::Sha256::digest(data).into();
@@ -258,13 +252,22 @@ mod tests {
             root: tmp.path().to_path_buf(),
         };
 
-        let a1 = backend.store("photo.jpg", "image/jpeg", b"data1").await.unwrap();
-        let a2 = backend.store("photo.jpg", "image/jpeg", b"data2").await.unwrap();
+        let a1 = backend
+            .store("photo.jpg", "image/jpeg", b"data1")
+            .await
+            .unwrap();
+        let a2 = backend
+            .store("photo.jpg", "image/jpeg", b"data2")
+            .await
+            .unwrap();
 
         // Same filename → different UUID prefix → different storage_ref.
         assert_ne!(a1.storage_ref, a2.storage_ref);
         // But same content hash for same data.
-        let a3 = backend.store("photo.jpg", "image/jpeg", b"data1").await.unwrap();
+        let a3 = backend
+            .store("photo.jpg", "image/jpeg", b"data1")
+            .await
+            .unwrap();
         assert_eq!(a1.content_hash, a3.content_hash);
     }
 
@@ -296,7 +299,10 @@ mod tests {
 
         let artifact = backend.store("empty.txt", "text/plain", b"").await.unwrap();
         assert_eq!(artifact.size_bytes, 0);
-        assert_eq!(artifact.content_hash, <[u8; 32]>::from(sha2::Sha256::digest(b"")));
+        assert_eq!(
+            artifact.content_hash,
+            <[u8; 32]>::from(sha2::Sha256::digest(b""))
+        );
     }
 
     #[tokio::test]
@@ -306,7 +312,10 @@ mod tests {
             root: tmp.path().to_path_buf(),
         };
 
-        let artifact = backend.store("doc.pdf", "application/pdf", b"pdf-content").await.unwrap();
+        let artifact = backend
+            .store("doc.pdf", "application/pdf", b"pdf-content")
+            .await
+            .unwrap();
 
         // Storage ref should start with YYYY/MM/DD/
         let today = chrono::Utc::now().format("%Y/%m/%d").to_string();
@@ -344,14 +353,10 @@ mod tests {
         body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
         // Content-Disposition header
         body.extend_from_slice(
-            format!(
-                "Content-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
-            )
-            .as_bytes(),
+            format!("Content-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n")
+                .as_bytes(),
         );
-        body.extend_from_slice(
-            format!("Content-Type: {content_type}\r\n\r\n").as_bytes(),
-        );
+        body.extend_from_slice(format!("Content-Type: {content_type}\r\n\r\n").as_bytes());
         // File content
         body.extend_from_slice(data);
         // Closing boundary
@@ -374,8 +379,8 @@ mod tests {
                         "content-type",
                         "multipart/form-data; boundary=----TerraTestBoundary",
                     )
-                .body(Body::from(body))
-                .unwrap(),
+                    .body(Body::from(body))
+                    .unwrap(),
             )
             .await
             .unwrap();

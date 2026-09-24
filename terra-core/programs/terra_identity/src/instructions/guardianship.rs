@@ -15,7 +15,10 @@ pub fn request_court_guardianship(
     case_hash: [u8; 32],
     scope_notes: String,
 ) -> Result<()> {
-    require!(successor != Pubkey::default(), IdentityError::EmptySuccessor);
+    require!(
+        successor != Pubkey::default(),
+        IdentityError::EmptySuccessor
+    );
     require!(
         !case_hash.iter().all(|b| *b == 0),
         IdentityError::EmptyCaseHash
@@ -93,7 +96,10 @@ pub fn revoke_guardianship(
     ctx: Context<crate::RevokeGuardianship>,
     new_owner: Pubkey,
 ) -> Result<()> {
-    require!(new_owner != Pubkey::default(), IdentityError::EmptySuccessor);
+    require!(
+        new_owner != Pubkey::default(),
+        IdentityError::EmptySuccessor
+    );
 
     let revoker = ctx.accounts.revoker.key();
     let identity = &ctx.accounts.identity;
@@ -136,7 +142,10 @@ pub fn execute_revoke_guardianship(ctx: Context<crate::ExecuteRevokeGuardianship
     );
 
     let new_owner = ctx.accounts.new_owner.key();
-    require!(new_owner != Pubkey::default(), IdentityError::EmptySuccessor);
+    require!(
+        new_owner != Pubkey::default(),
+        IdentityError::EmptySuccessor
+    );
     require!(new_owner != identity.owner, IdentityError::SuccessorIsOwner);
     require!(
         new_owner == identity.pending_new_owner,
