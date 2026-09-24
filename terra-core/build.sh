@@ -13,8 +13,8 @@ cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml 2>&1
 
 echo "==> Generating IDLs..."
 mkdir -p target/idl
-anchor idl build --skip-lint -p terra_registry > target/idl/terra_registry.json
-anchor idl build --skip-lint -p terra_identity > target/idl/terra_identity.json
+anchor idl build --skip-lint -p terra_registry -o target/idl/terra_registry.json
+anchor idl build --skip-lint -p terra_identity -o target/idl/terra_identity.json
 echo "==> Syncing terra_registry IDL to terra-web..."
 cp target/idl/terra_registry.json ../terra-web/src/idl/terra_registry.json
 # Regenerate typed wrapper (JSON → Idl const)

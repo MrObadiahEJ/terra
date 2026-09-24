@@ -425,6 +425,112 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "admin_verify_validator_capability",
+      "discriminator": [
+        136,
+        212,
+        150,
+        72,
+        59,
+        178,
+        184,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "capability",
+          "writable": true
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "capability_code",
+          "type": "u8"
+        },
+        {
+          "name": "level",
+          "type": "u8"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "allocate_country",
       "discriminator": [
         110,
@@ -2164,6 +2270,111 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "create_validator_relationship_edge",
+      "discriminator": [
+        174,
+        195,
+        231,
+        155,
+        189,
+        138,
+        224,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "edge",
+          "writable": true
+        },
+        {
+          "name": "from_profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "from_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "to_profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "to_profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "from_wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "edge_type",
+          "type": "u8"
+        },
+        {
+          "name": "weight_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "create_vault",
       "discriminator": [
         29,
@@ -2305,6 +2516,86 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "declare_validator_capability",
+      "discriminator": [
+        13,
+        57,
+        210,
+        102,
+        203,
+        195,
+        88,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "capability",
+          "writable": true
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "capability_code",
+          "type": "u8"
+        },
+        {
+          "name": "level",
+          "type": "u8"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "deposit_escrow",
@@ -4418,6 +4709,79 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "init_validator_profile",
+      "discriminator": [
+        135,
+        94,
+        41,
+        156,
+        111,
+        202,
+        31,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "identity_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "note",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "initialize_validator_reputation",
@@ -8668,6 +9032,314 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "set_validator_availability",
+      "discriminator": [
+        136,
+        107,
+        121,
+        13,
+        81,
+        250,
+        155,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "availability",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  97,
+                  118,
+                  97,
+                  105,
+                  108,
+                  97,
+                  98,
+                  105,
+                  108,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "set_validator_presence",
+      "discriminator": [
+        201,
+        97,
+        31,
+        245,
+        58,
+        238,
+        77,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "presence",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  101,
+                  115,
+                  101,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "latitude_e7",
+          "type": "i32"
+        },
+        {
+          "name": "longitude_e7",
+          "type": "i32"
+        },
+        {
+          "name": "accuracy_m",
+          "type": "u16"
+        },
+        {
+          "name": "provenance",
+          "type": "u8"
+        },
+        {
+          "name": "confidence_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_validator_profile_tier",
+      "discriminator": [
+        95,
+        3,
+        115,
+        155,
+        232,
+        27,
+        37,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "tier",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "settle_escrow",
       "discriminator": [
         22,
@@ -9467,6 +10139,135 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "suspend_validator_availability",
+      "discriminator": [
+        202,
+        137,
+        242,
+        150,
+        150,
+        167,
+        83,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "availability",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  97,
+                  118,
+                  97,
+                  105,
+                  108,
+                  97,
+                  98,
+                  105,
+                  108,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "profile.wallet",
+                "account": "ValidatorProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "sweep_expired_rights",
       "discriminator": [
         174,
@@ -9850,6 +10651,74 @@ export const terraRegistry: Idl = {
         {
           "name": "status",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_validator_profile",
+      "discriminator": [
+        31,
+        20,
+        102,
+        26,
+        128,
+        98,
+        167,
+        153
+      ],
+      "accounts": [
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "identity_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "note",
+          "type": "string"
         }
       ]
     },
@@ -11281,6 +12150,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ValidatorAvailability",
+      "discriminator": [
+        113,
+        127,
+        178,
+        236,
+        25,
+        220,
+        94,
+        89
+      ]
+    },
+    {
+      "name": "ValidatorCapability",
+      "discriminator": [
+        119,
+        194,
+        253,
+        171,
+        190,
+        211,
+        118,
+        50
+      ]
+    },
+    {
       "name": "ValidatorEndorsement",
       "discriminator": [
         140,
@@ -11307,6 +12202,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ValidatorPresence",
+      "discriminator": [
+        49,
+        114,
+        241,
+        63,
+        232,
+        95,
+        50,
+        90
+      ]
+    },
+    {
+      "name": "ValidatorProfile",
+      "discriminator": [
+        50,
+        223,
+        146,
+        114,
+        220,
+        208,
+        127,
+        86
+      ]
+    },
+    {
       "name": "ValidatorRegistry",
       "discriminator": [
         168,
@@ -11317,6 +12238,19 @@ export const terraRegistry: Idl = {
         121,
         163,
         230
+      ]
+    },
+    {
+      "name": "ValidatorRelationshipEdge",
+      "discriminator": [
+        128,
+        240,
+        223,
+        172,
+        123,
+        148,
+        81,
+        48
       ]
     },
     {
@@ -12609,6 +13543,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "ValidatorAvailabilityChanged",
+      "discriminator": [
+        149,
+        204,
+        226,
+        1,
+        214,
+        220,
+        195,
+        72
+      ]
+    },
+    {
+      "name": "ValidatorCapabilityDeclared",
+      "discriminator": [
+        147,
+        147,
+        83,
+        152,
+        88,
+        217,
+        69,
+        182
+      ]
+    },
+    {
       "name": "ValidatorEndorsed",
       "discriminator": [
         117,
@@ -12658,6 +13618,71 @@ export const terraRegistry: Idl = {
         57,
         36,
         155
+      ]
+    },
+    {
+      "name": "ValidatorPresenceUpdated",
+      "discriminator": [
+        34,
+        86,
+        135,
+        229,
+        6,
+        7,
+        121,
+        145
+      ]
+    },
+    {
+      "name": "ValidatorProfileInitialized",
+      "discriminator": [
+        249,
+        2,
+        119,
+        241,
+        158,
+        220,
+        204,
+        172
+      ]
+    },
+    {
+      "name": "ValidatorProfileTierChanged",
+      "discriminator": [
+        208,
+        17,
+        40,
+        237,
+        187,
+        190,
+        27,
+        108
+      ]
+    },
+    {
+      "name": "ValidatorProfileUpdated",
+      "discriminator": [
+        40,
+        88,
+        228,
+        225,
+        76,
+        214,
+        134,
+        24
+      ]
+    },
+    {
+      "name": "ValidatorRelationshipEdgeCreated",
+      "discriminator": [
+        32,
+        95,
+        29,
+        62,
+        146,
+        177,
+        5,
+        100
       ]
     },
     {
@@ -13630,6 +14655,51 @@ export const terraRegistry: Idl = {
       "code": 6159,
       "name": "DuplicateValidator",
       "msg": "Duplicate validator in the declared validator set"
+    },
+    {
+      "code": 6160,
+      "name": "StringTooLong",
+      "msg": "Profile note exceeds maximum length"
+    },
+    {
+      "code": 6161,
+      "name": "InvalidProfileTier",
+      "msg": "Invalid validator profile tier"
+    },
+    {
+      "code": 6162,
+      "name": "InvalidPresenceProvenance",
+      "msg": "Invalid presence provenance code"
+    },
+    {
+      "code": 6163,
+      "name": "InvalidPresenceFix",
+      "msg": "Presence fix is outside valid geographic bounds"
+    },
+    {
+      "code": 6164,
+      "name": "InvalidAvailabilityStatus",
+      "msg": "Invalid availability status"
+    },
+    {
+      "code": 6165,
+      "name": "InvalidCapabilityCode",
+      "msg": "Invalid capability code"
+    },
+    {
+      "code": 6166,
+      "name": "InvalidCapabilityLevel",
+      "msg": "Invalid capability level"
+    },
+    {
+      "code": 6167,
+      "name": "InvalidEdgeType",
+      "msg": "Invalid relationship edge type"
+    },
+    {
+      "code": 6168,
+      "name": "SelfRelationshipEdge",
+      "msg": "Self-relationship edges are not allowed"
     }
   ],
   "types": [
@@ -18633,6 +19703,136 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "ValidatorAvailability",
+      "docs": [
+        "Current availability state (distinct from reputation jail).",
+        "",
+        "PDA: `[\"validator_availability\", wallet]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "One of `availability_status`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorAvailabilityChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorCapability",
+      "docs": [
+        "Declared/verified capability for one capability code.",
+        "",
+        "PDA: `[\"validator_capability\", wallet, capability_code]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "capability_code",
+            "docs": [
+              "Capability code (`capability_code`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "level",
+            "docs": [
+              "Confidence level (`capability_level`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "evidence_hash",
+            "docs": [
+              "Optional evidence hash backing a VERIFIED/TRUSTED claim (0 = none)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "declared_at",
+            "type": "i64"
+          },
+          {
+            "name": "verified_at",
+            "docs": [
+              "0 until verified; set when level reaches VERIFIED or above."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorCapabilityDeclared",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "level",
+            "type": "u8"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ValidatorEndorsed",
       "type": {
         "kind": "struct",
@@ -18878,6 +20078,218 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "ValidatorPresence",
+      "docs": [
+        "Dynamic geographic presence \u2014 timestamped, confidence-scored, expiring.",
+        "",
+        "Never treat as immutable identity. PDA: `[\"validator_presence\", wallet]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "latitude_e7",
+            "docs": [
+              "Latitude in degrees * 1e7 (i32) \u2014 compact fixed-point."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "longitude_e7",
+            "docs": [
+              "Longitude in degrees * 1e7."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "accuracy_m",
+            "docs": [
+              "Horizontal accuracy in meters."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "provenance",
+            "docs": [
+              "How the fix was obtained (`presence_provenance`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "confidence_bps",
+            "docs": [
+              "Confidence in this presence fix (0\u201310000 bps)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "observed_at",
+            "docs": [
+              "When this fix was recorded."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "After this time the presence is stale (observed_at + TTL)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorPresenceUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "provenance",
+            "type": "u8"
+          },
+          {
+            "name": "confidence_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorProfile",
+      "docs": [
+        "Core validator profile \u2014 identity + tier attributes (not location-bound).",
+        "",
+        "PDA: `[\"validator_profile\", wallet]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "docs": [
+              "The validator's wallet (mobile participant \u2014 NOT a region)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "docs": [
+              "Trust tier (`profile_tier`). Starts NEW; admin/governance promotes."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "identity_hash",
+            "docs": [
+              "Optional link to an off-chain/on-chain identity hash (0 = unset)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "note",
+            "docs": [
+              "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorProfileInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "initialized_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorProfileTierChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_tier",
+            "type": "u8"
+          },
+          {
+            "name": "new_tier",
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorProfileUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ValidatorRegistry",
       "type": {
         "kind": "struct",
@@ -18932,6 +20344,74 @@ export const terraRegistry: Idl = {
           {
             "name": "updated_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRelationshipEdge",
+      "docs": [
+        "Directed relationship graph edge (endorsement / co-validation / infra).",
+        "",
+        "Correlation \u2260 fraud \u2014 used for review, not auto-punishment (RFC-012 \u00a76.12).",
+        "PDA: `[\"validator_edge\", from, to, edge_type]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "edge_type",
+            "docs": [
+              "One of `relationship_edge_type`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "weight_bps",
+            "docs": [
+              "Optional strength (0\u201310000 bps); default 10000 for binary endorsement."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorRelationshipEdgeCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "edge_type",
+            "type": "u8"
+          },
+          {
+            "name": "weight_bps",
+            "type": "u16"
           }
         ]
       }

@@ -234,13 +234,13 @@ Verified on `dev` (2026-09-24): registry lib 62/62, identity lib 6/6, rfc012 21/
 - All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).
 - RFC-012 **Phase 0** (architecture contract + `rfc012_structure` tests) and **Phase 1** (security hardening: unique validator sets, endorsement action binding, `remaining_accounts` ownership checks, admin constraints) — details in [SECURITY.md](SECURITY.md).
 - **A1 security residuals** (2026-09-24): M-2 foreign-entity audit guard, C-4 session-record signers + registry, L-1 `dec_rights_count`; unit + BPF tests green.
-- **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; `make idl`/`build.sh` now use `anchor idl build -p …`.
+- **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; **Phase 2** re-synced to **128/49/115/169**; `make idl`/`build.sh` now use `anchor idl build -p …`.
 - **A3 test/CI baseline** (2026-09-24): fixed `StoredArtifact` API test compile break; CI runs identity lib + rfc012 + geo; `make test-fast` for constrained machines.
 - PostGIS mirror API (23 routes, migrations `0001`…`0024`) + geo-engine + workspace CI green on `dev`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of A2 (119/44/108/160, 2026-09-24).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160; Phase 2, 128/49/115/169).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of Phase 2 (128/49/115/169, 2026-09-24).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
@@ -250,7 +250,7 @@ Anyone picking this up: start from root [README.md](../README.md) Status + Devne
 
 ## Error Codes
 
-- **terra_registry:** 160 custom error codes (`TerraError` in `lib.rs`).
+- **terra_registry:** 169 custom error codes (`TerraError` in `lib.rs`).
 - **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License

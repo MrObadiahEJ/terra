@@ -22931,3 +22931,435 @@ async fn p0_2_removal_duplicate_endorser_rejected() {
         "duplicate endorser on removal must be rejected"
     );
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 2 — validator profile / presence / availability / capability
+// ---------------------------------------------------------------------------
+
+fn validator_profile_pda(wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"validator_profile", wallet.as_ref()], &PROGRAM_ID)
+}
+
+fn validator_presence_pda(wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"validator_presence", wallet.as_ref()], &PROGRAM_ID)
+}
+
+fn validator_availability_pda(wallet: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"validator_availability", wallet.as_ref()], &PROGRAM_ID)
+}
+
+fn validator_capability_pda(wallet: &Pubkey, capability_code: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"validator_capability", wallet.as_ref(), &[capability_code]],
+        &PROGRAM_ID,
+    )
+}
+
+fn validator_edge_pda(from: &Pubkey, to: &Pubkey, edge_type: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"validator_edge", from.as_ref(), to.as_ref(), &[edge_type]],
+        &PROGRAM_ID,
+    )
+}
+
+#[tokio::test]
+async fn phase2_init_profile_and_presence() {
+    use terra_registry::validator_profile::{self, ValidatorPresence, ValidatorProfile};
+
+    let (mut ctx, payer) = setup().await;
+    let (profile_pk, _) = validator_profile_pda(&payer.pubkey());
+    let (presence_pk, _) = validator_presence_pda(&payer.pubkey());
+
+    // Init profile (self-onboarding, tier NEW).
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]); // identity_hash
+    data.extend_from_slice(&borsh_ser(&"mobile-node".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init_validator_profile failed");
+
+    let profile: ValidatorProfile = read_account(&ctx, profile_pk).await;
+    assert_eq!(profile.wallet, payer.pubkey());
+    assert_eq!(profile.tier, validator_profile::profile_tier::NEW);
+    assert_eq!(profile.note, "mobile-node");
+
+    // Set presence (Yaoundé-ish coords).
+    let mut data = discriminator("global", "set_validator_presence").to_vec();
+    data.extend_from_slice(&387_500_000i32.to_le_bytes()); // lat e7
+    data.extend_from_slice(&121_500_000i32.to_le_bytes()); // lon e7
+    data.extend_from_slice(&15u16.to_le_bytes()); // accuracy_m
+    data.push(validator_profile::presence_provenance::DEVICE_GNSS);
+    data.extend_from_slice(&8000u16.to_le_bytes()); // confidence
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(presence_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set_validator_presence failed");
+
+    let presence: ValidatorPresence = read_account(&ctx, presence_pk).await;
+    assert_eq!(presence.wallet, payer.pubkey());
+    assert_eq!(presence.latitude_e7, 387_500_000);
+    assert_eq!(
+        presence.provenance,
+        validator_profile::presence_provenance::DEVICE_GNSS
+    );
+    assert!(presence.expires_at > presence.observed_at);
+}
+
+#[tokio::test]
+async fn phase2_presence_rejects_stranger_signer() {
+    let (mut ctx, payer) = setup().await;
+    let stranger = Keypair::new();
+    // Fund stranger for fees.
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund stranger failed");
+
+    let (profile_pk, _) = validator_profile_pda(&payer.pubkey());
+    let (presence_pk, _) = validator_presence_pda(&payer.pubkey());
+
+    // Profile exists under payer's wallet seeds; stranger cannot satisfy
+    // `profile.wallet == wallet.key()` constraint when wallet is stranger.
+    // Use payer's profile but stranger as wallet signer → constraint fails.
+    let mut data = discriminator("global", "set_validator_presence").to_vec();
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&10u16.to_le_bytes());
+    data.push(0u8);
+    data.extend_from_slice(&5000u16.to_le_bytes());
+
+    // Init profile as payer first so account exists under correct seeds.
+    let mut init = discriminator("global", "init_validator_profile").to_vec();
+    init.extend_from_slice(&[0u8; 32]);
+    init.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: init,
+        },
+    )
+    .await
+    .expect("init profile failed");
+
+    // Stranger tries to publish presence on payer's profile — seeds use
+    // profile.wallet (payer) but wallet account is stranger → constraint fails.
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(presence_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(stranger.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "stranger must not publish presence");
+}
+
+#[tokio::test]
+async fn phase2_declare_capability_then_admin_verify() {
+    use terra_registry::validator_profile::{self, ValidatorCapability, ValidatorProfile};
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator failed");
+
+    // Init profile for validator (self).
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[1u8; 32]);
+    data.extend_from_slice(&borsh_ser(&"surveyor".to_string()));
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile failed");
+
+    // Self-declare GNSS at DECLARED.
+    let code = validator_profile::capability_code::GNSS;
+    let (cap_pk, _) = validator_capability_pda(&validator.pubkey(), code);
+    let mut data = discriminator("global", "declare_validator_capability").to_vec();
+    data.push(code);
+    data.push(validator_profile::capability_level::DECLARED);
+    data.extend_from_slice(&[0u8; 32]);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("declare capability failed");
+
+    let cap: ValidatorCapability = read_account(&ctx, cap_pk).await;
+    assert_eq!(cap.level, validator_profile::capability_level::DECLARED);
+    assert_eq!(cap.verified_at, 0);
+
+    // Self cannot claim VERIFIED.
+    let mut data = discriminator("global", "declare_validator_capability").to_vec();
+    data.push(code);
+    data.push(validator_profile::capability_level::VERIFIED);
+    data.extend_from_slice(&[9u8; 32]);
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "self must not claim VERIFIED");
+
+    // Admin verifies.
+    let mut data = discriminator("global", "admin_verify_validator_capability").to_vec();
+    data.push(code);
+    data.push(validator_profile::capability_level::VERIFIED);
+    data.extend_from_slice(&[9u8; 32]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("admin verify failed");
+
+    let cap: ValidatorCapability = read_account(&ctx, cap_pk).await;
+    assert_eq!(cap.level, validator_profile::capability_level::VERIFIED);
+    assert!(cap.verified_at > 0);
+}
+
+#[tokio::test]
+async fn phase2_availability_and_edge() {
+    use terra_registry::validator_profile::{
+        self, ValidatorAvailability, ValidatorProfile, ValidatorRelationshipEdge,
+    };
+
+    let (mut ctx, payer) = setup().await;
+    let alice = Keypair::new();
+    let bob = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &alice.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund alice");
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &bob.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund bob");
+
+    // Init both profiles.
+    for kp in [&alice, &bob] {
+        let (profile_pk, _) = validator_profile_pda(&kp.pubkey());
+        let mut data = discriminator("global", "init_validator_profile").to_vec();
+        data.extend_from_slice(&[0u8; 32]);
+        data.extend_from_slice(&borsh_ser(&String::new()));
+        process(
+            &mut ctx,
+            kp,
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: vec![
+                    AccountMeta::new(profile_pk, false),
+                    AccountMeta::new(kp.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                data,
+            },
+        )
+        .await
+        .expect("init profile");
+    }
+
+    // Alice sets AVAILABLE.
+    let (avail_pk, _) = validator_availability_pda(&alice.pubkey());
+    let (alice_profile, _) = validator_profile_pda(&alice.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &alice,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(alice_profile, false),
+                AccountMeta::new(alice.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    let av: ValidatorAvailability = read_account(&ctx, avail_pk).await;
+    assert_eq!(av.status, validator_profile::availability_status::AVAILABLE);
+
+    // Alice cannot set SUSPENDED on herself.
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::SUSPENDED);
+    let res = process(
+        &mut ctx,
+        &alice,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(alice_profile, false),
+                AccountMeta::new(alice.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "wallet must not self-suspend");
+
+    // Alice endorses Bob (relationship edge).
+    let (bob_profile, _) = validator_profile_pda(&bob.pubkey());
+    let (edge_pk, _) = validator_edge_pda(
+        &alice.pubkey(),
+        &bob.pubkey(),
+        validator_profile::relationship_edge_type::ENDORSEMENT,
+    );
+    let mut data = discriminator("global", "create_validator_relationship_edge").to_vec();
+    data.push(validator_profile::relationship_edge_type::ENDORSEMENT);
+    data.extend_from_slice(&10000u16.to_le_bytes());
+    process(
+        &mut ctx,
+        &alice,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(edge_pk, false),
+                AccountMeta::new_readonly(alice_profile, false),
+                AccountMeta::new_readonly(bob_profile, false),
+                AccountMeta::new(alice.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create edge");
+
+    let edge: ValidatorRelationshipEdge = read_account(&ctx, edge_pk).await;
+    assert_eq!(edge.from, alice.pubkey());
+    assert_eq!(edge.to, bob.pubkey());
+    assert_eq!(
+        edge.edge_type,
+        validator_profile::relationship_edge_type::ENDORSEMENT
+    );
+
+    // Self-edge rejected.
+    let (self_edge, _) = validator_edge_pda(
+        &alice.pubkey(),
+        &alice.pubkey(),
+        validator_profile::relationship_edge_type::ENDORSEMENT,
+    );
+    let mut data = discriminator("global", "create_validator_relationship_edge").to_vec();
+    data.push(validator_profile::relationship_edge_type::ENDORSEMENT);
+    data.extend_from_slice(&10000u16.to_le_bytes());
+    let res = process(
+        &mut ctx,
+        &alice,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(self_edge, false),
+                AccountMeta::new_readonly(alice_profile, false),
+                AccountMeta::new_readonly(alice_profile, false),
+                AccountMeta::new(alice.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(res.is_err(), "self-edge must be rejected");
+}

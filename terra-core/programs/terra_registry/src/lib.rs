@@ -300,6 +300,7 @@ pub mod recovery;
 pub mod staking;
 pub mod subdivision;
 pub mod time_bound;
+pub mod validator_profile;
 pub mod validator_registry;
 pub mod vault;
 pub mod verification;
@@ -2040,6 +2041,96 @@ pub mod terra_registry {
 
     pub fn slash_validator(ctx: Context<SlashValidator>, reputation_penalty: u16) -> Result<()> {
         verification::reputation::slash_validator(ctx, reputation_penalty)
+    }
+
+    // -----------------------------------------------------------------------
+    // Validator profile / presence / availability / capability / edges
+    // (RFC-012 Phase 2 — generalized validator PDAs)
+    // -----------------------------------------------------------------------
+
+    pub fn init_validator_profile(
+        ctx: Context<InitValidatorProfile>,
+        identity_hash: [u8; 32],
+        note: String,
+    ) -> Result<()> {
+        validator_profile::init_validator_profile(ctx, identity_hash, note)
+    }
+
+    pub fn update_validator_profile(
+        ctx: Context<UpdateValidatorProfile>,
+        identity_hash: [u8; 32],
+        note: String,
+    ) -> Result<()> {
+        validator_profile::update_validator_profile(ctx, identity_hash, note)
+    }
+
+    pub fn set_validator_profile_tier(
+        ctx: Context<SetValidatorProfileTier>,
+        tier: u8,
+    ) -> Result<()> {
+        validator_profile::set_validator_profile_tier(ctx, tier)
+    }
+
+    pub fn set_validator_presence(
+        ctx: Context<SetValidatorPresence>,
+        latitude_e7: i32,
+        longitude_e7: i32,
+        accuracy_m: u16,
+        provenance: u8,
+        confidence_bps: u16,
+    ) -> Result<()> {
+        validator_profile::set_validator_presence(
+            ctx,
+            latitude_e7,
+            longitude_e7,
+            accuracy_m,
+            provenance,
+            confidence_bps,
+        )
+    }
+
+    pub fn set_validator_availability(
+        ctx: Context<SetValidatorAvailability>,
+        status: u8,
+    ) -> Result<()> {
+        validator_profile::set_validator_availability(ctx, status)
+    }
+
+    pub fn suspend_validator_availability(
+        ctx: Context<SuspendValidatorAvailability>,
+    ) -> Result<()> {
+        validator_profile::suspend_validator_availability(ctx)
+    }
+
+    pub fn declare_validator_capability(
+        ctx: Context<DeclareValidatorCapability>,
+        capability_code: u8,
+        level: u8,
+        evidence_hash: [u8; 32],
+    ) -> Result<()> {
+        validator_profile::declare_validator_capability(ctx, capability_code, level, evidence_hash)
+    }
+
+    pub fn admin_verify_validator_capability(
+        ctx: Context<AdminVerifyValidatorCapability>,
+        capability_code: u8,
+        level: u8,
+        evidence_hash: [u8; 32],
+    ) -> Result<()> {
+        validator_profile::admin_verify_validator_capability(
+            ctx,
+            capability_code,
+            level,
+            evidence_hash,
+        )
+    }
+
+    pub fn create_validator_relationship_edge(
+        ctx: Context<CreateValidatorRelationshipEdge>,
+        edge_type: u8,
+        weight_bps: u16,
+    ) -> Result<()> {
+        validator_profile::create_validator_relationship_edge(ctx, edge_type, weight_bps)
     }
 
     // -----------------------------------------------------------------------
@@ -3994,6 +4085,199 @@ pub struct SlashValidator<'info> {
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Validator profile contexts (RFC-012 Phase 2)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct InitValidatorProfile<'info> {
+    #[account(
+        init,
+        payer = wallet,
+        space = 8 + validator_profile::ValidatorProfile::INIT_SPACE,
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateValidatorProfile<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+        constraint = profile.wallet == wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub wallet: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetValidatorProfileTier<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_profile", profile.wallet.as_ref()],
+        bump,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetValidatorPresence<'info> {
+    #[account(
+        init_if_needed,
+        payer = wallet,
+        space = 8 + validator_profile::ValidatorPresence::INIT_SPACE,
+        seeds = [b"validator_presence", profile.wallet.as_ref()],
+        bump,
+    )]
+    pub presence: Account<'info, validator_profile::ValidatorPresence>,
+    #[account(
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+        constraint = profile.wallet == wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetValidatorAvailability<'info> {
+    #[account(
+        init_if_needed,
+        payer = wallet,
+        space = 8 + validator_profile::ValidatorAvailability::INIT_SPACE,
+        seeds = [b"validator_availability", profile.wallet.as_ref()],
+        bump,
+    )]
+    pub availability: Account<'info, validator_profile::ValidatorAvailability>,
+    #[account(
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+        constraint = profile.wallet == wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SuspendValidatorAvailability<'info> {
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = 8 + validator_profile::ValidatorAvailability::INIT_SPACE,
+        seeds = [b"validator_availability", profile.wallet.as_ref()],
+        bump,
+    )]
+    pub availability: Account<'info, validator_profile::ValidatorAvailability>,
+    #[account(seeds = [b"validator_profile", profile.wallet.as_ref()], bump)]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        mut,
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(capability_code: u8, _level: u8, _evidence_hash: [u8; 32])]
+pub struct DeclareValidatorCapability<'info> {
+    #[account(
+        init_if_needed,
+        payer = wallet,
+        space = 8 + validator_profile::ValidatorCapability::INIT_SPACE,
+        seeds = [
+            b"validator_capability",
+            profile.wallet.as_ref(),
+            &[capability_code],
+        ],
+        bump,
+    )]
+    pub capability: Account<'info, validator_profile::ValidatorCapability>,
+    #[account(
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+        constraint = profile.wallet == wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(capability_code: u8, _level: u8, _evidence_hash: [u8; 32])]
+pub struct AdminVerifyValidatorCapability<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_capability",
+            profile.wallet.as_ref(),
+            &[capability_code],
+        ],
+        bump,
+    )]
+    pub capability: Account<'info, validator_profile::ValidatorCapability>,
+    #[account(seeds = [b"validator_profile", profile.wallet.as_ref()], bump)]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    #[account(
+        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
+    )]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(edge_type: u8, _weight_bps: u16)]
+pub struct CreateValidatorRelationshipEdge<'info> {
+    #[account(
+        init_if_needed,
+        payer = from_wallet,
+        space = 8 + validator_profile::ValidatorRelationshipEdge::INIT_SPACE,
+        seeds = [
+            b"validator_edge",
+            from_profile.wallet.as_ref(),
+            to_profile.wallet.as_ref(),
+            &[edge_type],
+        ],
+        bump,
+    )]
+    pub edge: Account<'info, validator_profile::ValidatorRelationshipEdge>,
+    #[account(
+        seeds = [b"validator_profile", from_wallet.key().as_ref()],
+        bump,
+        constraint = from_profile.wallet == from_wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub from_profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(seeds = [b"validator_profile", to_profile.wallet.as_ref()], bump)]
+    pub to_profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub from_wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Challenge / Audit contexts
+// ---------------------------------------------------------------------------
+
 #[derive(Accounts)]
 pub struct FileChallenge<'info> {
     #[account(
@@ -4795,6 +5079,63 @@ pub struct ReputationSlashed {
 }
 
 // ---------------------------------------------------------------------------
+// Validator profile events (RFC-012 Phase 2)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct ValidatorProfileInitialized {
+    pub wallet: Pubkey,
+    pub tier: u8,
+    pub initialized_at: i64,
+}
+
+#[event]
+pub struct ValidatorProfileUpdated {
+    pub wallet: Pubkey,
+    pub tier: u8,
+    pub updated_at: i64,
+}
+
+#[event]
+pub struct ValidatorProfileTierChanged {
+    pub wallet: Pubkey,
+    pub old_tier: u8,
+    pub new_tier: u8,
+    pub updated_at: i64,
+}
+
+#[event]
+pub struct ValidatorPresenceUpdated {
+    pub wallet: Pubkey,
+    pub provenance: u8,
+    pub confidence_bps: u16,
+    pub expires_at: i64,
+}
+
+#[event]
+pub struct ValidatorAvailabilityChanged {
+    pub wallet: Pubkey,
+    pub status: u8,
+    pub updated_at: i64,
+}
+
+#[event]
+pub struct ValidatorCapabilityDeclared {
+    pub wallet: Pubkey,
+    pub capability_code: u8,
+    pub level: u8,
+    pub verified_at: i64,
+}
+
+#[event]
+pub struct ValidatorRelationshipEdgeCreated {
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub edge_type: u8,
+    pub weight_bps: u16,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -5333,6 +5674,26 @@ pub enum TerraError {
     // P1: unique validator sets
     #[msg("Duplicate validator in the declared validator set")]
     DuplicateValidator,
+
+    // RFC-012 Phase 2: validator profile PDAs
+    #[msg("Profile note exceeds maximum length")]
+    StringTooLong,
+    #[msg("Invalid validator profile tier")]
+    InvalidProfileTier,
+    #[msg("Invalid presence provenance code")]
+    InvalidPresenceProvenance,
+    #[msg("Presence fix is outside valid geographic bounds")]
+    InvalidPresenceFix,
+    #[msg("Invalid availability status")]
+    InvalidAvailabilityStatus,
+    #[msg("Invalid capability code")]
+    InvalidCapabilityCode,
+    #[msg("Invalid capability level")]
+    InvalidCapabilityLevel,
+    #[msg("Invalid relationship edge type")]
+    InvalidEdgeType,
+    #[msg("Self-relationship edges are not allowed")]
+    SelfRelationshipEdge,
 }
 
 #[cfg(test)]

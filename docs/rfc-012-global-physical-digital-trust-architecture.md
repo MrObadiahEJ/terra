@@ -1,14 +1,14 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
-**Status:** Accepted (Phases 0–1 complete on `dev`; Phases 2–10 pending)  
+**Status:** Accepted (Phases 0–2 complete on `dev`; Phases 3–10 pending)  
 **Created:** 2026-09-22  
-**Updated:** 2026-09-23  
+**Updated:** 2026-09-24  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
 **Related:** RFC-004 (escrow), RFC-005 (staking), RFC-007 (disputes), RFC-011 (ZK)
 
 **Entry for a new contributor or agent:** read §8.1 (Handoff) first, then §8 (phase table), §9 (migration map), §10 (PDA sketch). Do not invent source counts — see `terra-core/docs/architecture.md` (verified 2026-09-23).
 
-**Phase 0 (this document + migration map + structural tests)** and **Phase 1 (security hardening)** are complete:
+**Phase 0 (this document + migration map + structural tests)**, **Phase 1 (security hardening)**, and **Phase 2 (generalized validator PDAs)** are complete:
 
 - Unique validator sets enforced on succession, guardianship, attest, rotate, forfeit, dispute, escrow (`DuplicateValidator`).
 - Endorsement action binding on `endorse_validator_add` (`WrongEndorsementAction`).
@@ -214,7 +214,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 |-------|------|--------|------------------|
 | **0** | Architecture contract | **Done** | This RFC + migration map + structural tests (`rfc012_structure.rs` 21/21) |
 | **1** | Secure current core | **Done** | Succession/guardianship duplicate endorsements, unique validator sets, endorsement action binding, remaining_accounts ownership audit, canonical ownership (is_authorized_owner), admin constraints on jail/reputation/ZK/dispute/cross-border/guardian paths; escrow invariants — see SECURITY.md |
-| **2** | Generalize validator | **Next** | `Validator = identity + reputation + capabilities + dynamic presence + availability + relationships` — start from §8.1, §9, §10 |
+| **2** | Generalize validator | **Complete** (2026-09-24) | `ValidatorProfile`/`Presence`/`Availability`/`Capability`/`RelationshipEdge` PDAs + 9 instructions, 5 accounts, 7 events, 9 errors; unit + BPF tests green; IDL 128/49/115/169 |
 | **3** | Introduce tasks | Pending | `Task → requirements → routing → assignment → verification → reward` |
 | **4** | Introduce observations | Pending | Multi-source: phone, GNSS, drone, satellite, document, human |
 | **5** | Evidence/provenance | Pending | Separate subject / capture_device / submitter roles |
@@ -224,21 +224,23 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Before starting Phase 2 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of A2 2026-09-24 it is 119/44/108/160 with A1 session-record accounts) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 2 is complete on `dev` (2026-09-24). Before starting Phase 3 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 2 2026-09-24 it is 128/49/115/169 with A1 session-record accounts + Phase 2 validator-profile PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
-## 8.1. Handoff: how to start Phase 2 (no prior context required)
+## 8.1. Handoff: Phase 2 complete; how to start Phase 3
 
 **Already done (do not redo):** Phase 0 structural tests (`terra-core/programs/terra_registry/tests/rfc012_structure.rs`, 21 tests); Phase 1 unique-validator sets, endorsement action binding, remaining-accounts owner checks, admin constraints — verified list in `terra-core/SECURITY.md` “Phase 1 additions”.
 
-**Immediate next actions before/while starting Phase 2:**
-1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 2 deliverable is `Validator` as a PDA with capability/presence/availability/relationship edges, while keeping `ValidatorRegistry` as an index.
-2. Checked-in IDL was refreshed in A2 (119/44/108/160); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+**Phase 2 delivered (2026-09-24):** `validator_profile.rs` module with `ValidatorProfile`, `ValidatorPresence`, `ValidatorAvailability`, `ValidatorCapability`, `ValidatorRelationshipEdge` accounts; instructions `init/update/set_tier` profile, `set_presence`, `set/suspend_availability`, `declare/admin_verify_capability`, `create_relationship_edge`; 6 lib unit tests + 4 BPF integration tests in `integration.rs` (`phase2_*`). Guards: self-init at tier NEW only, admin-only tier changes, SUSPENDED reserved for admin, VERIFIED/TRUSTED capability admin-only, self-edge rejected.
+
+**Immediate next actions for Phase 3:**
+1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 2 delivered `ValidatorProfile` etc. as PDAs while keeping `ValidatorRegistry` as an index; Phase 3 (tasks) should follow the same pattern.
+2. Checked-in IDL was refreshed in A2 (119/44/108/160) and Phase 2 (128/49/115/169); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 
-**Phase order:** 2 (validator) → 3 (tasks) → 4 (observations) → 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
+**Phase order (next):** 3 (tasks) → 4 (observations) → 5 (evidence provenance) → 6 (routing) → 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
 
 ---
 
