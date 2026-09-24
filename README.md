@@ -10,10 +10,9 @@
 
 ## What Terra Is
 
-Terra is a **claim/verification/evidence network** for land and property. It is not an authority-based registry. The distinction is fundamental:
+Terra is a **claim/verification/evidence network** for land and property:
 
-- **Authority-based registry:** Requires a government or institution to register parcels before anyone can use the system. No authority → no parcels → no claims.
-- **Terra's claim network:** Anyone can create a claim about any parcel. Validators independently evaluate evidence. The protocol records attestations and builds immutable history. Claims ≠ Facts — the protocol verifies claims, not legal ownership.
+- Anyone can create a claim about any parcel. Validators independently evaluate evidence. The protocol records attestations and builds immutable history. Claims ≠ Facts — the protocol verifies claims, not legal ownership.
 
 **Core data model:**
 
@@ -33,18 +32,19 @@ green on `dev` (fmt, `clippy -D warnings`, registry lib unit tests, API unit
 tests incl. live-PostGIS migration run, `tsc --noEmit`).
 
 **Phase 0 (RFC-012 architecture contract)**, **Phase 1 (security hardening)**, **Phase 2 (generalized validator PDAs)**, **Phase 3 (verification tasks)**, **Phase 4 (multi-source observations)**,
+ **Phase 5 (evidence provenance)**, **Phase 6 (dynamic routing)**, **Phase 7 (reputation governance)**,
  **A1 (security residuals)**, **A2 (IDL regeneration)**, and **A3 (test/CI
  baseline)** are complete: unique validator sets, endorsement action binding,
  account-ownership checks on `remaining_accounts` loaders, admin/authority
  constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL synced to source
- (138/55/124/191), and CI covers registry/identity lib + rfc012 + geo + API.
+ (147/59/133/206), and CI covers registry/identity lib + rfc012 + geo + API.
  See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 Verified tests on `dev` (2026-09-24):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 78 |
+| `terra-registry` lib unit tests | 105 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 18 |
@@ -53,9 +53,9 @@ Verified tests on `dev` (2026-09-24):
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and `tsc --noEmit`. Identity BPF (18) and the long-form
-registry BPF suite (283) are run locally / on demand.
+registry BPF suite (289) are run locally / on demand.
 
-Registry BPF integration suite (`tests/integration.rs`, 283 tests) is maintained
+Registry BPF integration suite (`tests/integration.rs`, 289 tests) is maintained
 but not re-run on constrained CI/dev machines (full `cargo test -p terra-registry`
 exceeds practical time budgets); it is the long-form regression suite for all
 instruction happy paths and guard rails.
@@ -74,15 +74,15 @@ before shipping client changes after any program edit.
 This repo is self-describing for a new contributor or agent — read in order:
 
 1. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
  3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
  4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
- 5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–6 done; **next phase is Phase 7** (capability restrictions / task requirements); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
+ 5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–7 done; **next phase is Phase 8** (economic/resource layer); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
 6. Individual specs `docs/rfc-003`…`rfc-011` each end with a **Handoff — status & next steps** footer (implementation location, open items, when to run which tests / `make idl`).
 
 Do not invent instruction/account/event/error counts or test totals — regenerate
 from source (`rg`, `cargo test`, `make idl`) or trust the tables above (verified
-2026-09-23). Prefer small incremental commits on `dev`; keep tests green before
+2026-09-24). Prefer small incremental commits on `dev`; keep tests green before
 merging to `main`.
 
 ## Branching Strategy
@@ -117,12 +117,12 @@ peer-consensus), `quorum.rs` (unique-validator + signer dedup), `ipfs_docs.rs`
 (document anchors), `verification/*` (claims, sessions, challenges, reputation).
 Full specs live in [`docs/`](docs/) as `rfc-003…rfc-012`.
 
-Source counts (regenerate IDL after changes): **138 instructions · 55 account
-types · 124 events · 191 `TerraError` codes** in `terra_registry`; **8
+Source counts (regenerate IDL after changes): **147 instructions · 59 account
+types · 133 events · 206 `TerraError` codes** in `terra_registry`; **8
 instructions · 2 accounts · 9 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
-matches source as of Phase 6 (2026-09-24); re-run `make idl` after program edits.
+matches source as of Phase 7 (2026-09-24); re-run `make idl` after program edits.
 
 ---
 
@@ -307,7 +307,7 @@ pnpm dev
 - [ ] `solana-test-validator` run with program deployed (requires AVX-capable CPU — not available on current dev machine)
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
-- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191 synced to `terra-web/src/idl/`
+- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206 synced to `terra-web/src/idl/`
 - [ ] ZK circuit choice (Groth16/PLONK) + external audit (RFC-006/011)
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
@@ -336,7 +336,8 @@ pnpm dev
 - [x] RFC-012 Phase 4 — multi-source observations (2026-09-24): ObservationV2 PDA + submit_observation_v2, IDL 135/53/121/184
 - [x] RFC-012 Phase 5 — evidence provenance (2026-09-24): EvidenceManifest/EvidenceArtifact PDAs + submit_evidence_manifest/add_evidence_artifact, IDL 137/55/123/187
 - [x] RFC-012 Phase 6 — dynamic routing (2026-09-24): routing.rs multi-factor eligibility + route_task + TaskRouted, errors 6187–6190, IDL 138/55/124/191
-- [ ] RFC-012 Phases 5–10 — evidence provenance, dynamic routing, reputation governance, economics, infrastructure, cross-border privacy
+- [x] RFC-012 Phase 7 — reputation governance (2026-09-24): fraud_governance.rs fraud report → random committee → capability demotion (no jail) → appeal → rehab; errors 6191–6205, IDL 147/59/133/206
+- [ ] RFC-012 Phases 8–10 — economics, infrastructure, cross-border privacy
 
 ---
 

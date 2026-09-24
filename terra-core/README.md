@@ -160,7 +160,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 283 BPF integration tests
+│   │       ├── integration.rs  # 289 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -218,15 +218,15 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 78 | Guards, quorum, staking, subdivision, zk, tasks, observations, … |
+| terra-registry lib | 105 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 18 | BPF happy paths + guard rails |
-| terra-registry integration | 283 | Full instruction matrix (long-running) |
+| terra-registry integration | 289 | Full instruction matrix (long-running) |
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-24): registry lib 90/90, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 4/4 + phase3 2/2 + phase4 2/2 + phase5 2/2 + phase6 2/2, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (Phase 6). Full registry BPF suite (283) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-24): registry lib 105/105, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 4/4 + phase3 2/2 + phase4 2/2 + phase5 2/2 + phase6 2/2 + phase7 6/6, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (Phase 7). Full registry BPF suite (289) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
 
 ## Current Status (as of 2026-09-24)
 
@@ -238,17 +238,18 @@ Verified on `dev` (2026-09-24): registry lib 90/90, identity lib 6/6, rfc012 21/
 - RFC-012 **Phase 4** (multi-source observations, 2026-09-24): `observation_v2.rs` with `ObservationV2` PDA (seeds `["observation_v2", task_id, observer, nonce]`); instruction `submit_observation_v2`; source PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; provenance SELF_REPORTED…SATELLITE_CONFIRMED; subject ≠ capture_device ≠ observer (Design Rule 7); 4 unit tests + 2 BPF tests (`phase4_*`); IDL 135/53/121/184.
 - RFC-012 **Phase 5** (evidence provenance, 2026-09-24): `evidence_manifest.rs` with `EvidenceManifest` (seeds `["evidence_manifest", task_id, submitter, nonce]`) + `EvidenceArtifact` (seeds `["evidence_artifact", manifest, artifact_index]`); instructions `submit_evidence_manifest` / `add_evidence_artifact`; artifact kinds PHOTO/DOCUMENT/VIDEO/MODEL/GEOMETRY/OTHER; append-only index + cap 32; 5 unit tests + 2 BPF tests (`phase5_*`); errors 6184–6186; IDL 137/55/123/187.
 - RFC-012 **Phase 6** (dynamic routing, 2026-09-24): `routing.rs` multi-factor eligibility (Eligibility → Capability → Jurisdiction → Geo → Availability → Reputation → independence + randomized pick) + instruction `route_task` (requester-signed; candidates in args; per-candidate PDAs in `remaining_accounts` with stride `3 + need_geo + need_cap`) creating `TaskAssignment` for the random winner; event `TaskRouted`; errors `ValidatorNotEligible` (6187), `NotRouteWinner` (6188), `TooManyRouteCandidates` (6189), `RouteAccountMismatch` (6190); 7 unit tests + 2 BPF tests (`phase6_*`); no new PDAs (reuses Phase 2/3 accounts); IDL 138/55/124/191.
-- **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; **Phase 2** re-synced to **128/49/115/169**; **Phase 3** re-synced to **134/52/120/182**; **Phase 4** re-synced to **135/53/121/184**; **Phase 5** re-synced to **137/55/123/187**; **Phase 6** re-synced to **138/55/124/191**; `make idl`/`build.sh` now use `anchor idl build -p …`.
+- RFC-012 **Phase 7** (reputation governance, 2026-09-24): `fraud_governance.rs` implements fraud report → random well-reputed committee vote → **capability demotion, never jail** (upheld: capability → DECLARED, tier → PROBATIONARY; Design Rules 13/14) → appeal (24 h window, fresh committee) → rehabilitation (30-day clean window, self-lift). Accounts `FraudReport`/`ReviewCase`/`CapabilityRestriction`/`Appeal`; 9 instructions; `route_task` stride extended to `3 + need_geo + 2*need_cap` with ACTIVE-restriction ineligibility gate; errors 6191–6205; 15 unit tests + 6 BPF tests (`phase7_*`); IDL 147/59/133/206. Legacy `jail_validator`/`unjail_validator` (RFC-005) is not part of this path (deprecation candidate).
+- **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; **Phase 2** re-synced to **128/49/115/169**; **Phase 3** re-synced to **134/52/120/182**; **Phase 4** re-synced to **135/53/121/184**; **Phase 5** re-synced to **137/55/123/187**; **Phase 6** re-synced to **138/55/124/191**; **Phase 7** re-synced to **147/59/133/206**; `make idl`/`build.sh` now use `anchor idl build -p …`.
 - **A3 test/CI baseline** (2026-09-24): fixed `StoredArtifact` API test compile break; CI runs identity lib + rfc012 + geo; `make test-fast` for constrained machines.
 - PostGIS mirror API (23 routes, migrations `0001`…`0024`) + geo-engine + workspace CI green on `dev`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160; Phase 2, 128/49/115/169; Phase 3, 134/52/120/182; Phase 4, 135/53/121/184; Phase 5, 137/55/123/187; Phase 6, 138/55/124/191).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of Phase 6 (138/55/124/191, 2026-09-24).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160; Phase 2, 128/49/115/169; Phase 3, 134/52/120/182; Phase 4, 135/53/121/184; Phase 5, 137/55/123/187; Phase 6, 138/55/124/191; Phase 7, 147/59/133/206).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of Phase 7 (147/59/133/206, 2026-09-24).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
-6. RFC-012 Phases 5–10 (evidence provenance → routing → reputation governance → economics → infrastructure → cross-border/privacy) — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md).
+6. RFC-012 Phases 8–10 (economics → infrastructure → cross-border/privacy) — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md).
 
 Anyone picking this up: start from root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 

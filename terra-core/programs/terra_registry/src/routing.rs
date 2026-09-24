@@ -209,9 +209,14 @@ fn deser<T: anchor_lang::AccountDeserialize>(ai: &AccountInfo) -> Result<T> {
 /// ```text
 /// for cand in candidates:
 ///   profile, availability, reputation,
-///   [presence]  if requirement.radius_m > 0
-///   [capability] if requirement.capability_code != CAPABILITY_ANY
+///   [presence]     if requirement.radius_m > 0
+///   [capability]   if requirement.capability_code != CAPABILITY_ANY
+///   [restriction]  if requirement.capability_code != CAPABILITY_ANY
 /// ```
+/// The optional `restriction` slot is a `CapabilityRestriction` PDA. If deser
+/// fails (empty account / wrong type) it is treated as "no restriction".
+/// An ACTIVE restriction on (candidate, capability_code) makes the candidate
+/// ineligible — Phase 7 demotion gate (no jail; partial capability loss only).
 #[allow(clippy::too_many_arguments)]
 pub fn route_task(
     ctx: Context<crate::RouteTask>,
@@ -259,10 +264,11 @@ pub fn route_task(
     );
     require!(chosen != t.requester, TerraError::SelfTaskAssignment);
 
-    // Stride: reputation always; +presence if geo; +capability if specific code.
+    // Stride: reputation always; +presence if geo; +capability if specific code;
+    // +restriction when a specific capability code is required (Phase 7 gate).
     let need_geo = req.radius_m > 0;
     let need_cap = req.capability_code != CAPABILITY_ANY;
-    let stride = 3 + need_geo as usize + need_cap as usize;
+    let stride = 3 + need_geo as usize + 2 * need_cap as usize;
     let expected_len = stride * candidates.len();
     require!(
         ctx.remaining_accounts.len() == expected_len,
@@ -305,6 +311,7 @@ pub fn route_task(
         };
         let candidate_level: Option<u8> = if need_cap {
             let ai = &ctx.remaining_accounts[cursor];
+            cursor += 1;
             let c: ValidatorCapability =
                 deser(ai).map_err(|_| error!(TerraError::ValidatorNotEligible))?;
             require!(
@@ -315,6 +322,23 @@ pub fn route_task(
         } else {
             None
         };
+
+        // Phase 7 gate: ACTIVE CapabilityRestriction on this (wallet, code)
+        // blocks routing. Deser failure = no restriction (account optional).
+        if need_cap {
+            let ai = &ctx.remaining_accounts[cursor];
+            let restriction: Option<crate::fraud_governance::CapabilityRestriction> =
+                deser(ai).ok();
+            if crate::fraud_governance::blocks_capability(
+                restriction.as_ref(),
+                cand,
+                req.capability_code,
+            ) {
+                // Not eligible — skip without aborting the whole route so the
+                // random pick still works among free candidates.
+                continue;
+            }
+        }
 
         let ok = is_eligible(
             req,

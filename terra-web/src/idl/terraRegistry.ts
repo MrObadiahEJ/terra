@@ -1702,6 +1702,120 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "cast_appeal_vote",
+      "discriminator": [
+        76,
+        236,
+        68,
+        226,
+        134,
+        226,
+        237,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "review.report",
+                "account": "ReviewCase"
+              }
+            ]
+          }
+        },
+        {
+          "name": "appeal"
+        },
+        {
+          "name": "voter",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "grant",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "cast_fraud_vote",
+      "discriminator": [
+        55,
+        195,
+        39,
+        206,
+        219,
+        91,
+        112,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "review.report",
+                "account": "ReviewCase"
+              }
+            ]
+          }
+        },
+        {
+          "name": "report"
+        },
+        {
+          "name": "voter",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "uphold",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "cast_quorum_vote",
       "discriminator": [
         27,
@@ -4585,6 +4699,223 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "file_fraud_appeal",
+      "discriminator": [
+        223,
+        21,
+        14,
+        161,
+        5,
+        56,
+        84,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  101,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "restriction"
+              },
+              {
+                "kind": "account",
+                "path": "appellant"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "restriction",
+          "writable": true
+        },
+        {
+          "name": "report",
+          "writable": true
+        },
+        {
+          "name": "appellant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "note",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "finalize_appeal_review",
+      "discriminator": [
+        175,
+        147,
+        250,
+        36,
+        162,
+        172,
+        217,
+        238
+      ],
+      "accounts": [
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "appeal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "appeal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  101,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "appeal.restriction",
+                "account": "Appeal"
+              },
+              {
+                "kind": "account",
+                "path": "appeal.appellant",
+                "account": "Appeal"
+              },
+              {
+                "kind": "account",
+                "path": "appeal.nonce",
+                "account": "Appeal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "restriction",
+          "writable": true
+        },
+        {
+          "name": "capability",
+          "writable": true
+        },
+        {
+          "name": "report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  97,
+                  117,
+                  100,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report.accused",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.reporter",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.nonce",
+                "account": "FraudReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "finalizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "finalize_credential",
       "discriminator": [
         159,
@@ -4703,6 +5034,142 @@ export const terraRegistry: Idl = {
         },
         {
           "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_fraud_review",
+      "discriminator": [
+        83,
+        178,
+        116,
+        175,
+        100,
+        172,
+        99,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report"
+              }
+            ]
+          }
+        },
+        {
+          "name": "report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  97,
+                  117,
+                  100,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report.accused",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.reporter",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.nonce",
+                "account": "FraudReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "restriction",
+          "writable": true
+        },
+        {
+          "name": "capability",
+          "writable": true
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report.accused",
+                "account": "FraudReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "finalizer",
           "writable": true,
           "signer": true
         },
@@ -6629,6 +7096,189 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "open_appeal_review",
+      "discriminator": [
+        84,
+        185,
+        145,
+        44,
+        10,
+        217,
+        140,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  101,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "appeal.restriction",
+                "account": "Appeal"
+              },
+              {
+                "kind": "account",
+                "path": "appeal.appellant",
+                "account": "Appeal"
+              },
+              {
+                "kind": "account",
+                "path": "appeal.nonce",
+                "account": "Appeal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "restriction"
+        },
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "appeal"
+              }
+            ]
+          }
+        },
+        {
+          "name": "appellant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_fraud_review",
+      "discriminator": [
+        111,
+        26,
+        122,
+        231,
+        162,
+        127,
+        252,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  97,
+                  117,
+                  100,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report.accused",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.reporter",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.nonce",
+                "account": "FraudReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "review",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "open_verification_session",
       "discriminator": [
         233,
@@ -8305,6 +8955,113 @@ export const terraRegistry: Idl = {
           }
         }
       ]
+    },
+    {
+      "name": "rehabilitate_restriction",
+      "discriminator": [
+        161,
+        98,
+        41,
+        226,
+        120,
+        112,
+        91,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "restriction",
+          "writable": true
+        },
+        {
+          "name": "report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  97,
+                  117,
+                  100,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "report.accused",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.reporter",
+                "account": "FraudReport"
+              },
+              {
+                "kind": "account",
+                "path": "report.nonce",
+                "account": "FraudReport"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "capability",
+          "writable": true
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "remove_validator_from_registry",
@@ -10613,6 +11370,97 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "submit_fraud_report",
+      "discriminator": [
+        31,
+        239,
+        168,
+        126,
+        140,
+        132,
+        55,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  114,
+                  97,
+                  117,
+                  100,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "accused"
+              },
+              {
+                "kind": "account",
+                "path": "reporter"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "accused"
+        },
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "reason_code",
+          "type": "u8"
+        },
+        {
+          "name": "note",
+          "type": "string"
+        },
+        {
+          "name": "capability_code",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "submit_observation",
       "discriminator": [
         109,
@@ -12815,6 +13663,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "Appeal",
+      "discriminator": [
+        155,
+        196,
+        80,
+        143,
+        64,
+        220,
+        198,
+        177
+      ]
+    },
+    {
       "name": "Attestation",
       "discriminator": [
         152,
@@ -12838,6 +13699,19 @@ export const terraRegistry: Idl = {
         16,
         148,
         113
+      ]
+    },
+    {
+      "name": "CapabilityRestriction",
+      "discriminator": [
+        74,
+        254,
+        245,
+        177,
+        59,
+        188,
+        186,
+        56
       ]
     },
     {
@@ -13007,6 +13881,19 @@ export const terraRegistry: Idl = {
         17,
         31,
         5
+      ]
+    },
+    {
+      "name": "FraudReport",
+      "discriminator": [
+        136,
+        69,
+        45,
+        181,
+        210,
+        24,
+        121,
+        177
       ]
     },
     {
@@ -13189,6 +14076,19 @@ export const terraRegistry: Idl = {
         253,
         158,
         169
+      ]
+    },
+    {
+      "name": "ReviewCase",
+      "discriminator": [
+        91,
+        9,
+        100,
+        255,
+        116,
+        51,
+        53,
+        93
       ]
     },
     {
@@ -13519,6 +14419,19 @@ export const terraRegistry: Idl = {
   ],
   "events": [
     {
+      "name": "AppealReviewOpened",
+      "discriminator": [
+        158,
+        228,
+        47,
+        141,
+        115,
+        86,
+        151,
+        4
+      ]
+    },
+    {
       "name": "AttestationMigrated",
       "discriminator": [
         72,
@@ -13555,6 +14468,32 @@ export const terraRegistry: Idl = {
         44,
         191,
         201
+      ]
+    },
+    {
+      "name": "CapabilityRestrictionApplied",
+      "discriminator": [
+        224,
+        226,
+        118,
+        114,
+        180,
+        19,
+        233,
+        124
+      ]
+    },
+    {
+      "name": "CapabilityRestrictionLifted",
+      "discriminator": [
+        227,
+        47,
+        169,
+        65,
+        35,
+        29,
+        146,
+        240
       ]
     },
     {
@@ -13984,6 +14923,84 @@ export const terraRegistry: Idl = {
         1,
         245,
         201
+      ]
+    },
+    {
+      "name": "FraudAppealDecided",
+      "discriminator": [
+        24,
+        216,
+        217,
+        225,
+        99,
+        196,
+        222,
+        160
+      ]
+    },
+    {
+      "name": "FraudAppealFiled",
+      "discriminator": [
+        251,
+        135,
+        229,
+        53,
+        160,
+        103,
+        69,
+        244
+      ]
+    },
+    {
+      "name": "FraudReportSubmitted",
+      "discriminator": [
+        18,
+        15,
+        109,
+        93,
+        27,
+        149,
+        200,
+        83
+      ]
+    },
+    {
+      "name": "FraudReviewFinalized",
+      "discriminator": [
+        196,
+        214,
+        48,
+        219,
+        18,
+        103,
+        207,
+        227
+      ]
+    },
+    {
+      "name": "FraudReviewOpened",
+      "discriminator": [
+        35,
+        186,
+        232,
+        174,
+        11,
+        57,
+        157,
+        179
+      ]
+    },
+    {
+      "name": "FraudVoteCast",
+      "discriminator": [
+        30,
+        73,
+        152,
+        83,
+        81,
+        88,
+        81,
+        137
       ]
     },
     {
@@ -16086,6 +17103,81 @@ export const terraRegistry: Idl = {
       "code": 6190,
       "name": "RouteAccountMismatch",
       "msg": "Route remaining_accounts do not match candidate list"
+    },
+    {
+      "code": 6191,
+      "name": "InvalidFraudReason",
+      "msg": "Invalid fraud reason code"
+    },
+    {
+      "code": 6192,
+      "name": "InvalidFraudStatus",
+      "msg": "Fraud status does not allow this transition"
+    },
+    {
+      "code": 6193,
+      "name": "SelfFraudReport",
+      "msg": "Reporters cannot file fraud against themselves"
+    },
+    {
+      "code": 6194,
+      "name": "CommitteeTooSmall",
+      "msg": "Too few eligible well-reputed validators for a committee"
+    },
+    {
+      "code": 6195,
+      "name": "ReviewAlreadyDecided",
+      "msg": "Review already has a final decision"
+    },
+    {
+      "code": 6196,
+      "name": "NotCommitteeMember",
+      "msg": "Signer is not a member of this review committee"
+    },
+    {
+      "code": 6197,
+      "name": "DuplicateCommitteeVote",
+      "msg": "This committee member has already voted"
+    },
+    {
+      "code": 6198,
+      "name": "ReviewNotFinalizable",
+      "msg": "Not every committee member has voted yet"
+    },
+    {
+      "code": 6199,
+      "name": "InvalidRestrictionStatus",
+      "msg": "Invalid capability restriction status"
+    },
+    {
+      "code": 6200,
+      "name": "RestrictionNotActive",
+      "msg": "Restriction is not active"
+    },
+    {
+      "code": 6201,
+      "name": "AppealWindowClosed",
+      "msg": "Appeal window for this restriction has not opened"
+    },
+    {
+      "code": 6202,
+      "name": "NotRestrictedWallet",
+      "msg": "Signer is not the restricted wallet"
+    },
+    {
+      "code": 6203,
+      "name": "InvalidAppealStatus",
+      "msg": "Invalid fraud appeal status"
+    },
+    {
+      "code": 6204,
+      "name": "RehabTooEarly",
+      "msg": "Rehabilitation period for this restriction has not elapsed"
+    },
+    {
+      "code": 6205,
+      "name": "CapabilityRestricted",
+      "msg": "Active capability restriction blocks this route"
     }
   ],
   "types": [
@@ -16167,6 +17259,75 @@ export const terraRegistry: Idl = {
             "docs": [
               "0=Pending, 1=Completed, 2=Failed."
             ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Appeal",
+      "docs": [
+        "Due-process appeal against an active CapabilityRestriction.",
+        "PDA: `[\"appeal\", restriction, appellant, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "note",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "decided_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AppealReviewOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "review",
+            "type": "pubkey"
+          },
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "committee_size",
             "type": "u8"
           }
         ]
@@ -16448,6 +17609,110 @@ export const terraRegistry: Idl = {
           {
             "name": "timestamp",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapabilityRestriction",
+      "docs": [
+        "Partial capability downgrade \u2014 NOT a ban, NOT a jail (Design Rule 13).",
+        "PDA: `[\"capability_restriction\", wallet, capability_code]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "report",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_level",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "applied_at",
+            "type": "i64"
+          },
+          {
+            "name": "appeal_opens_at",
+            "type": "i64"
+          },
+          {
+            "name": "rehab_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "lifted_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapabilityRestrictionApplied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "max_level",
+            "type": "u8"
+          },
+          {
+            "name": "report",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapabilityRestrictionLifted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "by",
+            "type": "u8"
           }
         ]
       }
@@ -18370,6 +19635,203 @@ export const terraRegistry: Idl = {
           {
             "name": "nonce",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudAppealDecided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudAppealFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudReport",
+      "docs": [
+        "Accusation with evidence. Permissionless to file; never auto-punishes.",
+        "PDA: `[\"fraud_report\", accused, reporter, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "accused",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "reason_code",
+            "type": "u8"
+          },
+          {
+            "name": "note",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudReportSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "report",
+            "type": "pubkey"
+          },
+          {
+            "name": "accused",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "reason_code",
+            "type": "u8"
+          },
+          {
+            "name": "capability_code",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudReviewFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "review",
+            "type": "pubkey"
+          },
+          {
+            "name": "report",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          },
+          {
+            "name": "votes_upheld",
+            "type": "u8"
+          },
+          {
+            "name": "votes_dismissed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudReviewOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "review",
+            "type": "pubkey"
+          },
+          {
+            "name": "report",
+            "type": "pubkey"
+          },
+          {
+            "name": "accused",
+            "type": "pubkey"
+          },
+          {
+            "name": "committee_size",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FraudVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "review",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "uphold",
+            "type": "bool"
+          },
+          {
+            "name": "votes_cast",
+            "type": "u8"
           }
         ]
       }
@@ -20552,6 +22014,65 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "slashed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReviewCase",
+      "docs": [
+        "Independent review of a FraudReport by a random well-reputed committee.",
+        "PDA: `[\"review_case\", report]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "report",
+            "type": "pubkey"
+          },
+          {
+            "name": "accused",
+            "type": "pubkey"
+          },
+          {
+            "name": "committee",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "voted",
+            "docs": [
+              "Members who have already voted (prevents double-vote)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "votes_cast",
+            "type": "u8"
+          },
+          {
+            "name": "votes_upheld",
+            "type": "u8"
+          },
+          {
+            "name": "votes_dismissed",
+            "type": "u8"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          },
+          {
+            "name": "opened_at",
+            "type": "i64"
+          },
+          {
+            "name": "decided_at",
             "type": "i64"
           }
         ]

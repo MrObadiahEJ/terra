@@ -25365,3 +25365,729 @@ async fn phase6_route_guards() {
     let task: VerificationTask = read_account(&ctx, task_pk).await;
     assert_eq!(task.assigned_count, 0);
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 7 — reputation governance (no-jail demotion)
+// ---------------------------------------------------------------------------
+
+fn fraud_report_pda(accused: &Pubkey, reporter: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"fraud_report",
+            accused.as_ref(),
+            reporter.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn review_case_pda(report: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"review_case", report.as_ref()], &PROGRAM_ID)
+}
+
+fn capability_restriction_pda(wallet: &Pubkey, capability_code: u8) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"capability_restriction",
+            wallet.as_ref(),
+            &[capability_code],
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn appeal_pda(restriction: &Pubkey, appellant: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"appeal",
+            restriction.as_ref(),
+            appellant.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+async fn phase7_init_validator(ctx: &mut ProgramTestContext, payer: &Keypair, wallet: &Keypair) {
+    process(
+        ctx,
+        payer,
+        fund_ix(&payer.pubkey(), &wallet.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    let (profile_pk, _) = validator_profile_pda(&wallet.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        ctx,
+        wallet,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(wallet.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile");
+
+    let (avail_pk, _) = validator_availability_pda(&wallet.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(terra_registry::validator_profile::availability_status::AVAILABLE);
+    process(
+        ctx,
+        wallet,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(wallet.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    let _ = init_reputation_ok(ctx, payer, &wallet.pubkey()).await;
+}
+
+#[tokio::test]
+async fn phase7_submit_fraud_report_ok() {
+    use terra_registry::fraud_governance::FraudReport;
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund reporter");
+
+    let nonce = 1u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[7u8; 32]); // evidence_hash
+    data.push(terra_registry::fraud_governance::fraud_reason::FALSIFIED_OBSERVATION);
+    data.extend_from_slice(&borsh_ser(&"obs mismatch".to_string()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_fraud_report failed");
+
+    let report: FraudReport = read_account(&ctx, report_pk).await;
+    assert_eq!(report.accused, accused.pubkey());
+    assert_eq!(report.reporter, reporter.pubkey());
+    assert_eq!(
+        report.status,
+        terra_registry::fraud_governance::fraud_status::OPEN
+    );
+    assert_eq!(report.nonce, nonce);
+}
+
+#[tokio::test]
+async fn phase7_self_report_rejected() {
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+
+    let nonce = 0u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &accused.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[1u8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::OTHER);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+
+    let res = process(
+        &mut ctx,
+        &accused,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(accused.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6193, "self fraud report must fail");
+}
+
+#[tokio::test]
+async fn phase7_invalid_reason_rejected() {
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    let nonce = 0u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[1u8; 32]);
+    data.push(99); // invalid reason
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+
+    let res = process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6191, "invalid reason must fail");
+}
+
+#[tokio::test]
+async fn phase7_open_review_needs_committee() {
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    let nonce = 0u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[1u8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::COLLUSION);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit");
+
+    // Open review with empty remaining_accounts → CommitteeTooSmall (6194).
+    let (review_pk, _) = review_case_pda(&report_pk);
+    let res = process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: discriminator("global", "open_fraud_review").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6194, "empty committee pool must fail");
+}
+
+#[tokio::test]
+async fn phase7_vote_double_and_not_member() {
+    use terra_registry::fraud_governance::{FraudReport, ReviewCase};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    // 6 well-reputed validators for the committee pool.
+    let mut pool: Vec<Keypair> = Vec::new();
+    let mut remaining: Vec<AccountMeta> = Vec::new();
+    for _ in 0..6 {
+        let v = Keypair::new();
+        phase7_init_validator(&mut ctx, &payer, &v).await;
+        let (profile_pk, _) = validator_profile_pda(&v.pubkey());
+        let (rep_pk, _) = validator_reputation_pda(&v.pubkey());
+        remaining.push(AccountMeta::new_readonly(profile_pk, false));
+        remaining.push(AccountMeta::new_readonly(rep_pk, false));
+        pool.push(v);
+    }
+
+    let nonce = 3u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[9u8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::EVIDENCE_TAMPERING);
+    data.extend_from_slice(&borsh_ser(&"hash mismatch".to_string()));
+    data.push(terra_registry::validator_profile::capability_code::IMAGERY);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit");
+
+    let (review_pk, _) = review_case_pda(&report_pk);
+    let mut accounts = vec![
+        AccountMeta::new(report_pk, false),
+        AccountMeta::new(review_pk, false),
+        AccountMeta::new(reporter.pubkey(), true),
+        AccountMeta::new_readonly(system_program_id(), false),
+    ];
+    accounts.extend(remaining.clone());
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts,
+            data: discriminator("global", "open_fraud_review").to_vec(),
+        },
+    )
+    .await
+    .expect("open review");
+
+    let report: FraudReport = read_account(&ctx, report_pk).await;
+    assert_eq!(
+        report.status,
+        terra_registry::fraud_governance::fraud_status::UNDER_REVIEW
+    );
+    let case: ReviewCase = read_account(&ctx, review_pk).await;
+    assert_eq!(case.committee.len(), 5);
+    assert_eq!(
+        case.decision,
+        terra_registry::fraud_governance::review_decision::PENDING
+    );
+
+    // Non-member cannot vote (6196).
+    let non_member = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &non_member.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+    let mut data = discriminator("global", "cast_fraud_vote").to_vec();
+    data.push(1); // uphold
+    let res = process(
+        &mut ctx,
+        &non_member,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new_readonly(report_pk, false),
+                AccountMeta::new(non_member.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6196, "non-member vote must fail");
+
+    // First member votes; double-vote fails (6197).
+    let first = case.committee[0];
+    let first_kp = pool
+        .iter()
+        .find(|k| k.pubkey() == first)
+        .expect("committee member is in pool");
+    let mut data = discriminator("global", "cast_fraud_vote").to_vec();
+    data.push(1);
+    process(
+        &mut ctx,
+        first_kp,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new_readonly(report_pk, false),
+                AccountMeta::new(first, true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("first vote");
+
+    let mut data = discriminator("global", "cast_fraud_vote").to_vec();
+    data.push(1);
+    let res = process(
+        &mut ctx,
+        first_kp,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new_readonly(report_pk, false),
+                AccountMeta::new(first, true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6197, "double vote must fail");
+
+    // Finalize too early (only 1/5) → 6198.
+    let mut data = discriminator("global", "finalize_fraud_review").to_vec();
+    let (restriction_pk, _) = capability_restriction_pda(&accused.pubkey(), report.capability_code);
+    let (cap_pk, _) = validator_capability_pda(&accused.pubkey(), report.capability_code);
+    let (profile_pk, _) = validator_profile_pda(&accused.pubkey());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new(restriction_pk, false),
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6198, "early finalize must fail");
+}
+
+#[tokio::test]
+async fn phase7_upheld_demotes_not_jails() {
+    use terra_registry::fraud_governance::{
+        restriction_status, CapabilityRestriction, FraudReport, ReviewCase,
+    };
+    use terra_registry::validator_profile::{ValidatorCapability, ValidatorProfile};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+
+    // Promote accused to ESTABLISHED so demotion is observable.
+    let (profile_pk, _) = validator_profile_pda(&accused.pubkey());
+    let (registry, _) = registry_pda();
+    let mut data = discriminator("global", "set_validator_profile_tier").to_vec();
+    data.push(terra_registry::validator_profile::profile_tier::ESTABLISHED);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set tier");
+
+    // Declare a VERIFIED capability so demotion to DECLARED is visible.
+    let cap_code = terra_registry::validator_profile::capability_code::GNSS;
+    let (cap_pk, _) = validator_capability_pda(&accused.pubkey(), cap_code);
+    let mut data = discriminator("global", "declare_validator_capability").to_vec();
+    data.push(cap_code);
+    data.push(terra_registry::validator_profile::capability_level::DECLARED);
+    data.extend_from_slice(&[3u8; 32]);
+    process(
+        &mut ctx,
+        &accused,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(accused.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("declare capability");
+
+    // Admin promotes to VERIFIED (self can only go to DECLARED).
+    let mut data = discriminator("global", "admin_verify_validator_capability").to_vec();
+    data.push(cap_code);
+    data.push(terra_registry::validator_profile::capability_level::VERIFIED);
+    data.extend_from_slice(&[4u8; 32]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("admin verify capability");
+
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund");
+
+    let mut pool: Vec<Keypair> = Vec::new();
+    let mut remaining: Vec<AccountMeta> = Vec::new();
+    for _ in 0..6 {
+        let v = Keypair::new();
+        phase7_init_validator(&mut ctx, &payer, &v).await;
+        let (p, _) = validator_profile_pda(&v.pubkey());
+        let (r, _) = validator_reputation_pda(&v.pubkey());
+        remaining.push(AccountMeta::new_readonly(p, false));
+        remaining.push(AccountMeta::new_readonly(r, false));
+        pool.push(v);
+    }
+
+    let nonce = 0u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[0xAAu8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::FALSIFIED_OBSERVATION);
+    data.extend_from_slice(&borsh_ser(&"forged fix".to_string()));
+    data.push(cap_code);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit");
+
+    let (review_pk, _) = review_case_pda(&report_pk);
+    let mut accounts = vec![
+        AccountMeta::new(report_pk, false),
+        AccountMeta::new(review_pk, false),
+        AccountMeta::new(reporter.pubkey(), true),
+        AccountMeta::new_readonly(system_program_id(), false),
+    ];
+    accounts.extend(remaining);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts,
+            data: discriminator("global", "open_fraud_review").to_vec(),
+        },
+    )
+    .await
+    .expect("open review");
+
+    let case: ReviewCase = read_account(&ctx, review_pk).await;
+    assert_eq!(case.committee.len(), 5);
+
+    // All 5 uphold.
+    for member in case.committee.clone() {
+        let kp = pool
+            .iter()
+            .find(|k| k.pubkey() == member)
+            .expect("member in pool");
+        let mut data = discriminator("global", "cast_fraud_vote").to_vec();
+        data.push(1);
+        process(
+            &mut ctx,
+            kp,
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: vec![
+                    AccountMeta::new(review_pk, false),
+                    AccountMeta::new_readonly(report_pk, false),
+                    AccountMeta::new(member, true),
+                ],
+                data,
+            },
+        )
+        .await
+        .expect("vote");
+    }
+
+    // Finalize → demotion (no jail).
+    let (restriction_pk, _) = capability_restriction_pda(&accused.pubkey(), cap_code);
+    let mut data = discriminator("global", "finalize_fraud_review").to_vec();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(review_pk, false),
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new(restriction_pk, false),
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("finalize");
+
+    let report: FraudReport = read_account(&ctx, report_pk).await;
+    assert_eq!(
+        report.status,
+        terra_registry::fraud_governance::fraud_status::UPHELD
+    );
+
+    let restriction: CapabilityRestriction = read_account(&ctx, restriction_pk).await;
+    assert_eq!(restriction.status, restriction_status::ACTIVE);
+    assert_eq!(
+        restriction.max_level,
+        terra_registry::fraud_governance::restricted_max_level()
+    );
+    assert_eq!(restriction.wallet, accused.pubkey());
+
+    // Capability demoted to DECLARED — not banned/jailed.
+    let cap: ValidatorCapability = read_account(&ctx, cap_pk).await;
+    assert_eq!(
+        cap.level,
+        terra_registry::validator_profile::capability_level::DECLARED
+    );
+
+    // Profile tier demoted to PROBATIONARY — still a validator.
+    let profile: ValidatorProfile = read_account(&ctx, profile_pk).await;
+    assert_eq!(
+        profile.tier,
+        terra_registry::validator_profile::profile_tier::PROBATIONARY
+    );
+
+    // Review finalized.
+    let case2: ReviewCase = read_account(&ctx, review_pk).await;
+    assert_eq!(
+        case2.decision,
+        terra_registry::fraud_governance::review_decision::UPHELD
+    );
+
+    // Rehab is time-locked: 30-day window has not elapsed → 6204.
+    let (rehab_profile_pk, _) = validator_profile_pda(&accused.pubkey());
+    let mut data = discriminator("global", "rehabilitate_restriction").to_vec();
+    let res = process(
+        &mut ctx,
+        &accused,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(restriction_pk, false),
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new(rehab_profile_pk, false),
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new(accused.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6204, "rehab before 30 days must fail");
+
+    // Restriction still ACTIVE after failed rehab.
+    let still: CapabilityRestriction = read_account(&ctx, restriction_pk).await;
+    assert_eq!(still.status, restriction_status::ACTIVE);
+}

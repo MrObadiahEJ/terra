@@ -11,13 +11,14 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-24, Phase 6): `terra_registry` — 138 instructions, 55 `#[account]` types, 124 events, 191 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-24, Phase 7): `terra_registry` — 147 instructions, 59 `#[account]` types, 133 events, 206 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (191 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (206 codes)
+├── fraud_governance.rs       # RFC-012 Phase 7 fraud report/committee/appeal/restriction
 ├── evidence_manifest.rs     # RFC-012 Phase 5 evidence manifest/artifacts
 ├── routing.rs               # RFC-012 Phase 6 multi-factor dynamic routing
 ├── observation_v2.rs         # RFC-012 Phase 4 multi-source ObservationV2
@@ -279,7 +280,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 138/55/124/191 as of Phase 6, 2026-09-24).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 147/59/133/206 as of Phase 7, 2026-09-24).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

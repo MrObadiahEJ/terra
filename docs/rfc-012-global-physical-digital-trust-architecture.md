@@ -1,6 +1,6 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
-**Status:** Accepted (Phases 0–6 complete on `dev`; Phases 7–10 pending)  
+**Status:** Accepted (Phases 0–7 complete on `dev`; Phases 8–10 pending)  
 **Created:** 2026-09-22  
 **Updated:** 2026-09-24  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
@@ -219,16 +219,16 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **4** | Introduce observations | **Complete** (2026-09-24) | `ObservationV2` PDA (seeds `["observation_v2", task_id, observer, nonce]`) + `submit_observation_v2`; multi-source PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; provenance SELF_REPORTED…SATELLITE_CONFIRMED; subject/capture_device/observer role separation; 1 account, 1 instruction, 1 event, 2 errors; 4 unit + 2 BPF tests; IDL 135/53/121/184 |
 | **5** | Evidence/provenance | **Complete** (2026-09-24) | `EvidenceManifest`/`EvidenceArtifact` PDAs (`["evidence_manifest", task_id, submitter, nonce]`, `["evidence_artifact", manifest, artifact_index]`) + `submit_evidence_manifest`/`add_evidence_artifact`; artifact kinds PHOTO…OTHER; optional ObservationV2 link; append-only index + cap 32; 2 accounts, 2 instructions, 2 events, 3 errors (6184–6186); 5 unit + 2 BPF tests; IDL 137/55/123/187 |
 | **6** | Dynamic routing | **Complete** (2026-09-24) | `routing.rs` multi-factor eligibility (Eligibility→Capability→Jurisdiction→Geo→Availability→Reputation→independence) + instruction `route_task` creating Phase 3 `TaskAssignment` for the random winner; 0 new PDAs, 1 instruction, 1 event (`TaskRouted`), 4 errors (6187–6190); 7 unit + 2 BPF tests; IDL 138/55/124/191 |
-| **7** | Reputation governance | Pending | Fraud report → review → random independent committee → decision → capability downgrade → appeal → rehabilitation |
+| **7** | Reputation governance | **Complete** (2026-09-24) | `fraud_governance.rs` with `FraudReport` (`["fraud_report", accused, reporter, nonce]`), `ReviewCase` (`["review_case", report]`), `CapabilityRestriction` (`["capability_restriction", wallet, capability_code]`), `Appeal` (`["appeal", restriction, appellant, nonce]`); 9 instructions (submit/open/cast/finalize fraud + file/open/cast/finalize appeal + rehabilitate); random well-reputed committee (COMMITTEE_SIZE=5, MIN reputation 5000 bps); upheld fraud demotes to DECLARED/PROBATIONARY (no jail — Design Rule 13); route_task capability gate (stride `3 + need_geo + 2*need_cap`); 15 errors (6191–6205); 15 unit + 6 BPF tests (`phase7_*`); IDL 147/59/133/206 |
 | **8** | Economic/resource layer | Pending | Task cost → escrow → rewards → infrastructure → coverage subsidy |
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Phase 6 is complete on `dev` (2026-09-24). Before starting Phase 7 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 6 2026-09-24 it is 138/55/124/191 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2 + Phase 5 EvidenceManifest/EvidenceArtifact + Phase 6 route_task) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 7 is complete on `dev` (2026-09-24). Before starting Phase 8 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 7 2026-09-24 it is 147/59/133/206 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2 + Phase 5 EvidenceManifest/EvidenceArtifact + Phase 6 route_task + Phase 7 fraud/review/restriction/appeal PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
-## 8.1. Handoff: Phase 6 complete; how to start Phase 7
+## 8.1. Handoff: Phase 7 complete; how to start Phase 8
 
 **Already done (do not redo):** Phase 0 structural tests (`terra-core/programs/terra_registry/tests/rfc012_structure.rs`, 21 tests); Phase 1 unique-validator sets, endorsement action binding, remaining-accounts owner checks, admin constraints — verified list in `terra-core/SECURITY.md` “Phase 1 additions”.
 
@@ -242,13 +242,15 @@ Phase 6 is complete on `dev` (2026-09-24). Before starting Phase 7 on a clean ch
 
 **Phase 6 delivered (2026-09-24):** `routing.rs` multi-factor dynamic routing per Design Rule 3 (Eligibility → Capability → Jurisdiction → Geo → Availability → Reputation → independence → randomized pick among eligible candidates). Instruction `route_task(task_id, req_index, candidates, chosen, competitor_count)` is requester-signed; no new PDAs — creates Phase 3 `TaskAssignment` for the random winner. Candidate eligibility PDAs are passed in `remaining_accounts` with fixed stride `3 + need_geo + need_cap` (profile, availability, reputation, [presence if radius_m>0], [capability if code≠CAPABILITY_ANY]). Entropy: `hashv(task_id ‖ task_pda ‖ slot)` + domain-separated draw (`draw_bps`); admission gate always passes when `competitor_count==1`. Jurisdiction filter is a soft-pass stub until Phase 10 cross-border bindings. Event `TaskRouted`; errors `ValidatorNotEligible` (6187), `NotRouteWinner` (6188), `TooManyRouteCandidates` (6189), `RouteAccountMismatch` (6190); 7 lib unit tests + 2 BPF integration tests (`phase6_*`); IDL 138/55/124/191.
 
-**Immediate next actions for Phase 7:**
-1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 6 delivered dynamic routing over Phase 2 profile PDAs + Phase 3 task assignments; Phase 7 should add capability restriction gates (`CapabilityRestriction` per §10 sketch) so route_task can consult on-chain capability allow-lists.
-2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), Phase 4 (135/53/121/184), Phase 5 (137/55/123/187), and Phase 6 (138/55/124/191); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+**Phase 7 delivered (2026-09-24):** `fraud_governance.rs` implements reputation governance with **no jail** (user vision + Design Rules 13/14): progressive admin → `PEER_CONSENSUS` self-regulation, fraud confirmed by a random committee of well-reputed validators, punishment is a **capability demotion** (DECLARED level + PROBATIONARY tier — "just like a new validator"), never a binary ban. Accounts per §10: `FraudReport` (seeds `["fraud_report", accused, reporter, nonce]`), `ReviewCase` (`["review_case", report]`, reuse `["review_case", appeal]` for appeal reviews), `CapabilityRestriction` (`["capability_restriction", wallet, capability_code]`), `Appeal` (`["appeal", restriction, appellant, nonce]`). 9 instructions: `submit_fraud_report` (permissionless, self-report banned), `open_fraud_review` (permissionless open; committee = 5 distinct validators picked from `remaining_accounts` (profile, reputation) pairs with reputation ≥ 5000 bps, excluding the accused, via `hashv(report ‖ slot ‖ "terra_committee")`), `cast_fraud_vote` (committee-only, one vote each), `finalize_fraud_review` (all voted → majority; upheld creates ACTIVE `CapabilityRestriction` + clamps capability to DECLARED + tier to PROBATIONARY), `file_fraud_appeal` (after 24 h appeal window, restricted wallet only), `open_appeal_review` / `cast_appeal_vote` / `finalize_appeal_review` (fresh random committee excluding appellant; majority grant → LIFTED), `rehabilitate_restriction` (self-lift after 30-day clean window, no admin). `route_task` gained a Phase 7 gate: stride is now `3 + need_geo + 2*need_cap` — when a specific capability code is required, an optional `CapabilityRestriction` slot follows the capability slot; an ACTIVE restriction on (candidate, code) makes the candidate ineligible (`blocks_capability`). Events: `FraudReportSubmitted`, `FraudReviewOpened`, `FraudVoteCast`, `FraudReviewFinalized`, `CapabilityRestrictionApplied`, `FraudAppealFiled`, `AppealReviewOpened`, `FraudAppealDecided`, `CapabilityRestrictionLifted`. Errors `InvalidFraudReason` (6191) … `CapabilityRestricted` (6205); 15 lib unit tests + 6 BPF tests (`phase7_*`); IDL 147/59/133/206. Legacy `jail_validator`/`unjail_validator` (RFC-005) remains for staking continuity but is **not** part of the Phase 7 path — future work may deprecate it.
+
+**Immediate next actions for Phase 8:**
+1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 7 delivered fraud → committee → demotion → appeal → rehabilitation over Phase 2 profile PDAs; Phase 8 is the economic layer (task cost → escrow → rewards → infrastructure → coverage subsidy), reusing RFC-005 staking/escrow primitives.
+2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), Phase 4 (135/53/121/184), Phase 5 (137/55/123/187), Phase 6 (138/55/124/191), and Phase 7 (147/59/133/206); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 
-**Phase order (next):** 7 (reputation governance) → 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
+**Phase order (next):** 8 (economics) → 9 (infrastructure) → 10 (cross-border/privacy). Do not skip the migration map dual-write rules in §9.
 
 ---
 
@@ -286,9 +288,10 @@ ObservationV2               seeds: ["observation_v2", task_id, observer, nonce]
 EvidenceManifest            seeds: ["evidence_manifest", task_id, nonce]
 EvidenceArtifact            seeds: ["evidence_artifact", manifest, artifact_index]
 
-ReviewCase                  seeds: ["review_case", subject, nonce]
+ReviewCase                  seeds: ["review_case", report]  (also ["review_case", appeal])
 FraudReport                 seeds: ["fraud_report", accused, reporter, nonce]
 CapabilityRestriction       seeds: ["capability_restriction", wallet, capability_code]
+Appeal                      seeds: ["appeal", restriction, appellant, nonce]
 ```
 
 ---

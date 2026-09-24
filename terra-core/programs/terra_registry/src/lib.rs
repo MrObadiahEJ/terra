@@ -295,6 +295,7 @@ pub mod cross_border;
 pub mod dispute;
 pub mod escrow;
 pub mod evidence_manifest;
+pub mod fraud_governance;
 pub mod ipfs_docs;
 pub mod observation_v2;
 pub mod quorum;
@@ -2310,6 +2311,65 @@ pub mod terra_registry {
             chosen,
             competitor_count,
         )
+    }
+
+    // -----------------------------------------------------------------------
+    // Reputation governance — fraud / demotion (RFC-012 Phase 7, no jail)
+    // -----------------------------------------------------------------------
+
+    pub fn submit_fraud_report(
+        ctx: Context<SubmitFraudReport>,
+        nonce: u16,
+        evidence_hash: [u8; 32],
+        reason_code: u8,
+        note: String,
+        capability_code: u8,
+    ) -> Result<()> {
+        fraud_governance::submit_fraud_report(
+            ctx,
+            nonce,
+            evidence_hash,
+            reason_code,
+            note,
+            capability_code,
+        )
+    }
+
+    pub fn open_fraud_review(ctx: Context<OpenFraudReview>) -> Result<()> {
+        fraud_governance::open_fraud_review(ctx)
+    }
+
+    pub fn cast_fraud_vote(ctx: Context<CastFraudVote>, uphold: bool) -> Result<()> {
+        fraud_governance::cast_fraud_vote(ctx, uphold)
+    }
+
+    pub fn finalize_fraud_review(ctx: Context<FinalizeFraudReview>) -> Result<()> {
+        fraud_governance::finalize_fraud_review(ctx)
+    }
+
+    pub fn file_fraud_appeal(
+        ctx: Context<FileFraudAppeal>,
+        nonce: u16,
+        evidence_hash: [u8; 32],
+        note: String,
+    ) -> Result<()> {
+        fraud_governance::file_fraud_appeal(ctx, nonce, evidence_hash, note)
+    }
+
+    pub fn open_appeal_review(ctx: Context<OpenAppealReview>) -> Result<()> {
+        fraud_governance::open_appeal_review(ctx)
+    }
+
+    pub fn cast_appeal_vote(ctx: Context<CastAppealVote>, grant: bool) -> Result<()> {
+        fraud_governance::cast_appeal_vote(ctx, grant)
+    }
+
+    pub fn finalize_appeal_review(ctx: Context<FinalizeAppealReview>) -> Result<()> {
+        fraud_governance::finalize_appeal_review(ctx)
+    }
+
+    pub fn rehabilitate_restriction(ctx: Context<RehabilitateRestriction>) -> Result<()> {
+        fraud_governance::rehabilitate_restriction(ctx)
     }
 
     // -----------------------------------------------------------------------
@@ -4728,6 +4788,310 @@ pub struct RouteTask<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Reputation governance contexts (RFC-012 Phase 7 — no jail)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(nonce: u16)]
+pub struct SubmitFraudReport<'info> {
+    #[account(
+        init,
+        payer = reporter,
+        space = 8 + fraud_governance::FraudReport::INIT_SPACE,
+        seeds = [
+            b"fraud_report",
+            accused.key().as_ref(),
+            reporter.key().as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    /// CHECK: accused is a wallet pubkey only; self-report is checked in handler.
+    pub accused: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub reporter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Seeds derive from `report` fields — no instruction args needed.
+#[derive(Accounts)]
+pub struct OpenFraudReview<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"fraud_report",
+            report.accused.as_ref(),
+            report.reporter.as_ref(),
+            &report.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    #[account(
+        init,
+        payer = reporter,
+        space = 8 + fraud_governance::ReviewCase::INIT_SPACE,
+        seeds = [b"review_case", report.key().as_ref()],
+        bump,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    #[account(mut)]
+    pub reporter: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CastFraudVote<'info> {
+    #[account(
+        mut,
+        seeds = [b"review_case", review.report.as_ref()],
+        bump,
+        constraint = review.report == report.key() @ TerraError::RouteAccountMismatch,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    pub voter: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeFraudReview<'info> {
+    #[account(
+        mut,
+        seeds = [b"review_case", report.key().as_ref()],
+        bump,
+        constraint = review.report == report.key() @ TerraError::RouteAccountMismatch,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    #[account(
+        mut,
+        seeds = [
+            b"fraud_report",
+            report.accused.as_ref(),
+            report.reporter.as_ref(),
+            &report.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    #[account(
+        init_if_needed,
+        payer = finalizer,
+        space = 8 + fraud_governance::CapabilityRestriction::INIT_SPACE,
+        seeds = [
+            b"capability_restriction",
+            report.accused.as_ref(),
+            &[report.capability_code],
+        ],
+        bump,
+    )]
+    pub restriction: Account<'info, fraud_governance::CapabilityRestriction>,
+    #[account(
+        init_if_needed,
+        payer = finalizer,
+        space = 8 + validator_profile::ValidatorCapability::INIT_SPACE,
+        seeds = [
+            b"validator_capability",
+            report.accused.as_ref(),
+            &[report.capability_code],
+        ],
+        bump,
+    )]
+    pub capability: Account<'info, validator_profile::ValidatorCapability>,
+    #[account(
+        mut,
+        seeds = [b"validator_profile", report.accused.as_ref()],
+        bump,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(mut)]
+    pub finalizer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(nonce: u16)]
+pub struct FileFraudAppeal<'info> {
+    #[account(
+        init,
+        payer = appellant,
+        space = 8 + fraud_governance::Appeal::INIT_SPACE,
+        seeds = [
+            b"appeal",
+            restriction.key().as_ref(),
+            appellant.key().as_ref(),
+            &nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub appeal: Account<'info, fraud_governance::Appeal>,
+    #[account(
+        mut,
+        seeds = [
+            b"capability_restriction",
+            restriction.wallet.as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+        constraint = restriction.wallet == appellant.key() @ TerraError::NotRestrictedWallet,
+    )]
+    pub restriction: Account<'info, fraud_governance::CapabilityRestriction>,
+    #[account(mut)]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    #[account(mut)]
+    pub appellant: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Seeds derive from `appeal` fields — no instruction args needed.
+#[derive(Accounts)]
+pub struct OpenAppealReview<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"appeal",
+            appeal.restriction.as_ref(),
+            appeal.appellant.as_ref(),
+            &appeal.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub appeal: Account<'info, fraud_governance::Appeal>,
+    #[account(
+        seeds = [
+            b"capability_restriction",
+            restriction.wallet.as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+        constraint = restriction.key() == appeal.restriction @ TerraError::RouteAccountMismatch,
+    )]
+    pub restriction: Account<'info, fraud_governance::CapabilityRestriction>,
+    #[account(
+        init,
+        payer = appellant,
+        space = 8 + fraud_governance::ReviewCase::INIT_SPACE,
+        seeds = [b"review_case", appeal.key().as_ref()],
+        bump,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    #[account(mut)]
+    pub appellant: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CastAppealVote<'info> {
+    #[account(
+        mut,
+        seeds = [b"review_case", review.report.as_ref()],
+        bump,
+        constraint = review.report == appeal.key() @ TerraError::RouteAccountMismatch,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    pub appeal: Account<'info, fraud_governance::Appeal>,
+    pub voter: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeAppealReview<'info> {
+    #[account(
+        mut,
+        seeds = [b"review_case", appeal.key().as_ref()],
+        bump,
+        constraint = review.report == appeal.key() @ TerraError::RouteAccountMismatch,
+    )]
+    pub review: Account<'info, fraud_governance::ReviewCase>,
+    #[account(
+        mut,
+        seeds = [
+            b"appeal",
+            appeal.restriction.as_ref(),
+            appeal.appellant.as_ref(),
+            &appeal.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub appeal: Account<'info, fraud_governance::Appeal>,
+    #[account(
+        mut,
+        seeds = [
+            b"capability_restriction",
+            restriction.wallet.as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+        constraint = restriction.key() == appeal.restriction @ TerraError::RouteAccountMismatch,
+    )]
+    pub restriction: Account<'info, fraud_governance::CapabilityRestriction>,
+    #[account(
+        init_if_needed,
+        payer = finalizer,
+        space = 8 + validator_profile::ValidatorCapability::INIT_SPACE,
+        seeds = [
+            b"validator_capability",
+            restriction.wallet.as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+    )]
+    pub capability: Account<'info, validator_profile::ValidatorCapability>,
+    #[account(
+        mut,
+        seeds = [b"fraud_report", report.accused.as_ref(), report.reporter.as_ref(), &report.nonce.to_le_bytes()],
+        bump,
+        constraint = report.status == fraud_governance::fraud_status::APPEALED @ TerraError::InvalidFraudStatus,
+    )]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    #[account(mut)]
+    pub finalizer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct RehabilitateRestriction<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"capability_restriction",
+            wallet.key().as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+        constraint = restriction.wallet == wallet.key() @ TerraError::NotRestrictedWallet,
+    )]
+    pub restriction: Account<'info, fraud_governance::CapabilityRestriction>,
+    #[account(
+        mut,
+        seeds = [b"fraud_report", report.accused.as_ref(), report.reporter.as_ref(), &report.nonce.to_le_bytes()],
+        bump,
+        constraint = report.accused == wallet.key() @ TerraError::NotRestrictedWallet,
+    )]
+    pub report: Account<'info, fraud_governance::FraudReport>,
+    #[account(
+        mut,
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    #[account(
+        init_if_needed,
+        payer = wallet,
+        space = 8 + validator_profile::ValidatorCapability::INIT_SPACE,
+        seeds = [
+            b"validator_capability",
+            wallet.key().as_ref(),
+            &[restriction.capability_code],
+        ],
+        bump,
+    )]
+    pub capability: Account<'info, validator_profile::ValidatorCapability>,
+    #[account(mut)]
+    pub wallet: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -5696,6 +6060,81 @@ pub struct TaskRouted {
 }
 
 // ---------------------------------------------------------------------------
+// Reputation governance events (RFC-012 Phase 7 — no jail)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct FraudReportSubmitted {
+    pub report: Pubkey,
+    pub accused: Pubkey,
+    pub reporter: Pubkey,
+    pub reason_code: u8,
+    pub capability_code: u8,
+}
+
+#[event]
+pub struct FraudReviewOpened {
+    pub review: Pubkey,
+    pub report: Pubkey,
+    pub accused: Pubkey,
+    pub committee_size: u8,
+}
+
+#[event]
+pub struct FraudVoteCast {
+    pub review: Pubkey,
+    pub voter: Pubkey,
+    pub uphold: bool,
+    pub votes_cast: u8,
+}
+
+#[event]
+pub struct FraudReviewFinalized {
+    pub review: Pubkey,
+    pub report: Pubkey,
+    pub decision: u8,
+    pub votes_upheld: u8,
+    pub votes_dismissed: u8,
+}
+
+#[event]
+pub struct CapabilityRestrictionApplied {
+    pub restriction: Pubkey,
+    pub wallet: Pubkey,
+    pub capability_code: u8,
+    pub max_level: u8,
+    pub report: Pubkey,
+}
+
+#[event]
+pub struct FraudAppealFiled {
+    pub appeal: Pubkey,
+    pub restriction: Pubkey,
+    pub appellant: Pubkey,
+}
+
+#[event]
+pub struct AppealReviewOpened {
+    pub review: Pubkey,
+    pub appeal: Pubkey,
+    pub committee_size: u8,
+}
+
+#[event]
+pub struct FraudAppealDecided {
+    pub appeal: Pubkey,
+    pub decision: u8,
+}
+
+#[event]
+pub struct CapabilityRestrictionLifted {
+    pub restriction: Pubkey,
+    pub wallet: Pubkey,
+    pub capability_code: u8,
+    pub by: u8,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -6306,6 +6745,38 @@ pub enum TerraError {
     TooManyRouteCandidates,
     #[msg("Route remaining_accounts do not match candidate list")]
     RouteAccountMismatch,
+
+    // RFC-012 Phase 7: reputation governance (no-jail demotion)
+    #[msg("Invalid fraud reason code")]
+    InvalidFraudReason,
+    #[msg("Fraud status does not allow this transition")]
+    InvalidFraudStatus,
+    #[msg("Reporters cannot file fraud against themselves")]
+    SelfFraudReport,
+    #[msg("Too few eligible well-reputed validators for a committee")]
+    CommitteeTooSmall,
+    #[msg("Review already has a final decision")]
+    ReviewAlreadyDecided,
+    #[msg("Signer is not a member of this review committee")]
+    NotCommitteeMember,
+    #[msg("This committee member has already voted")]
+    DuplicateCommitteeVote,
+    #[msg("Not every committee member has voted yet")]
+    ReviewNotFinalizable,
+    #[msg("Invalid capability restriction status")]
+    InvalidRestrictionStatus,
+    #[msg("Restriction is not active")]
+    RestrictionNotActive,
+    #[msg("Appeal window for this restriction has not opened")]
+    AppealWindowClosed,
+    #[msg("Signer is not the restricted wallet")]
+    NotRestrictedWallet,
+    #[msg("Invalid fraud appeal status")]
+    InvalidAppealStatus,
+    #[msg("Rehabilitation period for this restriction has not elapsed")]
+    RehabTooEarly,
+    #[msg("Active capability restriction blocks this route")]
+    CapabilityRestricted,
 }
 
 #[cfg(test)]
