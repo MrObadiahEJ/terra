@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
+import ProgressPage from './pages/ProgressPage'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
 
@@ -16,10 +18,15 @@ function App() {
   useSyncParcels()
 
   return (
-    <div className="flex flex-col h-screen bg-bg text-ink">
-      <Navbar />
-      <GlobePage />
-    </div>
+    <BrowserRouter>
+      <div className="flex flex-col h-screen bg-bg text-ink">
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<GlobePage />} />
+          <Route path="/progress" element={<ProgressPage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   )
 }
 

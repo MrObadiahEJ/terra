@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { NavLink } from 'react-router-dom'
 import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapter-react-ui'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
@@ -18,7 +19,19 @@ export default function Navbar() {
         Terra
       </div>
       <nav className="flex gap-1 ml-2 text-sm">
-        <a href="/" className="px-3 py-1.5 rounded hover:bg-bg">Globe</a>
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+        >
+          Globe
+        </NavLink>
+        <NavLink
+          to="/progress"
+          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+        >
+          Progress
+        </NavLink>
       </nav>
 
       <div className="ml-auto flex items-center gap-2">
