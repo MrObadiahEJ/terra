@@ -478,6 +478,44 @@ pub fn endorse_validator_add(ctx: Context<super::EndorseValidatorAdd>) -> Result
     Ok(())
 }
 
+/// Collect an endorsement for a REMOVE proposal (P0-2 counterpart of
+/// `endorse_validator_add`: each governance path collects its own quorum).
+pub fn endorse_validator_removal(ctx: Context<super::EndorseValidatorRemove>) -> Result<()> {
+    let endorsement = &mut ctx.accounts.endorsement;
+    let endorser = ctx.accounts.endorser.key();
+
+    require!(
+        endorsement.proposed != Pubkey::default(),
+        super::TerraError::NoProposalFound
+    );
+    // P0-2: this instruction collects REMOVE endorsements only.
+    require!(
+        endorsement.action == endorsement_action::REMOVE,
+        super::TerraError::WrongEndorsementAction
+    );
+
+    let registry = &ctx.accounts.registry;
+    require!(
+        registry.validators.contains(&endorser),
+        super::TerraError::NotValidator
+    );
+    require!(
+        !endorsement.endorsers.contains(&endorser),
+        super::TerraError::AlreadyEndorsedRotation
+    );
+
+    endorsement.endorsers.push(endorser);
+
+    emit!(super::ValidatorEndorsed {
+        registry: registry.key(),
+        proposed: endorsement.proposed,
+        endorser,
+        endorsements_count: endorsement.endorsers.len() as u8,
+        required: endorsement.required,
+    });
+    Ok(())
+}
+
 impl ValidatorEndorsement {
     /// Helper to produce a display pubkey for the endorsement set.
     pub fn endorsements_pubkey(&self) -> Pubkey {

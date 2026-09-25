@@ -4478,6 +4478,72 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "endorse_validator_removal",
+      "discriminator": [
+        88,
+        47,
+        224,
+        49,
+        1,
+        200,
+        113,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "endorsement.proposed",
+                "account": "ValidatorEndorsement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "endorser",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute_emergency_injection",
       "discriminator": [
         170,

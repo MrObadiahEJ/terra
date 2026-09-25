@@ -976,6 +976,7 @@ async fn zk_register_generate_verify_double_use() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data,
@@ -1095,6 +1096,7 @@ async fn zk_register_generate_verify_double_use() {
         accounts: vec![
             AccountMeta::new(zone_set, false),
             AccountMeta::new(root, false),
+            AccountMeta::new_readonly(registry, false),
             AccountMeta::new_readonly(intruder.pubkey(), true),
         ],
         data,
@@ -1957,6 +1959,7 @@ async fn update_verification_key_hash() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(reg, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: {
@@ -2995,7 +2998,7 @@ async fn dispute_lifecycle_owner_wins() {
     process(
         &mut ctx,
         &payer,
-        fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000),
+        fund_ix(&payer.pubkey(), &owner.pubkey(), 30_000_000),
     )
     .await
     .expect("fund owner");
@@ -3085,15 +3088,6 @@ async fn dispute_lifecycle_owner_wins() {
     assert_eq!(d.status, 1); // FROZEN
 
     // 3. Adjudicate — owner wins, re-activate parcel.
-    let authority = Keypair::new();
-    process(
-        &mut ctx,
-        &payer,
-        fund_ix(&payer.pubkey(), &authority.pubkey(), 10_000_000),
-    )
-    .await
-    .expect("fund authority");
-
     let mut adj_data = discriminator("global", "adjudicate_dispute").to_vec();
     adj_data.push(0u8); // outcome = OWNER_WINS
     adj_data.extend_from_slice(&Pubkey::default().to_bytes()); // new_owner (ignored for OWNER_WINS)
@@ -3102,14 +3096,16 @@ async fn dispute_lifecycle_owner_wins() {
         accounts: vec![
             AccountMeta::new(dispute_pda, false),
             AccountMeta::new(parcel_pk, false),
-            AccountMeta::new(authority.pubkey(), true),
+            AccountMeta::new_readonly(registry, false),
+            // Adjudicator must be the registry admin.
+            AccountMeta::new(payer.pubkey(), true),
             // remaining_accounts: validator signers
             AccountMeta::new_readonly(val1.pubkey(), true),
             AccountMeta::new_readonly(val2.pubkey(), true),
         ],
         data: adj_data,
     };
-    process_with(&mut ctx, &authority, &[&authority, &val1, &val2], adj_ix)
+    process_with(&mut ctx, &payer, &[&payer, &val1, &val2], adj_ix)
         .await
         .expect("adjudicate_dispute failed");
 
@@ -5098,6 +5094,7 @@ async fn invalidate_proof_happy_path() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data,
@@ -5120,6 +5117,7 @@ async fn invalidate_proof_happy_path() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data: data2,
@@ -5138,6 +5136,7 @@ async fn invalidate_proof_happy_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(zone_set, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data,
@@ -8349,6 +8348,7 @@ async fn guardian_claim_lifecycle() {
             accounts: vec![
                 AccountMeta::new(gc_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry_pda().0, false),
             ],
             data: discriminator("global", "resolve_guardian_claim").to_vec(),
         },
@@ -11579,7 +11579,7 @@ async fn dispute_slashing_rejects_appeal_window_expired() {
         },
     )
     .await;
-    assert_custom_error(res, 6066, "wrong offender disputes");
+    assert_custom_error(res, 6155, "wrong offender disputes");
 }
 
 #[tokio::test]
@@ -15758,6 +15758,7 @@ async fn guardian_resolve_rejects_already_resolved() {
             accounts: vec![
                 AccountMeta::new(gc_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry_pda().0, false),
             ],
             data: discriminator("global", "resolve_guardian_claim").to_vec(),
         },
@@ -15773,6 +15774,7 @@ async fn guardian_resolve_rejects_already_resolved() {
             accounts: vec![
                 AccountMeta::new(gc_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry_pda().0, false),
             ],
             data: discriminator("global", "resolve_guardian_claim").to_vec(),
         },
@@ -15848,6 +15850,7 @@ async fn guardian_dispute_rejects_already_disputed() {
             accounts: vec![
                 AccountMeta::new(gc_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry_pda().0, false),
             ],
             data: discriminator("global", "dispute_guardian_claim").to_vec(),
         },
@@ -15863,6 +15866,7 @@ async fn guardian_dispute_rejects_already_disputed() {
             accounts: vec![
                 AccountMeta::new(gc_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(registry_pda().0, false),
             ],
             data: discriminator("global", "dispute_guardian_claim").to_vec(),
         },
@@ -16041,6 +16045,7 @@ async fn verify_cross_border_rejects_not_pending() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(cbv_pk, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: discriminator("global", "verify_cross_border").to_vec(),
@@ -16056,6 +16061,7 @@ async fn verify_cross_border_rejects_not_pending() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(cbv_pk, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: discriminator("global", "verify_cross_border").to_vec(),
@@ -16363,7 +16369,7 @@ async fn zk_register_rejects_non_admin() {
         },
     )
     .await;
-    assert_custom_error(res, 6108, "non-admin register zone set");
+    assert_custom_error(res, 6010, "non-admin register zone set");
 }
 
 // =========================================================================
@@ -16581,6 +16587,7 @@ async fn zk_generate_root_rejects_zero_commitments() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data,
@@ -16634,6 +16641,7 @@ async fn zk_verify_rejects_empty_proof_data() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data: {
@@ -16721,6 +16729,7 @@ async fn zk_verify_rejects_invalid_disclosure_type() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data: {
@@ -16808,6 +16817,7 @@ async fn zk_verify_rejects_invalid_proof_purpose() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data: {
@@ -16895,6 +16905,7 @@ async fn zk_verify_rejects_root_version_mismatch() {
             accounts: vec![
                 AccountMeta::new(zone_set, false),
                 AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new_readonly(payer.pubkey(), true),
             ],
             data: {
@@ -21893,6 +21904,32 @@ async fn endorse_add(
     .expect("endorse_validator_add failed");
 }
 
+/// Endorse a validator-removal for `target` as an existing registered validator.
+async fn endorse_remove(
+    ctx: &mut ProgramTestContext,
+    registry: &Pubkey,
+    target: &Pubkey,
+    endorser: &Keypair,
+) {
+    let (endorsement, _) = endorsement_pda(registry, target);
+    let mut data = discriminator("global", "endorse_validator_removal").to_vec();
+    process(
+        ctx,
+        endorser,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(*registry, false),
+                AccountMeta::new(endorser.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("endorse_validator_add failed");
+}
+
 /// Propose removal of a registered validator (creates REMOVE endorsement).
 async fn propose_removal_ok(
     ctx: &mut ProgramTestContext,
@@ -22110,12 +22147,12 @@ async fn p0_2_removal_duplicate_endorser_rejected() {
 
     propose_removal_ok(&mut ctx, &payer, &registry, &target.pubkey()).await;
 
-    // First endorsement succeeds.
-    endorse_add(&mut ctx, &registry, &target.pubkey(), &v2).await;
+    // First removal endorsement succeeds.
+    endorse_remove(&mut ctx, &registry, &target.pubkey(), &v2).await;
 
     // Same endorser again — rejected (AlreadyEndorsedRotation).
     let (endorsement, _) = endorsement_pda(&registry, &target.pubkey());
-    let mut data = discriminator("global", "endorse_validator_add").to_vec();
+    let mut data = discriminator("global", "endorse_validator_removal").to_vec();
     let res = process(
         &mut ctx,
         &v2,

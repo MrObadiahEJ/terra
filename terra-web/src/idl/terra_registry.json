@@ -524,7 +524,7 @@
         {
           "name": "admin_signer",
           "docs": [
-            "Admin signer — required in bootstrap mode, ignored in peer-consensus",
+            "Admin signer \u2014 required in bootstrap mode, ignored in peer-consensus",
             "(the endorsement account carries authority instead)."
           ],
           "writable": true,
@@ -686,7 +686,7 @@
         {
           "name": "authority",
           "docs": [
-            "Court authority or designated adjudicator — must be registry admin."
+            "Court authority or designated adjudicator \u2014 must be registry admin."
           ],
           "signer": true
         }
@@ -886,7 +886,7 @@
         {
           "name": "result_ownership",
           "docs": [
-            "Ownership right of the result parcel — authority must control it."
+            "Ownership right of the result parcel \u2014 authority must control it."
           ],
           "pda": {
             "seeds": [
@@ -938,7 +938,7 @@
         {
           "name": "source_ownership",
           "docs": [
-            "Ownership right of the source parcel — authority must control it too."
+            "Ownership right of the source parcel \u2014 authority must control it too."
           ],
           "pda": {
             "seeds": [
@@ -1120,7 +1120,7 @@
       "docs": [
         "Attach a parcel to an identity (the person behind its holder wallet).",
         "Only the current ownership holder may do this, and only for an identity",
-        "whose owner wallet matches. The identity link is provenance — it never",
+        "whose owner wallet matches. The identity link is provenance \u2014 it never",
         "becomes the ownership record."
       ],
       "discriminator": [
@@ -2105,7 +2105,7 @@
       "docs": [
         "Claim a succession AND transfer every ownership right it covers in one",
         "atomic step (B6 boundary rule: identity state is only ever *composed*",
-        "from this program — never written directly).",
+        "from this program \u2014 never written directly).",
         "",
         "The identity-side claim runs as a CPI into",
         "`terra_identity::claim_succession`, which enforces its own guards,",
@@ -2116,7 +2116,7 @@
         "",
         "`remaining_accounts` = ownership Rights PDAs (`[\"ownership\", parcel]`).",
         "Each must be held either by the previous identity-owner wallet",
-        "(re-pointed to the successor) or by the Identity PDA itself (skipped —",
+        "(re-pointed to the successor) or by the Identity PDA itself (skipped \u2014",
         "it already follows the identity). If the CPI fails, no rights are",
         "written; if a rights write fails, the CPI rolls back. Atomic."
       ],
@@ -4475,6 +4475,72 @@
       "args": []
     },
     {
+      "name": "endorse_validator_removal",
+      "discriminator": [
+        88,
+        47,
+        224,
+        49,
+        1,
+        200,
+        113,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "endorsement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  101,
+                  110,
+                  100,
+                  111,
+                  114,
+                  115,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "registry"
+              },
+              {
+                "kind": "account",
+                "path": "endorsement.proposed",
+                "account": "ValidatorEndorsement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry"
+        },
+        {
+          "name": "endorser",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "execute_emergency_injection",
       "discriminator": [
         170,
@@ -6111,7 +6177,7 @@
         "valid Identity PDA.",
         "",
         "Identity is a separate binding/provenance layer: this creates the",
-        "optional identity↔parcel link (`IdentityRights`), it is never the",
+        "optional identity\u2194parcel link (`IdentityRights`), it is never the",
         "ownership record itself (ownership lives at `[\"ownership\", parcel]`).",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`."
@@ -6215,7 +6281,7 @@
         "",
         "`nonce` must equal the parcel's current `rights_count`, which is",
         "incremented so every right gets a unique PDA. OWNERSHIP is excluded",
-        "here — it lives solely at the canonical `[\"ownership\", parcel]` PDA",
+        "here \u2014 it lives solely at the canonical `[\"ownership\", parcel]` PDA",
         "and only moves via `transfer_parcel`."
       ],
       "discriminator": [
@@ -6830,7 +6896,7 @@
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -9121,7 +9187,7 @@
         {
           "name": "ownership",
           "docs": [
-            "The canonical ownership right (RRR: this — not the parcel — is the",
+            "The canonical ownership right (RRR: this \u2014 not the parcel \u2014 is the",
             "ownership record). Created in the same instruction as the parcel."
           ],
           "writable": true,
@@ -10434,7 +10500,7 @@
         "holder or the original granter may revoke. The account is closed and",
         "its lamports returned. The parcel's rights counter is decremented so",
         "the freed nonce can be reused by a future grant (safe: the old account",
-        "no longer exists). The canonical ownership right is not revocable —",
+        "no longer exists). The canonical ownership right is not revocable \u2014",
         "it only moves via `transfer_parcel`."
       ],
       "discriminator": [
@@ -11699,7 +11765,7 @@
         {
           "name": "sub_ownership",
           "docs": [
-            "The sub-parcel's canonical ownership right — inherited from the",
+            "The sub-parcel's canonical ownership right \u2014 inherited from the",
             "original parcel's holder in the same instruction."
           ],
           "writable": true,
@@ -11762,7 +11828,7 @@
           "name": "claim",
           "docs": [
             "Verified surveyor claim for the original parcel: the surveyor flow",
-            "(`create_claim(SUBDIVISION) → evidence → observations → verify_claim`)",
+            "(`create_claim(SUBDIVISION) \u2192 evidence \u2192 observations \u2192 verify_claim`)",
             "replaces the deprecated parcel-`Attestation` gate."
           ],
           "pda": {
@@ -13516,7 +13582,7 @@
           "name": "treasury",
           "docs": [
             "Treasury PDA receiving slashed lamports. Constrained to a deterministic",
-            "PDA derived from the authority registry — no one can redirect funds to",
+            "PDA derived from the authority registry \u2014 no one can redirect funds to",
             "an arbitrary wallet."
           ],
           "writable": true,
@@ -17154,7 +17220,7 @@
     {
       "code": 6069,
       "name": "InsufficientDeposit",
-      "msg": "Full deposit not yet received — seller cannot accept"
+      "msg": "Full deposit not yet received \u2014 seller cannot accept"
     },
     {
       "code": 6070,
@@ -17169,12 +17235,12 @@
     {
       "code": 6072,
       "name": "CancelWindowExpired",
-      "msg": "Buyer grace period has expired — cannot cancel"
+      "msg": "Buyer grace period has expired \u2014 cannot cancel"
     },
     {
       "code": 6073,
       "name": "CancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired — escrow not stale"
+      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
     },
     {
       "code": 6074,
@@ -17309,12 +17375,12 @@
     {
       "code": 6100,
       "name": "StakeAlreadyActive",
-      "msg": "Stake is already active — cannot deposit again"
+      "msg": "Stake is already active \u2014 cannot deposit again"
     },
     {
       "code": 6101,
       "name": "UnbondingInProgress",
-      "msg": "Unbonding is in progress — cannot deposit or withdraw"
+      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
     },
     {
       "code": 6102,
@@ -17429,7 +17495,7 @@
     {
       "code": 6124,
       "name": "ProgramPaused",
-      "msg": "Program is paused — state-changing operations are frozen"
+      "msg": "Program is paused \u2014 state-changing operations are frozen"
     },
     {
       "code": 6125,
@@ -17894,7 +17960,7 @@
     {
       "code": 6217,
       "name": "EscrowNotRefundable",
-      "msg": "Task is still active — escrow is not refundable"
+      "msg": "Task is still active \u2014 escrow is not refundable"
     },
     {
       "code": 6218,
@@ -18174,7 +18240,7 @@
     {
       "name": "CapabilityRestriction",
       "docs": [
-        "Partial capability downgrade — NOT a ban, NOT a jail (Design Rule 13).",
+        "Partial capability downgrade \u2014 NOT a ban, NOT a jail (Design Rule 13).",
         "PDA: `[\"capability_restriction\", wallet, capability_code]`"
       ],
       "type": {
@@ -18537,7 +18603,7 @@
           {
             "name": "required_attestations",
             "docs": [
-              "Quorum threshold — number of attestations needed to verify."
+              "Quorum threshold \u2014 number of attestations needed to verify."
             ],
             "type": "u8"
           },
@@ -18757,7 +18823,7 @@
           {
             "name": "difficulty_bps",
             "docs": [
-              "Base difficulty contribution; scaled ×required_validators (cap 4)."
+              "Base difficulty contribution; scaled \u00d7required_validators (cap 4)."
             ],
             "type": "u16"
           },
@@ -19304,7 +19370,7 @@
           {
             "name": "status",
             "docs": [
-              "Current dispute status (FILED → FROZEN → ADJUDICATED → EXECUTED)."
+              "Current dispute status (FILED \u2192 FROZEN \u2192 ADJUDICATED \u2192 EXECUTED)."
             ],
             "type": "u8"
           },
@@ -19339,7 +19405,7 @@
             "docs": [
               "Validators that actually co-signed (recorded at freeze/adjudicate).",
               "Unlike `validators` (declared at filing), this is on-chain proof of",
-              "who testified — events alone are not reliably indexable."
+              "who testified \u2014 events alone are not reliably indexable."
             ],
             "type": {
               "array": [
@@ -20019,14 +20085,14 @@
           {
             "name": "source",
             "docs": [
-              "Capture source — one of `observation_source` (reused for provenance richness)."
+              "Capture source \u2014 one of `observation_source` (reused for provenance richness)."
             ],
             "type": "u8"
           },
           {
             "name": "provenance",
             "docs": [
-              "Provenance — one of `observation_provenance`."
+              "Provenance \u2014 one of `observation_provenance`."
             ],
             "type": "u8"
           },
@@ -20045,7 +20111,7 @@
           {
             "name": "storage_reference",
             "docs": [
-              "IPFS CID, URL, or content address (≤128 bytes)."
+              "IPFS CID, URL, or content address (\u2264128 bytes)."
             ],
             "type": "string"
           },
@@ -20828,7 +20894,7 @@
         "",
         "This is the foundation for replacing raw wallet ownership (`Parcel.owner`)",
         "with identity-centric ownership. Rather than a wallet pubkey holding a right,",
-        "the Identity PDA is the holder — making rights portable across wallets.",
+        "the Identity PDA is the holder \u2014 making rights portable across wallets.",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`.",
         "One IdentityRights per (identity, parcel, kind) is allowed."
@@ -21483,7 +21549,7 @@
         "",
         "PDA: `[\"observation_v2\", task_id, observer, nonce]`",
         "",
-        "Roles (Design Rule 7): `subject` ≠ `capture_device` ≠ `observer`",
+        "Roles (Design Rule 7): `subject` \u2260 `capture_device` \u2260 `observer`",
         "(submitter). A document owned by Alice (`subject`), photographed on",
         "Bob's phone (`capture_device`), submitted by Charlie (`observer`)."
       ],
@@ -21519,7 +21585,7 @@
           {
             "name": "subject",
             "docs": [
-              "What is observed — claim, parcel, identity, or other account key."
+              "What is observed \u2014 claim, parcel, identity, or other account key."
             ],
             "type": "pubkey"
           },
@@ -21590,7 +21656,7 @@
           {
             "name": "confidence",
             "docs": [
-              "Confidence 0–100."
+              "Confidence 0\u2013100."
             ],
             "type": "u8"
           },
@@ -22622,7 +22688,7 @@
     {
       "name": "ResourceQuote",
       "docs": [
-        "Requester's estimated resource cost for a task (travel, materials, …).",
+        "Requester's estimated resource cost for a task (travel, materials, \u2026).",
         "",
         "PDA: `[\"resource_quote\", task_id]`"
       ],
@@ -23678,7 +23744,7 @@
       "docs": [
         "Locked funds for a verification task.",
         "",
-        "PDA: `[\"task_escrow\", task_id]` — vault PDA: `[\"task_escrow_vault\", escrow]`"
+        "PDA: `[\"task_escrow\", task_id]` \u2014 vault PDA: `[\"task_escrow_vault\", escrow]`"
       ],
       "type": {
         "kind": "struct",
@@ -23849,7 +23915,7 @@
           {
             "name": "req_index",
             "docs": [
-              "Append-only index (0, 1, … requirement_count-1)."
+              "Append-only index (0, 1, \u2026 requirement_count-1)."
             ],
             "type": "u8"
           },
@@ -23914,7 +23980,7 @@
           {
             "name": "confidence_target_bps",
             "docs": [
-              "Minimum confidence the result should target (0–10000 bps)."
+              "Minimum confidence the result should target (0\u201310000 bps)."
             ],
             "type": "u16"
           },
@@ -24247,7 +24313,7 @@
           {
             "name": "is_active",
             "docs": [
-              "Soft flag — set to false by admin to forcibly exclude a validator from",
+              "Soft flag \u2014 set to false by admin to forcibly exclude a validator from",
               "quorum without removing them from the registry."
             ],
             "type": "bool"
@@ -24657,7 +24723,7 @@
     {
       "name": "ValidatorPresence",
       "docs": [
-        "Dynamic geographic presence — timestamped, confidence-scored, expiring.",
+        "Dynamic geographic presence \u2014 timestamped, confidence-scored, expiring.",
         "",
         "Never treat as immutable identity. PDA: `[\"validator_presence\", wallet]`"
       ],
@@ -24671,7 +24737,7 @@
           {
             "name": "latitude_e7",
             "docs": [
-              "Latitude in degrees * 1e7 (i32) — compact fixed-point."
+              "Latitude in degrees * 1e7 (i32) \u2014 compact fixed-point."
             ],
             "type": "i32"
           },
@@ -24699,7 +24765,7 @@
           {
             "name": "confidence_bps",
             "docs": [
-              "Confidence in this presence fix (0–10000 bps)."
+              "Confidence in this presence fix (0\u201310000 bps)."
             ],
             "type": "u16"
           },
@@ -24751,7 +24817,7 @@
     {
       "name": "ValidatorProfile",
       "docs": [
-        "Core validator profile — identity + tier attributes (not location-bound).",
+        "Core validator profile \u2014 identity + tier attributes (not location-bound).",
         "",
         "PDA: `[\"validator_profile\", wallet]`"
       ],
@@ -24761,7 +24827,7 @@
           {
             "name": "wallet",
             "docs": [
-              "The validator's wallet (mobile participant — NOT a region)."
+              "The validator's wallet (mobile participant \u2014 NOT a region)."
             ],
             "type": "pubkey"
           },
@@ -24787,7 +24853,7 @@
           {
             "name": "note",
             "docs": [
-              "Free-form operator note (device class, org, …) — not used for selection."
+              "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
             ],
             "type": "string"
           },
@@ -24902,7 +24968,7 @@
               "Emergency pause flag. When true, all pausable subsystem instructions",
               "(staking, cross-border, guardian, zk, escrow, dispute) reject",
               "state-changing calls. Core parcel/identity operations authorized by",
-              "individual owners are unaffected — the admin stops processing via",
+              "individual owners are unaffected \u2014 the admin stops processing via",
               "off-chain policy."
             ],
             "type": "bool"
@@ -24930,7 +24996,7 @@
       "docs": [
         "Directed relationship graph edge (endorsement / co-validation / infra).",
         "",
-        "Correlation ≠ fraud — used for review, not auto-punishment (RFC-012 §6.12).",
+        "Correlation \u2260 fraud \u2014 used for review, not auto-punishment (RFC-012 \u00a76.12).",
         "PDA: `[\"validator_edge\", from, to, edge_type]`"
       ],
       "type": {
@@ -24954,7 +25020,7 @@
           {
             "name": "weight_bps",
             "docs": [
-              "Optional strength (0–10000 bps); default 10000 for binary endorsement."
+              "Optional strength (0\u201310000 bps); default 10000 for binary endorsement."
             ],
             "type": "u16"
           },
@@ -25755,7 +25821,7 @@
           {
             "name": "subject",
             "docs": [
-              "What the task is about — claim, parcel, identity, or other account.",
+              "What the task is about \u2014 claim, parcel, identity, or other account.",
               "Not constrained to one program (migration map: claims become subjects)."
             ],
             "type": "pubkey"
@@ -25914,7 +25980,7 @@
           {
             "name": "admin",
             "docs": [
-              "Global founder — temporary sole authority during bootstrap phase."
+              "Global founder \u2014 temporary sole authority during bootstrap phase."
             ],
             "type": "pubkey"
           },

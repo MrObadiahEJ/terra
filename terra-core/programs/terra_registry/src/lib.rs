@@ -723,6 +723,22 @@ pub struct EndorseValidatorAdd<'info> {
 }
 
 #[derive(Accounts)]
+pub struct EndorseValidatorRemove<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"validator_endorsement",
+            registry.key().as_ref(),
+            endorsement.proposed.as_ref()
+        ],
+        bump,
+    )]
+    pub endorsement: Account<'info, validator_registry::ValidatorEndorsement>,
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    pub endorser: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct PauseProgram<'info> {
     #[account(mut)]
     pub registry: Account<'info, validator_registry::ValidatorRegistry>,
@@ -1461,6 +1477,10 @@ pub mod terra_registry {
 
     pub fn endorse_validator_add(ctx: Context<EndorseValidatorAdd>) -> Result<()> {
         validator_registry::endorse_validator_add(ctx)
+    }
+
+    pub fn endorse_validator_removal(ctx: Context<EndorseValidatorRemove>) -> Result<()> {
+        validator_registry::endorse_validator_removal(ctx)
     }
 
     pub fn pause_program(ctx: Context<PauseProgram>) -> Result<()> {
