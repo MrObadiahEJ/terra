@@ -1,12 +1,18 @@
+import { Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import {
+  ARCHITECTURE,
+  CTA,
   HERO,
   METRICS,
   NEXT_MILESTONE,
   PROTOCOLS,
   RELEASE,
   ROADMAP,
+  SCENARIOS,
   SECURITY_CLOSED,
   SECURITY_OPEN,
+  VISION,
 } from '../lib/progressData'
 
 export default function ProgressPage() {
@@ -23,6 +29,75 @@ export default function ProgressPage() {
           </div>
         </header>
 
+        <h2 className="pp-h2">Vision</h2>
+        <section className="pp-vision">
+          <p className="pp-pitch">{VISION.pitch}</p>
+          <div className="pp-chain">
+            {VISION.chain.map((node, i) => (
+              <Fragment key={node}>
+                {i > 0 && <span className="pp-chain-arrow">→</span>}
+                <span className="pp-chain-node">{node}</span>
+              </Fragment>
+            ))}
+          </div>
+          <div className="pp-callout">
+            <strong>{VISION.calloutTitle}</strong> — {VISION.calloutBody}
+          </div>
+        </section>
+
+        <h2 className="pp-h2">Architecture</h2>
+        <section className="pp-arch">
+          {ARCHITECTURE.map((layer) => (
+            <div className="pp-card" key={layer.title}>
+              <div className="pp-layer-title">{layer.title}</div>
+              <div className="pp-rfc-note">{layer.body}</div>
+              <div className="pp-tags">
+                {layer.tags.map((t) => (
+                  <span className="pp-tag pp-tag-mono" key={t}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <h2 className="pp-h2">Flagship scenarios</h2>
+        <section className="pp-scenarios">
+          {SCENARIOS.map((s) => (
+            <div className="pp-card" key={s.title}>
+              <div className="pp-layer-title">{s.title}</div>
+              <ol className="pp-steps">
+                {s.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <div className="pp-ref">{s.ref}</div>
+            </div>
+          ))}
+        </section>
+
+        <h2 className="pp-h2">Live product</h2>
+        <section className="pp-card pp-cta">
+          <div className="pp-cta-text">
+            <h3 className="pp-next-title">{CTA.title}</h3>
+            <p className="pp-next-body">{CTA.body}</p>
+            <ul className="pp-findings pp-closed pp-cta-list">
+              {CTA.bullets.map((b) => (
+                <li className="pp-finding" key={b}>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="pp-cta-action">
+            <Link to="/" className="btn btn-primary pp-cta-btn">
+              Open the Globe →
+            </Link>
+          </div>
+        </section>
+
+        <h2 className="pp-h2">Progress in numbers</h2>
         <section className="pp-grid">
           {METRICS.map((m) => (
             <div className="pp-card" key={m.label}>

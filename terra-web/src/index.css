@@ -471,6 +471,111 @@ a {
   line-height: 1.6;
 }
 
+.pp-vision {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+.pp-pitch {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.pp-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+}
+.pp-chain-node {
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pp-chain-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+.pp-callout {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  background: #ecfdf5;
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.pp-arch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+.pp-layer-title {
+  font-size: 14px;
+  font-weight: 650;
+}
+.pp-tag-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.pp-scenarios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.pp-steps {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.pp-steps li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+.pp-ref {
+  margin-top: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.pp-cta-text {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+.pp-cta-list {
+  margin-top: 12px;
+}
+.pp-cta-action {
+  flex-shrink: 0;
+}
+.pp-cta-btn {
+  padding: 11px 20px;
+  font-size: 14px;
+}
+
 @media (max-width: 720px) {
   .pp { padding: 20px 14px 40px; }
   .pp-title { font-size: 20px; }

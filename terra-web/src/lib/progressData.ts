@@ -214,3 +214,120 @@ export const NEXT_MILESTONE = {
   body: 'Tie field devices and imagery to on-chain identity: DeviceIdentity and capability PDAs built on the Phase-4 ObservationV2 provenance sources — then Devnet deployment rehearsal. Mainnet gates (staking reconfirm, ZK audit) follow.',
   tags: ['Devices + capabilities', 'ObservationV2 provenance', 'Devnet rehearsal', 'Mainnet gates'],
 }
+
+export const VISION = {
+  pitch:
+    'Terra is a decentralized, blockchain-anchored claim/verification network for land: anyone can create a claim about any parcel, validators independently evaluate evidence, and the network records attestations and immutable history — no authority provider is required to participate.',
+  chain: [
+    'People',
+    'Claims',
+    'Evidence',
+    'Validators',
+    'Attestations',
+    'Consensus',
+    'Immutable History',
+  ],
+  calloutTitle: 'Claims ≠ Facts',
+  calloutBody:
+    'The protocol verifies claims, not legal ownership. Physical-world observation is a first-class layer: validators can observe, photograph, and attest to the physical state of land, binding digital records to physical reality.',
+}
+
+export interface Layer {
+  title: string
+  body: string
+  tags: string[]
+}
+
+export const ARCHITECTURE: Layer[] = [
+  {
+    title: 'On-chain — Solana / Anchor',
+    body: 'Two programs hold minimal state: parcel rights, attestations, quorum, escrow, staking, disputes, ZK. Off-chain validation is anchored as hashes.',
+    tags: [
+      'terra_registry · 148 instructions',
+      'terra_identity · 8 instructions',
+      'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage',
+      '68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4',
+    ],
+  },
+  {
+    title: 'Off-chain mirror — PostGIS + Axum',
+    body: 'Every on-chain account has a mirror table; the REST API serves wallets, verification flows, evidence, and spatial queries against a live PostGIS.',
+    tags: ['26 migrations (0001…0026)', 'REST /api/*', '68 API tests incl. live-PostGIS run'],
+  },
+  {
+    title: 'Geo engine + client',
+    body: 'OSM fusion into PostGIS, road-access validation anchored on-chain, parcel spatial stats — visualised and driven from a Cesium globe client.',
+    tags: ['OSM ingestion', 'road-access digest anchor', 'Cesium globe + wallet adapter'],
+  },
+]
+
+export interface Scenario {
+  title: string
+  steps: string[]
+  ref: string
+}
+
+export const SCENARIOS: Scenario[] = [
+  {
+    title: 'Claim → attestation → consensus',
+    steps: [
+      'Anyone files a claim on a parcel',
+      'Attaches typed evidence (13 evidence types)',
+      'Validators evaluate independently (14 claim types)',
+      'Weighted quorum records attestations',
+      'Append-only audit trail accumulates',
+    ],
+    ref: 'verification/* · quorum.rs',
+  },
+  {
+    title: 'Succession when an owner vanishes',
+    steps: [
+      'Heir files a succession request on terra_identity',
+      'Validators endorse — no authority provider needed',
+      'Claim succeeds; ownership Rights PDAs re-point atomically',
+      'RFC-010 court guardianship: ≥3 validators, ≥90-day grace',
+    ],
+    ref: 'terra_identity · RFC-010',
+  },
+  {
+    title: 'Dispute & parcel freeze',
+    steps: [
+      'Owner or buyer files a dispute on the parcel',
+      'Parcel freezes — transfers blocked while contested',
+      'Registry adjudicator resolves with evidence',
+      'Execute the winner path, or cancel to unfreeze',
+    ],
+    ref: 'dispute.rs · RFC-007',
+  },
+  {
+    title: 'Cross-border identity bridge',
+    steps: [
+      'Register jurisdiction + identity binding',
+      'ZK binding proves the identity link without revealing it',
+      'Nullifiers prevent double-use across borders',
+      'Revoke / rebind when policy changes',
+    ],
+    ref: 'cross_border.rs · RFC-006',
+  },
+  {
+    title: 'Subdivision & amalgamation',
+    steps: [
+      'Split a parcel into children — or merge siblings',
+      'Lineage record preserves provenance',
+      'Rights migrate to the new parcel IDs',
+      'Subdivide + credit settle atomically in one transaction',
+    ],
+    ref: 'subdivision.rs · RFC-008',
+  },
+]
+
+export const CTA = {
+  title: 'See it live',
+  body: 'The Cesium globe client is the working product — connect, draw a parcel polygon, and register it against the on-chain registry.',
+  bullets: [
+    'Connect a wallet (Phantom / Solflare)',
+    'Draw geometry and register a parcel',
+    'Browse the on-chain registry',
+    'Transfer rights from the parcel panel',
+  ],
+}
