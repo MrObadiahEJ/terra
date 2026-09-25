@@ -1,5 +1,7 @@
 # RFC-005: Validator Staking & Slashing Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (staking.rs; governance caution remains — reconfirm before mainnet)

@@ -1,8 +1,19 @@
-# Terra — A Decentralized Land Claim & Verification Network
+# Terra — Infrastructure for a Verifiable Digital Representation of the Physical World
 
 [![CI](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml/badge.svg)](https://github.com/MrObadiahEJ/terra/actions/workflows/ci.yml)
 
-> A decentralized, blockchain-anchored protocol where anyone can create claims about land, validators independently verify them, and the network records attestations and immutable history. No authority provider is required to participate.
+> **Terra is an open physical-world trust and spatial infrastructure protocol that
+> gives real-world entities persistent spatial identity and verifiable history by
+> connecting observations, evidence, independent validation, rights and transactions
+> across time and jurisdictions. Land is the first domain.**
+
+**Start here: [`docs/VISION.md`](docs/VISION.md)** — the north-star document (what
+Terra is, the 10 domains, development stages 0–10, where we are today). Read it
+before anything else.
+
+**Architectural rule:** Terra never treats a single AI model, sensor, person,
+company, government, oracle or database as absolute truth. The canonical transition
+is `observation → evidence → validation → consensus → state`.
 
 **Program ID:** `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` (devnet / localnet)
 
@@ -10,7 +21,8 @@
 
 ## What Terra Is
 
-Terra is a **claim/verification/evidence network** for land and property:
+Terra is a **claim/verification/evidence network** for land and property — the
+first domain of the wider vision above:
 
 - Anyone can create a claim about any parcel. Validators independently evaluate evidence. The protocol records attestations and builds immutable history. Claims ≠ Facts — the protocol verifies claims, not legal ownership.
 
@@ -28,34 +40,40 @@ Physical world observation is a first-class layer, not an afterthought. Validato
 
 All protocol modules (RFC-003 → RFC-012) have on-chain implementations:
 Anchor programs + PostGIS mirror + REST API + frontend client + IDL, with CI
-green on `dev` (fmt, `clippy -D warnings`, registry lib unit tests, API unit
-tests incl. live-PostGIS migration run, `tsc --noEmit`).
+green on `dev` and `main` (fmt, `clippy -D warnings`, registry/identity lib
+unit tests, RFC-012 structural, geo, API unit tests incl. live-PostGIS
+migration run, `tsc --noEmit`).
 
-**Phase 0 (RFC-012 architecture contract)**, **Phase 1 (security hardening)**, **Phase 2 (generalized validator PDAs)**, **Phase 3 (verification tasks)**, **Phase 4 (multi-source observations)**,
-**Phase 5 (evidence provenance)**, **Phase 6 (dynamic routing)**, **Phase 7 (reputation governance)**, **Phase 8 (economic/resource layer)**,
- **A1 (security residuals)**, **A2 (IDL regeneration)**, and **A3 (test/CI
- baseline)** are complete: unique validator sets, endorsement action binding,
- account-ownership checks on `remaining_accounts` loaders, admin/authority
- constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL synced to source
- (148/62/135/220), and CI covers registry/identity lib + rfc012 + geo + API.
- See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
+**Complete on `dev` (verified 2026-09-25):** RFC-012 **Phases 0–8** (architecture
+contract, security hardening, generalized validator PDAs, verification tasks,
+multi-source observations, evidence provenance, dynamic routing, reputation
+governance, economic/resource layer), **Tier A1–A3** (security residuals, IDL
+regeneration, test/CI baseline), **RFC-012 legacy sweep**, **B6 program-boundary
+split**, and **P0-2 removal-endorsement path** — unique validator sets, endorsement
+action binding, account-ownership checks on `remaining_accounts` loaders,
+admin/authority constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL
+synced to source (148/62/135/220), and CI covers registry/identity lib + rfc012 +
+geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
-Verified tests on `dev` (2026-09-24):
+**Frontend:** investor demo page at `/progress`, 3D Cesium globe with automatic
+2D Leaflet fallback when WebGL is unavailable, typed API client, wallet adapter.
+
+Verified tests on `dev` (2026-09-25):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 105 |
+| `terra-registry` lib unit tests | 112 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
-| `terra-identity` integration (BPF) | 18 |
-| `terra-api` unit tests | 73 |
+| `terra-identity` integration (BPF) | 23 |
+| `terra-api` unit tests | 68 |
 | `terra-geo` unit tests | 4 |
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
-(+PostGIS migrations), and `tsc --noEmit`. Identity BPF (18) and the long-form
-registry BPF suite (292) are run locally / on demand.
+(+PostGIS migrations), and `tsc --noEmit`. Identity BPF (23) and the long-form
+registry BPF suite (281) are run locally / on demand.
 
-Registry BPF integration suite (`tests/integration.rs`, 292 tests) is maintained
+Registry BPF integration suite (`tests/integration.rs`, 281 tests) is maintained
 but not re-run on constrained CI/dev machines (full `cargo test -p terra-registry`
 exceeds practical time budgets); it is the long-form regression suite for all
 instruction happy paths and guard rails.
@@ -65,24 +83,25 @@ Known limits before `main`: no devnet deployment yet (see
 (proof bytes opaque, no on-chain Groth16 verification — needs audit);
 time-locked paths (7-day unbonding withdraw) are guard-verified, not
 time-executed, in the harness; checked-in IDL
-(`terra-web/src/idl/terra_registry.json`) was regenerated in A2 (2026-09-24)
-to match source (135 / 53 / 121 / 184) — re-run `make idl` / `./build.sh`
+(`terra-web/src/idl/terra_registry.json`) is synced to source at
+**148/62/135/220 (2026-09-25)** — re-run `make idl` / `./build.sh`
 before shipping client changes after any program edit.
 
 ### How to continue (handoff)
 
 This repo is self-describing for a new contributor or agent — read in order:
 
-1. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); B6 program-boundary split re-synced (147/62/135/220); P0-2 removal-endorsement path re-synced (148/62/135/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
- 3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
- 4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
- 5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–8 done; **next phase is Phase 9** (physical infrastructure); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
-6. Individual specs `docs/rfc-003`…`rfc-011` each end with a **Handoff — status & next steps** footer (implementation location, open items, when to run which tests / `make idl`).
+1. **[`docs/VISION.md`](docs/VISION.md)** — the north star: what Terra is, the 10 domains, stages 0–10, where we are today. Never work against this document.
+2. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
+3. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); B6 program-boundary split re-synced (147/62/135/220); P0-2 removal-endorsement path re-synced (148/62/135/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+4. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
+5. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
+6. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–8 done; **next phase is Phase 9** (physical infrastructure); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
+7. Individual specs `docs/rfc-003`…`rfc-011` each end with a **Handoff — status & next steps** footer (implementation location, open items, when to run which tests / `make idl`).
 
 Do not invent instruction/account/event/error counts or test totals — regenerate
 from source (`rg`, `cargo test`, `make idl`) or trust the tables above (verified
-2026-09-24). Prefer small incremental commits on `dev`; keep tests green before
+2026-09-25). Prefer small incremental commits on `dev`; keep tests green before
 merging to `main`.
 
 ## Branching Strategy
@@ -122,7 +141,7 @@ types · 135 events · 220 `TerraError` codes** in `terra_registry`; **8
 instructions · 2 accounts · 8 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
-matches source as of Phase 8 (2026-09-24); re-run `make idl` after program edits.
+matches source (P0-2, 2026-09-25); re-run `make idl` after program edits.
 
 ---
 
@@ -214,10 +233,10 @@ terra/
 ├── terra-core/                       # Rust workspace (terra-registry, terra-identity, terra-api, terra-geo)
 │   ├── programs/terra_registry/src/  # lib.rs + protocol modules + verification/
 │   ├── programs/terra_identity/src/  # identity, succession, guardianship
-│   ├── api/src/routes/               # 23 route modules (parcels, staking, zk_proofs, spatial, …)
+│   ├── api/src/routes/               # 21 route modules (parcels, staking, zk_proofs, spatial, …)
 │   ├── api/migrations/               # 0001…0026 (PostGIS schema + mirrors)
 │   └── geo-engine/                   # OSM graph + reachability (terra-geo)
-├── docs/                             # rfc-003 … rfc-012
+├── docs/                             # VISION.md (north star) + rfc-003 … rfc-012
 └── .github/workflows/ci.yml          # fmt, clippy, lib/api tests (PostGIS svc), tsc
 ```
 
@@ -247,9 +266,9 @@ createdb -h localhost -p 5433 -U terra terra_dev
 ```bash
 cd terra-core
 cargo check -p terra-registry            # on-chain program (native)
-cargo test -p terra-registry --lib       # 90 unit tests
+cargo test -p terra-registry --lib       # 112 unit tests
 cargo test -p terra-identity --lib       # 6 unit tests
-cargo test -p terra-api                  # 73 API unit tests
+cargo test -p terra-api                  # 68 API unit tests
 DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
   cargo run -p terra-api                 # serves /api/v1 (migrations auto-applied)
 ```
@@ -263,9 +282,9 @@ Build the BPF program (manifest parsing issue in Anchor requires direct
 cd terra-core
 cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
 cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
-# Long-form registry BPF suite (283 tests; heavy — needs built SBF + time):
+# Long-form registry BPF suite (281 tests; heavy — needs built SBF + time):
 cargo test -p terra-registry --test integration -- --test-threads=1
-# Identity BPF suite (18 tests):
+# Identity BPF suite (23 tests):
 cargo test -p terra-identity --test integration
 ```
 
@@ -287,14 +306,14 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 74/74 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 112/112 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
-| Identity BPF | `cargo test -p terra-identity --test integration` | 18/18 |
-| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 283 (maintained; run when machine/time allow) |
-| Unit (API validation logic) | `cargo test -p terra-api` | 73/73 |
+| Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
+| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 281 (maintained; run when machine/time allow) |
+| Unit (API validation logic) | `cargo test -p terra-api` | 68/68 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 4/4 |
-| Migrations on real PostGIS 16 | CI service + local scratch instance | 24/24 apply |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 26/26 apply |
 | Frontend types | `tsc --noEmit` | clean |
 | Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
 
@@ -307,13 +326,18 @@ pnpm dev
 - [ ] `solana-test-validator` run with program deployed (requires AVX-capable CPU — not available on current dev machine)
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
-- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220 synced to `terra-web/src/idl/`
+- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): **148/62/135/220** synced to `terra-web/src/idl/`
 - [ ] ZK circuit choice (Groth16/PLONK) + external audit (RFC-006/011)
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
 ---
 
 ## Roadmap
+
+The stage map (0–10) and long-term direction live in
+[`docs/VISION.md`](docs/VISION.md); this is the repository-level checklist.
+
+**Proven through 2026-09-25:**
 
 - [x] Architecture research — LADM, comparable repos, data-source legal review
 - [x] Country-agnostic core model (Parcel / Rights / Owner / infra flags)
@@ -327,10 +351,6 @@ pnpm dev
 - [x] RFC-012 Phase 0 — architecture contract + structural tests
 - [x] RFC-012 Phase 1 — security hardening (unique validator sets, endorsement binding, ownership checks, admin constraints)
 - [x] Tier A1–A3 — security residuals, IDL regen, test/CI baseline (2026-09-24)
-- [ ] Devnet deployment (see checklist above)
-- [ ] Phase 5 — legal 3D/air-rights layer
-- [ ] Phase 6 — country config layer (tenure types, multi-authority)
-- [ ] Phase 7/8 — regional expansion → global platform
 - [x] RFC-012 Phase 2 — generalized validator PDAs (2026-09-24): profile/presence/availability/capability/relationship-edge, IDL 128/49/115/169
 - [x] RFC-012 Phase 3 — verification tasks (2026-09-24): VerificationTask/TaskRequirement/TaskAssignment PDAs + 6 instructions, IDL 134/52/120/182
 - [x] RFC-012 Phase 4 — multi-source observations (2026-09-24): ObservationV2 PDA + submit_observation_v2, IDL 135/53/121/184
@@ -338,7 +358,18 @@ pnpm dev
 - [x] RFC-012 Phase 6 — dynamic routing (2026-09-24): routing.rs multi-factor eligibility + route_task + TaskRouted, errors 6187–6190, IDL 138/55/124/191
 - [x] RFC-012 Phase 7 — reputation governance (2026-09-24): fraud_governance.rs fraud report → random committee → capability demotion (no jail) → appeal → rehab; errors 6191–6205, IDL 147/59/133/206
 - [x] RFC-012 Phase 8 — economic/resource layer (2026-09-24): task_economics.rs quote → task escrow → reward + coverage subsidy → refund; FeePolicy/CoverageIncentive/ResourceQuote/TaskEscrow/RewardAllocation PDAs; errors 6206–6219, IDL 153/64/139/220
-- [ ] RFC-012 Phases 9–10 — physical infrastructure, cross-border privacy
+- [x] RFC-012 legacy sweep — removed legacy account/instruction surface, IDL 146/62/134/220 (2026-09-25)
+- [x] B6 program-boundary split — `terra_identity` program isolation, IDL 147/62/135/220 (2026-09-25)
+- [x] P0-2 removal-endorsement path — `endorse_validator_removal`, IDL **148/62/135/220** (2026-09-25)
+- [x] Frontend investor demo — `/progress` page, hand-rolled utility CSS, vision/architecture/scenarios sections (2026-09-25)
+- [x] Frontend resilience — graceful WebGL failure + automatic **2D Leaflet fallback** (zero new deps, 2026-09-25)
+
+**Next (in order):**
+
+- [ ] **Devnet deployment** (see checklist above) — `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates
+- [ ] **RFC-012 Phase 9 — physical infrastructure** (vision Stage 2): devices, GNSS, imagery, 3D scanning (Vision Stages 2–3)
+- [ ] **RFC-012 Phase 10 — cross-border privacy** (vision Stage 7): ZK identity/ownership, selective disclosure
+- [ ] Product layers — Phase 5 (legal 3D/air-rights = vision Stage 5), Phase 6 (country config = vision Stage 6), regional expansion → global platform (vision Stages 9–10)
 
 ---
 

@@ -1,5 +1,7 @@
 # RFC-009: Time-Bound Credential Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (time_bound.rs; keeper sweep now requires parcel owner)

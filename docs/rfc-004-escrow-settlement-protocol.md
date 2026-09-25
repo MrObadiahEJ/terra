@@ -1,5 +1,7 @@
 # RFC-004: Escrow Settlement Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (escrow.rs end-to-end; audited via SECURITY.md Phase 1)

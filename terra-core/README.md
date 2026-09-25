@@ -1,10 +1,14 @@
 # Terra
 
-A decentralized land registry and governance platform built on Solana using Anchor.
+Solana/Anchor core of **Terra — Infrastructure for a Verifiable Digital
+Representation of the Physical World** (land is the first domain).
+
+> Start with [`../../docs/VISION.md`](../../docs/VISION.md) (north star), then the
+> [root `../../README.md`](../../README.md) (repo status).
 
 ## Overview
 
-Terra is a multi-program Solana system for managing land parcels, rights, escrow, staking, verification, and cross-border governance. It consists of two on-chain programs and supporting infrastructure.
+Terra is a multi-program Solana system for managing land parcels, rights, escrow, staking, verification, and cross-border governance. It consists of two on-chain programs and supporting infrastructure: PostGIS mirror API + OSM geo-engine.
 
 ### Programs
 
@@ -148,7 +152,7 @@ terra-core/
 ├── programs/
 │   ├── terra_registry/         # Core registry program
 │   │   ├── src/
-│   │   │   ├── lib.rs          # Entry point, contexts, error codes (184)
+│   │   │   ├── lib.rs          # Entry point, contexts, error codes (220)
 │   │   │   ├── cross_border.rs # Cross-border identity bridge
 │   │   │   ├── dispute.rs      # Parcel dispute system
 │   │   │   ├── escrow.rs       # Parcel escrow (buy/sell)
@@ -160,15 +164,15 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 292 BPF integration tests
+│   │       ├── integration.rs  # 281 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
 │       │   ├── helpers.rs      # count_unique_validators + tests
 │       │   └── instructions/   # bind, succession, guardianship
-│       └── tests/integration.rs # 18 BPF tests
+│       └── tests/integration.rs # 23 BPF tests
 ├── api/                        # REST API backend (Axum + Postgres)
-│   ├── src/routes/             # 23 route modules
+│   ├── src/routes/             # 21 route modules
 │   └── migrations/             # 0001…0026 (PostGIS + mirrors)
 ├── geo-engine/                 # OSM data processing engine (terra-geo)
 ├── docs/                       # Documentation
@@ -218,17 +222,21 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 116 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, … |
+| terra-registry lib | 112 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
-| terra-identity integration | 18 | BPF happy paths + guard rails |
-| terra-registry integration | 292 | Full instruction matrix (long-running) |
-| terra-api | 73 | Route validation + storage helpers |
+| terra-identity integration | 23 | BPF happy paths + guard rails |
+| terra-registry integration | 281 | Full instruction matrix (long-running) |
+| terra-api | 68 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-25, RRR migration): registry lib 116/116, identity lib 6/6, rfc012 21/21, API 73/73, geo 4/4, full registry BPF suite 276/292 (the 16 failures are pre-existing at HEAD — verified against a stashed baseline: guardian/ZK/dispute-slash identity-path and `GenerateOwnershipRoot` account-count mismatches), `cargo fmt` + `clippy -D warnings` clean, `cargo build-sbf` OK, checked-in IDL matches source (no `Parcel.owner` — ownership lives in the Rights PDA), `tsc --noEmit` clean. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-25): registry lib 112/112, identity lib 6/6, rfc012
+21/21, API 68/68, geo 4/4, registry BPF suite 281/281, identity BPF 23/23,
+`cargo fmt` + `clippy -D warnings` clean, `cargo build-sbf` OK, checked-in IDL
+matches source at **148/62/135/220**, `tsc --noEmit` clean, CI 4/4 green on
+`dev` and `main`. Fast baseline: `make test-fast`.
 
-## Current Status (as of 2026-09-24)
+## Current Status (as of 2026-09-25)
 
 **Done:**
 - All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).
@@ -242,21 +250,24 @@ Verified on `dev` (2026-09-25, RRR migration): registry lib 116/116, identity li
 - RFC-012 **Phase 8** (economic/resource layer, 2026-09-24): `task_economics.rs` implements quote → task escrow → reward + coverage subsidy → refund. Accounts `FeePolicy`/`CoverageIncentive` (admin-set policies), `ResourceQuote`, `TaskEscrow` (+ vault PDA, fee sink `task_treasury`), `RewardAllocation`; 6 instructions (`set_fee_policy`, `set_coverage_incentive`, `quote_task_resources`, `fund_task_escrow`, `claim_task_reward`, `refund_task_escrow`); subsidy = demand + deficit + difficulty + strategic class bonus, clamped; errors 6206–6219 (reuses 6175/6176/6174); 11 unit tests + 3 BPF tests (`phase8_*`); IDL 153/64/139/220. Rent-exempt guard: fund requires `amount >= rent_min × required`, fee waived when treasury would be left sub-rent-exempt, claim caps subsidy at `treasury − rent_min`.
 - **A2 IDL regeneration** (2026-09-24): `ValidatorSlashed` collision resolved → `ReputationSlashed` (staking keeps `ValidatorSlashed` per RFC-005); checked-in `terra-web` IDL synced to **119/44/108/160**; **Phase 2** re-synced to **128/49/115/169**; **Phase 3** re-synced to **134/52/120/182**; **Phase 4** re-synced to **135/53/121/184**; **Phase 5** re-synced to **137/55/123/187**; **Phase 6** re-synced to **138/55/124/191**; **Phase 7** re-synced to **147/59/133/206**; **Phase 8** re-synced to **153/64/139/220**; `make idl`/`build.sh` now use `anchor idl build -p …`.
 - **A3 test/CI baseline** (2026-09-24): fixed `StoredArtifact` API test compile break; CI runs identity lib + rfc012 + geo; `make test-fast` for constrained machines.
-- PostGIS mirror API (21 routes, migrations `0001`…`0026`) + geo-engine + workspace CI green on `dev`.
+- **RFC-012 legacy sweep** (2026-09-25): removed legacy account/instruction surface (incl. `jail_validator`/`unjail_validator`), IDL re-synced **146/62/134/220**.
+- **B6 program boundary** (2026-09-25): identity concerns split into the `terra_identity` program boundary, IDL **147/62/135/220**.
+- **P0-2 removal-endorsement path** (2026-09-25): `endorse_validator_removal` shipped, IDL **148/62/135/220** — current synced state.
+- PostGIS mirror API (21 route modules, migrations `0001`…`0026`) + geo-engine + workspace CI green on `dev` and `main`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160; Phase 2, 128/49/115/169; Phase 3, 134/52/120/182; Phase 4, 135/53/121/184; Phase 5, 137/55/123/187; Phase 6, 138/55/124/191; Phase 7, 147/59/133/206; Phase 8, 153/64/139/220).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen chain through P0-2 is current (**148/62/135/220**, 2026-09-25).
 2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of the P0-2 removal-endorsement path (148/62/135/220, 2026-09-25).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
-6. RFC-012 Phases 8–10 (economics → infrastructure → cross-border/privacy) — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md).
+6. **RFC-012 Phase 9 — physical infrastructure (NEXT)**, then Phase 10 cross-border/privacy — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md) and the stage map in [`docs/VISION.md`](../../docs/VISION.md).
 
-Anyone picking this up: start from root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
+Anyone picking this up: start from [`docs/VISION.md`](../../docs/VISION.md) (north star), then root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 
 ## Error Codes
 
-- **terra_registry:** 184 custom error codes (`TerraError` in `lib.rs`).
+- **terra_registry:** 220 custom error codes (`TerraError` in `lib.rs`).
 - **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License

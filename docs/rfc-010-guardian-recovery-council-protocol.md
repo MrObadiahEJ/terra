@@ -1,5 +1,7 @@
 # RFC-010: Guardian & Recovery Council Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (terra_identity guardianship.rs + registry guardian_claim bridge; unique-validator sets enforced)

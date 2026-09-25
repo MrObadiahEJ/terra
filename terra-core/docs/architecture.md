@@ -1,8 +1,13 @@
 # Terra Architecture
 
+> Part of **Terra — Infrastructure for a Verifiable Digital Representation of the
+> Physical World** (land is the first domain). North star:
+> [`../../../docs/VISION.md`](../../../docs/VISION.md); repo status:
+> [`../../README.md`](../../README.md).
+
 ## System Overview
 
-Terra is a decentralized land claim & verification network on Solana built with Anchor. It manages land parcels, rights, escrow, staking, verification, vaults, ZK proofs, and cross-border governance through two on-chain programs, a PostGIS mirror API, and a geo engine.
+Terra is a decentralized land claim & verification network on Solana built with Anchor — the on-chain core of the wider Terra vision. It manages land parcels, rights, escrow, staking, verification, vaults, ZK proofs, and cross-border governance through two on-chain programs, a PostGIS mirror API, and a geo engine.
 
 **Program IDs** (devnet / localnet / mainnet slots in `Anchor.toml`):
 

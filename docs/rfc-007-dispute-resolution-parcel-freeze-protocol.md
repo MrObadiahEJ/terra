@@ -1,5 +1,7 @@
 # RFC-007: Dispute Resolution & Parcel Freeze Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (dispute.rs; unique-validator sets enforced on file_dispute)

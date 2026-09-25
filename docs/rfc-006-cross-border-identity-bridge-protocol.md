@@ -1,5 +1,7 @@
 # RFC-006: Cross-Border Identity Bridge Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (cross_border.rs; admin/validator constraints on VerifyCrossBorder)

@@ -1,5 +1,7 @@
 # RFC-008: Parcel Subdivision & Amalgamation Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (subdivision.rs end-to-end)

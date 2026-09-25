@@ -1,5 +1,7 @@
 # RFC-003: Vault Shard Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (vault.rs end-to-end; audited via SECURITY.md Phase 1)

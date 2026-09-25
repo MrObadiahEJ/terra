@@ -1,12 +1,16 @@
 # RFC-012: Terra Global Physical-Digital Trust Architecture
 
+> **North star:** [`VISION.md`](VISION.md) — *Infrastructure for a Verifiable
+> Digital Representation of the Physical World* (land is the first domain).
+> This RFC is its architecture contract.
+
 **Status:** Accepted (Phases 0–8 complete on `dev`; Phases 9–10 pending)  
 **Created:** 2026-09-22  
-**Updated:** 2026-09-24  
+**Updated:** 2026-09-25  
 **Supersedes:** None (architecture contract; refines RFC-003…011)  
 **Related:** RFC-004 (escrow), RFC-005 (staking), RFC-007 (disputes), RFC-011 (ZK)
 
-**Entry for a new contributor or agent:** read §8.1 (Handoff) first, then §8 (phase table), §9 (migration map), §10 (PDA sketch). Do not invent source counts — see `terra-core/docs/architecture.md` (verified 2026-09-23).
+**Entry for a new contributor or agent:** read [`VISION.md`](VISION.md) first (stages 0–10, where we are), then §8.1 (Handoff) of this document, then §8 (phase table), §9 (migration map), §10 (PDA sketch). Do not invent source counts — see `terra-core/docs/architecture.md` (verified 2026-09-25).
 
 **Phase 0 (this document + migration map + structural tests)**, **Phase 1 (security hardening)**, and **Phase 2 (generalized validator PDAs)** are complete:
 
@@ -224,7 +228,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | **9** | Physical infrastructure | Pending | Smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning |
 | **10** | Cross-border + privacy | Pending | Jurisdiction bindings, ZK identity/ownership, selective disclosure |
 
-Phase 8 is complete on `dev` (2026-09-24). Before starting Phase 9 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — as of Phase 8 2026-09-24 it is 153/64/139/220 with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2 + Phase 5 EvidenceManifest/EvidenceArtifact + Phase 6 route_task + Phase 7 fraud/review/restriction/appeal PDAs + Phase 8 fee/coverage/quote/escrow/allocation PDAs) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
+Phase 8 is complete on `dev` (2026-09-24), followed by the RFC-012 legacy sweep, B6 program-boundary split, and P0-2 removal-endorsement path (all 2026-09-25). Before starting Phase 9 on a clean checkout, confirm the checked-in IDL matches source (`make idl` — current as of 2026-09-25 it is **148/62/135/220** with Phase 2 validator-profile PDAs + Phase 3 task PDAs + Phase 4 ObservationV2 + Phase 5 EvidenceManifest/EvidenceArtifact + Phase 6 route_task + Phase 7 fraud/review/restriction/appeal PDAs + Phase 8 fee/coverage/quote/escrow/allocation PDAs, post-legacy-sweep + B6 + P0-2) and clear remaining SECURITY.md mainnet items (RFC-005 reconfirm, ZK audit) — see §8.1.
 
 ---
 
@@ -248,7 +252,7 @@ Phase 8 is complete on `dev` (2026-09-24). Before starting Phase 9 on a clean ch
 
 **Immediate next actions for Phase 9:**
 1. Read §9 (Migration Map) and §10 (PDA sketch) — Phase 8 delivered the economic layer (quote → escrow → rewards → coverage incentives → refunds) over Phase 3 task PDAs; Phase 9 is physical infrastructure (smartphone, GNSS, drones, survey devices, satellite imagery, 3D scanning) and should reuse Phase 4 observation sources/provenance.
-2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), Phase 4 (135/53/121/184), Phase 5 (137/55/123/187), Phase 6 (138/55/124/191), Phase 7 (147/59/133/206), and Phase 8 (153/64/139/220); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
+2. Checked-in IDL was refreshed in A2 (119/44/108/160), Phase 2 (128/49/115/169), Phase 3 (134/52/120/182), Phase 4 (135/53/121/184), Phase 5 (137/55/123/187), Phase 6 (138/55/124/191), Phase 7 (147/59/133/206), Phase 8 (153/64/139/220), legacy sweep (146/62/134/220), B6 (147/62/135/220), and P0-2 (**148/62/135/220**, 2026-09-25 — current); re-run `make idl` after further program edits. Close remaining SECURITY.md items (RFC-005 reconfirm, ZK audit) if touching staking/ZK.
 3. When adding accounts/instructions/events/errors: update `rfc012_structure.rs` expectations, root/`terra-core` README source counts, and run `make idl`.
 4. Ship each phase with unit tests + BPF integration tests per §11.
 

@@ -45,7 +45,7 @@ export const RELEASE = {
 export const HERO = {
   title: 'Terra — Protocol Progress',
   subtitle:
-    'A country-agnostic land-registry protocol on Solana: ISO 19152 (LADM) data model, on-chain parcel rights with validator attestations, identity and guardianship, and a ten-RFC protocol suite — built, tested, and promoted to a stable main release.',
+    'Infrastructure for a verifiable digital representation of the physical world: an open physical-world trust and spatial protocol giving real-world entities persistent spatial identity and verifiable history. Land is the first domain — ISO 19152 (LADM) data model, on-chain rights with validator attestations, identity and guardianship, a ten-RFC suite — built, tested, and promoted to a stable main release.',
 }
 
 export const METRICS: Metric[] = [
@@ -217,19 +217,17 @@ export const NEXT_MILESTONE = {
 
 export const VISION = {
   pitch:
-    'Terra is a decentralized, blockchain-anchored claim/verification network for land: anyone can create a claim about any parcel, validators independently evaluate evidence, and the network records attestations and immutable history — no authority provider is required to participate.',
+    'Terra is an open physical-world trust and spatial infrastructure protocol that gives real-world entities persistent spatial identity and verifiable history by connecting observations, evidence, independent validation, rights and transactions across time and jurisdictions. Land is the first domain: anyone can create a claim about any parcel, validators independently evaluate evidence, and the network records attestations and immutable history — no authority provider is required to participate.',
   chain: [
-    'People',
-    'Claims',
+    'Observation',
     'Evidence',
-    'Validators',
-    'Attestations',
+    'Validation',
     'Consensus',
-    'Immutable History',
+    'State',
   ],
   calloutTitle: 'Claims ≠ Facts',
   calloutBody:
-    'The protocol verifies claims, not legal ownership. Physical-world observation is a first-class layer: validators can observe, photograph, and attest to the physical state of land, binding digital records to physical reality.',
+    'The canonical transition is observation → evidence → validation → consensus → state: no single AI model, sensor, person, company, government, oracle or database is treated as absolute truth. The protocol verifies claims, not legal ownership; physical-world observation is a first-class layer — validators can observe, photograph, and attest to the physical state of land, binding digital records to physical reality.',
 }
 
 export interface Layer {

@@ -1,5 +1,7 @@
 # RFC-011: Zero-Knowledge Ownership Proof Protocol
 
+> Part of Terra — read the north star [`VISION.md`](VISION.md) first; repo status: [`../README.md`](../README.md).
+
 ## 1. Status
 
 - **Status:** Implemented (zk.rs structural; on-chain proof verification still opaque — external audit required)
