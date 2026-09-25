@@ -164,7 +164,7 @@ terra_identity/
 ### Parcel Lifecycle
 
 ```
-REGISTER (signer → owner)
+REGISTER (signer → holder)
   ↓
 ACTIVE → FOR_SALE (escrow) → SOLD
        → DISPUTED (freeze) → RESOLVED
@@ -231,7 +231,7 @@ EXECUTE (after timelock + endorsements)
 
 ## Key Patterns
 
-1. **Dual ownership:** Wallet-based (`Parcel.owner`) and identity-based (`IdentityRights`) ownership paths via `is_authorized_owner()` with `terra_identity` account-ownership checks.
+1. **Single-source ownership (RRR):** Every parcel's canonical holder lives in the `Rights` PDA `["ownership", parcel]` (`rights_kind == OWNERSHIP`, field `holder`) — a wallet **or** an Identity PDA. `is_authorized_holder()` checks the signer directly (fast path) or resolves a `terra_identity`-owned Identity holder via `remaining_accounts`. `Parcel.owner` and `is_authorized_owner()` were hard-removed (RFC-012 §9).
 2. **Anti-grief:** Minimum 2 validators for disputes/forfeiture, self-dealing checks everywhere, **unique validator sets** (`require_unique_validators`).
 3. **Progressive decentralization:** Bootstrap phase (1-3 validators) then peer-consensus endorsement (`endorse_validator_add` enforces ADD action).
 4. **Emergency pause:** Admin can pause the program; most handlers check `require_not_paused()`.

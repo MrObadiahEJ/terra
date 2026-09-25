@@ -18,9 +18,10 @@ import type { ParcelAccount, RightsAccount } from '../../lib/program'
 interface Props {
   address: string
   account: ParcelAccount
+  holder: string
 }
 
-export default function ParcelPanel({ address, account }: Props) {
+export default function ParcelPanel({ address, account, holder }: Props) {
   const { publicKey, send } = useWallet()
   const setLastSignature = useAppStore((s) => s.setLastSignature)
   const refreshParcels = useAppStore((s) => s.refreshParcels)
@@ -36,7 +37,7 @@ export default function ParcelPanel({ address, account }: Props) {
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const isOwner = publicKey?.toBase58() === account.owner.toBase58()
+  const isHolder = publicKey?.toBase58() === holder
   const idHex = bytesToHex(account.id)
 
   const loadRights = async () => {
@@ -137,9 +138,9 @@ export default function ParcelPanel({ address, account }: Props) {
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
-        <dt className="text-muted">Owner</dt>
-        <dd className="font-mono break-all">{account.owner.toBase58()}</dd>
-        {isOwner && <dt className="text-muted">(you)</dt>}
+        <dt className="text-muted">Holder</dt>
+        <dd className="font-mono break-all">{holder || '—'}</dd>
+        {isHolder && <dt className="text-muted">(you)</dt>}
         <dt className="text-muted">Parcel ID</dt>
         <dd className="font-mono break-all text-[10px]">{idHex}</dd>
         <dt className="text-muted">Geometry Hash</dt>
@@ -186,14 +187,14 @@ export default function ParcelPanel({ address, account }: Props) {
         )}
       </div>
 
-      {isOwner && (
+      {isHolder && (
         <div className="space-y-3 border-t pt-3">
           <div>
             <h4 className="font-semibold mb-1">Transfer ownership</h4>
             <div className="flex gap-1">
               <input
                 className="text-input"
-                placeholder="New owner address"
+                placeholder="New holder address"
                 value={transferTo}
                 onChange={(e) => setTransferTo(e.target.value)}
               />

@@ -213,7 +213,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 | Phase | Goal | Status | Key deliverables |
 |-------|------|--------|------------------|
 | **0** | Architecture contract | **Done** | This RFC + migration map + structural tests (`rfc012_structure.rs` 21/21) |
-| **1** | Secure current core | **Done** | Succession/guardianship duplicate endorsements, unique validator sets, endorsement action binding, remaining_accounts ownership audit, canonical ownership (is_authorized_owner), admin constraints on jail/reputation/ZK/dispute/cross-border/guardian paths; escrow invariants — see SECURITY.md |
+| **1** | Secure current core | **Done** | Succession/guardianship duplicate endorsements, unique validator sets, endorsement action binding, remaining_accounts ownership audit, canonical ownership (is_authorized_holder; RRR migration replaced `is_authorized_owner`), admin constraints on jail/reputation/ZK/dispute/cross-border/guardian paths; escrow invariants — see SECURITY.md |
 | **2** | Generalize validator | **Complete** (2026-09-24) | `ValidatorProfile`/`Presence`/`Availability`/`Capability`/`RelationshipEdge` PDAs + 9 instructions, 5 accounts, 7 events, 9 errors; unit + BPF tests green; IDL 128/49/115/169 |
 | **3** | Introduce tasks | **Complete** (2026-09-24) | `VerificationTask`/`TaskRequirement`/`TaskAssignment` PDAs + 6 instructions (create/add/assign/claim/submit/cancel), 3 accounts, 5 events, 13 errors; unit + BPF tests green; IDL 134/52/120/182 |
 | **4** | Introduce observations | **Complete** (2026-09-24) | `ObservationV2` PDA (seeds `["observation_v2", task_id, observer, nonce]`) + `submit_observation_v2`; multi-source PHONE/GNSS/CAMERA/DRONE/SATELLITE/HUMAN/DOCUMENT/API; provenance SELF_REPORTED…SATELLITE_CONFIRMED; subject/capture_device/observer role separation; 1 account, 1 instruction, 1 event, 2 errors; 4 unit + 2 BPF tests; IDL 135/53/121/184 |
@@ -265,7 +265,7 @@ Phase 8 is complete on `dev` (2026-09-24). Before starting Phase 9 on a clean ch
 | `Observation` (validator-bound) | `Observation` + `ObservationProvenance` + separate subject/capture/submitter | Add role fields; backfill with validator as all roles |
 | `Claim` | `VerificationTask` (new) + `Claim` (legacy subject) | Claims become task subjects; new tasks reference claims |
 | `Evidence` | `Evidence` + `EvidenceManifest` + `EvidenceArtifact` | Manifest groups artifacts; single evidence becomes one-artifact manifest |
-| `Parcel.owner: Pubkey` | `OwnershipRight` via `LegalSubject` | Dual-write during transition; `is_authorized_owner()` already supports both |
+| `Parcel.owner: Pubkey` | `Rights` PDA `["ownership", parcel]` (`rights_kind == OWNERSHIP`, field `holder`) | **Done on `dev`** — field hard-removed; `is_authorized_holder()` resolves wallet **or** Identity-PDA holders; no dual-write remains (bridge closed) |
 | `Attestation` (deprecated) | `VerificationAttestation` | Already bridged via `migrate_attestation_to_claim` |
 | `Jurisdiction` | `Jurisdiction` + `CrossBorderBinding` | Extend with binding relationships |
 | `EscrowRecord` (parcel-only) | `TaskEscrow` + parcel escrow | Generalize to any task subject |
@@ -275,6 +275,9 @@ Phase 8 is complete on `dev` (2026-09-24). Before starting Phase 9 on a clean ch
 ## 10. Account / PDA Sketch (Phase 2+)
 
 ```
+Rights (ownership)          seeds: ["ownership", parcel]  (canonical parcel holder; field `holder`)
+Rights (sub-rights)         seeds: ["rights", parcel, nonce]
+
 ValidatorProfile            seeds: ["validator_profile", wallet]
 ValidatorPresence           seeds: ["validator_presence", wallet]
 ValidatorAvailability       seeds: ["validator_availability", wallet]

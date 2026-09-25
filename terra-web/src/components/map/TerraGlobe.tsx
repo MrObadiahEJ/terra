@@ -164,7 +164,7 @@ export default function TerraGlobe({
           terId: parcel.id,
           terName: parcel.name,
           terStatus: parcel.status,
-          terOwner: parcel.owner,
+          terHolder: parcel.holder,
         },
         label: {
           text: parcel.name,

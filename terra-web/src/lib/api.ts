@@ -5,7 +5,7 @@ import { API_BASE } from './constants'
 export interface OffChainParcel {
   id: string
   name: string
-  owner: string
+  holder: string
   status: string
   geometry: string | null // GeoJSON string
   area_m2: number | null
@@ -15,7 +15,7 @@ export interface OffChainParcel {
 
 export interface NewParcelInput {
   name: string
-  owner: string
+  holder: string
   status?: string
   geometry: unknown // GeoJSON Polygon
 }
@@ -763,7 +763,7 @@ export interface VerifyProofInput {
 export interface ParcelSpatialStats {
   id: string
   name: string
-  owner: string
+  holder: string
   status: string
   onchain_id: string | null
   area_m2: number | null
@@ -778,7 +778,7 @@ export interface ParcelSpatialStats {
 export interface NearParcel {
   id: string
   name: string
-  owner: string
+  holder: string
   status: string
   area_m2: number | null
   distance_m: number | null

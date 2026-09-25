@@ -138,11 +138,11 @@ pub async fn file_dispute(
 
     // Verify parcel exists.
     let current: Option<(String,)> =
-        sqlx::query_as("SELECT owner FROM parcels WHERE id = $1 FOR UPDATE")
+        sqlx::query_as("SELECT holder FROM parcel_ownership WHERE parcel_id = $1 FOR UPDATE")
             .bind(parcel_id)
             .fetch_optional(&mut *tx)
             .await?;
-    let Some((_owner,)) = current else {
+    let Some((_holder,)) = current else {
         return Err(AppError::not_found("parcel not found"));
     };
 
@@ -309,12 +309,16 @@ async fn execute_judgment(
             AppError::bad_request("new_owner is required for owner_loses outcome")
         })?;
         sqlx::query(
-            "UPDATE parcels SET owner = $2, status = 'forfeited', updated_at = now() WHERE id = $1",
+            "UPDATE parcel_ownership SET holder = $2, updated_at = now() WHERE parcel_id = $1",
         )
         .bind(dispute.parcel_id)
         .bind(new_owner)
         .execute(&mut *tx)
         .await?;
+        sqlx::query("UPDATE parcels SET status = 'forfeited', updated_at = now() WHERE id = $1")
+            .bind(dispute.parcel_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     sqlx::query("UPDATE disputes SET status = 'executed', updated_at = now() WHERE id = $1")

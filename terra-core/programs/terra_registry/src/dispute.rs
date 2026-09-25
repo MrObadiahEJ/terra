@@ -77,11 +77,11 @@ pub fn file_dispute(
         TerraError::InvalidThreshold
     );
 
-    // Anti-grief: only the parcel owner or a registered validator may file.
+    // Anti-grief: only the parcel holder or a registered validator may file.
     // This prevents random wallets from griefing any registered parcel.
     let filer_key = ctx.accounts.filer.key();
-    let is_owner = crate::is_authorized_owner(
-        ctx.accounts.parcel.owner,
+    let is_holder = crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         ctx.accounts.parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.filer.key(),
@@ -89,7 +89,7 @@ pub fn file_dispute(
     .is_ok();
     let registry = &ctx.accounts.registry;
     let is_validator = registry.validators.contains(&filer_key);
-    require!(is_owner || is_validator, TerraError::NotAuthorized);
+    require!(is_holder || is_validator, TerraError::NotAuthorized);
 
     // Count unique validators; enforce self-dealing and reject duplicates.
     let count = crate::quorum::require_unique_validators(&validators)?;
@@ -102,9 +102,9 @@ pub fn file_dispute(
             v != ctx.accounts.filer.key(),
             TerraError::ValidatorOwnsAsset
         );
-        // The parcel owner cannot be a dispute validator (self-dealing).
+        // The ownership holder cannot be a dispute validator (self-dealing).
         require!(
-            v != ctx.accounts.parcel.owner,
+            v != ctx.accounts.ownership.holder,
             TerraError::ValidatorOwnsAsset
         );
     }
@@ -280,12 +280,14 @@ pub fn execute_judgment(ctx: Context<super::ExecuteJudgment>) -> Result<()> {
         // Owner wins — unfreeze, return to ACTIVE.
         parcel.status = parcel_status::REGISTERED;
     } else {
-        // Owner loses — forfeit to new_owner.
+        // Owner loses — forfeit: the ownership right follows the judgment.
         require!(
             dispute.new_owner != Pubkey::default(),
             TerraError::EmptyNewOwner
         );
-        parcel.owner = dispute.new_owner;
+        let ownership = &mut ctx.accounts.ownership;
+        ownership.granter = ownership.holder;
+        ownership.holder = dispute.new_owner;
         parcel.status = parcel_status::FORFEITED;
     }
     parcel.updated_at = now;
@@ -309,16 +311,16 @@ pub fn cancel_dispute(ctx: Context<super::CancelDispute>) -> Result<()> {
         dispute.status == dispute_status::FILED,
         TerraError::InvalidDisputeStatus
     );
-    // Only the filer or parcel owner can cancel before adjudication.
+    // Only the filer or parcel holder can cancel before adjudication.
     let signer = ctx.accounts.signer.key();
-    let owner_ok = crate::is_authorized_owner(
-        ctx.accounts.parcel.owner,
+    let holder_ok = crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         ctx.accounts.parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.signer.key(),
     );
     require!(
-        signer == dispute.filed_by || owner_ok.is_ok(),
+        signer == dispute.filed_by || holder_ok.is_ok(),
         TerraError::NotAuthorized
     );
 

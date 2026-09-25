@@ -9,7 +9,6 @@ import type { TerraRegistry } from '../idl/terraRegistry'
 // Anchor account interfaces (decoded from the on-chain program).
 export interface ParcelAccount {
   id: number[]
-  owner: PublicKey
   name: string
   geometryHash: number[]
   status: number

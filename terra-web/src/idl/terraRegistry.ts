@@ -70,6 +70,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "seller",
           "signer": true
         }
@@ -862,6 +887,34 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "result_ownership",
+          "docs": [
+            "Ownership right of the result parcel \u2014 authority must control it."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "result_parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "source_parcel",
           "writable": true,
           "pda": {
@@ -881,6 +934,34 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "source_parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "source_ownership",
+          "docs": [
+            "Ownership right of the source parcel \u2014 authority must control it too."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "source_parcel"
               }
             ]
           }
@@ -1040,9 +1121,10 @@ export const terraRegistry: Idl = {
     {
       "name": "attach_parcel",
       "docs": [
-        "Attach a parcel to an identity (the person behind its owner wallet).",
-        "Only the parcel's owner may do this, and only for an identity whose",
-        "owner wallet matches."
+        "Attach a parcel to an identity (the person behind its holder wallet).",
+        "Only the current ownership holder may do this, and only for an identity",
+        "whose owner wallet matches. The identity link is provenance \u2014 it never",
+        "becomes the ownership record."
       ],
       "discriminator": [
         99,
@@ -1080,6 +1162,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "identity"
         },
         {
@@ -1101,7 +1208,7 @@ export const terraRegistry: Idl = {
         "",
         "`validators` holds the public keys of the (possibly several) parties",
         "who must sign off on the transaction; `required` is how many signatures",
-        "are needed. The signer must be the parcel owner or a registered",
+        "are needed. The signer must be the parcel holder or a registered",
         "registrar. Per-validator Ed25519 signatures live off-chain but are",
         "verified against this on-chain identity set and `content_hash`."
       ],
@@ -1135,6 +1242,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -1501,6 +1633,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -2808,6 +2965,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -4554,6 +4736,32 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "registry",
           "pda": {
             "seeds": [
@@ -4853,6 +5061,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -5892,6 +6125,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "rights",
           "writable": true
         },
@@ -5943,14 +6201,13 @@ export const terraRegistry: Idl = {
     {
       "name": "grant_identity_right",
       "docs": [
-        "Grant an identity-based right on a parcel. Only the parcel owner (or",
-        "current granter) may sign. The `identity` must be a valid Identity PDA",
-        "owned by the signer.",
+        "Grant an identity-based right on a parcel. Only the current holder",
+        "of the canonical ownership right may sign. The `identity` must be a",
+        "valid Identity PDA.",
         "",
-        "Authorization: the granter must be either the legacy `parcel.owner` wallet",
-        "**or** the holder of an active OWNERSHIP IdentityRights for this parcel.",
-        "This enables identity-based ownership to grant sub-rights without",
-        "requiring the legacy wallet field.",
+        "Identity is a separate binding/provenance layer: this creates the",
+        "optional identity\u2194parcel link (`IdentityRights`), it is never the",
+        "ownership record itself (ownership lives at `[\"ownership\", parcel]`).",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`."
       ],
@@ -5990,6 +6247,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "identity"
         },
         {
@@ -6024,10 +6306,12 @@ export const terraRegistry: Idl = {
     {
       "name": "grant_right",
       "docs": [
-        "Grant a right on a parcel to `holder`. Owner-only.",
+        "Grant a non-ownership right on a parcel to `holder`. Holder-only.",
         "",
         "`nonce` must equal the parcel's current `rights_count`, which is",
-        "incremented so every right gets a unique PDA."
+        "incremented so every right gets a unique PDA. OWNERSHIP is excluded",
+        "here \u2014 it lives solely at the canonical `[\"ownership\", parcel]` PDA",
+        "and only moves via `transfer_parcel`."
       ],
       "discriminator": [
         147,
@@ -6060,6 +6344,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -6748,6 +7057,32 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "authority",
           "docs": [
             "Relaying authority (court clerk / govt channel). Must NOT be the owner."
@@ -7093,6 +7428,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "old_parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "new_parcel",
           "pda": {
             "seeds": [
@@ -7234,6 +7594,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "old_parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "old_parcel"
               }
             ]
           }
@@ -9304,7 +9689,9 @@ export const terraRegistry: Idl = {
     {
       "name": "register_parcel",
       "docs": [
-        "Register a new parcel on-chain. The signer becomes its owner.",
+        "Register a new parcel on-chain. The signer receives the canonical",
+        "ownership right (`Rights` PDA at `[\"ownership\", parcel]`), which is",
+        "the single source of protocol-level control over the parcel.",
         "",
         "`id` is a caller-provided unique 32-byte identifier (e.g. a SHA-256 of",
         "the parcel geometry). It is also the PDA seed, so it can never change."
@@ -9347,6 +9734,36 @@ export const terraRegistry: Idl = {
           "name": "owner",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "ownership",
+          "docs": [
+            "The canonical ownership right (RRR: this \u2014 not the parcel \u2014 is the",
+            "ownership record). Created in the same instruction as the parcel."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
         },
         {
           "name": "system_program",
@@ -9728,6 +10145,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "holder",
           "docs": [
             "Holder must sign."
@@ -9737,7 +10179,7 @@ export const terraRegistry: Idl = {
         {
           "name": "granter",
           "docs": [
-            "Granter must co-sign (original granter or current parcel owner)."
+            "Granter must co-sign (original granter or current ownership holder)."
           ],
           "signer": true
         },
@@ -10605,10 +11047,12 @@ export const terraRegistry: Idl = {
     {
       "name": "revoke_right",
       "docs": [
-        "Revoke a previously granted right. The parcel owner or the original",
-        "granter may revoke. The account is closed and its lamports returned.",
-        "The parcel's rights counter is decremented so the freed nonce can be",
-        "reused by a future grant (safe: the old account no longer exists)."
+        "Revoke a previously granted (non-ownership) right. The current parcel",
+        "holder or the original granter may revoke. The account is closed and",
+        "its lamports returned. The parcel's rights counter is decremented so",
+        "the freed nonce can be reused by a future grant (safe: the old account",
+        "no longer exists). The canonical ownership right is not revocable \u2014",
+        "it only moves via `transfer_parcel`."
       ],
       "discriminator": [
         209,
@@ -10646,6 +11090,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "rights",
           "writable": true
         },
@@ -10670,7 +11139,7 @@ export const terraRegistry: Idl = {
       "name": "rotate_validators",
       "docs": [
         "Replace the validator set on an attestation (the fix for dead/leaving",
-        "validators). Only the parcel owner may rotate. Bumps `version` so a",
+        "validators). Only the parcel holder may rotate. Bumps `version` so a",
         "reconstituted set is provably newer, and resets `required`/`count`.",
         "",
         "**DEPRECATED**: Use the verification pipeline's validator management instead."
@@ -10706,6 +11175,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -11629,6 +12123,32 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "seller",
           "docs": [
             "Seller receives SOL."
@@ -11866,6 +12386,34 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "docs": [
+            "Ownership right of the original parcel (auth source for subdivision)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "original_parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "sub_parcel",
           "writable": true,
           "pda": {
@@ -11884,6 +12432,36 @@ export const terraRegistry: Idl = {
               {
                 "kind": "arg",
                 "path": "new_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sub_ownership",
+          "docs": [
+            "The sub-parcel's canonical ownership right \u2014 inherited from the",
+            "original parcel's holder in the same instruction."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sub_parcel"
               }
             ]
           }
@@ -12977,6 +13555,31 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
           "name": "keeper",
           "signer": true
         },
@@ -12995,7 +13598,9 @@ export const terraRegistry: Idl = {
     {
       "name": "transfer_parcel",
       "docs": [
-        "Transfer ownership of a parcel. Only the current owner can sign."
+        "Transfer the ownership right of a parcel to `new_owner`. Only the",
+        "current holder can sign (wallet holder or, via the identity overlay,",
+        "the owner of an Identity PDA holder)."
       ],
       "discriminator": [
         214,
@@ -13028,6 +13633,32 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -13158,7 +13789,7 @@ export const terraRegistry: Idl = {
       "name": "update_infrastructure",
       "docs": [
         "Set the parcel's infrastructure flag bitmask together with the canonical",
-        "access digest produced by the off-chain validation engine. Owner-only.",
+        "access digest produced by the off-chain validation engine. Holder-only.",
         "",
         "`access_hash` must be non-zero and match the digests the off-chain",
         "engine derives for these flags on the parcel geometry."
@@ -13194,6 +13825,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -13274,7 +13930,7 @@ export const terraRegistry: Idl = {
     {
       "name": "update_status",
       "docs": [
-        "Update a parcel's status (e.g. for-sale). Owner-only."
+        "Update a parcel's status (e.g. for-sale). Holder-only."
       ],
       "discriminator": [
         147,
@@ -13307,6 +13963,31 @@ export const terraRegistry: Idl = {
                 "kind": "account",
                 "path": "parcel.id",
                 "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
               }
             ]
           }
@@ -17130,7 +17811,7 @@ export const terraRegistry: Idl = {
     {
       "code": 6019,
       "name": "IdentityMismatch",
-      "msg": "Identity owner does not match the parcel owner"
+      "msg": "Identity owner does not match the acting holder"
     },
     {
       "code": 6020,
@@ -20250,7 +20931,7 @@ export const terraRegistry: Idl = {
           {
             "name": "seller",
             "docs": [
-              "Wallet of the seller (must match parcel.owner)."
+              "Wallet of the seller (must control the parcel's ownership right)."
             ],
             "type": "pubkey"
           },
@@ -22398,12 +23079,11 @@ export const terraRegistry: Idl = {
       "docs": [
         "A parcel of land.",
         "",
-        "**DEPRECATED: `owner` field** \u2014 Ownership should be expressed through",
-        "`IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct",
-        "`owner` wallet field. The `is_authorized_owner()` function supports both",
-        "paths. New code should prefer the IdentityRights path. The `owner` field",
-        "is retained for backward compatibility and will be removed in a future",
-        "major version once all existing accounts have migrated."
+        "The parcel itself carries no ownership. Ownership/control is the canonical",
+        "`Rights` PDA at `[\"ownership\", parcel]` with `rights_kind == OWNERSHIP`",
+        "(see `ownership_pda()`); its `holder` may be a wallet or an Identity PDA",
+        "(identity is an optional overlay, never a prerequisite). Authorization",
+        "goes through `is_authorized_holder()` only."
       ],
       "type": {
         "kind": "struct",
@@ -22416,14 +23096,6 @@ export const terraRegistry: Idl = {
                 32
               ]
             }
-          },
-          {
-            "name": "owner",
-            "docs": [
-              "**DEPRECATED**: Use `IdentityRights(OWNERSHIP)` instead.",
-              "Retained for backward compatibility. See `is_authorized_owner()`."
-            ],
-            "type": "pubkey"
           },
           {
             "name": "name",
@@ -22445,7 +23117,8 @@ export const terraRegistry: Idl = {
           {
             "name": "rights_count",
             "docs": [
-              "Monotonic nonce for the parcel's Rights PDAs. Never decremented."
+              "Monotonic nonce for the parcel's non-ownership Rights PDAs",
+              "(`[\"rights\", parcel, nonce]`). Never decremented."
             ],
             "type": "u8"
           },
@@ -22569,7 +23242,7 @@ export const terraRegistry: Idl = {
             }
           },
           {
-            "name": "owner",
+            "name": "holder",
             "type": "pubkey"
           }
         ]
@@ -23446,7 +24119,8 @@ export const terraRegistry: Idl = {
           {
             "name": "granter",
             "docs": [
-              "Party who granted the right (invariably the parcel owner)."
+              "Party who granted the right (invariably the current holder of the",
+              "canonical ownership right)."
             ],
             "type": "pubkey"
           },

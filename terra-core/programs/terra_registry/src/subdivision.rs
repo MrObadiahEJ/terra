@@ -122,10 +122,12 @@ pub fn subdivide_parcel(
         original.status == crate::parcel_status::REGISTERED,
         TerraError::InvalidStatus
     );
-    require!(
-        ctx.accounts.authority.key() == original.owner,
-        TerraError::NotOwner
-    );
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
+        original.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.authority.key(),
+    )?;
 
     // Surveyor attestation checks.
     let attestation = &ctx.accounts.surveyor_attestation;
@@ -144,10 +146,11 @@ pub fn subdivide_parcel(
 
     let now = Clock::get()?.unix_timestamp;
 
-    // Create the sub-parcel.
+    // Create the sub-parcel. Ownership is a separate right: the sub inherits
+    // the original's holder (the parcel record itself has no owner).
+    let original_holder = ctx.accounts.ownership.holder;
     let sub = &mut ctx.accounts.sub_parcel;
     sub.id = new_id;
-    sub.owner = original.owner;
     sub.name = new_name;
     sub.geometry_hash = new_geometry_hash;
     sub.status = crate::parcel_status::REGISTERED;
@@ -156,6 +159,17 @@ pub fn subdivide_parcel(
     sub.access_hash = [0; 32];
     sub.created_at = now;
     sub.updated_at = now;
+
+    let sub_ownership = &mut ctx.accounts.sub_ownership;
+    sub_ownership.parcel = sub.key();
+    sub_ownership.rights_kind = crate::right_kind::OWNERSHIP;
+    sub_ownership.holder = original_holder;
+    sub_ownership.granter = original_holder;
+    sub_ownership.created_at = now;
+    sub_ownership.expires_at = 0;
+    sub_ownership.notes = String::new();
+    sub_ownership.status = crate::right_status::ACTIVE;
+    sub_ownership.grace_period_secs = 0;
 
     // Create the subdivision record.
     let record = &mut ctx.accounts.subdivision_record;
@@ -213,8 +227,20 @@ pub fn amalgamate_parcels(
     );
 
     let authority = &ctx.accounts.authority;
-    require!(authority.key() == result.owner, TerraError::NotOwner);
-    require!(authority.key() == source.owner, TerraError::NotOwner);
+    crate::is_authorized_holder(
+        &ctx.accounts.result_ownership,
+        result.key(),
+        ctx.remaining_accounts,
+        authority.key(),
+    )
+    .map_err(|_| error!(TerraError::NotOwner))?;
+    crate::is_authorized_holder(
+        &ctx.accounts.source_ownership,
+        source.key(),
+        ctx.remaining_accounts,
+        authority.key(),
+    )
+    .map_err(|_| error!(TerraError::NotOwner))?;
 
     let now = Clock::get()?.unix_timestamp;
 
@@ -268,8 +294,8 @@ pub fn migrate_rights<'a>(ctx: Context<'a, super::MigrateRights<'a>>) -> Result<
     let old_parcel = &ctx.accounts.old_parcel;
     let new_parcel = &mut ctx.accounts.new_parcel;
 
-    crate::is_authorized_owner(
-        old_parcel.owner,
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         old_parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.authority.key(),
@@ -418,8 +444,8 @@ pub fn migrate_attestations(
     let old_parcel = &ctx.accounts.old_parcel;
     let new_parcel = &ctx.accounts.new_parcel;
 
-    crate::is_authorized_owner(
-        old_parcel.owner,
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         old_parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.authority.key(),

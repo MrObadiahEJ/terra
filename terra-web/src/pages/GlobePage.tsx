@@ -48,7 +48,7 @@ export default function GlobePage() {
 
   const selectedSummary = useMemo(() => {
     if (!selectedParcel) return null
-    const off = offChainParcels.find((p) => p.owner === selectedParcel.account.owner.toBase58())
+    const off = offChainParcels.find((p) => p.holder === selectedParcel.holder)
     return { onchain: selectedParcel, off }
   }, [selectedParcel, offChainParcels])
 
@@ -69,12 +69,12 @@ export default function GlobePage() {
             const off = offChainParcels.find((p) => p.id === id)
             if (off) {
               // Link the off-chain geometry record to its on-chain ownership by
-              // matching on owner + name (both are written at registration time).
+              // matching on holder + name (both are written at registration time).
               const onchain = useAppStore
                 .getState()
                 .parcels.find(
                   (p) =>
-                    p.account.owner.toBase58() === off.owner &&
+                    p.holder === off.holder &&
                     p.account.name === off.name,
                 )
               if (onchain) selectParcel(onchain)
@@ -133,7 +133,7 @@ export default function GlobePage() {
                   ✕
                 </button>
               </div>
-              <ParcelPanel address={selectedParcel.address} account={selectedParcel.account} />
+              <ParcelPanel address={selectedParcel.address} account={selectedParcel.account} holder={selectedParcel.holder} />
               {selectedSummary?.off && (
                 <div className="px-3 pb-3 text-[12px] text-muted">
                   Off-chain record: <b>{selectedSummary.off.status}</b> ·{' '}

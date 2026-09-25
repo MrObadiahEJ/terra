@@ -52,24 +52,21 @@ pub mod infra_flag {
 
 /// A parcel of land.
 ///
-/// **DEPRECATED: `owner` field** — Ownership should be expressed through
-/// `IdentityRights` with `rights_kind == OWNERSHIP` instead of the direct
-/// `owner` wallet field. The `is_authorized_owner()` function supports both
-/// paths. New code should prefer the IdentityRights path. The `owner` field
-/// is retained for backward compatibility and will be removed in a future
-/// major version once all existing accounts have migrated.
+/// The parcel itself carries no ownership. Ownership/control is the canonical
+/// `Rights` PDA at `["ownership", parcel]` with `rights_kind == OWNERSHIP`
+/// (see `ownership_pda()`); its `holder` may be a wallet or an Identity PDA
+/// (identity is an optional overlay, never a prerequisite). Authorization
+/// goes through `is_authorized_holder()` only.
 #[account]
 #[derive(InitSpace)]
 pub struct Parcel {
     pub id: [u8; 32],
-    /// **DEPRECATED**: Use `IdentityRights(OWNERSHIP)` instead.
-    /// Retained for backward compatibility. See `is_authorized_owner()`.
-    pub owner: Pubkey,
     #[max_len(64)]
     pub name: String,
     pub geometry_hash: [u8; 32],
     pub status: u8,
-    /// Monotonic nonce for the parcel's Rights PDAs. Never decremented.
+    /// Monotonic nonce for the parcel's non-ownership Rights PDAs
+    /// (`["rights", parcel, nonce]`). Never decremented.
     pub rights_count: u8,
     pub infrastructure_flags: u16,
     /// sha-256 canonical digest over the off-chain infra/access validation
@@ -90,7 +87,8 @@ pub struct Rights {
     pub rights_kind: u8,
     /// Party holding the right.
     pub holder: Pubkey,
-    /// Party who granted the right (invariably the parcel owner).
+    /// Party who granted the right (invariably the current holder of the
+    /// canonical ownership right).
     pub granter: Pubkey,
     pub created_at: i64,
     /// Unix timestamp; 0 means no expiration.
@@ -141,70 +139,72 @@ pub struct IdentityRights {
     pub notes: String,
 }
 
-/// Check whether `signer` is authorized to act as owner on `parcel`.
+/// Seed prefix for the canonical ownership right of a parcel (RRR model:
+/// the parcel does not embed ownership; this right *is* the ownership).
+pub const OWNERSHIP_SEED: &[u8] = b"ownership";
+
+/// Derive the canonical ownership `Rights` PDA for a parcel.
+/// The account exists from `register_parcel` onward and is the single
+/// source of protocol-level ownership/control.
+pub fn ownership_pda(parcel: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[OWNERSHIP_SEED, parcel.as_ref()], &crate::ID)
+}
+
+/// Check whether `signer` is authorized to act as controlling holder of
+/// `parcel`.
 ///
-/// Authorization passes if:
-/// 1. `signer == parcel.owner` (legacy wallet path), OR
-/// 2. `remaining_accounts` contains a valid `IdentityRights` with
-///    `rights_kind == OWNERSHIP`, `status == ACTIVE`, and
-///    `identity.owner == signer` (identity path).
-pub fn is_authorized_owner(
-    parcel_owner: Pubkey,
+/// The canonical ownership record is the `Rights` PDA at
+/// `["ownership", parcel]` with `rights_kind == OWNERSHIP` and
+/// `status == ACTIVE`. Its `holder` may be:
+///
+/// 1. the signer's wallet (direct control), OR
+/// 2. an `Identity` PDA owned by the `terra_identity` program, in which
+///    case the Identity's human owner (`identity.owner`) may sign.
+///
+/// Path 2 is the optional identity overlay: identity stays a separate
+/// binding/provenance layer (never embedded in the land record) and is only
+/// resolved when the holder itself *is* an Identity PDA. When case 2 applies,
+/// `remaining_accounts` must contain that Identity account.
+pub fn is_authorized_holder(
+    ownership: &Rights,
     parcel_key: Pubkey,
     remaining_accounts: &[AccountInfo],
     signer_key: Pubkey,
 ) -> Result<()> {
-    // Fast path: legacy wallet ownership.
-    if parcel_owner == signer_key {
+    // Defensive invariants: this really is *the* ownership right of *this*
+    // parcel and it is live (ownership is never revoked — transfer moves it).
+    require!(
+        ownership.rights_kind == right_kind::OWNERSHIP,
+        TerraError::NotAuthorized
+    );
+    require!(ownership.parcel == parcel_key, TerraError::NotAuthorized);
+    require!(
+        ownership.status == right_status::ACTIVE,
+        TerraError::NotAuthorized
+    );
+
+    // Direct control: the signer holds the right (wallet holder).
+    if ownership.holder == signer_key {
         return Ok(());
     }
 
-    // Identity path: look for a valid IdentityRights in remaining_accounts.
+    // Identity overlay: resolve the holder only if it is an Identity PDA.
     for acc in remaining_accounts.iter() {
-        // Verify account is owned by the terra_identity program to prevent
-        // fake accounts matching the data layout.
+        if acc.key != &ownership.holder {
+            continue;
+        }
+        // Verify the account is owned by the terra_identity program to
+        // prevent fake accounts matching the data layout.
         require!(acc.owner == &terra_identity::ID, TerraError::NotAuthorized);
-
         let data = acc.try_borrow_data()?;
         if data.len() < 8 {
             continue;
         }
-        let mut slice: &[u8] = &data;
-        let ir = match IdentityRights::try_deserialize(&mut slice) {
-            Ok(ir) => ir,
-            Err(_) => continue,
-        };
-
-        if ir.rights_kind != right_kind::OWNERSHIP {
-            continue;
-        }
-        if ir.parcel != parcel_key {
-            continue;
-        }
-        if ir.status != right_status::ACTIVE {
-            continue;
-        }
-
-        // The IdentityRights must be for the signer's identity.
-        // Read the Identity PDA to verify the signer is its owner.
-        let identity_info = remaining_accounts.iter().find(|a| a.key == &ir.identity);
-        if let Some(identity_acc) = identity_info {
-            // Verify the Identity account is also owned by terra_identity.
-            require!(
-                identity_acc.owner == &terra_identity::ID,
-                TerraError::NotAuthorized
-            );
-            let id_data = identity_acc.try_borrow_data()?;
-            let slice_id = if id_data.len() >= 8 {
-                &id_data[8..]
-            } else {
-                &id_data
-            };
-            let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice_id)
-                .map_err(|_| error!(TerraError::IdentityMismatch))?;
-            require!(identity.owner == signer_key, TerraError::IdentityMismatch);
-            return Ok(());
-        }
+        let slice = &data[8..];
+        let identity: Identity = anchor_lang::AnchorDeserialize::try_from_slice(slice)
+            .map_err(|_| error!(TerraError::IdentityMismatch))?;
+        require!(identity.owner == signer_key, TerraError::IdentityMismatch);
+        return Ok(());
     }
 
     Err(error!(TerraError::NotOwner))
@@ -812,7 +812,9 @@ pub struct RegisterDocument<'info> {
 pub mod terra_registry {
     use super::*;
 
-    /// Register a new parcel on-chain. The signer becomes its owner.
+    /// Register a new parcel on-chain. The signer receives the canonical
+    /// ownership right (`Rights` PDA at `["ownership", parcel]`), which is
+    /// the single source of protocol-level control over the parcel.
     ///
     /// `id` is a caller-provided unique 32-byte identifier (e.g. a SHA-256 of
     /// the parcel geometry). It is also the PDA seed, so it can never change.
@@ -829,37 +831,50 @@ pub mod terra_registry {
             TerraError::EmptyGeometryHash
         );
 
-        let parcel = &mut ctx.accounts.parcel;
         let now = Clock::get()?.unix_timestamp;
+        let holder = ctx.accounts.owner.key();
 
+        let parcel = &mut ctx.accounts.parcel;
         parcel.id = id;
-        parcel.owner = ctx.accounts.owner.key();
         parcel.name = name;
         parcel.geometry_hash = geometry_hash;
         parcel.status = parcel_status::REGISTERED;
         parcel.created_at = now;
         parcel.updated_at = now;
 
-        emit!(ParcelRegistered {
-            id,
-            owner: parcel.owner,
-        });
+        let ownership = &mut ctx.accounts.ownership;
+        ownership.parcel = parcel.key();
+        ownership.rights_kind = right_kind::OWNERSHIP;
+        ownership.holder = holder;
+        ownership.granter = holder;
+        ownership.created_at = now;
+        ownership.expires_at = 0;
+        ownership.notes = String::new();
+        ownership.status = right_status::ACTIVE;
+        ownership.grace_period_secs = 0;
+
+        emit!(ParcelRegistered { id, holder });
         Ok(())
     }
 
-    /// Transfer ownership of a parcel. Only the current owner can sign.
+    /// Transfer the ownership right of a parcel to `new_owner`. Only the
+    /// current holder can sign (wallet holder or, via the identity overlay,
+    /// the owner of an Identity PDA holder).
     pub fn transfer_parcel(ctx: Context<TransferParcel>) -> Result<()> {
-        let parcel = &mut ctx.accounts.parcel;
-        is_authorized_owner(
-            parcel.owner,
-            parcel.key(),
+        is_authorized_holder(
+            &ctx.accounts.ownership,
+            ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
         )?;
 
-        let from = parcel.owner;
+        let ownership = &mut ctx.accounts.ownership;
+        let from = ownership.holder;
         let to = ctx.accounts.new_owner.key();
-        parcel.owner = to;
+        ownership.holder = to;
+        ownership.granter = from;
+
+        let parcel = &mut ctx.accounts.parcel;
         parcel.updated_at = Clock::get()?.unix_timestamp;
 
         emit!(ParcelTransferred {
@@ -870,10 +885,10 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Update a parcel's status (e.g. for-sale). Owner-only.
+    /// Update a parcel's status (e.g. for-sale). Holder-only.
     pub fn update_status(ctx: Context<UpdateStatus>, status: u8) -> Result<()> {
-        is_authorized_owner(
-            ctx.accounts.parcel.owner,
+        is_authorized_holder(
+            &ctx.accounts.ownership,
             ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
@@ -886,10 +901,12 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Grant a right on a parcel to `holder`. Owner-only.
+    /// Grant a non-ownership right on a parcel to `holder`. Holder-only.
     ///
     /// `nonce` must equal the parcel's current `rights_count`, which is
-    /// incremented so every right gets a unique PDA.
+    /// incremented so every right gets a unique PDA. OWNERSHIP is excluded
+    /// here — it lives solely at the canonical `["ownership", parcel]` PDA
+    /// and only moves via `transfer_parcel`.
     pub fn grant_right(
         ctx: Context<GrantRight>,
         nonce: u8,
@@ -898,14 +915,18 @@ pub mod terra_registry {
         expires_at: i64,
         notes: String,
     ) -> Result<()> {
-        let parcel = &mut ctx.accounts.parcel;
-        is_authorized_owner(
-            parcel.owner,
-            parcel.key(),
+        is_authorized_holder(
+            &ctx.accounts.ownership,
+            ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
         )?;
         require!(rights_kind <= right_kind::MAX, TerraError::InvalidRightKind);
+        require!(
+            rights_kind != right_kind::OWNERSHIP,
+            TerraError::InvalidRightKind
+        );
+        let parcel = &mut ctx.accounts.parcel;
         require!(nonce == parcel.rights_count, TerraError::InvalidNonce);
         require!(
             (parcel.rights_count as u16) < u8::MAX as u16,
@@ -938,20 +959,22 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Revoke a previously granted right. The parcel owner or the original
-    /// granter may revoke. The account is closed and its lamports returned.
-    /// The parcel's rights counter is decremented so the freed nonce can be
-    /// reused by a future grant (safe: the old account no longer exists).
+    /// Revoke a previously granted (non-ownership) right. The current parcel
+    /// holder or the original granter may revoke. The account is closed and
+    /// its lamports returned. The parcel's rights counter is decremented so
+    /// the freed nonce can be reused by a future grant (safe: the old account
+    /// no longer exists). The canonical ownership right is not revocable —
+    /// it only moves via `transfer_parcel`.
     pub fn revoke_right(ctx: Context<RevokeRight>, _nonce: u8) -> Result<()> {
         let rights = &ctx.accounts.rights;
-        let owner_ok = is_authorized_owner(
-            ctx.accounts.parcel.owner,
+        let holder_ok = is_authorized_holder(
+            &ctx.accounts.ownership,
             ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
         );
         require!(
-            owner_ok.is_ok() || rights.granter == ctx.accounts.owner.key(),
+            holder_ok.is_ok() || rights.granter == ctx.accounts.owner.key(),
             TerraError::NotAuthorized
         );
 
@@ -968,14 +991,13 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Grant an identity-based right on a parcel. Only the parcel owner (or
-    /// current granter) may sign. The `identity` must be a valid Identity PDA
-    /// owned by the signer.
+    /// Grant an identity-based right on a parcel. Only the current holder
+    /// of the canonical ownership right may sign. The `identity` must be a
+    /// valid Identity PDA.
     ///
-    /// Authorization: the granter must be either the legacy `parcel.owner` wallet
-    /// **or** the holder of an active OWNERSHIP IdentityRights for this parcel.
-    /// This enables identity-based ownership to grant sub-rights without
-    /// requiring the legacy wallet field.
+    /// Identity is a separate binding/provenance layer: this creates the
+    /// optional identity↔parcel link (`IdentityRights`), it is never the
+    /// ownership record itself (ownership lives at `["ownership", parcel]`).
     ///
     /// PDA: `["identity_rights", identity, parcel, rights_kind]`.
     pub fn grant_identity_right(
@@ -991,20 +1013,18 @@ pub mod terra_registry {
             require!(expires_at > now, TerraError::InvalidExpiry);
         }
 
-        let parcel = &ctx.accounts.parcel;
-        // Use identity-aware authorization: supports both legacy owner wallet
-        // and IdentityRights (OWNERSHIP, ACTIVE) path.
-        is_authorized_owner(
-            parcel.owner,
-            parcel.key(),
+        // Authorization: only the holder of the canonical ownership right
+        // (wallet or identity-overlay signer) may grant identity bindings.
+        is_authorized_holder(
+            &ctx.accounts.ownership,
+            ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.granter.key(),
         )?;
 
         // Verify the identity account is a valid Identity PDA.
-        // Authorization (who can grant) is already checked by is_authorized_owner above.
-        // The identity's owner is not required to match the granter — a granter with
-        // OWNERSHIP rights may grant sub-rights to any valid identity.
+        // The identity's owner is not required to match the granter — a
+        // recognized holder may bind sub-rights to any valid identity.
         let identity_info = &ctx.accounts.identity;
         let identity_data = identity_info.try_borrow_data()?;
         let slice = if identity_data.len() >= 8 {
@@ -1017,7 +1037,7 @@ pub mod terra_registry {
 
         let ir = &mut ctx.accounts.identity_rights;
         ir.identity = identity_info.key();
-        ir.parcel = parcel.key();
+        ir.parcel = ctx.accounts.parcel.key();
         ir.rights_kind = rights_kind;
         ir.granter = ctx.accounts.granter.key();
         ir.created_at = now;
@@ -1056,7 +1076,7 @@ pub mod terra_registry {
     }
 
     /// Set the parcel's infrastructure flag bitmask together with the canonical
-    /// access digest produced by the off-chain validation engine. Owner-only.
+    /// access digest produced by the off-chain validation engine. Holder-only.
     ///
     /// `access_hash` must be non-zero and match the digests the off-chain
     /// engine derives for these flags on the parcel geometry.
@@ -1065,8 +1085,8 @@ pub mod terra_registry {
         flags: u16,
         access_hash: [u8; 32],
     ) -> Result<()> {
-        is_authorized_owner(
-            ctx.accounts.parcel.owner,
+        is_authorized_holder(
+            &ctx.accounts.ownership,
             ctx.accounts.parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
@@ -1102,7 +1122,7 @@ pub mod terra_registry {
     ///
     /// `validators` holds the public keys of the (possibly several) parties
     /// who must sign off on the transaction; `required` is how many signatures
-    /// are needed. The signer must be the parcel owner or a registered
+    /// are needed. The signer must be the parcel holder or a registered
     /// registrar. Per-validator Ed25519 signatures live off-chain but are
     /// verified against this on-chain identity set and `content_hash`.
     pub fn attest(
@@ -1113,9 +1133,10 @@ pub mod terra_registry {
         validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        // Only the parcel owner (or program authority) may create attestations.
-        is_authorized_owner(
-            parcel.owner,
+        // Only the ownership holder (or program authority) may create
+        // attestations.
+        is_authorized_holder(
+            &ctx.accounts.ownership,
             parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.authority.key(),
@@ -1158,13 +1179,14 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Attach a parcel to an identity (the person behind its owner wallet).
-    /// Only the parcel's owner may do this, and only for an identity whose
-    /// owner wallet matches.
+    /// Attach a parcel to an identity (the person behind its holder wallet).
+    /// Only the current ownership holder may do this, and only for an identity
+    /// whose owner wallet matches. The identity link is provenance — it never
+    /// becomes the ownership record.
     pub fn attach_parcel(ctx: Context<AttachParcel>) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        is_authorized_owner(
-            parcel.owner,
+        is_authorized_holder(
+            &ctx.accounts.ownership,
             parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
@@ -1195,7 +1217,7 @@ pub mod terra_registry {
     }
 
     /// Replace the validator set on an attestation (the fix for dead/leaving
-    /// validators). Only the parcel owner may rotate. Bumps `version` so a
+    /// validators). Only the parcel holder may rotate. Bumps `version` so a
     /// reconstituted set is provably newer, and resets `required`/`count`.
     ///
     /// **DEPRECATED**: Use the verification pipeline's validator management instead.
@@ -1205,8 +1227,8 @@ pub mod terra_registry {
         new_validators: [Pubkey; MAX_VALIDATORS],
     ) -> Result<()> {
         let parcel = &ctx.accounts.parcel;
-        is_authorized_owner(
-            parcel.owner,
+        is_authorized_holder(
+            &ctx.accounts.ownership,
             parcel.key(),
             ctx.remaining_accounts,
             ctx.accounts.authority.key(),
@@ -1268,17 +1290,16 @@ pub mod terra_registry {
             TerraError::InvalidThreshold
         );
 
-        // Count unique validators; reject duplicates and self-dealing (owner).
+        // Count unique validators; reject duplicates and self-dealing (holder).
         let count = quorum::require_unique_validators(&validators)?;
+        let from = ctx.accounts.ownership.holder;
         for &v in validators.iter() {
             if v == Pubkey::default() {
                 continue;
             }
-            // Self-dealing check: declared validators must not include the parcel owner.
-            require!(
-                v != ctx.accounts.parcel.owner,
-                TerraError::ValidatorOwnsAsset
-            );
+            // Self-dealing check: declared validators must not include the
+            // current ownership holder.
+            require!(v != from, TerraError::ValidatorOwnsAsset);
         }
         require!(count > 0, TerraError::NoValidators);
         require!(
@@ -1286,10 +1307,7 @@ pub mod terra_registry {
             TerraError::InvalidThreshold
         );
 
-        let parcel = &mut ctx.accounts.parcel;
-        let from = parcel.owner;
-
-        // Self-dealing check: parcel owner cannot sign as validator.
+        // Self-dealing check: holder cannot sign as validator.
         let signers = quorum::verify_quorum_signers(
             ctx.remaining_accounts,
             &validators,
@@ -1298,13 +1316,18 @@ pub mod terra_registry {
         )?;
         let present = signers.len() as u8;
 
-        // The relaying party must not be the current owner (prevents self-forfeit).
+        // The relaying party must not be the current holder (prevents self-forfeit).
         require!(
             ctx.accounts.authority.key() != from,
             TerraError::OwnerCannotSelfForfeit
         );
 
-        parcel.owner = new_owner;
+        // Court-ordered title move: the ownership right follows the judgment.
+        let ownership = &mut ctx.accounts.ownership;
+        ownership.holder = new_owner;
+        ownership.granter = from;
+
+        let parcel = &mut ctx.accounts.parcel;
         parcel.updated_at = Clock::get()?.unix_timestamp;
 
         emit!(ParcelForfeited {
@@ -2554,6 +2577,16 @@ pub struct RegisterParcel<'info> {
     pub parcel: Account<'info, Parcel>,
     #[account(mut)]
     pub owner: Signer<'info>,
+    /// The canonical ownership right (RRR: this — not the parcel — is the
+    /// ownership record). Created in the same instruction as the parcel.
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Rights::INIT_SPACE,
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub system_program: Program<'info, System>,
 }
 
@@ -2565,6 +2598,12 @@ pub struct TransferParcel<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub owner: Signer<'info>,
     pub new_owner: SystemAccount<'info>,
 }
@@ -2577,6 +2616,11 @@ pub struct UpdateStatus<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub owner: Signer<'info>,
 }
 
@@ -2589,6 +2633,11 @@ pub struct GrantRight<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = owner,
@@ -2611,6 +2660,11 @@ pub struct RevokeRight<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         mut,
         seeds = [b"rights".as_ref(), parcel.key().as_ref(), &[nonce]],
@@ -2636,6 +2690,11 @@ pub struct GrantIdentityRight<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     /// CHECK: Identity account owned by terra_identity program. Verified manually in handler.
     pub identity: UncheckedAccount<'info>,
     #[account(
@@ -2692,6 +2751,11 @@ pub struct UpdateInfrastructure<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub owner: Signer<'info>,
 }
 
@@ -2703,6 +2767,11 @@ pub struct Attest<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = authority,
@@ -2724,6 +2793,11 @@ pub struct AttachParcel<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     /// CHECK: Identity account owned by terra_identity program. Deserialized manually in handler.
     pub identity: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
@@ -2737,6 +2811,11 @@ pub struct RotateValidators<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         mut,
         seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
@@ -2755,6 +2834,12 @@ pub struct JudicialForfeiture<'info> {
         bump
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     /// Relaying authority (court clerk / govt channel). Must NOT be the owner.
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -2781,6 +2866,11 @@ pub struct FileDispute<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         seeds = [b"validator_registry"],
         bump,
@@ -2849,6 +2939,12 @@ pub struct ExecuteJudgment<'info> {
     )]
     pub parcel: Account<'info, Parcel>,
     #[account(
+        mut,
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
+    #[account(
         seeds = [b"validator_registry"],
         bump,
     )]
@@ -2870,6 +2966,11 @@ pub struct CancelDispute<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub signer: Signer<'info>,
 }
 
@@ -2901,6 +3002,11 @@ pub struct CreateEscrow<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(mut)]
     pub seller: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -2945,6 +3051,11 @@ pub struct AcceptEscrow<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub seller: Signer<'info>,
 }
 
@@ -2970,6 +3081,12 @@ pub struct SettleEscrow<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        mut,
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     /// Seller receives SOL.
     #[account(mut)]
     /// CHECK: validated as escrow.seller in handler.
@@ -3108,9 +3225,14 @@ pub struct RenewRight<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     /// Holder must sign.
     pub holder: Signer<'info>,
-    /// Granter must co-sign (original granter or current parcel owner).
+    /// Granter must co-sign (original granter or current ownership holder).
     pub granter: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -3127,9 +3249,13 @@ pub struct SweepExpiredRights<'info> {
     #[account(
         seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
         bump,
-        constraint = parcel.owner == keeper.key() @ TerraError::NotOwner,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     pub keeper: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
@@ -3143,6 +3269,11 @@ pub struct GrantConditionalRight<'info> {
         bump,
     )]
     pub parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = owner,
@@ -3287,6 +3418,12 @@ pub struct SubdivideParcel<'info> {
         bump,
     )]
     pub original_parcel: Account<'info, Parcel>,
+    /// Ownership right of the original parcel (auth source for subdivision).
+    #[account(
+        seeds = [b"ownership".as_ref(), original_parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = authority,
@@ -3295,6 +3432,16 @@ pub struct SubdivideParcel<'info> {
         bump
     )]
     pub sub_parcel: Account<'info, Parcel>,
+    /// The sub-parcel's canonical ownership right — inherited from the
+    /// original parcel's holder in the same instruction.
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Rights::INIT_SPACE,
+        seeds = [b"ownership".as_ref(), sub_parcel.key().as_ref()],
+        bump
+    )]
+    pub sub_ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = authority,
@@ -3329,12 +3476,24 @@ pub struct AmalgamateParcels<'info> {
         bump,
     )]
     pub result_parcel: Account<'info, Parcel>,
+    /// Ownership right of the result parcel — authority must control it.
+    #[account(
+        seeds = [b"ownership".as_ref(), result_parcel.key().as_ref()],
+        bump
+    )]
+    pub result_ownership: Account<'info, Rights>,
     #[account(
         mut,
         seeds = [b"parcel".as_ref(), source_parcel.id.as_ref()],
         bump,
     )]
     pub source_parcel: Account<'info, Parcel>,
+    /// Ownership right of the source parcel — authority must control it too.
+    #[account(
+        seeds = [b"ownership".as_ref(), source_parcel.key().as_ref()],
+        bump
+    )]
+    pub source_ownership: Account<'info, Rights>,
     #[account(
         init,
         payer = authority,
@@ -3361,6 +3520,11 @@ pub struct MigrateRights<'info> {
     )]
     pub old_parcel: Account<'info, Parcel>,
     #[account(
+        seeds = [b"ownership".as_ref(), old_parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
+    #[account(
         mut,
         seeds = [b"parcel".as_ref(), new_parcel.id.as_ref()],
         bump,
@@ -3379,6 +3543,11 @@ pub struct MigrateAttestations<'info> {
         bump,
     )]
     pub old_parcel: Account<'info, Parcel>,
+    #[account(
+        seeds = [b"ownership".as_ref(), old_parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
     #[account(
         seeds = [b"parcel".as_ref(), new_parcel.id.as_ref()],
         bump,
@@ -5640,7 +5809,7 @@ pub struct FinalizeQuorum<'info> {
 #[event]
 pub struct ParcelRegistered {
     pub id: [u8; 32],
-    pub owner: Pubkey,
+    pub holder: Pubkey,
 }
 
 #[event]
@@ -6615,7 +6784,7 @@ pub enum TerraError {
     EmptyIdentityHash,
     #[msg("Recovery wallet is required")]
     EmptyRecovery,
-    #[msg("Identity owner does not match the parcel owner")]
+    #[msg("Identity owner does not match the acting holder")]
     IdentityMismatch,
     #[msg("Successor wallet is required")]
     EmptySuccessor,

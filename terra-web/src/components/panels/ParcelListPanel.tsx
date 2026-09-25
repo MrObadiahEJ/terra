@@ -56,7 +56,7 @@ export default function ParcelListPanel({ onSelect }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="truncate text-[13px]">{p.account.name}</div>
                   <div className="font-mono text-[10px] text-muted truncate">
-                    {p.account.owner.toBase58().slice(0, 10)}…
+                    {(p.holder || '?').slice(0, 10)}…
                   </div>
                 </div>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0">

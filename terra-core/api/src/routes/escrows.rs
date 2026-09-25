@@ -152,18 +152,23 @@ async fn create_escrow(
 
     let mut tx = state.pool.begin().await?;
 
-    // Verify parcel exists and is FOR_SALE.
-    let current: Option<(String, String)> =
-        sqlx::query_as("SELECT owner, status FROM parcels WHERE id = $1 FOR UPDATE")
-            .bind(parcel_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let Some((owner, status)) = current else {
+    // Verify parcel exists and is FOR_SALE; the seller must be the current
+    // holder of the ownership right.
+    let current: Option<(String, String)> = sqlx::query_as(
+        "SELECT o.holder, p.status
+         FROM parcels p
+         JOIN parcel_ownership o ON o.parcel_id = p.id
+         WHERE p.id = $1 FOR UPDATE OF o",
+    )
+    .bind(parcel_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((holder, status)) = current else {
         return Err(AppError::not_found("parcel not found"));
     };
-    if owner != req.seller {
+    if holder != req.seller {
         return Err(AppError::bad_request(
-            "only the parcel owner can create an escrow",
+            "only the parcel holder can create an escrow",
         ));
     }
     if status != "for_sale" {
@@ -335,15 +340,19 @@ async fn settle_escrow(
 
     let mut tx2 = state.pool.begin().await?;
 
-    // Transfer parcel ownership.
-    sqlx::query(
-        "UPDATE parcels SET owner = $2, status = 'transferred', updated_at = $3 WHERE id = $1",
-    )
-    .bind(escrow.parcel_id)
-    .bind(&escrow.buyer)
-    .bind(now)
-    .execute(&mut *tx2)
-    .await?;
+    // Transfer the ownership right to the buyer and update parcel status.
+    sqlx::query("UPDATE parcel_ownership SET holder = $2, updated_at = $3 WHERE parcel_id = $1")
+        .bind(escrow.parcel_id)
+        .bind(&escrow.buyer)
+        .bind(now)
+        .execute(&mut *tx2)
+        .await?;
+    sqlx::query("UPDATE parcels SET status = 'transferred', updated_at = $3 WHERE id = $1")
+        .bind(escrow.parcel_id)
+        .bind(&escrow.buyer)
+        .bind(now)
+        .execute(&mut *tx2)
+        .await?;
 
     // Mark escrow settled.
     let updated = sqlx::query_as::<_, Escrow>(

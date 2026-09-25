@@ -23,22 +23,23 @@ fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
 
 const PARCEL_SELECT: &str = r#"
     SELECT
-        id,
-        name,
-        owner,
-        status,
-        ST_AsGeoJSON(geometry)::text AS geometry,
-        ST_Area(geometry::geography)::float8 AS area_m2,
-        created_at,
-        updated_at
-    FROM parcels
+        p.id,
+        p.name,
+        o.holder,
+        p.status,
+        ST_AsGeoJSON(p.geometry)::text AS geometry,
+        ST_Area(p.geometry::geography)::float8 AS area_m2,
+        p.created_at,
+        p.updated_at
+    FROM parcels p
+    JOIN parcel_ownership o ON o.parcel_id = p.id
 "#;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Parcel {
     pub id: Uuid,
     pub name: String,
-    pub owner: String,
+    pub holder: String,
     pub status: String,
     pub geometry: Option<String>,
     pub area_m2: Option<f64>,
@@ -57,7 +58,9 @@ pub struct ListParams {
 #[derive(Debug, Deserialize)]
 pub struct NewParcel {
     pub name: String,
-    pub owner: String,
+    /// Wallet that will hold the parcel's canonical ownership right
+    /// (mirrors the on-chain ownership Rights PDA holder).
+    pub holder: String,
     #[serde(default)]
     pub status: String,
     pub geometry: serde_json::Value,
@@ -105,7 +108,7 @@ async fn list(
         (Some(minx), Some(miny), Some(maxx), Some(maxy)) => {
             sqlx::query_as::<_, Parcel>(&format!(
                 "{PARCEL_SELECT}
-             WHERE ST_Intersects(geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
+             WHERE ST_Intersects(p.geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
              ORDER BY created_at DESC"
             ))
             .bind(minx)
@@ -133,7 +136,7 @@ async fn get_by_id(
 ) -> Result<Json<Parcel>, AppError> {
     let parcel = sqlx::query_as::<_, Parcel>(&format!(
         "{PARCEL_SELECT}
-         WHERE id = $1"
+         WHERE p.id = $1"
     ))
     .bind(id)
     .fetch_one(&state.pool)
@@ -153,13 +156,24 @@ async fn create_parcel(
     };
 
     let parcel = sqlx::query_as::<_, Parcel>(
-        "INSERT INTO parcels (name, owner, status, geometry)
-         VALUES ($1, $2, $3, ST_GeomFromGeoJSON($4))
-         RETURNING id, name, owner, status, ST_AsGeoJSON(geometry)::text AS geometry,
-                   ST_Area(geometry::geography)::float8 AS area_m2, created_at, updated_at",
+        "WITH p AS (
+            INSERT INTO parcels (name, status, geometry)
+            VALUES ($1, $3, ST_GeomFromGeoJSON($4))
+            RETURNING id, name, status,
+                      ST_AsGeoJSON(geometry)::text AS geometry,
+                      ST_Area(geometry::geography)::float8 AS area_m2,
+                      created_at, updated_at
+         ), o AS (
+            INSERT INTO parcel_ownership (parcel_id, holder)
+            SELECT id, $2 FROM p
+            RETURNING holder
+         )
+         SELECT p.id, p.name, o.holder, p.status, p.geometry, p.area_m2,
+                p.created_at, p.updated_at
+         FROM p, o",
     )
     .bind(&params.name)
-    .bind(&params.owner)
+    .bind(&params.holder)
     .bind(&status)
     .bind(&geojson)
     .fetch_one(&state.pool)
@@ -321,7 +335,7 @@ async fn reconcile(
 
     let parcel = sqlx::query_as::<_, Parcel>(&format!(
         "{PARCEL_SELECT}
-         WHERE id = $1"
+         WHERE p.id = $1"
     ))
     .bind(id)
     .fetch_one(&state.pool)
@@ -397,22 +411,26 @@ async fn judicial_forfeiture(
     let mut tx = state.pool.begin().await?;
 
     let current: Option<(String,)> =
-        sqlx::query_as("SELECT owner FROM parcels WHERE id = $1 FOR UPDATE")
+        sqlx::query_as("SELECT holder FROM parcel_ownership WHERE parcel_id = $1 FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut *tx)
             .await?;
-    let Some((owner,)) = current else {
+    let Some((holder,)) = current else {
         return Err(AppError::not_found("parcel not found"));
     };
-    if owner.eq_ignore_ascii_case(&req.relayer) {
+    if holder.eq_ignore_ascii_case(&req.relayer) {
         return Err(AppError::bad_request(
-            "the current owner cannot self-forfeit their own parcel",
+            "the current holder cannot self-forfeit their own parcel",
         ));
     }
 
-    sqlx::query("UPDATE parcels SET owner = $2, updated_at = now() WHERE id = $1")
+    sqlx::query("UPDATE parcel_ownership SET holder = $2, updated_at = now() WHERE parcel_id = $1")
         .bind(id)
         .bind(&req.new_owner)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE parcels SET updated_at = now() WHERE id = $1")
+        .bind(id)
         .execute(&mut *tx)
         .await?;
 
@@ -422,7 +440,7 @@ async fn judicial_forfeiture(
     )
     .bind(id)
     .bind(hex::encode(ih))
-    .bind(&owner)
+    .bind(&holder)
     .bind(&req.new_owner)
     .bind(req.threshold as i16)
     .bind(present as i16)
@@ -436,7 +454,7 @@ async fn judicial_forfeiture(
         StatusCode::OK,
         Json(serde_json::json!({
             "parcel_id": id,
-            "from": owner,
+            "from": holder,
             "to": req.new_owner,
             "threshold": req.threshold,
             "present": present,
@@ -452,7 +470,7 @@ mod tests {
     /// The core forfeiture guard: a collective seizure must meet a minimum
     /// threshold (>=2) of validator signers, and the threshold can never exceed
     /// the number of validator signers presented. This makes forfeiture
-    /// deliberately heavier than a normal owner-authorized transfer.
+    /// deliberately heavier than a normal holder-authorized transfer.
     fn forfeiture_ok(threshold: u16, present: usize) -> bool {
         threshold >= MIN_FORFEIT_VALIDATORS && (threshold as usize) <= present && present > 0
     }
@@ -469,7 +487,7 @@ mod tests {
 
     #[test]
     fn forfeiture_owner_cannot_be_validator_signer() {
-        // Self-dealing check: the parcel owner must not appear in the declared
+        // Self-dealing check: the parcel holder must not appear in the declared
         // validators array for judicial_forfeiture, nor sign as a validator.
         let owner = bs58::encode([1u8; 32]).into_string();
         let v1 = bs58::encode([2u8; 32]).into_string();

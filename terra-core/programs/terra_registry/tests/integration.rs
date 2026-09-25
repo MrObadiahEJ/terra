@@ -34,6 +34,18 @@ fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"parcel".as_ref(), id.as_ref()], &PROGRAM_ID)
 }
 
+/// Canonical ownership-right PDA for a parcel (RRR: the parcel has no
+/// `owner` field — this right *is* the ownership record).
+fn ownership_pda(parcel_pk: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[b"ownership", parcel_pk.as_ref()], &PROGRAM_ID).0
+}
+
+/// Read the current holder of a parcel's ownership right.
+async fn holder_of(ctx: &ProgramTestContext, parcel_pk: &Pubkey) -> Pubkey {
+    let ownership: Rights = read_account(ctx, ownership_pda(parcel_pk)).await;
+    ownership.holder
+}
+
 fn registry_pda() -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"validator_registry"], &PROGRAM_ID)
 }
@@ -367,6 +379,7 @@ fn register_ix(id: &[u8; 32], name: &str, geo: &[u8; 32], payer: &Pubkey) -> Ins
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
             AccountMeta::new(*payer, true),
+            AccountMeta::new(ownership_pda(&parcel_pk), false),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
         ],
         data,
@@ -433,6 +446,7 @@ async fn register_parcel_ok(
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(owner.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -477,6 +491,7 @@ async fn register_transfer_infrastructure() {
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
             AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(ownership_pda(&parcel_pk), false),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
         ],
         data,
@@ -493,7 +508,8 @@ async fn register_transfer_infrastructure() {
         .expect("parcel account missing");
     let mut data: &[u8] = &parcel.data;
     let decoded = Parcel::try_deserialize(&mut data).unwrap();
-    assert_eq!(decoded.owner, payer.pubkey());
+    let decoded_ownership: Rights = read_account(&ctx, ownership_pda(&parcel_pk)).await;
+    assert_eq!(decoded_ownership.holder, payer.pubkey());
     assert_eq!(decoded.status, parcel_status::REGISTERED);
     assert_eq!(decoded.rights_count, 0);
 
@@ -505,6 +521,7 @@ async fn register_transfer_infrastructure() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
             AccountMeta::new(payer.pubkey(), true),
         ],
         data,
@@ -554,6 +571,7 @@ async fn transfer_rejects_non_owner() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
+            AccountMeta::new(ownership_pda(&parcel_pk), false),
             AccountMeta::new(intruder.pubkey(), true),
             AccountMeta::new_readonly(intruder.pubkey(), false),
         ],
@@ -594,6 +612,7 @@ async fn rights_lifecycle() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
             AccountMeta::new(rights_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -623,6 +642,7 @@ async fn rights_lifecycle() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
             AccountMeta::new(rights_pk, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -1251,6 +1271,7 @@ async fn subdivision_creates_child_and_record() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -1277,7 +1298,9 @@ async fn subdivision_creates_child_and_record() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -1289,8 +1312,7 @@ async fn subdivision_creates_child_and_record() {
     .await
     .expect("subdivide_parcel failed");
 
-    let child: Parcel = read_account(&ctx, sub_pk).await;
-    assert_eq!(child.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &sub_pk).await, payer.pubkey());
     let parent: Parcel = read_account(&ctx, parent_pk).await;
     assert_eq!(parent.status, parcel_status::SUBDIVIDED);
     let _record: SubdivisionRecord = read_account(&ctx, record).await;
@@ -1645,6 +1667,7 @@ async fn migrate_rights_recreates_on_new_parcel() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(old_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
                 AccountMeta::new(old_rights, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -1677,6 +1700,7 @@ async fn migrate_rights_recreates_on_new_parcel() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(old_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
                 AccountMeta::new(new_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -2576,6 +2600,7 @@ async fn update_status_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data,
@@ -2605,6 +2630,7 @@ async fn update_status_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(intruder.pubkey(), true),
             ],
             data,
@@ -3159,6 +3185,7 @@ async fn judicial_forfeiture_transfers_ownership() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel, false),
+            AccountMeta::new(ownership_pda(&parcel), false),
             AccountMeta::new(authority.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             // remaining_accounts: both validator signers
@@ -3172,8 +3199,7 @@ async fn judicial_forfeiture_transfers_ownership() {
         .await
         .expect("judicial_forfeiture failed");
 
-    let p: Parcel = read_account(&ctx, parcel).await;
-    assert_eq!(p.owner, new_owner.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel).await, new_owner.pubkey());
 }
 
 #[tokio::test]
@@ -3227,6 +3253,7 @@ async fn judicial_forfeiture_rejects_owner_as_authority() {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(parcel, false),
+            AccountMeta::new(ownership_pda(&parcel), false),
             AccountMeta::new(owner.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             // remaining_accounts: both validator signers
@@ -3307,6 +3334,7 @@ async fn dispute_lifecycle_owner_wins() {
             accounts: vec![
                 AccountMeta::new(dispute_pda, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(owner.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -3386,8 +3414,10 @@ async fn dispute_lifecycle_owner_wins() {
             accounts: vec![
                 AccountMeta::new(dispute_pda, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry, false),
-                AccountMeta::new(payer.pubkey(), true), // payer is admin
+                AccountMeta::new(payer.pubkey(), true),
+                // payer is admin,
             ],
             data: exec_data,
         },
@@ -3399,7 +3429,7 @@ async fn dispute_lifecycle_owner_wins() {
     assert_eq!(d.status, 3); // EXECUTED
     let p: Parcel = read_account(&ctx, parcel_pk).await;
     assert_eq!(p.status, parcel_status::REGISTERED); // back to REGISTERED
-    assert_eq!(p.owner, owner.pubkey()); // ownership unchanged
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, owner.pubkey()); // ownership unchanged
 }
 
 #[tokio::test]
@@ -3411,7 +3441,7 @@ async fn dispute_cancel_by_filer() {
     process(
         &mut ctx,
         &payer,
-        fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000),
+        fund_ix(&payer.pubkey(), &owner.pubkey(), 30_000_000),
     )
     .await
     .expect("fund owner");
@@ -3463,6 +3493,7 @@ async fn dispute_cancel_by_filer() {
             accounts: vec![
                 AccountMeta::new(dispute_pda, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(owner.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -3485,6 +3516,7 @@ async fn dispute_cancel_by_filer() {
             accounts: vec![
                 AccountMeta::new(dispute_pda, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(owner.pubkey(), true),
             ],
             data: discriminator("global", "cancel_dispute").to_vec(),
@@ -3538,6 +3570,7 @@ async fn escrow_lifecycle_create_deposit_accept() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -3576,6 +3609,7 @@ async fn escrow_lifecycle_create_deposit_accept() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -3624,6 +3658,7 @@ async fn escrow_lifecycle_create_deposit_accept() {
             accounts: vec![
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: discriminator("global", "accept_escrow").to_vec(),
@@ -3670,6 +3705,7 @@ async fn escrow_seller_cancel_before_deposit() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -3696,6 +3732,7 @@ async fn escrow_seller_cancel_before_deposit() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -3733,7 +3770,7 @@ async fn escrow_seller_cancel_before_deposit() {
 
     let p: Parcel = read_account(&ctx, parcel_pk).await;
     assert_eq!(p.status, parcel_status::FOR_SALE);
-    assert_eq!(p.owner, seller.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, seller.pubkey());
 }
 
 // ===========================================================================
@@ -3879,6 +3916,7 @@ async fn attach_parcel_increments_count() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(id_pda, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
@@ -3933,6 +3971,7 @@ async fn rotate_validators_updates_attestation() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -3967,6 +4006,7 @@ async fn rotate_validators_updates_attestation() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
@@ -4132,6 +4172,7 @@ async fn register_document_on_attestation() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -4217,6 +4258,7 @@ async fn grant_conditional_right_creates_rights_account() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -4344,6 +4386,7 @@ async fn cancel_escrow_buyer_deposited_refund() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -4378,6 +4421,7 @@ async fn cancel_escrow_buyer_deposited_refund() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -4479,6 +4523,7 @@ async fn mutual_cancel_escrow_refunds_buyer() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -4513,6 +4558,7 @@ async fn mutual_cancel_escrow_refunds_buyer() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -4552,6 +4598,7 @@ async fn mutual_cancel_escrow_refunds_buyer() {
             accounts: vec![
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: discriminator("global", "accept_escrow").to_vec(),
@@ -4623,6 +4670,7 @@ async fn settle_escrow_rejects_before_deadline() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -4657,6 +4705,7 @@ async fn settle_escrow_rejects_before_deadline() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -4696,6 +4745,7 @@ async fn settle_escrow_rejects_before_deadline() {
             accounts: vec![
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: discriminator("global", "accept_escrow").to_vec(),
@@ -4714,6 +4764,7 @@ async fn settle_escrow_rejects_before_deadline() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new(buyer.pubkey(), false),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5047,6 +5098,7 @@ async fn renew_right_extends_expiry() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5075,6 +5127,7 @@ async fn renew_right_extends_expiry() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(holder.pubkey(), true),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5122,6 +5175,7 @@ async fn sweep_permanent_right_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5143,6 +5197,7 @@ async fn sweep_permanent_right_rejected() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -5186,6 +5241,7 @@ async fn expire_escrow_rejects_before_deadline() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -5220,6 +5276,7 @@ async fn expire_escrow_rejects_before_deadline() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -5284,6 +5341,7 @@ async fn dispute_escrow_creates_dispute_record() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -5318,6 +5376,7 @@ async fn dispute_escrow_creates_dispute_record() {
                 AccountMeta::new(escrow_pda, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -5435,7 +5494,9 @@ async fn amalgamate_parcels_happy_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_a, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_a), false),
                 AccountMeta::new(parcel_b, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_b), false),
                 AccountMeta::new(amalgamation_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5710,6 +5771,7 @@ async fn migrate_attestations_happy_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(old_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
                 AccountMeta::new(old_att, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -5731,6 +5793,7 @@ async fn migrate_attestations_happy_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(old_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
                 AccountMeta::new_readonly(new_pk, false),
                 AccountMeta::new(old_att, false),
                 AccountMeta::new(new_att, false),
@@ -9142,6 +9205,7 @@ async fn identity_rights_grant_and_revoke() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -9237,6 +9301,7 @@ async fn identity_based_update_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -9260,6 +9325,7 @@ async fn identity_based_update_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -9325,6 +9391,7 @@ async fn grant_identity_right_via_identity_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(alice_id_pk, false),
                 AccountMeta::new(alice_ownership_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -9381,6 +9448,7 @@ async fn grant_identity_right_via_identity_path() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(bob_id_pk, false),
                 AccountMeta::new(bob_ownership_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -9438,6 +9506,7 @@ async fn attestation_to_claim_bridge() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -10634,6 +10703,7 @@ async fn revoked_identity_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -10693,6 +10763,7 @@ async fn revoked_identity_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk2, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -11314,6 +11385,7 @@ async fn setup_escrow(
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
             ],
             data: status_data,
@@ -11337,6 +11409,7 @@ async fn setup_escrow(
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(seller.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12297,6 +12370,7 @@ async fn create_escrow_rejects_parcel_not_for_sale() {
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12328,6 +12402,7 @@ async fn create_escrow_rejects_empty_buyer() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -12350,6 +12425,7 @@ async fn create_escrow_rejects_empty_buyer() {
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12381,6 +12457,7 @@ async fn create_escrow_rejects_self_dealing() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -12403,6 +12480,7 @@ async fn create_escrow_rejects_self_dealing() {
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12434,6 +12512,7 @@ async fn create_escrow_rejects_amount_below_minimum() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -12457,6 +12536,7 @@ async fn create_escrow_rejects_amount_below_minimum() {
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12488,6 +12568,7 @@ async fn create_escrow_rejects_amount_above_maximum() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -12511,6 +12592,7 @@ async fn create_escrow_rejects_amount_above_maximum() {
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new(escrow_vault, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -12673,6 +12755,7 @@ async fn accept_escrow_rejects_wrong_status() {
             accounts: vec![
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: discriminator("global", "accept_escrow").to_vec(),
@@ -12738,6 +12821,7 @@ async fn accept_escrow_rejects_wrong_seller() {
             accounts: vec![
                 AccountMeta::new(escrow_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(wrong_seller.pubkey(), true),
             ],
             data: discriminator("global", "accept_escrow").to_vec(),
@@ -12984,6 +13068,7 @@ async fn subdivide_rejects_zero_id() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13009,7 +13094,9 @@ async fn subdivide_rejects_zero_id() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -13053,6 +13140,7 @@ async fn subdivide_rejects_empty_name() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13078,7 +13166,9 @@ async fn subdivide_rejects_empty_name() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -13114,6 +13204,7 @@ async fn subdivide_rejects_wrong_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: status_data,
@@ -13140,6 +13231,7 @@ async fn subdivide_rejects_wrong_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13165,7 +13257,9 @@ async fn subdivide_rejects_wrong_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -13209,6 +13303,7 @@ async fn subdivide_rejects_not_owner() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13243,7 +13338,9 @@ async fn subdivide_rejects_not_owner() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(not_owner.pubkey(), true),
@@ -13277,7 +13374,9 @@ async fn amalgamate_rejects_same_parcel() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(a_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&a_pk), false),
                 AccountMeta::new(a_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&a_pk), false),
                 AccountMeta::new(Pubkey::default(), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13328,7 +13427,9 @@ async fn amalgamate_rejects_not_owner_of_source() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(a_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&a_pk), false),
                 AccountMeta::new(b_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&b_pk), false),
                 AccountMeta::new(record, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13360,6 +13461,7 @@ async fn migrate_rights_rejects_same_parcel() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(pk, false),
+                AccountMeta::new_readonly(ownership_pda(&pk), false),
                 AccountMeta::new(pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13403,6 +13505,7 @@ async fn renew_right_rejects_past_expiry() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13434,6 +13537,7 @@ async fn renew_right_rejects_past_expiry() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(granter.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13473,6 +13577,7 @@ async fn renew_right_rejects_notes_too_long() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13496,6 +13601,7 @@ async fn renew_right_rejects_notes_too_long() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13536,6 +13642,7 @@ async fn renew_right_rejects_shorter_expiry() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13559,6 +13666,7 @@ async fn renew_right_rejects_shorter_expiry() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13602,6 +13710,7 @@ async fn grant_conditional_right_rejects_invalid_grace_period() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13645,6 +13754,7 @@ async fn grant_conditional_right_rejects_condition_after_expiry() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13684,6 +13794,7 @@ async fn sweep_rejects_grace_status() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -13703,6 +13814,7 @@ async fn sweep_rejects_grace_status() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -15757,6 +15869,7 @@ async fn attest_rejects_empty_specifier() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -15790,6 +15903,7 @@ async fn attest_rejects_empty_content_hash() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -15823,6 +15937,7 @@ async fn attest_rejects_no_validators() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -15857,6 +15972,7 @@ async fn attest_rejects_invalid_threshold() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -15893,6 +16009,7 @@ async fn rotate_validators_rejects_invalid_threshold() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -15921,6 +16038,7 @@ async fn rotate_validators_rejects_invalid_threshold() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
@@ -18202,6 +18320,7 @@ async fn setup_identity_owner(
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18248,6 +18367,7 @@ async fn setup_identity_owner(
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -18274,6 +18394,7 @@ fn transfer_ix(parcel_pk: &Pubkey, owner: &Pubkey, new_owner: &Pubkey) -> Instru
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
+            AccountMeta::new(ownership_pda(&*parcel_pk), false),
             AccountMeta::new(*owner, true),
             AccountMeta::new(*new_owner, false),
         ],
@@ -18289,6 +18410,7 @@ fn update_status_ix(parcel_pk: &Pubkey, owner: &Pubkey, status: u8) -> Instructi
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&*parcel_pk), false),
             AccountMeta::new(*owner, true),
         ],
         data,
@@ -18315,6 +18437,7 @@ fn grant_right_ix(
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&*parcel_pk), false),
             AccountMeta::new(rights_pk, false),
             AccountMeta::new(*owner, true),
             AccountMeta::new_readonly(system_program_id(), false),
@@ -18339,6 +18462,7 @@ async fn ownership_invariant_o1_legacy_owner_authorizes() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18401,6 +18525,7 @@ async fn ownership_invariant_o2_identity_rights_authorizes() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: {
@@ -18421,6 +18546,7 @@ async fn ownership_invariant_o2_identity_rights_authorizes() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: {
@@ -18452,6 +18578,7 @@ async fn ownership_invariant_o3_unrelated_wallet_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18568,6 +18695,7 @@ async fn ownership_invariant_o5_wrong_parcel_identity_rights_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_b_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_b_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18591,6 +18719,7 @@ async fn ownership_invariant_o5_wrong_parcel_identity_rights_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_b_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_b_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: {
@@ -18608,7 +18737,7 @@ async fn ownership_invariant_o5_wrong_parcel_identity_rights_rejected() {
 
     // Verify: passing parcel A's IR as remaining_accounts for parcel B operation.
     // The IR's `parcel` field points to parcel A, so it won't match parcel B in
-    // the is_authorized_owner check (ir.parcel != parcel_key).
+    // the is_authorized_holder check (ir.parcel != parcel_key).
     // We can't easily test this directly without a custom instruction, but the
     // fact that the on-chain check verifies ir.parcel == parcel_key ensures this.
 }
@@ -18658,7 +18787,7 @@ async fn ownership_invariant_o6_wrong_wallet_identity_rejected() {
     .expect("bind bob identity");
 
     // Bob tries to use payer's IdentityRights as remaining_accounts.
-    // The is_authorized_owner check will find the IR, but identity.owner != bob's key.
+    // The is_authorized_holder check will find the IR, but identity.owner != bob's key.
     // So bob cannot authorize via the identity path.
     // Bob also isn't parcel.owner, so both paths fail.
     let res = process(
@@ -18668,6 +18797,7 @@ async fn ownership_invariant_o6_wrong_wallet_identity_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(bob.pubkey(), true),
             ],
             data: {
@@ -18697,6 +18827,7 @@ async fn ownership_invariant_o7_fake_identity_rights_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18732,6 +18863,7 @@ async fn ownership_invariant_o7_fake_identity_rights_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
             ],
             data: {
@@ -18805,9 +18937,8 @@ async fn ownership_invariant_o9_dual_owner_disagreement_detected() {
     .await;
     assert!(res.is_ok(), "O9: transfer should succeed");
 
-    // Verify: parcel.owner is now bob.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, bob.pubkey());
+    // Verify: the ownership right now names bob (single source of truth).
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
 
     // IdentityRights still belongs to payer's identity — they now disagree.
     // Bob (new owner) can authorize via legacy path.
@@ -18828,10 +18959,9 @@ async fn ownership_invariant_o9_dual_owner_disagreement_detected() {
     .await;
     assert_custom_error(res, 6003, "O9: old owner rejected after transfer");
 
-    // Payer tries to authorize via identity path — the IdentityRights still exists
-    // and is ACTIVE, and identity.owner == payer. But the IR's parcel field
-    // still matches. So payer CAN authorize via identity path!
-    // This is the disagreement scenario: legacy says bob, identity says payer.
+    // Payer tries to authorize with the stale IdentityRights still attached.
+    // Under the RRR model the ownership right is the single source of truth:
+    // holder is bob, so payer must be rejected regardless of IdentityRights.
     let res = process(
         &mut ctx,
         &payer,
@@ -18839,6 +18969,7 @@ async fn ownership_invariant_o9_dual_owner_disagreement_detected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -18851,13 +18982,12 @@ async fn ownership_invariant_o9_dual_owner_disagreement_detected() {
         },
     )
     .await;
-    // This succeeds because is_authorized_owner checks identity path
-    // independently of parcel.owner. This IS the disagreement the invariant
-    // should detect — but the current code allows both paths.
-    // The test documents this behavior.
-    assert!(
-        res.is_ok(),
-        "O9: identity path still authorizes after transfer — DOCUMENTED DISAGREEMENT"
+    // The stale IdentityRights no longer grants authority: ownership lives in
+    // the Rights PDA and IdentityRights is not an authorization path.
+    assert_custom_error(
+        res,
+        6003,
+        "O9: stale IdentityRights no longer authorizes after transfer",
     );
 }
 
@@ -18877,6 +19007,7 @@ async fn ownership_invariant_o10_transfer_no_contradiction() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -18909,9 +19040,8 @@ async fn ownership_invariant_o10_transfer_no_contradiction() {
     .await
     .expect("transfer to bob");
 
-    // Verify: parcel.owner = bob.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, bob.pubkey());
+    // Verify: the ownership right now names bob.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
 
     // Transfer back to payer.
     process(
@@ -18922,10 +19052,9 @@ async fn ownership_invariant_o10_transfer_no_contradiction() {
     .await
     .expect("transfer back to payer");
 
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
 
-    // No IdentityRights involved — clean legacy-only transfers produce no contradiction.
+    // No IdentityRights involved — clean transfers keep a single holder.
 }
 
 // O11: Recovery cannot create two effective owners.
@@ -18938,9 +19067,8 @@ async fn ownership_invariant_o11_recovery_no_dual_owner() {
     let (parcel_pk, identity_pk, ir_pk) =
         setup_identity_owner(&mut ctx, &payer, parcel_id, identity_hash).await;
 
-    // Verify current state: parcel.owner = payer, IdentityRights(OWNERSHIP) active.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, payer.pubkey());
+    // Verify current state: ownership right held by payer, IdentityRights(OWNERSHIP) active.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
 
     // Transfer parcel to a new owner (simulating recovery/transfer).
     let new_owner = Keypair::new();
@@ -18960,12 +19088,10 @@ async fn ownership_invariant_o11_recovery_no_dual_owner() {
     .await
     .expect("transfer to new owner");
 
-    // Now parcel.owner = new_owner, but IdentityRights(OWNERSHIP) still active for payer.
-    // The new owner has legacy ownership, payer has identity ownership.
-    // Both can independently authorize — this IS the dual-owner problem.
-    // This test documents that the protocol currently allows this state.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, new_owner.pubkey());
+    // The ownership right now names new_owner. IdentityRights(OWNERSHIP) still
+    // exists for payer's identity, but it is NOT an authority path — only the
+    // ownership right grants control, so no dual-owner state is possible.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, new_owner.pubkey());
 
     // New owner can authorize.
     let res = process(
@@ -18976,7 +19102,7 @@ async fn ownership_invariant_o11_recovery_no_dual_owner() {
     .await;
     assert!(res.is_ok(), "O11: new owner authorizes via legacy path");
 
-    // Old owner (payer) can still authorize via identity path.
+    // Old owner (payer) tries the stale identity path — must be rejected now.
     let res = process(
         &mut ctx,
         &payer,
@@ -18984,6 +19110,7 @@ async fn ownership_invariant_o11_recovery_no_dual_owner() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -18996,9 +19123,10 @@ async fn ownership_invariant_o11_recovery_no_dual_owner() {
         },
     )
     .await;
-    assert!(
-        res.is_ok(),
-        "O11: old owner still authorizes via identity path — DOCUMENTED"
+    assert_custom_error(
+        res,
+        6003,
+        "O11: stale identity no longer authorizes after transfer",
     );
 }
 
@@ -19024,6 +19152,7 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(attestation_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -19057,7 +19186,9 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(sub_parcel_pk, false),
+                AccountMeta::new(ownership_pda(&sub_parcel_pk), false),
                 AccountMeta::new(subdivision_rec, false),
                 AccountMeta::new_readonly(attestation_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19076,13 +19207,13 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
     .await
     .expect("subdivide");
 
-    // Verify: original parcel is now SUBDIVIDED, sub_parcel has same owner.
+    // Verify: original parcel is now SUBDIVIDED, sub_parcel has same holder.
     let original: Parcel = read_account(&ctx, parcel_pk).await;
-    let sub: Parcel = read_account(&ctx, sub_parcel_pk).await;
     assert_eq!(original.status, parcel_status::SUBDIVIDED);
-    assert_eq!(sub.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &sub_parcel_pk).await, payer.pubkey());
     assert_eq!(
-        original.owner, sub.owner,
+        holder_of(&ctx, &parcel_pk).await,
+        holder_of(&ctx, &sub_parcel_pk).await,
         "O12: ownership preserved through subdivision"
     );
 }
@@ -19108,6 +19239,7 @@ async fn ownership_invariant_o13_amalgamation_preserves_ownership() {
                 accounts: vec![
                     AccountMeta::new(pk, false),
                     AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new(ownership_pda(&pk), false),
                     AccountMeta::new_readonly(system_program_id(), false),
                 ],
                 data: {
@@ -19138,7 +19270,9 @@ async fn ownership_invariant_o13_amalgamation_preserves_ownership() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_a_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_a_pk), false),
                 AccountMeta::new(parcel_b_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_b_pk), false),
                 AccountMeta::new(amalgamation_rec, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -19149,13 +19283,13 @@ async fn ownership_invariant_o13_amalgamation_preserves_ownership() {
     .await
     .expect("amalgamate");
 
-    // Verify: result parcel (A) keeps the owner, source parcel (B) is AMALGAMATED.
-    let result: Parcel = read_account(&ctx, parcel_a_pk).await;
+    // Verify: result parcel (A) keeps the holder, source parcel (B) is AMALGAMATED.
     let source: Parcel = read_account(&ctx, parcel_b_pk).await;
-    assert_eq!(result.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_a_pk).await, payer.pubkey());
     assert_eq!(source.status, parcel_status::AMALGAMATED);
     assert_eq!(
-        result.owner, source.owner,
+        holder_of(&ctx, &parcel_a_pk).await,
+        holder_of(&ctx, &parcel_b_pk).await,
         "O13: ownership preserved through amalgamation"
     );
 }
@@ -19176,6 +19310,7 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19210,6 +19345,7 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -19231,9 +19367,8 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
         "O14: filing dispute should work (owner can file)"
     );
 
-    // But the dispute doesn't change ownership — parcel.owner is still payer.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, payer.pubkey());
+    // But the dispute doesn't change ownership — the holder is still payer.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
 
     // Owner can still operate despite the dispute.
     let res = process(
@@ -19250,7 +19385,7 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
 // ============================================================================
 
 // B1: USAGE IdentityRights cannot authorize parcel operations.
-// Only OWNERSHIP rights pass is_authorized_owner; USAGE is explicitly skipped.
+// Only OWNERSHIP rights pass is_authorized_holder; USAGE is explicitly skipped.
 #[tokio::test]
 async fn authority_path_b1_usage_right_cannot_authorize() {
     let (mut ctx, payer) = setup().await;
@@ -19267,6 +19402,7 @@ async fn authority_path_b1_usage_right_cannot_authorize() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19313,6 +19449,7 @@ async fn authority_path_b1_usage_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19347,9 +19484,8 @@ async fn authority_path_b1_usage_right_cannot_authorize() {
     .await
     .expect("transfer to bob");
 
-    // Verify bob is the owner.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, bob.pubkey());
+    // Verify bob holds the ownership right.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
 
     // Payer tries to update_status via identity path with USAGE right — should fail.
     // parcel.owner is now bob, and the identity path only checks OWNERSHIP rights.
@@ -19360,6 +19496,7 @@ async fn authority_path_b1_usage_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -19395,6 +19532,7 @@ async fn authority_path_b2_servitude_right_cannot_authorize() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19440,6 +19578,7 @@ async fn authority_path_b2_servitude_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19482,6 +19621,7 @@ async fn authority_path_b2_servitude_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -19517,6 +19657,7 @@ async fn authority_path_b3_easement_right_cannot_authorize() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19562,6 +19703,7 @@ async fn authority_path_b3_easement_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19604,6 +19746,7 @@ async fn authority_path_b3_easement_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -19639,6 +19782,7 @@ async fn authority_path_b4_lien_right_cannot_authorize() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19684,6 +19828,7 @@ async fn authority_path_b4_lien_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19726,6 +19871,7 @@ async fn authority_path_b4_lien_right_cannot_authorize() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -19764,6 +19910,7 @@ async fn authority_path_b5_wrong_parcel_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_a_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_a_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19795,6 +19942,7 @@ async fn authority_path_b5_wrong_parcel_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_b_pk, false),
                 AccountMeta::new(bob.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_b_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19840,6 +19988,7 @@ async fn authority_path_b5_wrong_parcel_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_a_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_a_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -19866,6 +20015,7 @@ async fn authority_path_b5_wrong_parcel_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_b_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_b_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -19901,6 +20051,7 @@ async fn authority_path_b6_revoked_identity_rights_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -19946,6 +20097,7 @@ async fn authority_path_b6_revoked_identity_rights_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -20012,6 +20164,7 @@ async fn authority_path_b6_revoked_identity_rights_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -20047,6 +20200,7 @@ async fn edge_case_c1_owner_sweeps_expired_rights() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20082,6 +20236,7 @@ async fn edge_case_c1_owner_sweeps_expired_rights() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20119,6 +20274,7 @@ async fn edge_case_c1_owner_sweeps_expired_rights() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -20148,6 +20304,7 @@ async fn edge_case_c2_non_owner_sweep_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20181,6 +20338,7 @@ async fn edge_case_c2_non_owner_sweep_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20224,14 +20382,14 @@ async fn edge_case_c2_non_owner_sweep_rejected() {
     .await
     .unwrap();
 
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
+    let owner_now = holder_of(&ctx, &parcel_pk).await;
     assert_eq!(
-        parcel.owner,
+        owner_now,
         payer.pubkey(),
         "C2: parcel owner should be payer"
     );
     assert_ne!(
-        parcel.owner,
+        owner_now,
         intruder.pubkey(),
         "C2: parcel owner must not be intruder"
     );
@@ -20248,6 +20406,7 @@ async fn edge_case_c2_non_owner_sweep_rejected() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(intruder.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -20277,6 +20436,7 @@ async fn edge_case_c3_dispute_sets_disputed_status() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20311,6 +20471,7 @@ async fn edge_case_c3_dispute_sets_disputed_status() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20355,6 +20516,7 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20386,6 +20548,7 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20437,6 +20600,7 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20475,6 +20639,7 @@ async fn edge_case_c5_grant_identity_right_past_expiry_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20527,6 +20692,7 @@ async fn edge_case_c5_grant_identity_right_past_expiry_rejected() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -20565,6 +20731,7 @@ async fn edge_case_c6_empty_case_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20595,6 +20762,7 @@ async fn edge_case_c6_empty_case_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20629,6 +20797,7 @@ async fn edge_case_c7_nonce_reuse_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20706,6 +20875,7 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20733,6 +20903,7 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -20760,6 +20931,7 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
             accounts: vec![
                 AccountMeta::new(rights_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -20797,6 +20969,7 @@ async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20843,6 +21016,7 @@ async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -20877,11 +21051,11 @@ async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
     .await
     .expect("transfer to bob");
 
-    // 5. Verify bob is now legacy owner.
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, bob.pubkey());
+    // 5. Verify bob now holds the ownership right.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
 
-    // 6. Payer can still authorize via identity path (OWNERSHIP right is still ACTIVE).
+    // 6. Payer tries the stale identity path — under RRR only the ownership
+    // right authorizes, so this must now be rejected.
     let res = process(
         &mut ctx,
         &payer,
@@ -20889,6 +21063,7 @@ async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -20901,9 +21076,10 @@ async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
         },
     )
     .await;
-    assert!(
-        res.is_ok(),
-        "D1: identity owner can still authorize after transfer"
+    assert_custom_error(
+        res,
+        6003,
+        "D1: stale identity no longer authorizes after transfer",
     );
 
     // 7. Bob (new legacy owner) can also authorize.
@@ -20934,6 +21110,7 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -20980,6 +21157,7 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -21014,7 +21192,8 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
     .await
     .expect("transfer to bob");
 
-    // Payer can authorize via identity path.
+    // Payer tries the stale identity path — rejected: only the ownership
+    // right authorizes, and bob is the holder.
     let res = process(
         &mut ctx,
         &payer,
@@ -21022,6 +21201,7 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -21034,9 +21214,10 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
         },
     )
     .await;
-    assert!(
-        res.is_ok(),
-        "D2: identity owner can authorize before revoke"
+    assert_custom_error(
+        res,
+        6003,
+        "D2: identity right does not authorize after transfer",
     );
 
     // Revoke the OWNERSHIP identity right.
@@ -21070,6 +21251,7 @@ async fn cross_module_d2_right_lifecycle_grant_revoke() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -21119,6 +21301,7 @@ async fn cross_module_d3_dispute_lifecycle() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21157,6 +21340,7 @@ async fn cross_module_d3_dispute_lifecycle() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21217,6 +21401,7 @@ async fn cross_module_d4_attestation_subdivide_flow() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21243,6 +21428,7 @@ async fn cross_module_d4_attestation_subdivide_flow() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21274,7 +21460,9 @@ async fn cross_module_d4_attestation_subdivide_flow() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(sub_rec, false),
                 AccountMeta::new_readonly(att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -21295,10 +21483,10 @@ async fn cross_module_d4_attestation_subdivide_flow() {
 
     // Verify.
     let parent: Parcel = read_account(&ctx, parcel_pk).await;
-    let sub: Parcel = read_account(&ctx, sub_pk).await;
     assert_eq!(parent.status, parcel_status::SUBDIVIDED);
     assert_eq!(
-        parent.owner, sub.owner,
+        holder_of(&ctx, &parcel_pk).await,
+        holder_of(&ctx, &sub_pk).await,
         "D4: ownership preserved through subdivision"
     );
 }
@@ -21320,6 +21508,7 @@ async fn cross_module_d5_transfer_then_new_owner_attests() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21363,6 +21552,7 @@ async fn cross_module_d5_transfer_then_new_owner_attests() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(att_pk, false),
                 AccountMeta::new(bob.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21393,6 +21583,7 @@ async fn cross_module_d5_transfer_then_new_owner_attests() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(old_att_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21518,6 +21709,7 @@ async fn negative_e1_wrong_parcel_pda_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_a_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_a_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21566,6 +21758,7 @@ async fn negative_e2_forged_signer_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21622,6 +21815,7 @@ async fn negative_e3_threshold_bypass_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21652,6 +21846,7 @@ async fn negative_e3_threshold_bypass_rejected() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21686,6 +21881,7 @@ async fn negative_e4_zero_parcel_id_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21716,6 +21912,7 @@ async fn negative_e5_empty_name_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21746,6 +21943,7 @@ async fn negative_e6_zero_geometry_hash_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21777,6 +21975,7 @@ async fn negative_e7_double_register_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21800,6 +21999,7 @@ async fn negative_e7_double_register_rejected() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21830,6 +22030,7 @@ async fn negative_e8_transfer_to_self_succeeds() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21878,6 +22079,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -21893,7 +22095,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
     .expect("1. register parcel");
 
     let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
     assert_eq!(parcel.status, parcel_status::REGISTERED);
 
     // 2. Set to FOR_SALE.
@@ -21925,8 +22127,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
     .await
     .expect("3. transfer to buyer");
 
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, buyer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, buyer.pubkey());
 
     // 4. Buyer sets to REGISTERED.
     process(
@@ -21952,6 +22153,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
             accounts: vec![
                 AccountMeta::new(dispute_pk, false),
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(buyer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -21972,7 +22174,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
 
     let parcel: Parcel = read_account(&ctx, parcel_pk).await;
     assert_eq!(parcel.status, parcel_status::DISPUTED);
-    assert_eq!(parcel.owner, buyer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, buyer.pubkey());
 
     let dispute: Dispute = read_account(&ctx, dispute_pk).await;
     assert_eq!(dispute.status, dispute::dispute_status::FILED);
@@ -21980,8 +22182,8 @@ async fn e2e_f1_full_parcel_lifecycle() {
 }
 
 // F2: Identity migration lifecycle — legacy owner → bind identity → grant
-// OWNERSHIP → transfer via legacy → verify identity path still works →
-// transfer to another legacy owner.
+// OWNERSHIP → transfer → verify the stale identity path is rejected →
+// transfer to another holder.
 #[tokio::test]
 async fn e2e_f2_identity_migration_lifecycle() {
     let (mut ctx, payer) = setup().await;
@@ -21998,6 +22200,7 @@ async fn e2e_f2_identity_migration_lifecycle() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -22044,6 +22247,7 @@ async fn e2e_f2_identity_migration_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(identity_pk, false),
                 AccountMeta::new(ir_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
@@ -22078,10 +22282,9 @@ async fn e2e_f2_identity_migration_lifecycle() {
     .await
     .expect("4. transfer to alice");
 
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, alice.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, alice.pubkey());
 
-    // 5. Payer can still authorize via identity path.
+    // 5. Payer tries the stale identity path — rejected under RRR (alice holds).
     let res = process(
         &mut ctx,
         &payer,
@@ -22089,6 +22292,7 @@ async fn e2e_f2_identity_migration_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -22101,7 +22305,7 @@ async fn e2e_f2_identity_migration_lifecycle() {
         },
     )
     .await;
-    assert!(res.is_ok(), "5. identity path works after legacy transfer");
+    assert_custom_error(res, 6003, "5. stale identity path rejected after transfer");
 
     // 6. Alice transfers to bob — alice is now legacy owner.
     let bob = Keypair::new();
@@ -22120,10 +22324,10 @@ async fn e2e_f2_identity_migration_lifecycle() {
     .await
     .expect("6. alice transfers to bob");
 
-    let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, bob.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
 
-    // 7. Payer can still authorize via identity path (right is still ACTIVE).
+    // 7. Payer tries the stale identity path again — still rejected:
+    // IdentityRights is not an authority path regardless of ACTIVE status.
     let res = process(
         &mut ctx,
         &payer,
@@ -22131,6 +22335,7 @@ async fn e2e_f2_identity_migration_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(ir_pk, false),
                 AccountMeta::new_readonly(identity_pk, false),
@@ -22143,9 +22348,13 @@ async fn e2e_f2_identity_migration_lifecycle() {
         },
     )
     .await;
-    assert!(res.is_ok(), "7. identity path works after second transfer");
+    assert_custom_error(
+        res,
+        6003,
+        "7. stale identity path rejected after second transfer",
+    );
 
-    // 8. Bob (current legacy owner) can also authorize.
+    // 8. Bob (current holder) can also authorize.
     let res = process(
         &mut ctx,
         &bob,
@@ -22172,6 +22381,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
@@ -22205,6 +22415,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_a_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -22234,6 +22445,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
             program_id: PROGRAM_ID,
             accounts: vec![
                 AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(rights_b_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
@@ -22271,6 +22483,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
             accounts: vec![
                 AccountMeta::new(rights_a_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -22284,9 +22497,9 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
     .await
     .expect("5. sweep expired rights");
 
-    // 6. Verify parcel still has 2 rights_count and owner unchanged.
+    // 6. Verify parcel still has 2 rights_count and holder unchanged.
     let parcel: Parcel = read_account(&ctx, parcel_pk).await;
-    assert_eq!(parcel.owner, payer.pubkey());
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
     assert_eq!(parcel.rights_count, 2);
 
     // 7. Permanent right cannot be swept.
@@ -22298,6 +22511,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
             accounts: vec![
                 AccountMeta::new(rights_b_pk, false),
                 AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],

@@ -94,16 +94,16 @@ pub fn renew_right(
         TerraError::RenewalMustExtendExpiry
     );
 
-    // Granter must be the original granter or current parcel owner.
+    // Granter must be the original granter or current parcel holder.
     let granter_key = ctx.accounts.granter.key();
-    let owner_ok = crate::is_authorized_owner(
-        ctx.accounts.parcel.owner,
+    let holder_ok = crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         ctx.accounts.parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.granter.key(),
     );
     require!(
-        owner_ok.is_ok() || granter_key == rights.granter,
+        holder_ok.is_ok() || granter_key == rights.granter,
         TerraError::NotAuthorized
     );
 
@@ -143,8 +143,18 @@ pub fn renew_right(
 }
 
 /// Keeper instruction: mark expired rights as EXPIRED or GRACE.
-/// Callable by an authorized keeper, the holder, the granter, or the parcel owner.
+/// Callable by an authorized keeper, the holder, the granter, or the
+/// ownership holder.
 pub fn sweep_expired_rights(ctx: Context<super::SweepExpiredRights>, _nonce: u8) -> Result<()> {
+    // Only the current ownership holder may sweep their parcel's rights
+    // (replaces the former parcel.owner constraint).
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        ctx.accounts.keeper.key(),
+    )?;
+
     let rights = &mut ctx.accounts.rights;
 
     // Only sweep ACTIVE or EXPIRING rights.
@@ -180,14 +190,18 @@ pub fn grant_conditional_right(
     notes: String,
 ) -> Result<()> {
     let parcel = &mut ctx.accounts.parcel;
-    crate::is_authorized_owner(
-        parcel.owner,
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.owner.key(),
     )?;
     require!(
         rights_kind <= crate::right_kind::MAX,
+        TerraError::InvalidRightKind
+    );
+    require!(
+        rights_kind != crate::right_kind::OWNERSHIP,
         TerraError::InvalidRightKind
     );
     require!(nonce == parcel.rights_count, TerraError::InvalidNonce);

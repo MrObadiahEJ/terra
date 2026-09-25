@@ -25,7 +25,7 @@
 
 **File:** `lib.rs` (`is_authorized_owner`)
 
-Now requires `acc.owner == &terra_identity::ID` before deserializing `IdentityRights` and `Identity`, and checks `identity.owner == signer_key`. Fake accounts from a foreign program cannot spoof the identity path.
+Now requires `acc.owner == &terra_identity::ID` before deserializing `IdentityRights` and `Identity`, and checks `identity.owner == signer_key`. Fake accounts from a foreign program cannot spoof the identity path. *(Function renamed to `is_authorized_holder()` in the RRR migration — RFC-012 §9; the same identity checks now gate every parcel mutation.)*
 
 ### C-2: No signer on `JailValidator`, `UnjailValidator`, `SlashValidator` — FIXED
 
@@ -81,7 +81,7 @@ Both helpers (and `try_load_quorum_config`) now `require!(acc.owner == &crate::I
 
 ### M-1: `SweepExpiredRights` has no access control — FIXED
 
-`parcel` has `constraint = parcel.owner == keeper.key() @ TerraError::NotOwner`.
+The sweep handler now calls `is_authorized_holder()` (ownership `Rights` PDA + optional `terra_identity` path) before sweeping. The former `parcel.owner == keeper` constraint was removed together with `Parcel.owner` in the RRR migration.
 
 ### M-2: `RecordAuditEntry` entity is unconstrained — FIXED (A1)
 

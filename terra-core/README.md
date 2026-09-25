@@ -226,7 +226,7 @@ Immutable audit entries for tracking system events.
 | terra-api | 73 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-24): registry lib 116/116, identity lib 6/6, rfc012 21/21, identity BPF 18/18, registry BPF phase2 4/4 + phase3 2/2 + phase4 2/2 + phase5 2/2 + phase6 2/2 + phase7 6/6 + phase8 3/3, API 73/73, geo 4/4, `cargo fmt` + `clippy -D warnings` clean, both programs `cargo build-sbf` OK, checked-in IDL matches source (Phase 8). Full registry BPF suite (292) is maintained but not re-run on constrained machines. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-25, RRR migration): registry lib 116/116, identity lib 6/6, rfc012 21/21, API 73/73, geo 4/4, full registry BPF suite 276/292 (the 16 failures are pre-existing at HEAD — verified against a stashed baseline: guardian/ZK/dispute-slash identity-path and `GenerateOwnershipRoot` account-count mismatches), `cargo fmt` + `clippy -D warnings` clean, `cargo build-sbf` OK, checked-in IDL matches source (no `Parcel.owner` — ownership lives in the Rights PDA), `tsc --noEmit` clean. Fast baseline: `make test-fast`.
 
 ## Current Status (as of 2026-09-24)
 

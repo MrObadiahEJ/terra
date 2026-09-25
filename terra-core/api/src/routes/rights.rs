@@ -233,13 +233,14 @@ async fn grant_conditional_right(
 
     let mut tx = state.pool.begin().await?;
 
-    // Verify parcel exists.
+    // Verify parcel exists; the current holder is the granter of the new right
+    // (mirrors the on-chain ownership-right authorization).
     let current: Option<(String,)> =
-        sqlx::query_as("SELECT owner FROM parcels WHERE id = $1 FOR UPDATE")
+        sqlx::query_as("SELECT holder FROM parcel_ownership WHERE parcel_id = $1 FOR UPDATE")
             .bind(parcel_id)
             .fetch_optional(&mut *tx)
             .await?;
-    let Some((_owner,)) = current else {
+    let Some((holder,)) = current else {
         return Err(AppError::not_found("parcel not found"));
     };
 
@@ -252,7 +253,7 @@ async fn grant_conditional_right(
     .bind(parcel_id)
     .bind(1i16) // USAGE kind
     .bind(&req.holder)
-    .bind("owner") // placeholder — on-chain it's the granter
+    .bind(&holder)
     .bind(req.expires_at.as_deref().and_then(|s| s.parse::<DateTime<Utc>>().ok()))
     .bind(&req.notes)
     .bind(req.grace_period_secs)

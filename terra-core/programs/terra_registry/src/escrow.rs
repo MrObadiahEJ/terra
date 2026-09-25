@@ -28,7 +28,7 @@ pub const MIN_ESCROW_AMOUNT: u64 = 100_000_000;
 pub struct EscrowRecord {
     /// The parcel being sold.
     pub parcel: Pubkey,
-    /// Wallet of the seller (must match parcel.owner).
+    /// Wallet of the seller (must control the parcel's ownership right).
     pub seller: Pubkey,
     /// Wallet of the buyer (set at creation).
     pub buyer: Pubkey,
@@ -61,8 +61,8 @@ pub fn create_escrow(ctx: Context<super::CreateEscrow>, amount: u64, buyer: Pubk
         ctx.accounts.parcel.status == parcel_status::FOR_SALE,
         TerraError::InvalidStatus
     );
-    crate::is_authorized_owner(
-        ctx.accounts.parcel.owner,
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         ctx.accounts.parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.seller.key(),
@@ -170,8 +170,8 @@ pub fn accept_escrow(ctx: Context<super::AcceptEscrow>) -> Result<()> {
         ctx.accounts.seller.key() == escrow.seller,
         TerraError::NotDesignatedSeller
     );
-    crate::is_authorized_owner(
-        ctx.accounts.parcel.owner,
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
         ctx.accounts.parcel.key(),
         ctx.remaining_accounts,
         ctx.accounts.seller.key(),
@@ -213,10 +213,13 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
         escrow.deposit_amount >= escrow.amount,
         TerraError::InsufficientDeposit
     );
-    require!(
-        ctx.accounts.parcel.owner == escrow.seller,
-        TerraError::ParcelStillOwnedBySeller
-    );
+    crate::is_authorized_holder(
+        &ctx.accounts.ownership,
+        ctx.accounts.parcel.key(),
+        ctx.remaining_accounts,
+        escrow.seller,
+    )
+    .map_err(|_| error!(TerraError::ParcelStillOwnedBySeller))?;
 
     let vault_info = ctx.accounts.escrow_vault.to_account_info();
     let seller_info = ctx.accounts.seller.to_account_info();
@@ -266,9 +269,12 @@ pub fn settle_escrow(ctx: Context<super::SettleEscrow>) -> Result<()> {
         )?;
     }
 
-    // Transfer parcel ownership.
+    // Transfer the ownership right to the buyer (RRR: the right moves,
+    // the parcel record itself has no owner field).
+    let ownership = &mut ctx.accounts.ownership;
+    ownership.granter = ownership.holder;
+    ownership.holder = escrow.buyer;
     let parcel = &mut ctx.accounts.parcel;
-    parcel.owner = escrow.buyer;
     parcel.status = parcel_status::TRANSFERRED;
     parcel.updated_at = now;
     let parcel_key = escrow.parcel;

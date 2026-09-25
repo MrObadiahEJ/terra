@@ -81,7 +81,7 @@ export default function RegisterParcelPanel({
       try {
         await api.createParcel({
           name: name.trim(),
-          owner: publicKey.toBase58(),
+          holder: publicKey.toBase58(),
           status: 'registered',
           geometry,
         })

@@ -7,6 +7,7 @@ export interface OnChainParcelItem {
   address: string
   id: string // hex of the 32-byte parcel id
   account: ParcelAccount
+  holder: string // base58 wallet (or identity) from the canonical ownership Rights PDA
 }
 
 interface AppState {
@@ -44,11 +45,23 @@ export const useAppStore = create<AppState>((set) => ({
       // avoids a hard crash when the wallet is not yet connected.
       const { getProgram } = await import('../lib/program')
       const program = getProgram()
-      const accounts = await program.account.parcel.all()
+      const [accounts, rights] = await Promise.all([
+        program.account.parcel.all(),
+        program.account.rights.all(),
+      ])
+      // Ownership is the Rights PDA with rightsKind === 0 (OWNERSHIP); it is
+      // the single source of truth for who holds a parcel.
+      const holders = new Map<string, string>()
+      for (const r of rights) {
+        if (r.account.rightsKind === 0) {
+          holders.set(r.account.parcel.toBase58(), r.account.holder.toBase58())
+        }
+      }
       const items: OnChainParcelItem[] = accounts.map((a) => ({
         address: a.publicKey.toBase58(),
         id: bytesToHex(a.account.id),
         account: a.account,
+        holder: holders.get(a.publicKey.toBase58()) ?? '',
       }))
       set({ parcels: items, loadingParcels: false })
     } catch (err) {

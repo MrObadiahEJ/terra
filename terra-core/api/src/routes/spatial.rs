@@ -46,7 +46,7 @@ fn validate_lon_lat(lon: f64, lat: f64) -> Result<(), AppError> {
 pub struct ParcelSpatialStats {
     pub id: Uuid,
     pub name: String,
-    pub owner: String,
+    pub holder: String,
     pub status: String,
     pub onchain_id: Option<String>,
     pub area_m2: Option<f64>,
@@ -62,7 +62,7 @@ pub struct ParcelSpatialStats {
 pub struct NearParcel {
     pub id: Uuid,
     pub name: String,
-    pub owner: String,
+    pub holder: String,
     pub status: String,
     pub area_m2: Option<f64>,
     pub distance_m: Option<f64>,
@@ -99,11 +99,12 @@ async fn parcels_near(
 
     let rows: Vec<NearParcel> = sqlx::query_as(
         "SELECT
-            p.id, p.name, p.owner, p.status,
+            p.id, p.name, o.holder, p.status,
             ST_Area(p.geometry::geography)::float8 AS area_m2,
             ST_Distance(p.centroid::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography)::float8 AS distance_m,
             ST_AsGeoJSON(p.centroid)::text AS centroid
          FROM parcels p
+         JOIN parcel_ownership o ON o.parcel_id = p.id
          WHERE p.centroid IS NOT NULL
            AND ST_DWithin(p.centroid::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3)
          ORDER BY distance_m ASC
@@ -124,7 +125,7 @@ async fn parcel_stats(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ParcelSpatialStats>, AppError> {
     let row: ParcelSpatialStats = sqlx::query_as(
-        "SELECT id, name, owner, status, onchain_id, area_m2, geometry,
+        "SELECT id, name, holder, status, onchain_id, area_m2, geometry,
                 centroid, minx, miny, maxx, maxy
          FROM parcel_spatial_stats WHERE id = $1",
     )
@@ -151,7 +152,7 @@ async fn parcels_within_zone(
     Path(zone_id): Path<Uuid>,
 ) -> Result<Json<Vec<ParcelSpatialStats>>, AppError> {
     let rows: Vec<ParcelSpatialStats> = sqlx::query_as(
-        "SELECT s.id, s.name, s.owner, s.status, s.onchain_id, s.area_m2,
+        "SELECT s.id, s.name, s.holder, s.status, s.onchain_id, s.area_m2,
                 s.geometry, s.centroid, s.minx, s.miny, s.maxx, s.maxy
          FROM parcel_spatial_stats s
          JOIN parcels p ON p.id = s.id
