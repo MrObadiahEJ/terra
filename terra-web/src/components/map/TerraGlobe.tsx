@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { DEFAULT_FOCUS } from '../../lib/constants'
 import { parseGeoJSON, type OffChainParcel, type RoadRow, type PoiRow } from '../../lib/api'
+import LeafletMap from './LeafletMap'
 
 // Set your Cesium Ion token here to unlock World Terrain + 3D Tiles
 // (e.g. photorealistic city tiles and photogrammetry mesh support).
@@ -247,18 +247,21 @@ export default function TerraGlobe({
 
   if (webglError) {
     return (
-      <div className="globe-fallback">
-        <div className="globe-fallback-card">
-          <strong>3D globe unavailable</strong>
-          <p>
-            WebGL could not be initialised on this device (<code>{webglError}</code>
-            ).
-          </p>
-          <p>
-            Enable hardware acceleration in your browser settings, try a different
-            browser — or open the <Link to="/progress">Progress</Link> page: metrics,
-            roadmap, architecture and scenarios all work without WebGL.
-          </p>
+      <div className="globe-shell">
+        <div className="globe-notice">
+          WebGL unavailable — showing the 2D map ({webglError}).
+        </div>
+        <div className="globe-map">
+          <LeafletMap
+            offChainParcels={offChainParcels}
+            roads={roads}
+            pois={pois}
+            drawing={drawing}
+            drawVertices={drawVertices}
+            onDrawVertexAdd={onDrawVertexAdd}
+            onParcelClick={onParcelClick}
+            focus={focus}
+          />
         </div>
       </div>
     )
