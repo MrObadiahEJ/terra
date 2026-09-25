@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { DEFAULT_FOCUS } from '../../lib/constants'
@@ -37,44 +38,53 @@ export default function TerraGlobe({
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const drawingRef = useRef(false)
+  const [webglError, setWebglError] = useState<string | null>(null)
 
   // ---- init viewer ---------------------------------------------------------
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const viewer = new Cesium.Viewer(container, {
-      baseLayerPicker: false,
-      geocoder: true,
-      homeButton: true,
-      sceneModePicker: true,
-      navigationHelpButton: false,
-      animation: false,
-      timeline: false,
-      fullscreenButton: true,
-      infoBox: false,
-      selectionIndicator: false,
-      baseLayer: new Cesium.ImageryLayer(
-        new Cesium.OpenStreetMapImageryProvider({
-          url: 'https://tile.openstreetmap.org/',
-        }),
-      ),
-      // World Terrain requires a Cesium Ion token. If none is configured we
-      // fall back to the bare ellipsoid so the globe works out of the box.
-      terrain:
-        Cesium.Ion.defaultAccessToken
-          ? Cesium.Terrain.fromWorldTerrain()
-          : undefined,
-    })
+    let viewer: Cesium.Viewer
+    try {
+      viewer = new Cesium.Viewer(container, {
+        baseLayerPicker: false,
+        geocoder: true,
+        homeButton: true,
+        sceneModePicker: true,
+        navigationHelpButton: false,
+        animation: false,
+        timeline: false,
+        fullscreenButton: true,
+        infoBox: false,
+        selectionIndicator: false,
+        baseLayer: new Cesium.ImageryLayer(
+          new Cesium.OpenStreetMapImageryProvider({
+            url: 'https://tile.openstreetmap.org/',
+          }),
+        ),
+        // World Terrain requires a Cesium Ion token. If none is configured we
+        // fall back to the bare ellipsoid so the globe works out of the box.
+        terrain:
+          Cesium.Ion.defaultAccessToken
+            ? Cesium.Terrain.fromWorldTerrain()
+            : undefined,
+      })
 
-    viewer.scene.globe.enableLighting = true
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(
-        DEFAULT_FOCUS.longitude,
-        DEFAULT_FOCUS.latitude,
-        DEFAULT_FOCUS.height,
-      ),
-    })
+      viewer.scene.globe.enableLighting = true
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(
+          DEFAULT_FOCUS.longitude,
+          DEFAULT_FOCUS.latitude,
+          DEFAULT_FOCUS.height,
+        ),
+      })
+    } catch (err) {
+      // WebGL unavailable (no GPU / acceleration disabled / remote session).
+      // Show a fallback panel instead of letting the error kill the app.
+      setWebglError(err instanceof Error ? err.message : String(err))
+      return
+    }
 
     viewerRef.current = viewer
 
@@ -234,6 +244,25 @@ export default function TerraGlobe({
       duration: 1.2,
     })
   }, [focus])
+
+  if (webglError) {
+    return (
+      <div className="globe-fallback">
+        <div className="globe-fallback-card">
+          <strong>3D globe unavailable</strong>
+          <p>
+            WebGL could not be initialised on this device (<code>{webglError}</code>
+            ).
+          </p>
+          <p>
+            Enable hardware acceleration in your browser settings, try a different
+            browser — or open the <Link to="/progress">Progress</Link> page: metrics,
+            roadmap, architecture and scenarios all work without WebGL.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return <div ref={containerRef} className="w-full h-full" />
 }
