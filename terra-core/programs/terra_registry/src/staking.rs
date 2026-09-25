@@ -189,8 +189,6 @@ pub struct ValidatorStake {
     /// Snapshot of the pool's reward_per_token_stored at the time of last
     /// claim or deposit. Claimable = (pool.rpt - self.rpt_paid) * staked / PRECISION.
     pub reward_per_token_paid: u64,
-    /// Rewards accumulated but not yet claimed (legacy field, kept for compat).
-    pub rewards_accrued: u64,
     /// Number of past slashing events (for graduated severity).
     pub slash_history: u8,
     /// Recent offense flags: [equivocation, liveness, collusion, unused].
@@ -689,7 +687,6 @@ pub fn claim_rewards(ctx: Context<super::ClaimRewards>) -> Result<()> {
 
     let stake = &mut ctx.accounts.validator_stake;
     stake.reward_per_token_paid = pool.reward_per_token_stored;
-    stake.rewards_accrued = 0; // clear legacy field
     stake.updated_at = Clock::get()?.unix_timestamp;
 
     let pool = &mut ctx.accounts.stake_pool;

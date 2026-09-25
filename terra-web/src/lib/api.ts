@@ -112,67 +112,6 @@ export interface PhotogrammetryAsset {
   created_at: string
 }
 
-// ---- Off-chain API: attestations + documents (binding to on-chain) --------
-
-export interface RegisterAttestationInput {
-  onchain_id: string
-  specifier: string
-  content_hash: string
-  required: number
-  count: number
-  validators: string[]
-}
-
-export interface Attestation {
-  id: string
-  parcel_id: string
-  onchain_id: string
-  specifier: string
-  content_hash: string
-  required: number
-  validators: string[]
-  created_at: string
-}
-
-export interface ValidationView {
-  validator: string
-  signature: string
-  valid: boolean
-  created_at: string
-}
-
-export interface AttestationDetail extends Attestation {
-  has_quorum: boolean
-  signatories: number
-  required: number
-  validations: ValidationView[]
-}
-
-export interface SubmitValidationInput {
-  validator: string
-  signature: string
-  content_hash: string
-}
-
-export interface BoundDocument {
-  id: string
-  parcel_id: string
-  title: string
-  category: string
-  content_hash: string
-  storage_ref: string
-  owner: string
-  created_at: string
-}
-
-export interface RegisterDocumentInput {
-  title: string
-  category: string
-  content_hash: string
-  storage_ref: string
-  owner: string
-}
-
 // ---- Off-chain API: identities + wallet passation --------------------------
 
 export interface BindIdentityInput {
@@ -231,13 +170,6 @@ export interface JudicialForfeitureInput {
   threshold: number // validator signers required (>=2)
   validators: string[] // declared validator signers
   relayer: string // court/govt relaying authority wallet
-}
-
-export interface RotateValidatorsInput {
-  version: number
-  required: number
-  validators: string[]
-  rotated_by: string
 }
 
 // ---- Vault shard protocol (RFC-003) ----------------------------------------
@@ -340,25 +272,6 @@ export interface ValidatorEndorsement {
 
 export interface AddValidatorInput {
   validator: string
-}
-
-// ---- IPFS document anchoring -----------------------------------------------
-
-export interface DocumentAnchor {
-  id: number
-  attestation_pubkey: string
-  cid: string
-  content_hash: string
-  category: string
-  registered_by: string
-  registered_at: string
-}
-
-export interface RegisterDocumentAnchorInput {
-  attestation_pubkey: string
-  cid: string
-  content_hash: string
-  category: string
 }
 
 // ---- Off-chain API: /api/v1/disputes (RFC-007) ----------------------------
@@ -543,7 +456,6 @@ export interface SubdivisionRecord {
   new_geometry_hash: string
   surveyor_attestation_id: string | null
   rights_migrated: boolean
-  attestations_migrated: boolean
   initiated_by: string
   created_at: string
   completed_at: string | null
@@ -890,27 +802,6 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
-  // attestations + documents (binding heavy off-chain data to on-chain)
-  registerAttestation: (parcelId: string, input: RegisterAttestationInput) =>
-    request<Attestation>(`/parcels/${parcelId}/attestations`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  getAttestation: (parcelId: string, specifier: string) =>
-    request<AttestationDetail>(`/parcels/${parcelId}/attestations/${specifier}`),
-  submitValidation: (parcelId: string, specifier: string, input: SubmitValidationInput) =>
-    request<ValidationView>(`/parcels/${parcelId}/attestations/${specifier}/validations`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  registerDocument: (parcelId: string, input: RegisterDocumentInput) =>
-    request<BoundDocument>(`/parcels/${parcelId}/documents`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  listDocuments: (parcelId: string) =>
-    request<BoundDocument[]>(`/parcels/${parcelId}/documents`),
-
   // identities + wallet passation (person->wallet binding, recovery, succession)
   bindIdentity: (input: BindIdentityInput) =>
     request<IdentityView>(`/identities`, { method: 'POST', body: JSON.stringify(input) }),
@@ -932,13 +823,6 @@ export const api = {
   endorseSuccession: (identityHash: string, successor: string, input: EndorseSuccessionInput) =>
     request<SuccessionRow>(
       `/identities/${identityHash}/successions/${successor}/endorsement`,
-      { method: 'POST', body: JSON.stringify(input) },
-    ),
-
-  // validator rotation (fix for dead/leaving validators) on a parcel's attestation
-  rotateValidators: (parcelId: string, specifier: string, input: RotateValidatorsInput) =>
-    request<{ attestation_id: string; version: number; required: number; validators: string[] }>(
-      `/parcels/${parcelId}/attestations/${specifier}/rotation`,
       { method: 'POST', body: JSON.stringify(input) },
     ),
 
@@ -1011,16 +895,6 @@ export const api = {
     }),
   flipToConsensus: (pubkey: string) =>
     request<AuthorityRegistry>(`/authority-registry/${pubkey}/flip`, { method: 'POST' }),
-
-  // ---- IPFS document anchoring --------------------------------------------
-
-  registerDocumentAnchor: (input: RegisterDocumentAnchorInput) =>
-    request<DocumentAnchor>(`/ipfs-docs`, { method: 'POST', body: JSON.stringify(input) }),
-  getDocumentAnchor: (id: string) => request<DocumentAnchor>(`/ipfs-docs/${id}`),
-  listDocumentAnchors: (attestationPubkey?: string) => {
-    const q = attestationPubkey ? `?attestation=${attestationPubkey}` : ''
-    return request<DocumentAnchor[]>(`/ipfs-docs${q}`)
-  },
 
   // ---- Dispute resolution (RFC-007) ----------------------------------------
 
@@ -1128,7 +1002,7 @@ export const api = {
     request<SubdivisionRecord>('/subdivision/subdivisions', {
       method: 'POST', body: JSON.stringify(input),
     }),
-  updateSubdivision: (id: string, input: Partial<{ rights_migrated: boolean; attestations_migrated: boolean; status: string }>) =>
+  updateSubdivision: (id: string, input: Partial<{ rights_migrated: boolean; status: string }>) =>
     request<SubdivisionRecord>(`/subdivision/subdivisions/${id}`, {
       method: 'PATCH', body: JSON.stringify(input),
     }),

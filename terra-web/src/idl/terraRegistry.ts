@@ -1197,157 +1197,6 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "attest",
-      "docs": [
-        "Register an attestation that binds heavy off-chain data to this parcel",
-        "and records the set of validator wallets required to validate it.",
-        "",
-        "**DEPRECATED**: Use `create_claim` in the verification pipeline instead.",
-        "This instruction remains for backward compatibility with existing",
-        "attestations. New attestations should use `Claim \u2192 Evidence \u2192 Observation`.",
-        "",
-        "`validators` holds the public keys of the (possibly several) parties",
-        "who must sign off on the transaction; `required` is how many signatures",
-        "are needed. The signer must be the parcel holder or a registered",
-        "registrar. Per-validator Ed25519 signatures live off-chain but are",
-        "verified against this on-chain identity set and `content_hash`."
-      ],
-      "discriminator": [
-        83,
-        148,
-        120,
-        119,
-        144,
-        139,
-        117,
-        160
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ownership",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  119,
-                  110,
-                  101,
-                  114,
-                  115,
-                  104,
-                  105,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "specifier"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "specifier",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "content_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "required",
-          "type": "u8"
-        },
-        {
-          "name": "validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "authorize_vault_access",
       "discriminator": [
         241,
@@ -6916,99 +6765,6 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "jail_validator",
-      "discriminator": [
-        234,
-        186,
-        36,
-        232,
-        160,
-        59,
-        184,
-        214
-      ],
-      "accounts": [
-        {
-          "name": "reputation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  114,
-                  101,
-                  112,
-                  117,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "reputation.validator",
-                "account": "ValidatorReputation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "duration_secs",
-          "type": "i64"
-        }
-      ]
-    },
-    {
       "name": "judicial_forfeiture",
       "docs": [
         "Force-transfer a parcel's ownership away from a non-compliant owner, per",
@@ -7264,302 +7020,6 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
-    },
-    {
-      "name": "migrate_attestation_to_claim",
-      "docs": [
-        "Migrate a legacy attestation into a verification pipeline claim.",
-        "",
-        "**DEPRECATED**: This is a one-way bridge for migrating old attestations.",
-        "New attestations should use `create_claim` directly."
-      ],
-      "discriminator": [
-        105,
-        2,
-        248,
-        249,
-        243,
-        174,
-        50,
-        241
-      ],
-      "accounts": [
-        {
-          "name": "attestation",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "account",
-                "path": "attestation.specifier",
-                "account": "Attestation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "claim",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  108,
-                  97,
-                  105,
-                  109
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "claim_id"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "claim_id",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "claim_type",
-          "type": "u8"
-        }
-      ]
-    },
-    {
-      "name": "migrate_attestations",
-      "discriminator": [
-        61,
-        112,
-        164,
-        122,
-        70,
-        246,
-        49,
-        209
-      ],
-      "accounts": [
-        {
-          "name": "old_parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "old_parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ownership",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  119,
-                  110,
-                  101,
-                  114,
-                  115,
-                  104,
-                  105,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "old_parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "new_parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "new_parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "old_attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "old_parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "specifier"
-              }
-            ]
-          }
-        },
-        {
-          "name": "new_attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "new_parcel"
-              },
-              {
-                "kind": "arg",
-                "path": "specifier"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "specifier",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
     },
     {
       "name": "migrate_rights",
@@ -9380,139 +8840,6 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "register_document",
-      "docs": [
-        "Register an IPFS document anchor tied to an attestation.",
-        "",
-        "**DEPRECATED**: Use `add_evidence` in the verification pipeline instead."
-      ],
-      "discriminator": [
-        108,
-        34,
-        153,
-        39,
-        82,
-        41,
-        133,
-        73
-      ],
-      "accounts": [
-        {
-          "name": "document",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  111,
-                  99,
-                  117,
-                  109,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "attestation"
-              },
-              {
-                "kind": "arg",
-                "path": "cid"
-              }
-            ]
-          }
-        },
-        {
-          "name": "attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "account",
-                "path": "attestation.specifier",
-                "account": "Attestation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "parcel",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "registrant",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "cid",
-          "type": "string"
-        },
-        {
-          "name": "content_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "category",
-          "type": "string"
-        }
-      ]
-    },
-    {
       "name": "register_jurisdiction",
       "discriminator": [
         6,
@@ -11136,129 +10463,6 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "rotate_validators",
-      "docs": [
-        "Replace the validator set on an attestation (the fix for dead/leaving",
-        "validators). Only the parcel holder may rotate. Bumps `version` so a",
-        "reconstituted set is provably newer, and resets `required`/`count`.",
-        "",
-        "**DEPRECATED**: Use the verification pipeline's validator management instead."
-      ],
-      "discriminator": [
-        98,
-        183,
-        54,
-        7,
-        187,
-        27,
-        218,
-        242
-      ],
-      "accounts": [
-        {
-          "name": "parcel",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  97,
-                  114,
-                  99,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel.id",
-                "account": "Parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ownership",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  119,
-                  110,
-                  101,
-                  114,
-                  115,
-                  104,
-                  105,
-                  112
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              }
-            ]
-          }
-        },
-        {
-          "name": "attestation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "parcel"
-              },
-              {
-                "kind": "account",
-                "path": "attestation.specifier",
-                "account": "Attestation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "new_required",
-          "type": "u8"
-        },
-        {
-          "name": "new_validators",
-          "type": {
-            "array": [
-              "pubkey",
-              8
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "route_task",
       "discriminator": [
         10,
@@ -12499,23 +11703,22 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "surveyor_attestation",
+          "name": "claim",
+          "docs": [
+            "Verified surveyor claim for the original parcel: the surveyor flow",
+            "(`create_claim(SUBDIVISION) \u2192 evidence \u2192 observations \u2192 verify_claim`)",
+            "replaces the deprecated parcel-`Attestation` gate."
+          ],
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
+                  99,
+                  108,
                   97,
-                  116,
-                  116,
-                  101,
-                  115,
-                  116,
-                  97,
-                  116,
                   105,
-                  111,
-                  110
+                  109
                 ]
               },
               {
@@ -12524,7 +11727,7 @@ export const terraRegistry: Idl = {
               },
               {
                 "kind": "arg",
-                "path": "specifier"
+                "path": "claim_id"
               }
             ]
           }
@@ -12563,7 +11766,7 @@ export const terraRegistry: Idl = {
           }
         },
         {
-          "name": "specifier",
+          "name": "claim_id",
           "type": {
             "array": [
               "u8",
@@ -13669,94 +12872,6 @@ export const terraRegistry: Idl = {
         },
         {
           "name": "new_owner"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "unjail_validator",
-      "discriminator": [
-        239,
-        31,
-        221,
-        71,
-        167,
-        135,
-        130,
-        90
-      ],
-      "accounts": [
-        {
-          "name": "reputation",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  114,
-                  101,
-                  112,
-                  117,
-                  116,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "reputation.validator",
-                "account": "ValidatorReputation"
-              }
-            ]
-          }
-        },
-        {
-          "name": "registry",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  108,
-                  105,
-                  100,
-                  97,
-                  116,
-                  111,
-                  114,
-                  95,
-                  114,
-                  101,
-                  103,
-                  105,
-                  115,
-                  116,
-                  114,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
         }
       ],
       "args": []
@@ -15097,19 +14212,6 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "Attestation",
-      "discriminator": [
-        152,
-        125,
-        183,
-        86,
-        36,
-        146,
-        121,
-        73
-      ]
-    },
-    {
       "name": "AuditEntry",
       "discriminator": [
         254,
@@ -15237,19 +14339,6 @@ export const terraRegistry: Idl = {
         36,
         241,
         74
-      ]
-    },
-    {
-      "name": "DocumentAnchor",
-      "discriminator": [
-        60,
-        3,
-        60,
-        133,
-        60,
-        201,
-        124,
-        184
       ]
     },
     {
@@ -15918,32 +15007,6 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "AttestationMigrated",
-      "discriminator": [
-        72,
-        105,
-        141,
-        47,
-        67,
-        143,
-        222,
-        127
-      ]
-    },
-    {
-      "name": "Attested",
-      "discriminator": [
-        184,
-        102,
-        113,
-        199,
-        220,
-        197,
-        96,
-        50
-      ]
-    },
-    {
       "name": "AuditEntryRecorded",
       "discriminator": [
         216,
@@ -16240,19 +15303,6 @@ export const terraRegistry: Idl = {
         44,
         249,
         153
-      ]
-    },
-    {
-      "name": "DocumentRegistered",
-      "discriminator": [
-        39,
-        98,
-        72,
-        173,
-        200,
-        16,
-        169,
-        166
       ]
     },
     {
@@ -17566,32 +16616,6 @@ export const terraRegistry: Idl = {
         42,
         5,
         213
-      ]
-    },
-    {
-      "name": "ValidatorUnjailed",
-      "discriminator": [
-        100,
-        182,
-        102,
-        226,
-        19,
-        221,
-        91,
-        59
-      ]
-    },
-    {
-      "name": "ValidatorsRotated",
-      "discriminator": [
-        80,
-        217,
-        37,
-        28,
-        47,
-        73,
-        79,
-        88
       ]
     },
     {
@@ -18962,175 +17986,6 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "committee_size",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Attestation",
-      "docs": [
-        "An on-chain attestation that binds a set of off-chain documents/data to a",
-        "parcel and records *who* (which wallets) must validate a transaction.",
-        "",
-        "**DEPRECATED**: This parcel-centric attestation model is superseded by the",
-        "verification pipeline (`Claim \u2192 Evidence \u2192 Observation \u2192 VerificationAttestation`).",
-        "Existing accounts remain valid for backward compatibility, but new attestations",
-        "should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)",
-        "is provided to transition legacy attestations into the new model.",
-        "",
-        "PDA: `[\"attestation\", parcel, specifier]`. The heavy payload \u2014 actual",
-        "documents and per-validator Ed25519 signatures \u2014 lives off-chain, but it is",
-        "anchored here by `content_hash`, and each validator's public key is recorded",
-        "so that any signature can be independently verified against this list."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "specifier",
-            "docs": [
-              "32-byte specifier (e.g. sha256 over the artifact/signing-session id)."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "content_hash",
-            "docs": [
-              "sha-256 over the off-chain payload (documents, deed, survey, ...)."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "required",
-            "docs": [
-              "Required threshold of validator signatures to consider this validated."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "count",
-            "docs": [
-              "Number of validator keys currently registered (<= MAX_VALIDATORS)."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "version",
-            "docs": [
-              "Monotonic rotation counter. Each rotate_validators bumps it so a",
-              "reconstituted validator set is provably newer than the previous one."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "document_count",
-            "docs": [
-              "Number of IPFS documents anchored to this attestation (capped by",
-              "MAX_DOCUMENTS_PER_ATTESTATION in register_document)."
-            ],
-            "type": "u8"
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          },
-          {
-            "name": "updated_at",
-            "type": "i64"
-          },
-          {
-            "name": "validators",
-            "type": {
-              "array": [
-                "pubkey",
-                8
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "AttestationMigrated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "old_parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "old_attestation",
-            "type": "pubkey"
-          },
-          {
-            "name": "new_attestation",
-            "type": "pubkey"
-          },
-          {
-            "name": "specifier",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Attested",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "specifier",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "content_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "required",
-            "type": "u8"
-          },
-          {
-            "name": "count",
             "type": "u8"
           }
         ]
@@ -20541,91 +19396,6 @@ export const terraRegistry: Idl = {
           {
             "name": "declared_count",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DocumentAnchor",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "attestation",
-            "docs": [
-              "The attestation this document belongs to."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "cid",
-            "docs": [
-              "IPFS CID v1 of the document."
-            ],
-            "type": "string"
-          },
-          {
-            "name": "content_hash",
-            "docs": [
-              "SHA-256 of the document bytes (integrity check)."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "category",
-            "docs": [
-              "Document category (e.g. \"deed\", \"survey\", \"photo\")."
-            ],
-            "type": "string"
-          },
-          {
-            "name": "registered_by",
-            "docs": [
-              "Who registered this document."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "registered_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "DocumentRegistered",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "attestation",
-            "type": "pubkey"
-          },
-          {
-            "name": "cid",
-            "type": "string"
-          },
-          {
-            "name": "content_hash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "category",
-            "type": "string"
-          },
-          {
-            "name": "registered_by",
-            "type": "pubkey"
           }
         ]
       }
@@ -24650,9 +23420,9 @@ export const terraRegistry: Idl = {
             }
           },
           {
-            "name": "surveyor_attestation",
+            "name": "survey_claim",
             "docs": [
-              "Attestation PDA that recorded surveyor sign-off."
+              "Verified SUBDIVISION claim PDA that recorded surveyor sign-off."
             ],
             "type": "pubkey"
           },
@@ -24660,13 +23430,6 @@ export const terraRegistry: Idl = {
             "name": "rights_migrated",
             "docs": [
               "Whether rights have been migrated to the sub-parcel."
-            ],
-            "type": "bool"
-          },
-          {
-            "name": "attestations_migrated",
-            "docs": [
-              "Whether attestations have been migrated."
             ],
             "type": "bool"
           },
@@ -26343,13 +25106,6 @@ export const terraRegistry: Idl = {
             "type": "u64"
           },
           {
-            "name": "rewards_accrued",
-            "docs": [
-              "Rewards accumulated but not yet claimed (legacy field, kept for compat)."
-            ],
-            "type": "u64"
-          },
-          {
             "name": "slash_history",
             "docs": [
               "Number of past slashing events (for graduated severity)."
@@ -26375,55 +25131,6 @@ export const terraRegistry: Idl = {
           {
             "name": "updated_at",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ValidatorUnjailed",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "validator",
-            "type": "pubkey"
-          },
-          {
-            "name": "unjailed_at",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ValidatorsRotated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "parcel",
-            "type": "pubkey"
-          },
-          {
-            "name": "specifier",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "version",
-            "type": "u8"
-          },
-          {
-            "name": "required",
-            "type": "u8"
-          },
-          {
-            "name": "count",
-            "type": "u8"
           }
         ]
       }

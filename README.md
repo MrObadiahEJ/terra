@@ -37,7 +37,7 @@ tests incl. live-PostGIS migration run, `tsc --noEmit`).
  baseline)** are complete: unique validator sets, endorsement action binding,
  account-ownership checks on `remaining_accounts` loaders, admin/authority
  constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL synced to source
- (153/64/139/220), and CI covers registry/identity lib + rfc012 + geo + API.
+ (146/62/134/220), and CI covers registry/identity lib + rfc012 + geo + API.
  See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 Verified tests on `dev` (2026-09-24):
@@ -74,7 +74,7 @@ before shipping client changes after any program edit.
 This repo is self-describing for a new contributor or agent — read in order:
 
 1. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
  3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
  4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
  5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–8 done; **next phase is Phase 9** (physical infrastructure); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
@@ -106,19 +106,19 @@ records how to do it, and it never touches key material.**
 | RFC-005 | Validator staking & slashing (graduated 10%/100% slash, 7-day unbonding + appeal) | `staking.rs` | pool/deposit/unbond/withdraw/report/slash/claim/distribute/dispute/dismiss |
 | RFC-006 | Cross-border identity bridge (jurisdictions, ZK bindings, nullifiers) | `cross_border.rs` | register/update/bind/verify/revoke/rebind |
 | RFC-007 | Dispute resolution & parcel freeze | `dispute.rs` | file/freeze/adjudicate/execute/cancel |
-| RFC-008 | Parcel subdivision & amalgamation (lineage records) | `subdivision.rs` | subdivide/amalgamate/migrate-rights/migrate-attestations |
+| RFC-008 | Parcel subdivision & amalgamation (lineage records) | `subdivision.rs` | subdivide/amalgamate/migrate-rights |
 | RFC-009 | Time-bound credentials (expiry, grace, renewal, sweep) | `time_bound.rs` | renew/sweep/conditional-grant |
 | RFC-010 | Guardian & Recovery Council (policy layer on Succession: ≥3 validators, ≥90-day grace, court `case_hash`, revocation) | `terra_identity` `guardianship.rs` + registry `guardian_claim` | request-court-guardianship/revoke-guardianship |
 | RFC-011 | Zero-knowledge ownership proofs (zone Merkle roots, nullifier first-use) | `zk.rs` | register-zone/generate-root/verify-proof/invalidate |
 | RFC-012 | Global physical-digital trust architecture (Phases 0–10) | design contract + Phase 1 hardening across modules | see `docs/rfc-012-…` |
 
 Supporting modules: `validator_registry.rs` (validator registry, bootstrap →
-peer-consensus), `quorum.rs` (unique-validator + signer dedup), `ipfs_docs.rs`
-(document anchors), `verification/*` (claims, sessions, challenges, reputation).
+peer-consensus), `quorum.rs` (unique-validator + signer dedup), `verification/*`
+(claims, sessions, challenges, reputation).
 Full specs live in [`docs/`](docs/) as `rfc-003…rfc-012`.
 
-Source counts (regenerate IDL after changes): **153 instructions · 64 account
-types · 139 events · 220 `TerraError` codes** in `terra_registry`; **8
+Source counts (regenerate IDL after changes): **146 instructions · 62 account
+types · 134 events · 220 `TerraError` codes** in `terra_registry`; **8
 instructions · 2 accounts · 9 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
@@ -135,7 +135,7 @@ Three layers, organized around **ISO 19152 (LADM)** concepts:
   off-chain validation. Minimal state, quorum primitives reused everywhere,
   region-scoped trust. No authority provider prerequisite.
 - **Off-chain mirror (PostGIS + Axum)** — `terra-core/api`: every on-chain
-  account has a mirror table (migrations `0001…0024`), plus the spatial engine:
+  account has a mirror table (migrations `0001…0026`), plus the spatial engine:
   maintained parcel centroids, geometry write-guards, `parcel_spatial_stats`
   and `zone_parcel_counts` views, `/spatial/*` radius/zone endpoints.
 - **Geo engine** — `terra-core/geo-engine` (`terra-geo`): pure-Rust OSM road
@@ -215,7 +215,7 @@ terra/
 │   ├── programs/terra_registry/src/  # lib.rs + protocol modules + verification/
 │   ├── programs/terra_identity/src/  # identity, succession, guardianship
 │   ├── api/src/routes/               # 23 route modules (parcels, staking, zk_proofs, spatial, …)
-│   ├── api/migrations/               # 0001…0024 (PostGIS schema + mirrors)
+│   ├── api/migrations/               # 0001…0026 (PostGIS schema + mirrors)
 │   └── geo-engine/                   # OSM graph + reachability (terra-geo)
 ├── docs/                             # rfc-003 … rfc-012
 └── .github/workflows/ci.yml          # fmt, clippy, lib/api tests (PostGIS svc), tsc

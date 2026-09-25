@@ -5,12 +5,13 @@
 - **Status:** Implemented (subdivision.rs end-to-end)
 - **Created:** 2026-09-03
 - **Supersedes:** None
+- **Amended (2026-09-25, RFC-012 legacy sweep):** the on-chain surveyor gate no longer uses the parcel `Attestation` account. `subdivide_parcel` now requires a **VERIFIED `SUBDIVISION` claim** (arg `claim_id`); the `Attestation` account and the `attest` / `rotate_validators` / `register_document` / `migrate_attestations` / `migrate_attestation_to_claim` instructions were hard-removed from `terra_registry`. `SubdivisionRecord` stores `survey_claim` (claim PDA key) instead of `surveyor_attestation`, and its `attestations_migrated` field was removed. Sections below that describe attestation-scoped migration (§4.3, §5.5, §6.4, §7.1 steps 4/5/8, §14.10) are updated in place or marked historical.
 
 ## 2. Summary
 
 This RFC specifies the **Parcel Subdivision & Amalgamation Protocol** — a geometric state-transition layer for Terra that allows a single parcel to split into N sub-parcels, or N parcels to merge into one, while correctly migrating all dependent state (rights, attestations, infrastructure flags, disputes). Every current instruction assumes exactly one parcel. Real land routinely splits or merges: a farmer subdivides a field for sale, two adjacent lots merge into one development site. Rights, attestations, vaults, and disputes must migrate correctly. This RFC closes that gap.
 
-The protocol reuses the **Attestation quorum pattern** for surveyor sign-off on new geometry and reuses **Succession-style re-pointing logic** (the `remaining_accounts` pattern already proven in `claim_succession`) for migrating rights to new parcel PDAs. Surveyor attestations bind cryptographically verified off-chain survey data to the new geometry hashes. A `SubdivisionRecord` PDA tracks the full migration lineage, enabling any observer to walk the ancestry of a parcel and verify that no rights, attestations, or disputes were orphaned.
+The protocol reuses the **claim-verification quorum pattern** (a `SUBDIVISION` claim driven to VERIFIED status) for surveyor sign-off on new geometry and reuses **Succession-style re-pointing logic** (the `remaining_accounts` pattern already proven in `claim_succession`) for migrating rights to new parcel PDAs. The verified claim binds cryptographically verified off-chain survey data to the new geometry hashes. A `SubdivisionRecord` PDA tracks the full migration lineage, enabling any observer to walk the ancestry of a parcel and verify that no rights or disputes were orphaned.
 
 **Target phase:** 7 (Regional expansion) — genuinely common in real land transactions, but not needed for a single-region pilot with a handful of parcels.
 
@@ -20,18 +21,18 @@ The protocol reuses the **Attestation quorum pattern** for surveyor sign-off on 
 
 | Class | Description | Mitigation |
 |-------|-------------|------------|
-| **Fraudulent surveyor** | Submits falsified geometry to gain land area | Surveyor attestation quorum (k-of-n validators must co-sign off-chain survey data); content_hash binding |
+| **Fraudulent surveyor** | Submits falsified geometry to gain land area | Survey claim quorum (k-of-n validators must confirm the claim before VERIFIED); statement_hash binding |
 | **Rights hijacker** | Attempts to drop or misdirect rights during migration | Each right is explicitly re-pointed via `migrate_rights`; SubdivisionRecord tracks provenance; event emission for audit |
-| **Orphaning attacker** | Tries to leave attestations or disputes dangling on a dead parcel | Attestation migration closes old attestations and creates new ones; dispute records are closed or re-pointed by the adjudicator |
+| **Orphaning attacker** | Tries to leave disputes dangling on a dead parcel | Dispute records are closed or re-pointed by the adjudicator; no attestation state exists to orphan (parcel `Attestation` removed 2026-09-25) |
 | **Amalgamation griefing** | Merges parcels with conflicting ownership to freeze a legitimate owner out | Conflicting rights must be explicitly resolved (revoked or re-granted) before amalgamation is allowed |
 | **几何欺诈 (Geometry fraud)** | Claims subdivision produces more area than the parent parcel | Area proportions are declared on-chain and verified by the surveyor quorum; cascading checks reject if sum of sub-parcel areas exceeds parent |
 | **Double-migration** | Attempts to subdivide a parcel that is already in-flight for subdivision | Status gate: only REGISTERED parcels can be subdivided; SubdivisionRecord tracks in-flight operations |
 
 ### 3.2 In Scope
 
-- Parcel subdivision (1 → N parcels) with rights, attestation, and infrastructure migration
+- Parcel subdivision (1 → N parcels) with rights and infrastructure migration
 - Parcel amalgamation (N → 1 parcel) with rights merging and conflict resolution
-- Surveyor attestation binding for new geometry (reuses existing Attestation pattern)
+- Surveyor sign-off via a VERIFIED SUBDIVISION claim (verification pipeline)
 - Rights migration helper instruction (reuses Succession remaining_accounts pattern)
 - SubdivisionRecord PDA for lineage tracking and auditability
 - Event emission for full on-chain audit trail
@@ -54,22 +55,22 @@ The protocol reuses the **Attestation quorum pattern** for surveyor sign-off on 
 ### 4.2 Signatures: Ed25519
 
 - Solana native — all validator and authority keys are Ed25519.
-- Surveyor attestations require k-of-n Ed25519 signatures off-chain, verified against the on-chain validator set.
+- Survey claim confirmation requires k-of-n Ed25519 signatures off-chain, verified against the on-chain validator set.
 - Owner co-signature is required for both subdivision and amalgamation (the parcel owner must initiate).
 
-### 4.3 Surveyor Quorum: Reused Attestation Pattern
+### 4.3 Surveyor Quorum: Verification-Pipeline Claim (amended 2026-09-25)
 
-- The existing `Attestation` PDA (`["attestation", parcel, specifier]`) is reused to record surveyor sign-off.
-- `specifier` = SHA-256 of the survey session ID or ceremony identifier.
-- `content_hash` = SHA-256 of the canonicalized survey output (new geometry coordinates, area calculations, boundary descriptions).
-- `required` = k (threshold of validators who must co-sign).
-- `validators` = the declared surveyor/validator set for this subdivision event.
+- Surveyor sign-off is recorded as a VERIFIED `Claim` PDA (`["claim", parcel, claim_id]`) in the verification pipeline; the parcel `Attestation` PDA was hard-removed in the RFC-012 legacy sweep.
+- `claim_id` = SHA-256 of the survey session ID or ceremony identifier.
+- `statement_hash` = SHA-256 of the canonicalized survey statement (geometry summary, area calculations, boundary descriptions).
+- `required_attestations` = k (threshold from QuorumConfig, default 2).
+- Observations + `VerificationAttestation`s from the declared surveyor/validator set drive the claim to VERIFIED.
 
 ### 4.4 Area Representation
 
 - Area is not stored on-chain (geometric computation is an off-chain concern).
 - The on-chain record stores only geometry hashes and the SubdivisionRecord, which declares the child parcel IDs and the original parcel ID.
-- Area proportionality is verified off-chain by the surveyor quorum before they co-sign the attestation.
+- Area proportionality is verified off-chain by the surveyor quorum before they confirm the claim.
 
 ## 5. Data Model
 
@@ -80,7 +81,6 @@ The protocol reuses the **Attestation quorum pattern** for surveyor sign-off on 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `[u8; 32]` | Unique 32-byte identifier (PDA seed, immutable) |
-| `owner` | `Pubkey` | Current owner wallet |
 | `name` | `String` | Human-readable parcel name (max 64 bytes) |
 | `geometry_hash` | `[u8; 32]` | SHA-256 of canonicalized boundary geometry |
 | `status` | `u8` | REGISTERED(1), FOR_SALE(2), etc. |
@@ -102,9 +102,8 @@ One SubdivisionRecord is created per sub-parcel, linking it back to the original
 | `sub_parcel` | `Pubkey` | The child sub-parcel's PDA key |
 | `original_geometry_hash` | `[u8; 32]` | Parent's geometry hash at time of subdivision |
 | `new_geometry_hash` | `[u8; 32]` | Child's geometry hash |
-| `surveyor_attestation` | `Pubkey` | Attestation PDA that recorded surveyor sign-off |
+| `survey_claim` | `Pubkey` | VERIFIED SUBDIVISION claim PDA that recorded surveyor sign-off |
 | `rights_migrated` | `bool` | Whether rights have been migrated to the sub-parcel |
-| `attestations_migrated` | `bool` | Whether attestations have been migrated |
 | `initiated_by` | `Pubkey` | Wallet that initiated the subdivision |
 | `created_at` | `i64` | Subdivision timestamp |
 | `completed_at` | `i64` | When migration finished (0 if in progress) |
@@ -142,21 +141,9 @@ One AmalgamationRecord is created per source parcel being merged into the result
 | `expires_at` | `i64` | Expiration timestamp (0 = no expiration) |
 | `notes` | `String` | Human-readable notes (max 128 bytes) |
 
-### 5.5 Attestation (existing, unchanged)
+### 5.5 Attestation — removed (RFC-012 legacy sweep, 2026-09-25)
 
-**PDA seed:** `["attestation", parcel, specifier]`
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `parcel` | `Pubkey` | The parcel this attestation is bound to |
-| `specifier` | `[u8; 32]` | 32-byte specifier (survey session ID) |
-| `content_hash` | `[u8; 32]` | SHA-256 of off-chain payload |
-| `required` | `u8` | Required validator signatures |
-| `count` | `u8` | Number of validator keys registered |
-| `version` | `u8` | Monotonic rotation counter |
-| `created_at` | `i64` | Creation timestamp |
-| `updated_at` | `i64` | Last update timestamp |
-| `validators` | `[Pubkey; MAX_VALIDATORS]` | Validator public keys |
+The parcel-scoped `Attestation` PDA (`["attestation", parcel, specifier]`) no longer exists in `terra_registry`. Surveyor sign-off lives in the verification pipeline as a VERIFIED `SUBDIVISION` claim (§4.3).
 
 ### 5.6 Cascading State Inventory
 
@@ -166,36 +153,38 @@ Before implementing any subdivision or amalgamation instruction, map every accou
 |-------------|----------------|----------------|
 | `Parcel` | `id` (PDA seed) | New PDA per sub-parcel; old parcel status → SUBDIVIDED |
 | `Rights` | `parcel` (field) | Re-pointed via `migrate_rights` (close old, init new) |
-| `Attestation` | `parcel` (field) | Old attestation closed; new attestation created per sub-parcel |
+| `Attestation` | `parcel` (field) | **Removed 2026-09-25** — no attestation state to migrate |
 | `Dispute` | `parcel` (field) | Closed (cancelled) before subdivision proceeds |
-| `DocumentAnchor` | `attestation` (PDA seed) | Migrated when parent attestation is closed |
+| `DocumentAnchor` | `attestation` (PDA seed) | **Removed** with the `Attestation` model (off-chain mirror dropped in migration `0026`) |
 | `Identity` | `parcel_count` | Decremented by N-1 on subdivision (N new parcels, 1 old closed) |
 
 ## 6. Instructions
 
 ### 6.1 `subdivide_parcel`
 
-**Purpose:** Split one parcel into N sub-parcels. Requires surveyor attestation for new geometry. Creates new Parcel PDAs and SubdivisionRecord PDAs. Rights and attestations are NOT migrated in this instruction — a separate `migrate_rights` call handles that.
+**Purpose:** Split one parcel into N sub-parcels. Requires a VERIFIED SUBDIVISION claim for new geometry. Creates new Parcel PDAs and SubdivisionRecord PDAs. Rights and attestations are NOT migrated in this instruction — a separate `migrate_rights` call handles that.
 
 **Accounts:**
 - `original_parcel` (mut, PDA `["parcel", id]`) — the parent parcel, status must be REGISTERED
 - `sub_parcel` (init, PDA `["parcel", new_id]`) — one of the N child sub-parcels
+- `ownership` (readonly, PDA `["ownership", original_parcel]`) — RRR ownership record of the parent
+- `sub_ownership` (init, PDA `["ownership", sub_parcel]`) — RRR ownership record of the child
 - `subdivision_record` (init, PDA `["subdivision", original_parcel.key(), sub_parcel.key()]`)
-- `surveyor_attestation` (readonly, PDA `["attestation", original_parcel.key(), specifier]`) — surveyor sign-off attestation
-- `authority` (signer, mut — must be original parcel owner; pays rent)
+- `claim` (readonly, PDA `["claim", original_parcel.key(), claim_id]`) — VERIFIED SUBDIVISION claim recording surveyor sign-off
+- `authority` (signer, mut — must be the ownership holder of the parent; pays rent)
 - `system_program`
 
-**Args:** `new_id: [u8; 32]`, `new_name: String`, `new_geometry_hash: [u8; 32]`, `specifier: [u8; 32]`
+**Args:** `new_id: [u8; 32]`, `new_name: String`, `new_geometry_hash: [u8; 32]`, `claim_id: [u8; 32]`
 
 **Guards:**
 - `original_parcel.status == parcel_status::REGISTERED`
-- `authority.key() == original_parcel.owner`
+- `is_authorized_holder(ownership, original_parcel, remaining_accounts, authority)` (RRR — replaced the pre-RRR `owner` check)
 - `new_id != [0; 32]`
 - `new_geometry_hash != [0; 32]`
 - `new_name` is non-empty and ≤ 64 bytes
-- `surveyor_attestation.parcel == original_parcel.key()`
-- `surveyor_attestation.content_hash != [0; 32]` (attestation must have been completed off-chain)
-- `surveyor_attestation.count >= surveyor_attestation.required` (quorum must be met)
+- `claim.parcel == original_parcel.key()`
+- `claim.status == claim_status::VERIFIED` (survey claim fully verified)
+- `claim.claim_type == claim_type::SUBDIVISION` (wrong claim type rejected)
 - No existing SubdivisionRecord for `(original_parcel.key(), sub_parcel.key())` (prevent double-subdivision of the same child)
 
 **Effects:**
@@ -222,8 +211,8 @@ Before implementing any subdivision or amalgamation instruction, map every accou
 **Guards:**
 - `result_parcel.status == parcel_status::REGISTERED`
 - `source_parcel.status == parcel_status::REGISTERED`
-- `authority.key() == result_parcel.owner`
-- `authority.key() == source_parcel.owner` (same owner for both — prevents hostile merges)
+- `is_authorized_holder(result_parcel ownership, authority)` — holder of the result parcel
+- `is_authorized_holder(source_parcel ownership, authority)` — same holder for both (prevents hostile merges)
 - `result_parcel.key() != source_parcel.key()` (cannot merge a parcel with itself)
 - `new_geometry_hash != [0; 32]`
 - No conflicting rights exist between the two parcels (verified by the caller: all EASEMENT/SERVITUDE/LIEN rights between the two parcels must have been revoked before calling this instruction)
@@ -251,7 +240,7 @@ Before implementing any subdivision or amalgamation instruction, map every accou
 **Args:** None (the Rights accounts are in `remaining_accounts`)
 
 **Guards:**
-- `authority.key() == old_parcel.owner`
+- `is_authorized_holder(old_parcel ownership, authority)`
 - `old_parcel.key() != new_parcel.key()`
 - Each account in `remaining_accounts` must:
   - Be owned by this program
@@ -265,31 +254,9 @@ Before implementing any subdivision or amalgamation instruction, map every accou
 
 **Emits:** `RightsMigrated` (once per right)
 
-### 6.4 `migrate_attestations`
+### 6.4 `migrate_attestations` — removed (RFC-012 legacy sweep, 2026-09-25)
 
-**Purpose:** Migrate attestations from an old parcel to a new parcel. Closes old attestation accounts and creates new ones for each sub-parcel. Used after subdivision to ensure the new parcels have their own attestation records.
-
-**Accounts:**
-- `old_parcel` (readonly, PDA `["parcel", old_id]`)
-- `new_parcel` (readonly, PDA `["parcel", new_id]`)
-- `old_attestation` (mut, PDA `["attestation", old_parcel.key(), specifier]`) — to be closed
-- `new_attestation` (init, PDA `["attestation", new_parcel.key(), specifier]`) — created with same specifier
-- `authority` (signer, mut — must be owner of old_parcel)
-- `system_program`
-
-**Args:** `specifier: [u8; 32]`
-
-**Guards:**
-- `authority.key() == old_parcel.owner`
-- `old_attestation.parcel == old_parcel.key()`
-- `old_attestation.count >= old_attestation.required` (attestation must be completed)
-- No existing attestation with this specifier on `new_parcel`
-
-**Effects:**
-- Creates `new_attestation` with all fields copied from `old_attestation` except `parcel = new_parcel.key()`
-- Closes `old_attestation` (returns lamports to authority)
-
-**Emits:** `AttestationMigrated`
+**Removed.** The instruction, the parcel `Attestation` accounts it moved, and the `AttestationMigrated` event no longer exist in `terra_registry`. Nothing needs attestation migration after subdivision: rights move via `migrate_rights` (§6.3), and the VERIFIED survey claim stays bound to the original parcel (the child subdivision is gated by it).
 
 ## 7. Off-Chain Protocol
 
@@ -297,14 +264,14 @@ Before implementing any subdivision or amalgamation instruction, map every accou
 
 1. **Surveyor engagement:** The parcel owner engages a licensed surveyor (or surveyor team) to produce new boundary descriptions for the N sub-parcels.
 2. **Survey data production:** The surveyor produces canonicalized geometry (GeoJSON/WKT) for each sub-parcel, plus area calculations, boundary descriptions, and any legal metadata.
-3. **Content hash computation:** SHA-256 of the canonicalized survey output → `content_hash`.
-4. **Validator quorum:** k-of-n validators (the surveyor attestation set) review the survey data off-chain and co-sign an Ed25519 attestation over the content_hash.
-5. **Attestation registration:** The owner calls `attest` on-chain to create an Attestation PDA with the surveyor's content_hash, specifier, and validator set.
-6. **Subdivision transaction:** The owner calls `subdivide_parcel` for each sub-parcel, passing the new geometry_hash, name, and referencing the surveyor attestation by specifier. This is done in a single Solana transaction (via CPI or as separate instructions in the same tx) for atomicity.
+3. **Statement hash computation:** SHA-256 of the canonicalized survey statement → `statement_hash`.
+4. **Validator quorum:** k-of-n validators (the surveyor set) review the survey data off-chain, then submit observations and confirmation `VerificationAttestation`s on a `SUBDIVISION` claim over the statement_hash.
+5. **Claim verification:** The claim is driven to VERIFIED status (`verify_claim`) once confirmations reach the claim's quorum threshold (default 2).
+6. **Subdivision transaction:** The owner (holding wallet) calls `subdivide_parcel` for each sub-parcel, passing the new geometry_hash, name, and referencing the VERIFIED claim by `claim_id`. This is done in a single Solana transaction (via CPI or as separate instructions in the same tx) for atomicity.
 7. **Rights migration:** After subdivision, the owner calls `migrate_rights` to move rights from the old parcel to each sub-parcel. This can be batched across multiple sub-parcels in a single transaction.
-8. **Attestation migration:** For each completed attestation on the old parcel, the owner calls `migrate_attestations` to close the old attestation and create a new one on the sub-parcel.
+8. **No attestation migration:** the parcel `Attestation` model was removed (2026-09-25); rights migration (step 7) is the only post-subdivision migration.
 9. **Identity update:** The owner's Identity `parcel_count` is updated (decremented by N-1, then incremented by N, net effect: +0, but the accounting changes).
-10. **Audit:** Any observer can walk the SubdivisionRecord chain to verify that no rights or attestations were lost.
+10. **Audit:** Any observer can walk the SubdivisionRecord chain to verify that no rights or disputes were lost.
 
 ### 7.2 Amalgamation Ceremony
 
@@ -579,14 +546,9 @@ If a subdivision or amalgamation fails partway through:
   - A.rights_count incremented by 1
   - `RightsMigrated` event emitted
 
-### 14.10 Attestation Migration
+### 14.10 Attestation Migration — removed (RFC-012 legacy sweep, 2026-09-25)
 
-- **Setup:** Parcel A with completed attestation (specifier=0x01, required=2, count=2). Subdivided into B.
-- **Action:** Owner calls `migrate_attestations` with old_parcel=A, new_parcel=B, specifier=0x01
-- **Expected:**
-  - Old attestation on A closed (lamports returned)
-  - New attestation created on B: parcel=B, all other fields copied
-  - `AttestationMigrated` event emitted
+Retired with the `migrate_attestations` instruction; subdivision leaves no attestation state behind.
 
 ### 14.11 Duplicate Subdivision Record Rejected
 
@@ -596,28 +558,27 @@ If a subdivision or amalgamation fails partway through:
 
 ### 14.12 Collusion Scenario: Fraudulent Geometry
 
-- **Setup:** Parcel A, surveyor attestation with required=2, count=2, validators=[V1, V2]
-- **Scenario:** V1 and V2 collude to attest to false geometry that gives the owner 2x the area
-- **Mitigation:** Off-chain area verification (the surveyor attestation is bound to a content_hash; anyone can verify the actual survey data against the hash). The on-chain program cannot verify area — it relies on the quorum model and audit trail. The SubdivisionRecord provides the lineage for post-hoc auditing.
+- **Setup:** Parcel A, VERIFIED survey claim confirmed by validators V1 and V2 (quorum 2)
+- **Scenario:** V1 and V2 collude to confirm false geometry that gives the owner 2x the area
+- **Mitigation:** Off-chain area verification (the claim is bound to a statement_hash; anyone can verify the actual survey data against the hash). The on-chain program cannot verify area — it relies on the quorum model and audit trail. The SubdivisionRecord provides the lineage for post-hoc auditing.
 
 ### 14.13 Migration Completeness Check
 
-- **Setup:** Parcel A subdivided into B and C. A has 2 rights, 1 attestation.
+- **Setup:** Parcel A subdivided into B and C. A has 2 rights.
 - **After migration:**
   - Walk all Rights accounts: none have `parcel == A.key()` (all migrated)
-  - Walk all Attestation accounts: none have `parcel == A.key()` (all migrated)
-  - SubdivisionRecord for (A, B): `rights_migrated = true`, `attestations_migrated = true`
-  - SubdivisionRecord for (A, C): `rights_migrated = true`, `attestations_migrated = true`
+  - SubdivisionRecord for (A, B): `rights_migrated = true`, `survey_claim` = the VERIFIED claim key
+  - SubdivisionRecord for (A, C): `rights_migrated = true`, `survey_claim` = the VERIFIED claim key
   - Parcel A status = SUBDIVIDED
   - No disputes referencing A (cancelled before subdivision)
 
 ---
 
-## Handoff — status & next steps (2026-09-23)
+## Handoff — status & next steps (2026-09-25)
 
-**Done:** `subdivision.rs` subdivide/amalgamate/migrate-rights/migrate-attestations end-to-end.
+**Done:** `subdivision.rs` subdivide/amalgamate/migrate-rights end-to-end; RFC-012 legacy sweep replaced the surveyor-attestation gate with a VERIFIED SUBDIVISION claim and removed `migrate_attestations` (this document amended accordingly).
 
 **Next for this RFC:**
 1. No separate open audit findings — covered by Phase 1 program-wide hygiene.
-2. When changing lineage records, add/extend BPF migration assertions (walk Rights/Attestations after subdivide).
+2. When changing lineage records, add/extend BPF migration assertions (walk Rights after subdivide).
 3. After program edits: `make idl`.

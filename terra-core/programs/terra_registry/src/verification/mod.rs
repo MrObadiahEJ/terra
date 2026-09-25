@@ -1,6 +1,5 @@
 pub mod attestation;
 pub mod audit_trail;
-pub mod bridge;
 pub mod challenge;
 pub mod claim;
 pub mod cross_border_bridge;
@@ -15,7 +14,6 @@ pub mod session;
 
 pub use attestation::*;
 pub use audit_trail::*;
-pub use bridge::*;
 pub use challenge::*;
 pub use claim::*;
 pub use cross_border_bridge::*;

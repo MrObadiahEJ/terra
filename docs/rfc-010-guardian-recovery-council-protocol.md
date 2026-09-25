@@ -408,9 +408,8 @@ The 90-day grace period serves dual purposes:
 
 If fewer than 3 validators are available to endorse (e.g., validators have left the pilot, lost keys), the guardianship cannot be claimed. Options:
 
-1. **Rotate the validator set** via `rotate_validators` on the attestation (existing mechanism) before requesting guardianship.
-2. **Request a new guardianship** with a different validator set.
-3. **Use the court-appointed path** — the court order provides additional legitimacy, and the registry admin can facilitate validator rotation.
+1. **Request a new guardianship** with a different validator set. *(The attestation-scoped `rotate_validators` was removed in the RFC-012 legacy sweep, 2026-09-25.)*
+2. **Use the court-appointed path** — the court order provides additional legitimacy, and the registry admin can facilitate validator rotation.
 
 ### 9.3 Recovery Wallet Liveness
 

@@ -30,12 +30,10 @@ pub struct SubdivisionRecord {
     pub original_geometry_hash: [u8; 32],
     /// Child's geometry hash.
     pub new_geometry_hash: [u8; 32],
-    /// Attestation PDA that recorded surveyor sign-off.
-    pub surveyor_attestation: Pubkey,
+    /// Verified SUBDIVISION claim PDA that recorded surveyor sign-off.
+    pub survey_claim: Pubkey,
     /// Whether rights have been migrated to the sub-parcel.
     pub rights_migrated: bool,
-    /// Whether attestations have been migrated.
-    pub attestations_migrated: bool,
     /// Wallet that initiated the subdivision.
     pub initiated_by: Pubkey,
     pub created_at: i64,
@@ -98,14 +96,13 @@ fn verify_rights_account<'info>(
 // ---------------------------------------------------------------------------
 
 /// Split one parcel into N sub-parcels. Caller invokes this once per sub-parcel.
-/// Rights and attestations are NOT migrated here — separate `migrate_rights`
-/// and `migrate_attestations` calls handle that.
+/// Rights are NOT migrated here — a separate `migrate_rights` call handles that.
 pub fn subdivide_parcel(
     ctx: Context<super::SubdivideParcel>,
     new_id: [u8; 32],
     new_name: String,
     new_geometry_hash: [u8; 32],
-    _specifier: [u8; 32],
+    _claim_id: [u8; 32],
 ) -> Result<()> {
     require!(!new_id.iter().all(|b| *b == 0), TerraError::InvalidId);
     require!(
@@ -129,20 +126,8 @@ pub fn subdivide_parcel(
         ctx.accounts.authority.key(),
     )?;
 
-    // Surveyor attestation checks.
-    let attestation = &ctx.accounts.surveyor_attestation;
-    require!(
-        attestation.parcel == original.key(),
-        TerraError::AttestationMismatch
-    );
-    require!(
-        !attestation.content_hash.iter().all(|b| *b == 0),
-        TerraError::EmptyContentHash
-    );
-    require!(
-        attestation.count >= attestation.required,
-        TerraError::InsufficientValidations
-    );
+    // Surveyor sign-off is the VERIFIED SUBDIVISION claim enforced by the
+    // `claim` account constraints (status + claim_type) in `SubdivideParcel`.
 
     let now = Clock::get()?.unix_timestamp;
 
@@ -177,9 +162,8 @@ pub fn subdivide_parcel(
     record.sub_parcel = sub.key();
     record.original_geometry_hash = original.geometry_hash;
     record.new_geometry_hash = new_geometry_hash;
-    record.surveyor_attestation = attestation.key();
+    record.survey_claim = ctx.accounts.claim.key();
     record.rights_migrated = false;
-    record.attestations_migrated = false;
     record.initiated_by = ctx.accounts.authority.key();
     record.created_at = now;
     record.completed_at = 0;
@@ -431,72 +415,6 @@ pub fn migrate_rights<'a>(ctx: Context<'a, super::MigrateRights<'a>>) -> Result<
     Ok(())
 }
 
-/// Migrate an attestation from an old parcel to a new parcel. Closes the old
-/// attestation account and creates a new one with the same data.
-///
-/// NOTE: Document PDAs derived from the old attestation key become orphaned
-/// after migration. The `AttestationMigrated` event emits both old and new
-/// keys so the indexer can re-create document PDAs under the new attestation.
-pub fn migrate_attestations(
-    ctx: Context<super::MigrateAttestations>,
-    specifier: [u8; 32],
-) -> Result<()> {
-    let old_parcel = &ctx.accounts.old_parcel;
-    let new_parcel = &ctx.accounts.new_parcel;
-
-    crate::is_authorized_holder(
-        &ctx.accounts.ownership,
-        old_parcel.key(),
-        ctx.remaining_accounts,
-        ctx.accounts.authority.key(),
-    )?;
-
-    let old_att = &ctx.accounts.old_attestation;
-    require!(
-        old_att.parcel == old_parcel.key(),
-        TerraError::AttestationMismatch
-    );
-    require!(
-        old_att.count >= old_att.required,
-        TerraError::InsufficientValidations
-    );
-    require!(old_att.specifier == specifier, TerraError::EmptySpecifier);
-
-    // Create new attestation with copied data.
-    let new_att = &mut ctx.accounts.new_attestation;
-    new_att.parcel = new_parcel.key();
-    new_att.specifier = specifier;
-    new_att.content_hash = old_att.content_hash;
-    new_att.required = old_att.required;
-    new_att.count = old_att.count;
-    new_att.version = old_att.version;
-    new_att.created_at = old_att.created_at;
-    new_att.updated_at = old_att.updated_at;
-    new_att.validators = old_att.validators;
-
-    // Close old attestation — return lamports to authority.
-    let old_lamports = ctx.accounts.old_attestation.to_account_info().lamports();
-    **ctx
-        .accounts
-        .old_attestation
-        .to_account_info()
-        .try_borrow_mut_lamports()? = 0;
-    **ctx
-        .accounts
-        .authority
-        .to_account_info()
-        .try_borrow_mut_lamports()? += old_lamports;
-
-    emit!(AttestationMigrated {
-        old_parcel: old_parcel.key(),
-        new_parcel: new_parcel.key(),
-        old_attestation: old_att.key(),
-        new_attestation: new_att.key(),
-        specifier,
-    });
-    Ok(())
-}
-
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
@@ -531,15 +449,6 @@ pub struct RightsMigrationComplete {
     pub old_parcel: Pubkey,
     pub new_parcel: Pubkey,
     pub count: u8,
-}
-
-#[event]
-pub struct AttestationMigrated {
-    pub old_parcel: Pubkey,
-    pub new_parcel: Pubkey,
-    pub old_attestation: Pubkey,
-    pub new_attestation: Pubkey,
-    pub specifier: [u8; 32],
 }
 
 // ---------------------------------------------------------------------------

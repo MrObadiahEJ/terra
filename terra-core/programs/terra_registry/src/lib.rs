@@ -233,42 +233,6 @@ pub fn is_session_recorder(
 /// Keeps the account space bounded and predictable.
 pub const MAX_VALIDATORS: usize = 8;
 
-/// An on-chain attestation that binds a set of off-chain documents/data to a
-/// parcel and records *who* (which wallets) must validate a transaction.
-///
-/// **DEPRECATED**: This parcel-centric attestation model is superseded by the
-/// verification pipeline (`Claim → Evidence → Observation → VerificationAttestation`).
-/// Existing accounts remain valid for backward compatibility, but new attestations
-/// should use the verification pipeline. A bridge instruction (`migrate_attestation_to_claim`)
-/// is provided to transition legacy attestations into the new model.
-///
-/// PDA: `["attestation", parcel, specifier]`. The heavy payload — actual
-/// documents and per-validator Ed25519 signatures — lives off-chain, but it is
-/// anchored here by `content_hash`, and each validator's public key is recorded
-/// so that any signature can be independently verified against this list.
-#[account]
-#[derive(InitSpace)]
-pub struct Attestation {
-    pub parcel: Pubkey,
-    /// 32-byte specifier (e.g. sha256 over the artifact/signing-session id).
-    pub specifier: [u8; 32],
-    /// sha-256 over the off-chain payload (documents, deed, survey, ...).
-    pub content_hash: [u8; 32],
-    /// Required threshold of validator signatures to consider this validated.
-    pub required: u8,
-    /// Number of validator keys currently registered (<= MAX_VALIDATORS).
-    pub count: u8,
-    /// Monotonic rotation counter. Each rotate_validators bumps it so a
-    /// reconstituted validator set is provably newer than the previous one.
-    pub version: u8,
-    /// Number of IPFS documents anchored to this attestation (capped by
-    /// MAX_DOCUMENTS_PER_ATTESTATION in register_document).
-    pub document_count: u8,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub validators: [Pubkey; MAX_VALIDATORS],
-}
-
 // ---------------------------------------------------------------------------
 // Identity types — canonical definitions live in terra_identity program.
 // These are imported directly for cross-program deserialization.
@@ -296,7 +260,6 @@ pub mod dispute;
 pub mod escrow;
 pub mod evidence_manifest;
 pub mod fraud_governance;
-pub mod ipfs_docs;
 pub mod observation_v2;
 pub mod quorum;
 pub mod recovery;
@@ -773,41 +736,6 @@ pub struct UnpauseProgram<'info> {
     pub admin: Signer<'info>,
 }
 
-// ---------------------------------------------------------------------------
-// IPFS document storage contexts
-// ---------------------------------------------------------------------------
-
-#[derive(Accounts)]
-#[instruction(cid: String, content_hash: [u8; 32], category: String)]
-pub struct RegisterDocument<'info> {
-    #[account(
-        init,
-        payer = registrant,
-        space = 8 + ipfs_docs::DocumentAnchor::INIT_SPACE,
-        seeds = [
-            b"document",
-            attestation.key().as_ref(),
-            cid.as_ref()
-        ],
-        bump
-    )]
-    pub document: Account<'info, ipfs_docs::DocumentAnchor>,
-    #[account(
-        mut,
-        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
-        bump,
-    )]
-    pub attestation: Account<'info, Attestation>,
-    #[account(
-        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
-        bump,
-    )]
-    pub parcel: Account<'info, Parcel>,
-    #[account(mut)]
-    pub registrant: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
 #[program]
 pub mod terra_registry {
     use super::*;
@@ -1113,72 +1041,6 @@ pub mod terra_registry {
         Ok(())
     }
 
-    /// Register an attestation that binds heavy off-chain data to this parcel
-    /// and records the set of validator wallets required to validate it.
-    ///
-    /// **DEPRECATED**: Use `create_claim` in the verification pipeline instead.
-    /// This instruction remains for backward compatibility with existing
-    /// attestations. New attestations should use `Claim → Evidence → Observation`.
-    ///
-    /// `validators` holds the public keys of the (possibly several) parties
-    /// who must sign off on the transaction; `required` is how many signatures
-    /// are needed. The signer must be the parcel holder or a registered
-    /// registrar. Per-validator Ed25519 signatures live off-chain but are
-    /// verified against this on-chain identity set and `content_hash`.
-    pub fn attest(
-        ctx: Context<Attest>,
-        specifier: [u8; 32],
-        content_hash: [u8; 32],
-        required: u8,
-        validators: [Pubkey; MAX_VALIDATORS],
-    ) -> Result<()> {
-        let parcel = &ctx.accounts.parcel;
-        // Only the ownership holder (or program authority) may create
-        // attestations.
-        is_authorized_holder(
-            &ctx.accounts.ownership,
-            parcel.key(),
-            ctx.remaining_accounts,
-            ctx.accounts.authority.key(),
-        )?;
-        require!(
-            !specifier.iter().all(|b| *b == 0),
-            TerraError::EmptySpecifier
-        );
-        require!(
-            !content_hash.iter().all(|b| *b == 0),
-            TerraError::EmptyContentHash
-        );
-
-        // Count unique validators; reject duplicates.
-        let count = quorum::require_unique_validators(&validators)?;
-        require!(count > 0, TerraError::NoValidators);
-        require!(
-            (required as usize) <= count as usize,
-            TerraError::InvalidThreshold
-        );
-
-        let now = Clock::get()?.unix_timestamp;
-        let attestation = &mut ctx.accounts.attestation;
-        attestation.parcel = parcel.key();
-        attestation.specifier = specifier;
-        attestation.content_hash = content_hash;
-        attestation.required = required;
-        attestation.count = count;
-        attestation.document_count = 0;
-        attestation.created_at = now;
-        attestation.validators = validators;
-
-        emit!(Attested {
-            parcel: parcel.key(),
-            specifier,
-            content_hash,
-            required,
-            count,
-        });
-        Ok(())
-    }
-
     /// Attach a parcel to an identity (the person behind its holder wallet).
     /// Only the current ownership holder may do this, and only for an identity
     /// whose owner wallet matches. The identity link is provenance — it never
@@ -1212,54 +1074,6 @@ pub mod terra_registry {
             identity: identity_info.key(),
             parcel: parcel.key(),
             owner: identity.owner,
-        });
-        Ok(())
-    }
-
-    /// Replace the validator set on an attestation (the fix for dead/leaving
-    /// validators). Only the parcel holder may rotate. Bumps `version` so a
-    /// reconstituted set is provably newer, and resets `required`/`count`.
-    ///
-    /// **DEPRECATED**: Use the verification pipeline's validator management instead.
-    pub fn rotate_validators(
-        ctx: Context<RotateValidators>,
-        new_required: u8,
-        new_validators: [Pubkey; MAX_VALIDATORS],
-    ) -> Result<()> {
-        let parcel = &ctx.accounts.parcel;
-        is_authorized_holder(
-            &ctx.accounts.ownership,
-            parcel.key(),
-            ctx.remaining_accounts,
-            ctx.accounts.authority.key(),
-        )?;
-        require!(
-            ctx.accounts.attestation.parcel == parcel.key(),
-            TerraError::AttestationMismatch
-        );
-
-        // Count unique validators in the rotated set; reject duplicates.
-        let count = quorum::require_unique_validators(&new_validators)?;
-        require!(count > 0, TerraError::NoValidators);
-        require!(
-            (new_required as usize) <= count as usize,
-            TerraError::InvalidThreshold
-        );
-
-        let now = Clock::get()?.unix_timestamp;
-        let attestation = &mut ctx.accounts.attestation;
-        attestation.validators = new_validators;
-        attestation.required = new_required;
-        attestation.count = count;
-        attestation.version = attestation.version.saturating_add(1);
-        attestation.updated_at = now;
-
-        emit!(ValidatorsRotated {
-            parcel: parcel.key(),
-            specifier: attestation.specifier,
-            version: attestation.version,
-            required: new_required,
-            count,
         });
         Ok(())
     }
@@ -1531,22 +1345,6 @@ pub mod terra_registry {
 
     pub fn unpause_program(ctx: Context<UnpauseProgram>) -> Result<()> {
         validator_registry::unpause_program(ctx)
-    }
-
-    // -----------------------------------------------------------------------
-    // IPFS document storage
-    // -----------------------------------------------------------------------
-
-    /// Register an IPFS document anchor tied to an attestation.
-    ///
-    /// **DEPRECATED**: Use `add_evidence` in the verification pipeline instead.
-    pub fn register_document(
-        ctx: Context<RegisterDocument>,
-        cid: String,
-        content_hash: [u8; 32],
-        category: String,
-    ) -> Result<()> {
-        ipfs_docs::register_document(ctx, cid, content_hash, category)
     }
 
     // -----------------------------------------------------------------------
@@ -1904,9 +1702,9 @@ pub mod terra_registry {
         new_id: [u8; 32],
         new_name: String,
         new_geometry_hash: [u8; 32],
-        specifier: [u8; 32],
+        claim_id: [u8; 32],
     ) -> Result<()> {
-        subdivision::subdivide_parcel(ctx, new_id, new_name, new_geometry_hash, specifier)
+        subdivision::subdivide_parcel(ctx, new_id, new_name, new_geometry_hash, claim_id)
     }
 
     pub fn amalgamate_parcels(
@@ -1920,15 +1718,8 @@ pub mod terra_registry {
         subdivision::migrate_rights(ctx)
     }
 
-    pub fn migrate_attestations(
-        ctx: Context<MigrateAttestations>,
-        specifier: [u8; 32],
-    ) -> Result<()> {
-        subdivision::migrate_attestations(ctx, specifier)
-    }
-
     // -----------------------------------------------------------------------
-    // Verification pipeline (Claim → Evidence → Observation → Attestation)
+    // Verification pipeline (Claim → Evidence → Observation → VerificationAttestation)
     // -----------------------------------------------------------------------
 
     pub fn create_claim(
@@ -1996,18 +1787,6 @@ pub mod terra_registry {
         verification::claim::verify_claim(ctx)
     }
 
-    /// Migrate a legacy attestation into a verification pipeline claim.
-    ///
-    /// **DEPRECATED**: This is a one-way bridge for migrating old attestations.
-    /// New attestations should use `create_claim` directly.
-    pub fn migrate_attestation_to_claim(
-        ctx: Context<MigrateAttestationToClaim>,
-        claim_id: [u8; 32],
-        claim_type: u8,
-    ) -> Result<()> {
-        verification::bridge::migrate_attestation_to_claim(ctx, claim_id, claim_type)
-    }
-
     // -----------------------------------------------------------------------
     // Verification session
     // -----------------------------------------------------------------------
@@ -2058,14 +1837,6 @@ pub mod terra_registry {
         confirmed: bool,
     ) -> Result<()> {
         verification::reputation::record_attestation_outcome(ctx, confirmed)
-    }
-
-    pub fn jail_validator(ctx: Context<JailValidator>, duration_secs: i64) -> Result<()> {
-        verification::reputation::jail_validator(ctx, duration_secs)
-    }
-
-    pub fn unjail_validator(ctx: Context<UnjailValidator>) -> Result<()> {
-        verification::reputation::unjail_validator(ctx)
     }
 
     pub fn slash_validator(ctx: Context<SlashValidator>, reputation_penalty: u16) -> Result<()> {
@@ -2760,32 +2531,6 @@ pub struct UpdateInfrastructure<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(specifier: [u8; 32])]
-pub struct Attest<'info> {
-    #[account(
-        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
-        bump
-    )]
-    pub parcel: Account<'info, Parcel>,
-    #[account(
-        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
-        bump
-    )]
-    pub ownership: Account<'info, Rights>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + Attestation::INIT_SPACE,
-        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), specifier.as_ref()],
-        bump
-    )]
-    pub attestation: Account<'info, Attestation>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 pub struct AttachParcel<'info> {
     #[account(
         mut,
@@ -2801,28 +2546,6 @@ pub struct AttachParcel<'info> {
     /// CHECK: Identity account owned by terra_identity program. Deserialized manually in handler.
     pub identity: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct RotateValidators<'info> {
-    #[account(
-        mut,
-        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
-        bump
-    )]
-    pub parcel: Account<'info, Parcel>,
-    #[account(
-        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
-        bump
-    )]
-    pub ownership: Account<'info, Rights>,
-    #[account(
-        mut,
-        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
-        bump
-    )]
-    pub attestation: Account<'info, Attestation>,
-    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -3410,7 +3133,7 @@ pub struct RebindCrossBorderIdentity<'info> {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-#[instruction(new_id: [u8; 32], _new_name: String, _new_geometry_hash: [u8; 32], specifier: [u8; 32])]
+#[instruction(new_id: [u8; 32], _new_name: String, _new_geometry_hash: [u8; 32], claim_id: [u8; 32])]
 pub struct SubdivideParcel<'info> {
     #[account(
         mut,
@@ -3454,15 +3177,22 @@ pub struct SubdivideParcel<'info> {
         bump
     )]
     pub subdivision_record: Account<'info, subdivision::SubdivisionRecord>,
+    /// Verified surveyor claim for the original parcel: the surveyor flow
+    /// (`create_claim(SUBDIVISION) → evidence → observations → verify_claim`)
+    /// replaces the deprecated parcel-`Attestation` gate.
     #[account(
         seeds = [
-            b"attestation".as_ref(),
+            b"claim".as_ref(),
             original_parcel.key().as_ref(),
-            &specifier,
+            &claim_id,
         ],
         bump,
+        constraint = claim.status == verification::claim::claim_status::VERIFIED
+            @ TerraError::InvalidClaimStatus,
+        constraint = claim.claim_type == verification::claim::claim_type::SUBDIVISION
+            @ TerraError::InvalidClaimType,
     )]
-    pub surveyor_attestation: Account<'info, Attestation>,
+    pub claim: Account<'info, verification::Claim>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -3530,51 +3260,6 @@ pub struct MigrateRights<'info> {
         bump,
     )]
     pub new_parcel: Account<'info, Parcel>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(specifier: [u8; 32])]
-pub struct MigrateAttestations<'info> {
-    #[account(
-        seeds = [b"parcel".as_ref(), old_parcel.id.as_ref()],
-        bump,
-    )]
-    pub old_parcel: Account<'info, Parcel>,
-    #[account(
-        seeds = [b"ownership".as_ref(), old_parcel.key().as_ref()],
-        bump
-    )]
-    pub ownership: Account<'info, Rights>,
-    #[account(
-        seeds = [b"parcel".as_ref(), new_parcel.id.as_ref()],
-        bump,
-    )]
-    pub new_parcel: Account<'info, Parcel>,
-    #[account(
-        mut,
-        seeds = [
-            b"attestation".as_ref(),
-            old_parcel.key().as_ref(),
-            &specifier,
-        ],
-        bump,
-    )]
-    pub old_attestation: Account<'info, Attestation>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + Attestation::INIT_SPACE,
-        seeds = [
-            b"attestation".as_ref(),
-            new_parcel.key().as_ref(),
-            &specifier,
-        ],
-        bump
-    )]
-    pub new_attestation: Account<'info, Attestation>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -4277,36 +3962,6 @@ pub struct VerifyClaim<'info> {
 }
 
 // ---------------------------------------------------------------------------
-// Attestation → Claim migration bridge
-// ---------------------------------------------------------------------------
-
-#[derive(Accounts)]
-#[instruction(claim_id: [u8; 32])]
-pub struct MigrateAttestationToClaim<'info> {
-    #[account(
-        seeds = [b"attestation".as_ref(), parcel.key().as_ref(), attestation.specifier.as_ref()],
-        bump,
-    )]
-    pub attestation: Account<'info, Attestation>,
-    #[account(
-        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
-        bump,
-    )]
-    pub parcel: Account<'info, Parcel>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + verification::Claim::INIT_SPACE,
-        seeds = [b"claim".as_ref(), parcel.key().as_ref(), claim_id.as_ref()],
-        bump,
-    )]
-    pub claim: Account<'info, verification::Claim>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-// ---------------------------------------------------------------------------
 // Verification session contexts
 // ---------------------------------------------------------------------------
 
@@ -4461,44 +4116,6 @@ pub struct InitializeValidatorReputation<'info> {
 
 #[derive(Accounts)]
 pub struct RecordAttestationOutcome<'info> {
-    #[account(
-        mut,
-        seeds = [b"validator_reputation", reputation.validator.as_ref()],
-        bump,
-    )]
-    pub reputation: Account<'info, verification::ValidatorReputation>,
-    #[account(
-        seeds = [b"validator_registry"],
-        bump,
-    )]
-    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
-    #[account(
-        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
-    )]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct JailValidator<'info> {
-    #[account(
-        mut,
-        seeds = [b"validator_reputation", reputation.validator.as_ref()],
-        bump,
-    )]
-    pub reputation: Account<'info, verification::ValidatorReputation>,
-    #[account(
-        seeds = [b"validator_registry"],
-        bump,
-    )]
-    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
-    #[account(
-        constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
-    )]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct UnjailValidator<'info> {
     #[account(
         mut,
         seeds = [b"validator_reputation", reputation.validator.as_ref()],
@@ -5855,30 +5472,12 @@ pub struct InfrastructureUpdated {
     pub access_hash: [u8; 32],
 }
 
-#[event]
-pub struct Attested {
-    pub parcel: Pubkey,
-    pub specifier: [u8; 32],
-    pub content_hash: [u8; 32],
-    pub required: u8,
-    pub count: u8,
-}
-
 // ParcelAttached is emitted by attach_parcel (still in this program).
 #[event]
 pub struct ParcelAttached {
     pub identity: Pubkey,
     pub parcel: Pubkey,
     pub owner: Pubkey,
-}
-
-#[event]
-pub struct ValidatorsRotated {
-    pub parcel: Pubkey,
-    pub specifier: [u8; 32],
-    pub version: u8,
-    pub required: u8,
-    pub count: u8,
 }
 
 #[event]
@@ -6157,19 +5756,6 @@ pub struct ProgramUnpaused {
 }
 
 // ---------------------------------------------------------------------------
-// IPFS document storage events
-// ---------------------------------------------------------------------------
-
-#[event]
-pub struct DocumentRegistered {
-    pub attestation: Pubkey,
-    pub cid: String,
-    pub content_hash: [u8; 32],
-    pub category: String,
-    pub registered_by: Pubkey,
-}
-
-// ---------------------------------------------------------------------------
 // Verification pipeline events
 // ---------------------------------------------------------------------------
 
@@ -6264,12 +5850,6 @@ pub struct ValidatorJailed {
     pub validator: Pubkey,
     pub reputation_score: u16,
     pub jailed_until: i64,
-}
-
-#[event]
-pub struct ValidatorUnjailed {
-    pub validator: Pubkey,
-    pub unjailed_at: i64,
 }
 
 /// Reputation slash (score hits 0). Distinct from staking `ValidatorSlashed`

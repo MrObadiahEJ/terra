@@ -27,9 +27,9 @@
 
 Now requires `acc.owner == &terra_identity::ID` before deserializing `IdentityRights` and `Identity`, and checks `identity.owner == signer_key`. Fake accounts from a foreign program cannot spoof the identity path. *(Function renamed to `is_authorized_holder()` in the RRR migration — RFC-012 §9; the same identity checks now gate every parcel mutation.)*
 
-### C-2: No signer on `JailValidator`, `UnjailValidator`, `SlashValidator` — FIXED
+### C-2: No signer on `SlashValidator` (originally also `JailValidator`, `UnjailValidator`) — FIXED
 
-All three contexts now have `authority: Signer` with `constraint = authority.key() == registry.admin @ TerraError::NotAuthorized`.
+`SlashValidator` has `authority: Signer` with `constraint = authority.key() == registry.admin @ TerraError::NotAuthorized`. The `JailValidator` / `UnjailValidator` contexts were removed in the RFC-012 legacy sweep (2026-09-25); slashing and reputation auto-jail remain the only jailing paths.
 
 ### C-3: No signer on `RecordAttestationOutcome` — FIXED
 
@@ -119,7 +119,7 @@ Settle path caps transfer at `vault_lamports` and returns excess to buyer. Rent-
 
 ## Phase 1 additions (RFC-012) — not in original audit
 
-1. **Unique validator sets** — `quorum::require_unique_validators` on `attest`, `rotate_validators`, `judicial_forfeiture`, `file_dispute`, `dispute_escrow`; identity `count_unique_validators` on succession/guardianship. Error: `DuplicateValidator`.
+1. **Unique validator sets** — `quorum::require_unique_validators` on `judicial_forfeiture`, `file_dispute`, `dispute_escrow`; identity `count_unique_validators` on succession/guardianship. Error: `DuplicateValidator`.
 2. **Endorsement action binding** — `endorse_validator_add` requires `endorsement.action == ADD` (`WrongEndorsementAction`).
 3. **Session/quorum remaining-accounts ownership** — owner checks on `try_load_session`, `try_load_quorum_config`, observation observer loop.
 

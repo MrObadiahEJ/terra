@@ -429,7 +429,7 @@ One record per report, created by the reporter.
 
 ### 7.1 Equivocation Detection
 
-1. Off-chain indexing service monitors all `attest` and `authorize_vault_access` transactions.
+1. Off-chain indexing service monitors all `submit_verification_attestation` and `authorize_vault_access` transactions.
 2. For each parcel, the service maintains a map of `(parcel_id, specifier) → validator_signatures`.
 3. If the same validator signs two different attestations for the same parcel+specifier, the service flags an equivocation.
 4. The service generates an evidence payload: `[attestation_a_bytes, attestation_b_bytes]` → `evidence_hash = SHA-256(concat)`.

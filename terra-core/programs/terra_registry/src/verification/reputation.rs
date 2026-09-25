@@ -140,51 +140,6 @@ pub fn record_attestation_outcome(
 
 /// Jail a validator for misconduct. Only callable through dispute resolution
 /// or by the registry admin.
-pub fn jail_validator(ctx: Context<crate::JailValidator>, duration_secs: i64) -> Result<()> {
-    let rep = &mut ctx.accounts.reputation;
-    require!(
-        rep.status == validator_status::ACTIVE,
-        TerraError::ValidatorNotActive
-    );
-
-    let now = Clock::get()?.unix_timestamp;
-    rep.status = validator_status::JAILED;
-    rep.jailed_until = now.saturating_add(duration_secs);
-    rep.updated_at = now;
-
-    emit!(crate::ValidatorJailed {
-        validator: rep.validator,
-        reputation_score: rep.reputation_score,
-        jailed_until: rep.jailed_until,
-    });
-    Ok(())
-}
-
-/// Unjail a validator after the jail period has elapsed.
-pub fn unjail_validator(ctx: Context<crate::UnjailValidator>) -> Result<()> {
-    let rep = &mut ctx.accounts.reputation;
-    require!(
-        rep.status == validator_status::JAILED,
-        TerraError::InvalidClaimStatus
-    );
-
-    let now = Clock::get()?.unix_timestamp;
-    require!(
-        now >= rep.jailed_until,
-        TerraError::SettlementNotYetEffective
-    );
-
-    rep.status = validator_status::ACTIVE;
-    rep.jailed_until = 0;
-    rep.updated_at = now;
-
-    emit!(crate::ValidatorUnjailed {
-        validator: rep.validator,
-        unjailed_at: now,
-    });
-    Ok(())
-}
-
 /// Slash a validator's reputation. Called through dispute resolution.
 pub fn slash_validator(ctx: Context<crate::SlashValidator>, reputation_penalty: u16) -> Result<()> {
     let rep = &mut ctx.accounts.reputation;

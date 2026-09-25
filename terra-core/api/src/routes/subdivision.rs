@@ -18,7 +18,7 @@ const SUBDIV_SELECT: &str = r#"
         id, original_parcel_id, sub_parcel_id,
         original_geometry_hash, new_geometry_hash,
         surveyor_attestation_id, rights_migrated,
-        attestations_migrated, initiated_by,
+        initiated_by,
         created_at, completed_at, status
     FROM subdivision_records
 "#;
@@ -32,7 +32,6 @@ pub struct SubdivisionRecord {
     pub new_geometry_hash: String,
     pub surveyor_attestation_id: Option<Uuid>,
     pub rights_migrated: bool,
-    pub attestations_migrated: bool,
     pub initiated_by: String,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
@@ -52,7 +51,6 @@ pub struct CreateSubdivisionRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateSubdivisionRequest {
     pub rights_migrated: Option<bool>,
-    pub attestations_migrated: Option<bool>,
     pub status: Option<String>,
 }
 
@@ -156,7 +154,7 @@ async fn create_subdivision(
         RETURNING id, original_parcel_id, sub_parcel_id,
             original_geometry_hash, new_geometry_hash,
             surveyor_attestation_id, rights_migrated,
-            attestations_migrated, initiated_by,
+            initiated_by,
             created_at, completed_at, status"#,
     )
     .bind(req.original_parcel_id)
@@ -194,25 +192,21 @@ async fn update_subdivision(
         .ok_or_else(|| AppError::not_found("subdivision record"))?;
 
     let rm = req.rights_migrated.unwrap_or(existing.rights_migrated);
-    let am = req
-        .attestations_migrated
-        .unwrap_or(existing.attestations_migrated);
     let st = req.status.unwrap_or(existing.status);
 
     let row: SubdivisionRecord = sqlx::query_as(
         r#"UPDATE subdivision_records SET
-            rights_migrated = $1, attestations_migrated = $2,
-            status = $3,
-            completed_at = CASE WHEN $3 = 'completed' THEN now() ELSE completed_at END
-        WHERE id = $4
+            rights_migrated = $1,
+            status = $2,
+            completed_at = CASE WHEN $2 = 'completed' THEN now() ELSE completed_at END
+        WHERE id = $3
         RETURNING id, original_parcel_id, sub_parcel_id,
             original_geometry_hash, new_geometry_hash,
             surveyor_attestation_id, rights_migrated,
-            attestations_migrated, initiated_by,
+            initiated_by,
             created_at, completed_at, status"#,
     )
     .bind(rm)
-    .bind(am)
     .bind(&st)
     .bind(id)
     .fetch_one(&state.pool)

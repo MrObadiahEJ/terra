@@ -39,8 +39,7 @@ pub fn router() -> Router<AppState> {
 // The on-chain `Identity` account binds a person (via a hashed identity
 // credential) to the wallet they actually hold; `recovery` is a second wallet
 // for key-loss recovery. `Succession` is a time-boxed passation that lets
-// control pass to an heir, a recovery account, or a deliberate transferee, and
-// lets a dead validator's slot be rotated by the parcel owner (rotate_validators).
+// control pass to an heir, a recovery account, or a deliberate transferee.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
@@ -156,16 +155,6 @@ pub struct SuccessionRow {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RotateValidators {
-    pub version: u16,
-    pub required: u16,
-    /// full base58 validator list after the rotation.
-    pub validators: Vec<String>,
-    /// base58 wallet that authorized the rotation (the on-chain parcel owner).
-    pub rotated_by: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct EndorseSuccession {
     /// base58 wallet of the declared validator endorsing the passation.
     pub validator: String,
@@ -195,7 +184,7 @@ pub async fn bind_identity(
     signed: SignedRequest,
     Json(req): Json<BindIdentity>,
 ) -> Result<(StatusCode, Json<IdentityView>), AppError> {
-    let identity_hash = crate::routes::attestations::decode_hex32(&req.identity_hash)?;
+    let identity_hash = decode_hex32(&req.identity_hash)?;
     // Owner must be a valid base58 32-byte address.
     let _ = decode_wallet(&req.owner)?;
     let _ = decode_wallet(&req.recovery)?;
@@ -314,7 +303,7 @@ pub async fn request_succession(
     Path(identity_hash): Path<String>,
     Json(req): Json<RequestSuccession>,
 ) -> Result<(StatusCode, Json<SuccessionRow>), AppError> {
-    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let ih = decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&req.successor)?;
     if req.kind > 4 {
         return Err(AppError::bad_request(
@@ -330,14 +319,14 @@ pub async fn request_succession(
                 "case_hash is required for court-appointed guardianship (kind 4)",
             ));
         }
-        let bytes = crate::routes::attestations::decode_hex32(raw)?;
+        let bytes = decode_hex32(raw)?;
         if bytes.iter().all(|b| *b == 0) {
             return Err(AppError::bad_request("case_hash cannot be all zeros"));
         }
         hex::encode(bytes)
     } else if let Some(raw) = req.case_hash.as_deref() {
         if !raw.trim().is_empty() {
-            let bytes = crate::routes::attestations::decode_hex32(raw.trim())?;
+            let bytes = decode_hex32(raw.trim())?;
             hex::encode(bytes)
         } else {
             String::new()
@@ -414,7 +403,7 @@ pub async fn cancel_succession(
     State(state): State<AppState>,
     Path((identity_hash, successor)): Path<(String, String)>,
 ) -> Result<Json<SuccessionRow>, AppError> {
-    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let ih = decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&successor)?;
 
     let row = sqlx::query_as::<_, SuccessionRow>(
@@ -443,7 +432,7 @@ pub async fn endorse_succession(
     Path((identity_hash, successor)): Path<(String, String)>,
     Json(req): Json<EndorseSuccession>,
 ) -> Result<Json<SuccessionRow>, AppError> {
-    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let ih = decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&successor)?;
     let _ = decode_wallet(&req.validator)?;
 
@@ -513,7 +502,7 @@ pub async fn claim_succession(
     State(state): State<AppState>,
     Path((identity_hash, successor)): Path<(String, String)>,
 ) -> Result<Json<IdentityRow>, AppError> {
-    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let ih = decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&successor)?;
 
     // Atomically: mark this pending+effective succession as claimed and swap
@@ -566,7 +555,7 @@ pub async fn revoke_guardianship(
     Path(identity_hash): Path<String>,
     Json(req): Json<RevokeGuardianship>,
 ) -> Result<Json<IdentityRow>, AppError> {
-    let ih = crate::routes::attestations::decode_hex32(&identity_hash)?;
+    let ih = decode_hex32(&identity_hash)?;
     let _ = decode_wallet(&req.new_owner)?;
     let _ = decode_wallet(&req.revoked_by)?;
 
@@ -633,77 +622,19 @@ pub async fn revoke_guardianship(
     Ok(Json(row))
 }
 
-/// Record a validator-set rotation for an attestation (the fix for dead or
-/// leaving validators). Mirrors the on-chain rotate_validators + version bump.
-pub async fn rotate_validators(
-    State(state): State<AppState>,
-    Path((parcel_id, specifier)): Path<(Uuid, String)>,
-    Json(req): Json<RotateValidators>,
-) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
-    if req.validators.is_empty() {
-        return Err(AppError::bad_request("at least one validator required"));
-    }
-    if (req.required as usize) > req.validators.len() {
-        return Err(AppError::bad_request(
-            "required threshold exceeds validator count",
-        ));
-    }
-    let _ = decode_wallet(&req.rotated_by)?;
-    for v in &req.validators {
-        let _ = decode_wallet(v)?;
-    }
-
-    let att = sqlx::query_as::<_, crate::routes::attestations::AttestationRow>(
-        "SELECT id, parcel_id, onchain_id, specifier, content_hash, required,
-                validators, created_at
-         FROM attestations WHERE parcel_id = $1 AND specifier = $2",
-    )
-    .bind(parcel_id)
-    .bind(&specifier)
-    .fetch_one(&state.pool)
-    .await?;
-
-    let mut tx = state.pool.begin().await?;
-
-    sqlx::query(
-        "INSERT INTO validator_rotations (attestation_id, version, required, validators, rotated_by)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(att.id)
-    .bind(req.version as i16)
-    .bind(req.required as i16)
-    .bind(&req.validators)
-    .bind(&req.rotated_by)
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query(
-        "UPDATE attestations
-         SET version = $2, required = $3, validators = $4
-         WHERE id = $1",
-    )
-    .bind(att.id)
-    .bind(req.version as i16)
-    .bind(req.required as i16)
-    .bind(&req.validators)
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
-    Ok((
-        StatusCode::OK,
-        Json(serde_json::json!({
-            "attestation_id": att.id,
-            "version": req.version,
-            "required": req.required,
-            "validators": req.validators,
-        })),
-    ))
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+pub fn decode_hex32(s: &str) -> Result<[u8; 32], AppError> {
+    let bytes = hex::decode(s).map_err(|_| AppError::bad_request("expected hex"))?;
+    if bytes.len() != 32 {
+        return Err(AppError::bad_request("expected 32 bytes"));
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&bytes);
+    Ok(out)
+}
 
 pub fn decode_wallet(s: &str) -> Result<[u8; 32], AppError> {
     let bytes = bs58::decode(s)
@@ -724,9 +655,7 @@ mod tests {
     use super::*;
 
     /// A passation is only valid if the required threshold does not exceed the
-    /// set of known validators. This is the rule guarding both attest() and
-    /// rotate_validators() so a dead/lost validator can always be rotated out
-    /// without leaving quorum unreachable.
+    /// set of known validators, so the endorsing set can always reach quorum.
     fn threshold_ok(required: usize, validators: &[String]) -> bool {
         required > 0 && required <= validators.len()
     }

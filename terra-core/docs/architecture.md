@@ -11,7 +11,7 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-24, Phase 8): `terra_registry` — 153 instructions, 64 `#[account]` types, 139 events, 220 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-25, RFC-012 legacy sweep): `terra_registry` — 146 instructions, 62 `#[account]` types, 134 events, 220 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
@@ -36,7 +36,6 @@ terra_registry/
 ├── time_bound.rs             # Time-bound rights (grant, renew, sweep)
 ├── recovery.rs               # Validator liveness, emergency injection
 ├── validator_registry.rs     # Validator onboarding, nomination, endorse add/remove
-├── ipfs_docs.rs              # IPFS document registration
 └── verification/
     ├── claim.rs              # Verification claims (14 types)
     ├── evidence.rs           # Claim evidence (13 types)
@@ -44,13 +43,12 @@ terra_registry/
     ├── attestation.rs        # Verification attestations
     ├── session.rs            # Verification sessions + quorum_config load
     ├── challenge.rs          # Claim challenges
-    ├── reputation.rs         # Validator reputation scoring + jail/unjail
+    ├── reputation.rs         # Validator reputation scoring + auto-jail
     ├── quorum_config.rs      # Quorum configuration per parcel type
     ├── quorum_voting.rs      # Weighted quorum voting
     ├── observer.rs           # Observer registry
     ├── guardian_claim.rs     # Guardian claim bridge
     ├── cross_border_bridge.rs # Cross-border verification
-    ├── bridge.rs             # Legacy attestation-to-claim migration
     └── audit_trail.rs        # Append-only audit log
 
 terra_identity/
@@ -73,7 +71,6 @@ terra_identity/
 | `Parcel` | `["parcel", id]` | Land parcel record |
 | `Rights` | `["rights", parcel, nonce]` | Wallet-based right |
 | `IdentityRights` | `["identity_rights", identity, parcel, rights_kind]` | Identity-based right |
-| `Attestation` | `["attestation", parcel, specifier]` | Legacy attestation (deprecated) |
 
 ### Escrow & Staking
 
@@ -194,7 +191,7 @@ ADD EVIDENCE (submitter attaches proofs)
   ↓
 SUBMIT OBSERVATION (validator observes)
   ↓
-SUBMIT ATTESTATION (validator attests)
+SUBMIT VERIFICATION ATTESTATION (validator signs)
   ↓
 VERIFY CLAIM (auto-resolves when quorum met)
   ↓
@@ -235,12 +232,12 @@ EXECUTE (after timelock + endorsements)
 2. **Anti-grief:** Minimum 2 validators for disputes/forfeiture, self-dealing checks everywhere, **unique validator sets** (`require_unique_validators`).
 3. **Progressive decentralization:** Bootstrap phase (1-3 validators) then peer-consensus endorsement (`endorse_validator_add` enforces ADD action).
 4. **Emergency pause:** Admin can pause the program; most handlers check `require_not_paused()`.
-5. **Deprecation bridge:** Legacy `Attestation` → `Claim` via `migrate_attestation_to_claim`.
+5. **Deprecation bridge (closed 2026-09-25):** the legacy `Attestation` account and its `attest` / `rotate_validators` / `register_document` / `migrate_attestation_to_claim` / `migrate_attestations` instructions were hard-removed; the claim pipeline (Claim → Evidence → Observation → VerificationAttestation) is the only path.
 6. **Remaining-accounts hygiene:** Session, quorum_config, reputation, and observation loaders verify `acc.owner == &crate::ID` before deserialize.
 
 ## Error Codes
 
-- `terra_registry`: **191** custom codes in `TerraError` (starts at Anchor 6000; ends with `RouteAccountMismatch`).
+- `terra_registry`: **220** custom codes in `TerraError` (starts at Anchor 6000; ends with `NothingToRefund`).
 - `terra_identity`: **29** custom codes in `IdentityError` (starts at 6000; ends with `DuplicateValidator`).
 
 ## Constants
@@ -258,15 +255,15 @@ EXECUTE (after timelock + endorsements)
 | `challenge` | REVIEW_PERIOD=14 days |
 | `cross_border` | MAX_PROOF_LEN=512, MAX_JURISDICTION_NAME=64 |
 | `world_registry` | GENESIS_MIN_CONFIRMATIONS=5, MIN_DISTINCT_COUNTRIES=3 |
-| `MAX_VALIDATORS` | 8 (per attestation / declared set) |
+| `MAX_VALIDATORS` | 8 (per declared set) |
 
 ## Workspace & Ops
 
 | Item | Location |
 |------|----------|
 | Workspace members | `programs/terra_registry`, `programs/terra_identity`, `api`, `geo-engine` |
-| API routes | `terra-core/api/src/routes/` — 23 modules |
-| Migrations | `terra-core/api/migrations/` — `0001`…`0024` |
+| API routes | `terra-core/api/src/routes/` — 21 modules |
+| Migrations | `terra-core/api/migrations/` — `0001`…`0026` |
 | Build | `cargo build-sbf` (see `build.sh`, `SBF_OUT_DIR` in `.cargo/config.toml`) |
 | Make targets | `build`, `test`, `lint`, `fix`, `idl`, `deploy-*`, `clean`, `size`, `verify-devnet` |
 | CI | `.github/workflows/ci.yml` — fmt, clippy, registry lib tests, API+PostGIS, tsc |
@@ -281,7 +278,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 153/64/139/220 as of Phase 8, 2026-09-24).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 146/62/134/220 as of the RFC-012 legacy sweep, 2026-09-25).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

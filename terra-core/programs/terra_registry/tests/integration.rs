@@ -12,7 +12,7 @@ use terra_identity::ID as IDENTITY_PROGRAM_ID;
 use terra_registry::{
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
-    infra_flag, ipfs_docs, parcel_status, recovery, right_kind, staking,
+    infra_flag, parcel_status, recovery, right_kind, staking,
     subdivision::{self, SubdivisionRecord},
     validator_registry::{self, ValidatorRegistry},
     verification::{
@@ -27,7 +27,7 @@ use terra_registry::{
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
-    Attestation, IdentityRights, Parcel, Rights, ID as PROGRAM_ID,
+    IdentityRights, Parcel, Rights, ID as PROGRAM_ID,
 };
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
@@ -113,13 +113,6 @@ fn xb_binding_pda(jurisdiction: &Pubkey, identity_hash: &[u8; 32]) -> (Pubkey, u
             jurisdiction.as_ref(),
             identity_hash.as_ref(),
         ],
-        &PROGRAM_ID,
-    )
-}
-
-fn attestation_pda(parcel: &Pubkey, specifier: &[u8; 32]) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[b"attestation".as_ref(), parcel.as_ref(), specifier.as_ref()],
         &PROGRAM_ID,
     )
 }
@@ -218,13 +211,6 @@ fn escrow_pda(parcel: &Pubkey) -> (Pubkey, u8) {
 
 fn escrow_vault_pda(escrow_record: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"escrow_vault", escrow_record.as_ref()], &PROGRAM_ID)
-}
-
-fn document_pda(attestation: &Pubkey, cid: &str) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[b"document", attestation.as_ref(), cid.as_bytes()],
-        &PROGRAM_ID,
-    )
 }
 
 fn amalgamation_pda(result: &Pubkey, source: &Pubkey) -> (Pubkey, u8) {
@@ -1252,37 +1238,19 @@ async fn subdivision_creates_child_and_record() {
         .await
         .expect("register failed");
 
-    // Surveyor attestation on the parent (required by subdivide).
-    let specifier: [u8; 32] = [53u8; 32];
-    let (att_pk, _) = attestation_pda(&parent_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    let mut data = discriminator("global", "attest").to_vec();
-    data.extend_from_slice(&specifier);
-    data.extend_from_slice(&[54u8; 32]);
-    data.extend_from_slice(&borsh_ser(&1u8));
-    for v in validators.iter() {
-        data.extend_from_slice(&borsh_ser(v));
-    }
-    process(
+    // Verified SUBDIVISION claim on the parent (required by subdivide).
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [53u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parent_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("attest failed");
+    .await;
 
-    // subdivide_parcel(new_id, name, hash, specifier)
+    // subdivide_parcel(new_id, name, hash, claim_id)
     let new_id: [u8; 32] = [55u8; 32];
     let (sub_pk, _) = parcel_pda(&new_id);
     let (record, _) = subdivision_pda(&parent_pk, &sub_pk);
@@ -1290,7 +1258,7 @@ async fn subdivision_creates_child_and_record() {
     data.extend_from_slice(&new_id);
     data.extend_from_slice(&borsh_ser(&"Child parcel".to_string()));
     data.extend_from_slice(&[56u8; 32]);
-    data.extend_from_slice(&specifier);
+    data.extend_from_slice(&claim_id);
     process(
         &mut ctx,
         &payer,
@@ -1302,7 +1270,7 @@ async fn subdivision_creates_child_and_record() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -1317,9 +1285,9 @@ async fn subdivision_creates_child_and_record() {
     assert_eq!(parent.status, parcel_status::SUBDIVIDED);
     let _record: SubdivisionRecord = read_account(&ctx, record).await;
 
-    // Attestation type is exercised so the import cannot go stale.
-    let att: Attestation = read_account(&ctx, att_pk).await;
-    assert_eq!(att.specifier, specifier);
+    // The surveyor claim is recorded on the subdivision record.
+    let rec: SubdivisionRecord = read_account(&ctx, record).await;
+    assert_eq!(rec.survey_claim, claim_pk);
 }
 
 #[tokio::test]
@@ -3862,7 +3830,7 @@ async fn request_court_guardianship_creates_succession() {
 }
 
 // ===========================================================================
-// Batch 7: attach_parcel, rotate_validators
+// Batch 7: attach_parcel
 // ===========================================================================
 
 #[tokio::test]
@@ -3930,98 +3898,6 @@ async fn attach_parcel_increments_count() {
     // (terra_registry cannot mutate identity accounts). parcel_count stays 0.
     let id: Identity = read_account(&ctx, id_pda).await;
     assert_eq!(id.parcel_count, 0);
-}
-
-#[tokio::test]
-async fn rotate_validators_updates_attestation() {
-    let (mut ctx, payer) = setup().await;
-
-    // Register parcel.
-    let parcel_id: [u8; 32] = [42u8; 32];
-    let (parcel_pk, _) = parcel_pda(&parcel_id);
-    process(
-        &mut ctx,
-        &payer,
-        register_ix(&parcel_id, "Attested Parcel", &[6u8; 32], &payer.pubkey()),
-    )
-    .await
-    .expect("register_parcel");
-
-    // Create attestation with 2 validators.
-    let val_old1 = Keypair::new();
-    let val_old2 = Keypair::new();
-    let specifier: [u8; 32] = [43u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-
-    let mut validators_old = [Pubkey::default(); 8];
-    validators_old[0] = val_old1.pubkey();
-    validators_old[1] = val_old2.pubkey();
-
-    let mut att_data = discriminator("global", "attest").to_vec();
-    att_data.extend_from_slice(&specifier);
-    att_data.extend_from_slice(&[7u8; 32]); // content_hash
-    att_data.push(2u8); // required = 2
-    for v in &validators_old {
-        att_data.extend_from_slice(&v.to_bytes());
-    }
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: att_data,
-        },
-    )
-    .await
-    .expect("attest failed");
-
-    let att: Attestation = read_account(&ctx, att_pk).await;
-    assert_eq!(att.required, 2);
-    assert_eq!(att.count, 2);
-    assert_eq!(att.version, 0); // initial version
-
-    // Rotate validators to a new set.
-    let val_new1 = Keypair::new();
-    let val_new2 = Keypair::new();
-    let mut validators_new = [Pubkey::default(); 8];
-    validators_new[0] = val_new1.pubkey();
-    validators_new[1] = val_new2.pubkey();
-
-    let mut rot_data = discriminator("global", "rotate_validators").to_vec();
-    rot_data.push(1u8); // new_required = 1
-    for v in &validators_new {
-        rot_data.extend_from_slice(&v.to_bytes());
-    }
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-            ],
-            data: rot_data,
-        },
-    )
-    .await
-    .expect("rotate_validators failed");
-
-    let att: Attestation = read_account(&ctx, att_pk).await;
-    assert_eq!(att.required, 1);
-    assert_eq!(att.version, 1); // bumped from 0 to 1
-    assert!(att.validators.contains(&val_new1.pubkey()));
-    assert!(att.validators.contains(&val_new2.pubkey()));
-    assert!(!att.validators.contains(&val_old1.pubkey()));
 }
 
 // ===========================================================================
@@ -4133,94 +4009,7 @@ async fn report_offense_files_slashing_report() {
     assert_eq!(stake_acc.offenses[1], 1); // one offense of type 1
 }
 
-// ===========================================================================
-// Batch 9: register_document, grant_conditional_right
-// ===========================================================================
-
-#[tokio::test]
-async fn register_document_on_attestation() {
-    let (mut ctx, payer) = setup().await;
-
-    // Register parcel.
-    let parcel_id: [u8; 32] = [70u8; 32];
-    let (parcel_pk, _) = parcel_pda(&parcel_id);
-    process(
-        &mut ctx,
-        &payer,
-        register_ix(&parcel_id, "Doc Parcel", &[7u8; 32], &payer.pubkey()),
-    )
-    .await
-    .expect("register_parcel");
-
-    // Create attestation.
-    let specifier: [u8; 32] = [71u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-
-    let mut att_data = discriminator("global", "attest").to_vec();
-    att_data.extend_from_slice(&specifier);
-    att_data.extend_from_slice(&[72u8; 32]); // content_hash
-    att_data.push(1u8); // required = 1
-    let mut vals = [Pubkey::default(); 8];
-    vals[0] = payer.pubkey();
-    for v in &vals {
-        att_data.extend_from_slice(&v.to_bytes());
-    }
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: att_data,
-        },
-    )
-    .await
-    .expect("attest failed");
-
-    // Register document on the attestation.
-    let cid = "bafybeigdyrzt5sfp7udm7hu76uh".to_string();
-    let content_hash = [0xAAu8; 32];
-    let category = "deed".to_string();
-    let (doc_pk, _) = document_pda(&att_pk, &cid);
-
-    let mut doc_data = discriminator("global", "register_document").to_vec();
-    doc_data.extend_from_slice(&borsh_ser(&cid));
-    doc_data.extend_from_slice(&content_hash);
-    doc_data.extend_from_slice(&borsh_ser(&category));
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(doc_pk, false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: doc_data,
-        },
-    )
-    .await
-    .expect("register_document failed");
-
-    let doc: ipfs_docs::DocumentAnchor = read_account(&ctx, doc_pk).await;
-    assert_eq!(doc.attestation, att_pk);
-    assert_eq!(doc.cid, "bafybeigdyrzt5sfp7udm7hu76uh");
-    assert_eq!(doc.category, "deed");
-    assert_eq!(doc.registered_by, payer.pubkey());
-
-    let att: Attestation = read_account(&ctx, att_pk).await;
-    assert_eq!(att.document_count, 1);
-}
-
+// Batch 9: grant_conditional_right
 #[tokio::test]
 async fn grant_conditional_right_creates_rights_account() {
     let (mut ctx, payer) = setup().await;
@@ -5730,90 +5519,6 @@ async fn endorse_shard_rotation_happy_path() {
 }
 
 #[tokio::test]
-async fn migrate_attestations_happy_path() {
-    let (mut ctx, payer) = setup().await;
-    let id_old: [u8; 32] = [230u8; 32];
-    let id_new: [u8; 32] = [231u8; 32];
-    let (old_pk, _) = parcel_pda(&id_old);
-    let (new_pk, _) = parcel_pda(&id_new);
-
-    process(
-        &mut ctx,
-        &payer,
-        register_ix(&id_old, "Old Parcel", &[1u8; 32], &payer.pubkey()),
-    )
-    .await
-    .expect("register old");
-    process(
-        &mut ctx,
-        &payer,
-        register_ix(&id_new, "New Parcel", &[2u8; 32], &payer.pubkey()),
-    )
-    .await
-    .expect("register new");
-
-    // Attest on old parcel.
-    let specifier: [u8; 32] = [232u8; 32];
-    let (old_att, _) = attestation_pda(&old_pk, &specifier);
-    let mut att_data = discriminator("global", "attest").to_vec();
-    att_data.extend_from_slice(&specifier);
-    att_data.extend_from_slice(&[233u8; 32]); // content_hash
-    att_data.push(1u8); // required = 1
-    let mut vals = [Pubkey::default(); 8];
-    vals[0] = payer.pubkey();
-    for v in &vals {
-        att_data.extend_from_slice(&v.to_bytes());
-    }
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(old_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
-                AccountMeta::new(old_att, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: att_data,
-        },
-    )
-    .await
-    .expect("attest");
-
-    // Migrate attestation to new parcel.
-    let (new_att, _) = attestation_pda(&new_pk, &specifier);
-    let mut data = discriminator("global", "migrate_attestations").to_vec();
-    data.extend_from_slice(&specifier);
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(old_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
-                AccountMeta::new_readonly(new_pk, false),
-                AccountMeta::new(old_att, false),
-                AccountMeta::new(new_att, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
-    )
-    .await
-    .expect("migrate_attestations failed");
-
-    let migrated: Attestation = read_account(&ctx, new_att).await;
-    assert_eq!(migrated.parcel, new_pk);
-    assert_eq!(migrated.specifier, specifier);
-    assert_eq!(migrated.count, 1);
-    assert_eq!(migrated.required, 1);
-}
-
-#[tokio::test]
 async fn dispute_slashing_happy_path() {
     let (mut ctx, payer) = setup().await;
     let registry = create_registry_ok(&mut ctx, &payer).await;
@@ -7183,7 +6888,7 @@ async fn session_open_and_record_evidence() {
 // ===========================================================================
 
 /// Accounts for reputation-scoped instructions that also require the registry
-/// and an admin/authority signer (record_attestation_outcome, jail/unjail/slash_validator).
+/// and an admin/authority signer (record_attestation_outcome, slash_validator).
 fn rep_accounts(rep_pk: &Pubkey, authority: &Pubkey) -> Vec<AccountMeta> {
     let (registry, _) = registry_pda();
     vec![
@@ -7220,6 +6925,130 @@ async fn init_reputation_ok(
     .await
     .expect("init_reputation failed");
     rep_pk
+}
+
+/// Drive a claim to `claim_status::VERIFIED` — the surveyor flow that gates
+/// `subdivide_parcel`: `create_claim` -> 2 funded validators observe -> each
+/// submits a CONFIRMED `submit_verification_attestation` -> `verify_claim`.
+/// Requires an existing validator registry (reputation init). Returns the
+/// claim PDA. `claim_type_v` is the `claim_type::*` value to file under.
+async fn verified_claim_ok(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    parcel_pk: Pubkey,
+    claim_id: [u8; 32],
+    claim_type_v: u8,
+) -> Pubkey {
+    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type_v);
+                d.extend_from_slice(&[9u8; 32]); // statement_hash (non-zero)
+                d.push(0u8); // parcel_type
+                d.extend_from_slice(&[0u8; 2]); // region
+                d
+            },
+        },
+    )
+    .await
+    .expect("verified_claim_ok: create_claim failed");
+
+    let observations = [(0_i64, 0_i64, 1_u8, 90_u8), (1_i64, 1_i64, 2_u8, 85_u8)];
+    for (lat, lon, method, confidence) in observations {
+        let validator = Keypair::new();
+        process(
+            ctx,
+            payer,
+            fund_ix(&payer.pubkey(), &validator.pubkey(), 10_000_000),
+        )
+        .await
+        .unwrap();
+        let (obs_pk, _) = observation_pda(&claim_pk, &validator.pubkey());
+        process(
+            ctx,
+            &validator,
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: vec![
+                    AccountMeta::new(obs_pk, false),
+                    AccountMeta::new(claim_pk, false),
+                    AccountMeta::new(validator.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                data: {
+                    let mut d = discriminator("global", "submit_observation").to_vec();
+                    d.extend_from_slice(&lat.to_le_bytes());
+                    d.extend_from_slice(&lon.to_le_bytes());
+                    d.push(method);
+                    d.extend_from_slice(&[5u8; 32]); // findings_hash
+                    d.push(confidence);
+                    d.extend_from_slice(&[6u8; 32]); // signature_hash
+                    d
+                },
+            },
+        )
+        .await
+        .expect("verified_claim_ok: submit_observation failed");
+
+        let rep_pk = init_reputation_ok(ctx, payer, &validator.pubkey()).await;
+        let (att_pk, _) = verification_attestation_pda(&claim_pk, &validator.pubkey());
+        process(
+            ctx,
+            &validator,
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: vec![
+                    AccountMeta::new(att_pk, false),
+                    AccountMeta::new(claim_pk, false),
+                    AccountMeta::new_readonly(obs_pk, false),
+                    AccountMeta::new(validator.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                    AccountMeta::new_readonly(rep_pk, false),
+                ],
+                data: {
+                    let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+                    d.push(attestation_result::CONFIRMED);
+                    d.push(confidence);
+                    d.extend_from_slice(&attestation_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs_pk,
+                        attestation_result::CONFIRMED,
+                        confidence,
+                    ));
+                    d
+                },
+            },
+        )
+        .await
+        .expect("verified_claim_ok: submit_verification_attestation failed");
+    }
+
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![AccountMeta::new(claim_pk, false)],
+            data: discriminator("global", "verify_claim").to_vec(),
+        },
+    )
+    .await
+    .expect("verified_claim_ok: verify_claim failed");
+
+    claim_pk
 }
 
 #[tokio::test]
@@ -7278,80 +7107,6 @@ async fn reputation_initialize_and_record_outcome() {
     // score = (1/2)*10000 - 1*500 = 5000 - 500 = 4500
     assert_eq!(rep_disputed.reputation_score, 4500);
 }
-
-#[tokio::test]
-async fn reputation_jail_and_unjail() {
-    let (mut ctx, payer) = setup().await;
-    create_registry_ok(&mut ctx, &payer).await;
-    let validator = Keypair::new();
-    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
-
-    // Jail for 100 seconds.
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&100_i64.to_le_bytes());
-                d
-            },
-        },
-    )
-    .await
-    .expect("jail failed");
-
-    let rep_jailed: ValidatorReputation = read_account(&ctx, rep_pk).await;
-    assert_eq!(rep_jailed.status, validator_status::JAILED);
-
-    // Unjail before timelock — should fail.
-    let result = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: discriminator("global", "unjail_validator").to_vec(),
-        },
-    )
-    .await;
-    assert!(result.is_err(), "unjail before timelock should fail");
-
-    // Fast-forward past timelock.
-    let clock = ctx
-        .banks_client
-        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
-        .await
-        .unwrap();
-    ctx.set_sysvar(&solana_sdk::sysvar::clock::Clock {
-        slot: clock.slot + 1_000_000,
-        epoch_start_timestamp: clock.unix_timestamp + 200,
-        epoch: clock.epoch,
-        leader_schedule_epoch: clock.leader_schedule_epoch,
-        unix_timestamp: clock.unix_timestamp + 200,
-    });
-
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: discriminator("global", "unjail_validator").to_vec(),
-        },
-    )
-    .await
-    .expect("unjail failed");
-
-    let rep_unjailed: ValidatorReputation = read_account(&ctx, rep_pk).await;
-    assert_eq!(rep_unjailed.status, validator_status::ACTIVE);
-}
-
-// ===========================================================================
-// Challenge / Audit tests
-// ===========================================================================
 
 #[tokio::test]
 async fn challenge_file_and_vote() {
@@ -7911,7 +7666,7 @@ async fn jailed_validator_cannot_attest() {
     .await
     .unwrap();
 
-    // Jail the validator.
+    // Jail the validator via slash: score 10_000 - 9_000 = 1_000 (< 2_000) => JAILED.
     process(
         &mut ctx,
         &payer,
@@ -7919,8 +7674,8 @@ async fn jailed_validator_cannot_attest() {
             program_id: PROGRAM_ID,
             accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&86400_i64.to_le_bytes());
+                let mut d = discriminator("global", "slash_validator").to_vec();
+                d.extend_from_slice(&9000_u16.to_le_bytes());
                 d
             },
         },
@@ -8262,8 +8017,8 @@ async fn p0_5_attestation_rejects_jailed_validator() {
             program_id: PROGRAM_ID,
             accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&86400_i64.to_le_bytes());
+                let mut d = discriminator("global", "slash_validator").to_vec();
+                d.extend_from_slice(&9000_u16.to_le_bytes());
                 d
             },
         },
@@ -9468,91 +9223,6 @@ async fn grant_identity_right_via_identity_path() {
     assert_eq!(bob_ir.rights_kind, right_kind::OWNERSHIP);
     assert_eq!(bob_ir.granter, payer.pubkey());
     assert_eq!(bob_ir.status, 0); // right_status::ACTIVE
-}
-
-#[tokio::test]
-async fn attestation_to_claim_bridge() {
-    let (mut ctx, payer) = setup().await;
-    let id: [u8; 32] = [102u8; 32];
-    let (parcel_pk, _) = parcel_pda(&id);
-
-    // Register parcel.
-    process(
-        &mut ctx,
-        &payer,
-        register_ix(&id, "Bridge Plot", &[4u8; 32], &payer.pubkey()),
-    )
-    .await
-    .expect("register_parcel");
-
-    // Create old-style attestation.
-    let specifier = [77u8; 32];
-    let content_hash = [88u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let mut att_data = discriminator("global", "attest").to_vec();
-    att_data.extend_from_slice(&specifier);
-    att_data.extend_from_slice(&content_hash);
-    att_data.push(2u8); // required = 2
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
-    for v in &validators {
-        att_data.extend_from_slice(&v.to_bytes());
-    }
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: att_data,
-        },
-    )
-    .await
-    .expect("attest");
-
-    // Migrate to claim.
-    let claim_id = hash(&specifier).to_bytes();
-    let (claim_pk, _) = claim_pda(&parcel_pk, &claim_id);
-    let mut migrate_data = discriminator("global", "migrate_attestation_to_claim").to_vec();
-    migrate_data.extend_from_slice(&claim_id);
-    migrate_data.push(claim_type::OWNERSHIP);
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(att_pk, false),
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new(claim_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: migrate_data,
-        },
-    )
-    .await
-    .expect("migrate_attestation_to_claim");
-
-    let claim: Claim = read_account(&ctx, claim_pk).await;
-    assert_eq!(claim.parcel, parcel_pk);
-    assert_eq!(claim.claim_type, claim_type::OWNERSHIP);
-    assert_eq!(claim.statement_hash, content_hash);
-    assert_eq!(claim.required_attestations, 2);
-    assert_eq!(claim.status, claim_status::SUBMITTED);
-    assert_eq!(claim.submitted_by, payer.pubkey());
-
-    // Old attestation should still exist.
-    let att: Attestation = read_account(&ctx, att_pk).await;
-    assert_eq!(att.parcel, parcel_pk);
-    assert_eq!(att.specifier, specifier);
 }
 
 // ---------------------------------------------------------------------------
@@ -13049,35 +12719,17 @@ async fn subdivide_rejects_zero_id() {
     .await
     .expect("register");
 
-    // Create attestation.
-    let specifier: [u8; 32] = [232u8; 32];
-    let (att_pk, _) = attestation_pda(&parent_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    let mut data = discriminator("global", "attest").to_vec();
-    data.extend_from_slice(&specifier);
-    data.extend_from_slice(&[233u8; 32]);
-    data.extend_from_slice(&borsh_ser(&1u8));
-    for v in validators.iter() {
-        data.extend_from_slice(&borsh_ser(v));
-    }
-    process(
+    // Verified SUBDIVISION claim (required by subdivide).
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [232u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parent_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("attest");
+    .await;
 
     let new_id = [0u8; 32]; // zero id
     let (sub_pk, _) = parcel_pda(&new_id);
@@ -13086,7 +12738,7 @@ async fn subdivide_rejects_zero_id() {
     data.extend_from_slice(&new_id);
     data.extend_from_slice(&borsh_ser(&"Child".to_string()));
     data.extend_from_slice(&[234u8; 32]);
-    data.extend_from_slice(&specifier);
+    data.extend_from_slice(&claim_id);
     let res = process(
         &mut ctx,
         &payer,
@@ -13098,7 +12750,7 @@ async fn subdivide_rejects_zero_id() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -13122,34 +12774,16 @@ async fn subdivide_rejects_empty_name() {
     .await
     .expect("register");
 
-    let specifier: [u8; 32] = [237u8; 32];
-    let (att_pk, _) = attestation_pda(&parent_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    let mut data = discriminator("global", "attest").to_vec();
-    data.extend_from_slice(&specifier);
-    data.extend_from_slice(&[238u8; 32]);
-    data.extend_from_slice(&borsh_ser(&1u8));
-    for v in validators.iter() {
-        data.extend_from_slice(&borsh_ser(v));
-    }
-    process(
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [237u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parent_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("attest");
+    .await;
 
     let new_id: [u8; 32] = [239u8; 32];
     let (sub_pk, _) = parcel_pda(&new_id);
@@ -13158,7 +12792,7 @@ async fn subdivide_rejects_empty_name() {
     data.extend_from_slice(&new_id);
     data.extend_from_slice(&borsh_ser(&"".to_string())); // empty name
     data.extend_from_slice(&[240u8; 32]);
-    data.extend_from_slice(&specifier);
+    data.extend_from_slice(&claim_id);
     let res = process(
         &mut ctx,
         &payer,
@@ -13170,7 +12804,7 @@ async fn subdivide_rejects_empty_name() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -13213,34 +12847,16 @@ async fn subdivide_rejects_wrong_status() {
     .await
     .expect("update status");
 
-    let specifier: [u8; 32] = [243u8; 32];
-    let (att_pk, _) = attestation_pda(&parent_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    let mut data = discriminator("global", "attest").to_vec();
-    data.extend_from_slice(&specifier);
-    data.extend_from_slice(&[244u8; 32]);
-    data.extend_from_slice(&borsh_ser(&1u8));
-    for v in validators.iter() {
-        data.extend_from_slice(&borsh_ser(v));
-    }
-    process(
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [243u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parent_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("attest");
+    .await;
 
     let new_id: [u8; 32] = [245u8; 32];
     let (sub_pk, _) = parcel_pda(&new_id);
@@ -13249,7 +12865,7 @@ async fn subdivide_rejects_wrong_status() {
     data.extend_from_slice(&new_id);
     data.extend_from_slice(&borsh_ser(&"Child".to_string()));
     data.extend_from_slice(&[246u8; 32]);
-    data.extend_from_slice(&specifier);
+    data.extend_from_slice(&claim_id);
     let res = process(
         &mut ctx,
         &payer,
@@ -13261,7 +12877,7 @@ async fn subdivide_rejects_wrong_status() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -13285,34 +12901,16 @@ async fn subdivide_rejects_not_owner() {
     .await
     .expect("register");
 
-    let specifier: [u8; 32] = [249u8; 32];
-    let (att_pk, _) = attestation_pda(&parent_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    let mut data = discriminator("global", "attest").to_vec();
-    data.extend_from_slice(&specifier);
-    data.extend_from_slice(&[250u8; 32]);
-    data.extend_from_slice(&borsh_ser(&1u8));
-    for v in validators.iter() {
-        data.extend_from_slice(&borsh_ser(v));
-    }
-    process(
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [249u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parent_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("attest");
+    .await;
 
     let not_owner = Keypair::new();
     process(
@@ -13330,7 +12928,7 @@ async fn subdivide_rejects_not_owner() {
     data.extend_from_slice(&new_id);
     data.extend_from_slice(&borsh_ser(&"Child".to_string()));
     data.extend_from_slice(&[252u8; 32]);
-    data.extend_from_slice(&specifier);
+    data.extend_from_slice(&claim_id);
     let res = process(
         &mut ctx,
         &not_owner,
@@ -13342,7 +12940,7 @@ async fn subdivide_rejects_not_owner() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(record, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(not_owner.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -13351,6 +12949,135 @@ async fn subdivide_rejects_not_owner() {
     )
     .await;
     assert_custom_error(res, 6003, "not owner subdivide");
+}
+
+/// The surveyor gate rejects a SUBDIVISION claim that has not completed the
+/// verification pipeline (status must be VERIFIED).
+#[tokio::test]
+async fn subdivide_rejects_claim_not_verified() {
+    let (mut ctx, payer) = setup().await;
+    let parent_id: [u8; 32] = [253u8; 32];
+    let (parent_pk, _) = parcel_pda(&parent_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parent_id, "Parent", &[254u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register");
+
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [255u8; 32];
+    let (claim_pk, _) = claim_pda(&parent_pk, &claim_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(claim_pk, false),
+                AccountMeta::new_readonly(parent_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "create_claim").to_vec();
+                d.extend_from_slice(&claim_id);
+                d.push(claim_type::SUBDIVISION);
+                d.extend_from_slice(&[1u8; 32]); // statement_hash
+                d.push(0u8);
+                d.extend_from_slice(&[0u8; 2]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("create_claim");
+
+    let new_id: [u8; 32] = [0xB1u8; 32];
+    let (sub_pk, _) = parcel_pda(&new_id);
+    let (record, _) = subdivision_pda(&parent_pk, &sub_pk);
+    let mut data = discriminator("global", "subdivide_parcel").to_vec();
+    data.extend_from_slice(&new_id);
+    data.extend_from_slice(&borsh_ser(&"Child".to_string()));
+    data.extend_from_slice(&[0xB2u8; 32]);
+    data.extend_from_slice(&claim_id);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
+                AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
+                AccountMeta::new(record, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6131, "claim not verified");
+}
+
+/// The surveyor gate requires `claim_type == SUBDIVISION`; a VERIFIED claim of
+/// another type (e.g. PARCEL_EXISTS) is rejected.
+#[tokio::test]
+async fn subdivide_rejects_wrong_claim_type() {
+    let (mut ctx, payer) = setup().await;
+    let parent_id: [u8; 32] = [0xC1u8; 32];
+    let (parent_pk, _) = parcel_pda(&parent_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parent_id, "Parent", &[0xC2u8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register");
+
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [0xC3u8; 32];
+    let claim_pk = verified_claim_ok(
+        &mut ctx,
+        &payer,
+        parent_pk,
+        claim_id,
+        claim_type::PARCEL_EXISTS,
+    )
+    .await;
+
+    let new_id: [u8; 32] = [0xC4u8; 32];
+    let (sub_pk, _) = parcel_pda(&new_id);
+    let (record, _) = subdivision_pda(&parent_pk, &sub_pk);
+    let mut data = discriminator("global", "subdivide_parcel").to_vec();
+    data.extend_from_slice(&new_id);
+    data.extend_from_slice(&borsh_ser(&"Child".to_string()));
+    data.extend_from_slice(&[0xC5u8; 32]);
+    data.extend_from_slice(&claim_id);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
+                AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
+                AccountMeta::new(record, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6129, "wrong claim type");
 }
 
 #[tokio::test]
@@ -14976,7 +14703,7 @@ async fn set_quorum_config_rejects_non_admin() {
 
 // ===========================================================================
 // Negative-path integration tests: Observer, Reputation, Audit, Pause,
-// World Registry, Attestation
+// World Registry
 // ===========================================================================
 
 #[tokio::test]
@@ -15245,8 +14972,8 @@ async fn record_attestation_outcome_rejects_jailed_validator() {
             program_id: PROGRAM_ID,
             accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&100_i64.to_le_bytes());
+                let mut d = discriminator("global", "slash_validator").to_vec();
+                d.extend_from_slice(&9000_u16.to_le_bytes());
                 d
             },
         },
@@ -15272,66 +14999,6 @@ async fn record_attestation_outcome_rejects_jailed_validator() {
 }
 
 #[tokio::test]
-async fn jail_validator_rejects_already_jailed() {
-    let (mut ctx, payer) = setup().await;
-    create_registry_ok(&mut ctx, &payer).await;
-    let validator = Keypair::new();
-    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
-
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&100_i64.to_le_bytes());
-                d
-            },
-        },
-    )
-    .await
-    .unwrap();
-
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&100_i64.to_le_bytes());
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6141, "jail already jailed");
-}
-
-#[tokio::test]
-async fn unjail_validator_rejects_not_jailed() {
-    let (mut ctx, payer) = setup().await;
-    create_registry_ok(&mut ctx, &payer).await;
-    let validator = Keypair::new();
-    let rep_pk = init_reputation_ok(&mut ctx, &payer, &validator.pubkey()).await;
-
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: rep_accounts(&rep_pk, &payer.pubkey()),
-            data: discriminator("global", "unjail_validator").to_vec(),
-        },
-    )
-    .await;
-    assert_custom_error(res, 6131, "unjail not jailed");
-}
-
-#[tokio::test]
 async fn slash_validator_rejects_jailed_validator() {
     let (mut ctx, payer) = setup().await;
     create_registry_ok(&mut ctx, &payer).await;
@@ -15345,8 +15012,8 @@ async fn slash_validator_rejects_jailed_validator() {
             program_id: PROGRAM_ID,
             accounts: rep_accounts(&rep_pk, &payer.pubkey()),
             data: {
-                let mut d = discriminator("global", "jail_validator").to_vec();
-                d.extend_from_slice(&100_i64.to_le_bytes());
+                let mut d = discriminator("global", "slash_validator").to_vec();
+                d.extend_from_slice(&9000_u16.to_le_bytes());
                 d
             },
         },
@@ -15855,206 +15522,6 @@ async fn request_genesis_rejects_unallocated_country() {
     )
     .await;
     assert_custom_error(res, 6120, "unallocated country genesis");
-}
-
-#[tokio::test]
-async fn attest_rejects_empty_specifier() {
-    let (mut ctx, payer) = setup().await;
-    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
-    let (att_pk, _) = attestation_pda(&parcel_pk, &[0u8; 32]);
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&[0u8; 32]);
-                d.extend_from_slice(&[1u8; 32]);
-                d.push(1u8);
-                for _ in 0..8 {
-                    d.extend_from_slice(&Pubkey::new_unique().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6013, "empty specifier");
-}
-
-#[tokio::test]
-async fn attest_rejects_empty_content_hash() {
-    let (mut ctx, payer) = setup().await;
-    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
-    let specifier = [1u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[0u8; 32]);
-                d.push(1u8);
-                for _ in 0..8 {
-                    d.extend_from_slice(&Pubkey::new_unique().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6014, "empty content hash");
-}
-
-#[tokio::test]
-async fn attest_rejects_no_validators() {
-    let (mut ctx, payer) = setup().await;
-    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
-    let specifier = [2u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[3u8; 32]);
-                d.push(1u8);
-                for _ in 0..8 {
-                    d.extend_from_slice(&Pubkey::default().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6015, "no validators");
-}
-
-#[tokio::test]
-async fn attest_rejects_invalid_threshold() {
-    let (mut ctx, payer) = setup().await;
-    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
-    let specifier = [3u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let validator = Keypair::new();
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[4u8; 32]);
-                d.push(5u8);
-                d.extend_from_slice(&validator.pubkey().to_bytes());
-                for _ in 0..7 {
-                    d.extend_from_slice(&Pubkey::default().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6016, "threshold exceeds validators");
-}
-
-#[tokio::test]
-async fn rotate_validators_rejects_invalid_threshold() {
-    let (mut ctx, payer) = setup().await;
-    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
-    let specifier = [5u8; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-
-    let validator = Keypair::new();
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[5u8; 32]);
-                d.push(1u8);
-                d.extend_from_slice(&validator.pubkey().to_bytes());
-                for _ in 0..7 {
-                    d.extend_from_slice(&Pubkey::default().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await
-    .unwrap();
-
-    let new_validator = Keypair::new();
-    let res = process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-            ],
-            data: {
-                let mut d = discriminator("global", "rotate_validators").to_vec();
-                d.push(3u8);
-                d.extend_from_slice(&new_validator.pubkey().to_bytes());
-                for _ in 0..7 {
-                    d.extend_from_slice(&Pubkey::default().to_bytes());
-                }
-                d
-            },
-        },
-    )
-    .await;
-    assert_custom_error(res, 6016, "rotate invalid threshold");
 }
 
 // =========================================================================
@@ -19140,37 +18607,17 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
     let (parcel_pk, _identity_pk, _ir_pk) =
         setup_identity_owner(&mut ctx, &payer, parcel_id, identity_hash).await;
 
-    // Create an attestation (required for subdivision).
-    let specifier: [u8; 32] = [0xA6; 32];
-    let (attestation_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    process(
+    // Verified SUBDIVISION claim (required for subdivision).
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [0xA6; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(attestation_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[3u8; 32]); // content_hash
-                d.extend_from_slice(&borsh_ser(&1u8)); // required validators = 1
-                for v in validators.iter() {
-                    d.extend_from_slice(&borsh_ser(v));
-                }
-                d
-            },
-        },
+        parcel_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("create attestation");
+    .await;
 
     // Subdivide.
     let new_id: [u8; 32] = [0xA7; 32];
@@ -19190,7 +18637,7 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
                 AccountMeta::new(sub_parcel_pk, false),
                 AccountMeta::new(ownership_pda(&sub_parcel_pk), false),
                 AccountMeta::new(subdivision_rec, false),
-                AccountMeta::new_readonly(attestation_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -19199,7 +18646,7 @@ async fn ownership_invariant_o12_subdivision_preserves_ownership() {
                 d.extend_from_slice(&new_id);
                 d.extend_from_slice(&borsh_ser(&"Sub Parcel".to_string()));
                 d.extend_from_slice(&[2u8; 32]);
-                d.extend_from_slice(&specifier);
+                d.extend_from_slice(&claim_id);
                 d
             },
         },
@@ -21384,7 +20831,7 @@ async fn cross_module_d3_dispute_lifecycle() {
 
 // D4: Parcel + attestation + subdivide — full subdivision flow.
 #[tokio::test]
-async fn cross_module_d4_attestation_subdivide_flow() {
+async fn cross_module_d4_claim_subdivide_flow() {
     let (mut ctx, payer) = setup().await;
     let parcel_id: [u8; 32] = [0xD4; 32];
     let mut sub_id: [u8; 32] = [0xD4; 32];
@@ -21416,37 +20863,17 @@ async fn cross_module_d4_attestation_subdivide_flow() {
     .await
     .expect("register parcel");
 
-    // Create attestation.
-    let specifier: [u8; 32] = [0xD4; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = payer.pubkey();
-    process(
+    // Verified SUBDIVISION claim (surveyor flow; replaces the old attestation).
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [0xD4; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[2u8; 32]); // content hash
-                d.extend_from_slice(&borsh_ser(&1u8)); // required = 1
-                for v in validators.iter() {
-                    d.extend_from_slice(&borsh_ser(v));
-                }
-                d
-            },
-        },
+        parcel_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("create attestation");
+    .await;
 
     // Subdivide.
     let (sub_rec, _) = Pubkey::find_program_address(
@@ -21464,7 +20891,7 @@ async fn cross_module_d4_attestation_subdivide_flow() {
                 AccountMeta::new(sub_pk, false),
                 AccountMeta::new(ownership_pda(&sub_pk), false),
                 AccountMeta::new(sub_rec, false),
-                AccountMeta::new_readonly(att_pk, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -21473,7 +20900,7 @@ async fn cross_module_d4_attestation_subdivide_flow() {
                 d.extend_from_slice(&sub_id);
                 d.extend_from_slice(&borsh_ser(&"Sub D4".to_string()));
                 d.extend_from_slice(&[3u8; 32]); // geometry hash
-                d.extend_from_slice(&specifier);
+                d.extend_from_slice(&claim_id);
                 d
             },
         },
@@ -21491,34 +20918,19 @@ async fn cross_module_d4_attestation_subdivide_flow() {
     );
 }
 
-// D5: Identity + transfer + attestation — new owner after identity-based
-// transfer can create attestations.
+// D5: Identity + transfer + claim pipeline — the new owner after an
+// identity-based transfer can drive a verified claim through subdivision,
+// while the previous holder is rejected by the ownership gate.
 #[tokio::test]
-async fn cross_module_d5_transfer_then_new_owner_attests() {
+async fn cross_module_d5_transfer_then_new_owner_subdivides() {
     let (mut ctx, payer) = setup().await;
     let parcel_id: [u8; 32] = [0xD5; 32];
     let (parcel_pk, _) = parcel_pda(&parcel_id);
 
-    // Register parcel.
     process(
         &mut ctx,
         &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new(ownership_pda(&parcel_pk), false),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "register_parcel").to_vec();
-                d.extend_from_slice(&parcel_id);
-                d.extend_from_slice(&borsh_ser(&"D5 Parcel".to_string()));
-                d.extend_from_slice(&[1u8; 32]);
-                d
-            },
-        },
+        register_ix(&parcel_id, "D5 Parcel", &[1u8; 32], &payer.pubkey()),
     )
     .await
     .expect("register parcel");
@@ -21540,68 +20952,79 @@ async fn cross_module_d5_transfer_then_new_owner_attests() {
     .await
     .expect("transfer to bob");
 
-    // Bob creates attestation — new owner can attest.
-    let specifier: [u8; 32] = [0xD5; 32];
-    let (att_pk, _) = attestation_pda(&parcel_pk, &specifier);
-    let mut validators = [Pubkey::default(); 8];
-    validators[0] = bob.pubkey();
-    process(
+    // Registry (payer is admin) + VERIFIED subdivision claim on the parcel.
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [0xD6u8; 32];
+    let claim_pk = verified_claim_ok(
         &mut ctx,
-        &bob,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(att_pk, false),
-                AccountMeta::new(bob.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&specifier);
-                d.extend_from_slice(&[4u8; 32]); // content hash
-                d.extend_from_slice(&borsh_ser(&1u8)); // required
-                for v in validators.iter() {
-                    d.extend_from_slice(&borsh_ser(v));
-                }
-                d
-            },
-        },
+        &payer,
+        parcel_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
     )
-    .await
-    .expect("bob creates attestation");
+    .await;
 
-    // Payer (old owner) cannot create a new attestation — not owner anymore.
-    let mut old_specifier: [u8; 32] = [0xD5; 32];
-    old_specifier[31] = 0x02;
-    let (old_att_pk, _) = attestation_pda(&parcel_pk, &old_specifier);
+    // Previous holder (payer) is rejected by the ownership gate first —
+    // a successful subdivide would flip the parent to SUBDIVIDED and the
+    // status check would mask the ownership check.
+    let old_id: [u8; 32] = [0xD9u8; 32];
+    let (old_sub, _) = parcel_pda(&old_id);
+    let (old_record, _) = subdivision_pda(&parcel_pk, &old_sub);
+    let mut data = discriminator("global", "subdivide_parcel").to_vec();
+    data.extend_from_slice(&old_id);
+    data.extend_from_slice(&borsh_ser(&"D5 Child 2".to_string()));
+    data.extend_from_slice(&[0xDAu8; 32]);
+    data.extend_from_slice(&claim_id);
     let res = process(
         &mut ctx,
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new(parcel_pk, false),
                 AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(old_att_pk, false),
+                AccountMeta::new(old_sub, false),
+                AccountMeta::new(ownership_pda(&old_sub), false),
+                AccountMeta::new(old_record, false),
+                AccountMeta::new_readonly(claim_pk, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
-            data: {
-                let mut d = discriminator("global", "attest").to_vec();
-                d.extend_from_slice(&old_specifier);
-                d.extend_from_slice(&[5u8; 32]);
-                d.extend_from_slice(&borsh_ser(&1u8));
-                for v in validators.iter() {
-                    d.extend_from_slice(&borsh_ser(v));
-                }
-                d
-            },
+            data,
         },
     )
     .await;
-    assert_custom_error(res, 6003, "D5: old owner cannot attest after transfer");
+    assert_custom_error(res, 6003, "D5: old owner cannot subdivide after transfer");
+
+    // New owner (bob) subdivides using the verified claim.
+    let new_id: [u8; 32] = [0xD7u8; 32];
+    let (sub_pk, _) = parcel_pda(&new_id);
+    let (record, _) = subdivision_pda(&parcel_pk, &sub_pk);
+    let mut data = discriminator("global", "subdivide_parcel").to_vec();
+    data.extend_from_slice(&new_id);
+    data.extend_from_slice(&borsh_ser(&"D5 Child".to_string()));
+    data.extend_from_slice(&[0xD8u8; 32]);
+    data.extend_from_slice(&claim_id);
+    process(
+        &mut ctx,
+        &bob,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
+                AccountMeta::new(record, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(bob.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("D5: new owner subdivide after transfer");
 }
 
 // D6: Staking lifecycle — register validator, stake, verify stake exists.
