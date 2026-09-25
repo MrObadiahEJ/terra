@@ -496,8 +496,10 @@ pub async fn endorse_succession(
 }
 
 /// Claim an effective succession: the successor becomes the identity's new
-/// owner and any parcels the identity owned transfer with it. Mirrors the
-/// on-chain claim + parcel re-pointing (a client computes/records the new owner).
+/// owner. Mirrors the on-chain `terra_identity::claim_succession` — or, when
+/// parcels must move with it, the registry's `claim_succession_with_parcels`
+/// composite (B6), which claims via CPI and then re-points ownership Rights
+/// on-chain. This mirror records the identity-side state only.
 pub async fn claim_succession(
     State(state): State<AppState>,
     Path((identity_hash, successor)): Path<(String, String)>,

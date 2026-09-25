@@ -36,24 +36,3 @@ pub struct Succession {
     pub endorsers: [Pubkey; MAX_VALIDATORS],
     pub endorsers_count: u8,
 }
-
-// ---------------------------------------------------------------------------
-// Cross-program mirror types (for reading accounts owned by other programs)
-// ---------------------------------------------------------------------------
-
-/// Read-only mirror of `terra_registry::Parcel` for cross-program
-/// deserialization. Fields and layout must match the canonical definition
-/// in terra_registry exactly (borsh order).
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct Parcel {
-    pub id: [u8; 32],
-    pub owner: Pubkey,
-    pub name: String,
-    pub geometry_hash: [u8; 32],
-    pub status: u8,
-    pub rights_count: u8,
-    pub infrastructure_flags: u16,
-    pub access_hash: [u8; 32],
-    pub created_at: i64,
-    pub updated_at: i64,
-}

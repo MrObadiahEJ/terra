@@ -2104,6 +2104,65 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "claim_succession_with_parcels",
+      "docs": [
+        "Claim a succession AND transfer every ownership right it covers in one",
+        "atomic step (B6 boundary rule: identity state is only ever *composed*",
+        "from this program \u2014 never written directly).",
+        "",
+        "The identity-side claim runs as a CPI into",
+        "`terra_identity::claim_succession`, which enforces its own guards,",
+        "moves `identity.owner` to the successor, closes the Succession PDA",
+        "(rent to the signer) and emits `SuccessionClaimed`. Only afterwards",
+        "does this handler re-point the provided registry-owned ownership",
+        "Rights PDAs from the previous identity owner to the successor.",
+        "",
+        "`remaining_accounts` = ownership Rights PDAs (`[\"ownership\", parcel]`).",
+        "Each must be held either by the previous identity-owner wallet",
+        "(re-pointed to the successor) or by the Identity PDA itself (skipped \u2014",
+        "it already follows the identity). If the CPI fails, no rights are",
+        "written; if a rights write fails, the CPI rolls back. Atomic."
+      ],
+      "discriminator": [
+        233,
+        141,
+        78,
+        83,
+        199,
+        38,
+        185,
+        110
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "docs": [
+            "mutated only by the CPI into terra_identity::claim_succession."
+          ],
+          "writable": true
+        },
+        {
+          "name": "succession",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "identity_program",
+          "docs": [
+            "transaction so the CPI can resolve the callee program."
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_task",
       "discriminator": [
         49,
@@ -16281,6 +16340,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "SuccessionParcelsTransferred",
+      "discriminator": [
+        185,
+        213,
+        67,
+        115,
+        214,
+        219,
+        212,
+        249
+      ]
+    },
+    {
       "name": "TaskAssigned",
       "discriminator": [
         67,
@@ -23456,6 +23528,26 @@ export const terraRegistry: Idl = {
             "docs": [
               "0=Pending, 1=Completed, 2=Failed."
             ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SuccessionParcelsTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "transferred",
             "type": "u8"
           }
         ]

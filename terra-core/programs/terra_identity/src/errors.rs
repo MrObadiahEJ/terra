@@ -54,6 +54,8 @@ pub enum IdentityError {
     GuardianshipAlreadyActive,
     #[msg("Settlement not yet effective")]
     SettlementNotYetEffective,
+    // Deprecated (B6, 2026-09-25): parcel state is registry-domain and this
+    // program no longer touches it. Codes retained so numbering never shifts.
     #[msg("Parcel account data is too short for deserialization")]
     ParcelDataTooShort,
     #[msg("Failed to deserialize parcel account data")]

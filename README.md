@@ -37,7 +37,7 @@ tests incl. live-PostGIS migration run, `tsc --noEmit`).
  baseline)** are complete: unique validator sets, endorsement action binding,
  account-ownership checks on `remaining_accounts` loaders, admin/authority
  constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL synced to source
- (146/62/134/220), and CI covers registry/identity lib + rfc012 + geo + API.
+ (147/62/135/220), and CI covers registry/identity lib + rfc012 + geo + API.
  See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 Verified tests on `dev` (2026-09-24):
@@ -74,7 +74,7 @@ before shipping client changes after any program edit.
 This repo is self-describing for a new contributor or agent — read in order:
 
 1. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+2. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); B6 program-boundary split re-synced (147/62/135/220); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
  3. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
  4. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
  5. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–8 done; **next phase is Phase 9** (physical infrastructure); start at §8.1 Handoff, then §9 Migration Map and §10 PDA sketch.
@@ -117,9 +117,9 @@ peer-consensus), `quorum.rs` (unique-validator + signer dedup), `verification/*`
 (claims, sessions, challenges, reputation).
 Full specs live in [`docs/`](docs/) as `rfc-003…rfc-012`.
 
-Source counts (regenerate IDL after changes): **146 instructions · 62 account
-types · 134 events · 220 `TerraError` codes** in `terra_registry`; **8
-instructions · 2 accounts · 9 events · 29 `IdentityError` codes** in
+Source counts (regenerate IDL after changes): **147 instructions · 62 account
+types · 135 events · 220 `TerraError` codes** in `terra_registry`; **8
+instructions · 2 accounts · 8 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
 matches source as of Phase 8 (2026-09-24); re-run `make idl` after program edits.

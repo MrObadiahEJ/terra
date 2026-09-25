@@ -13,13 +13,6 @@ pub struct IdentityBound {
 }
 
 #[event]
-pub struct ParcelAttached {
-    pub identity: Pubkey,
-    pub parcel: Pubkey,
-    pub owner: Pubkey,
-}
-
-#[event]
 pub struct SuccessionRequested {
     pub identity: Pubkey,
     pub successor: Pubkey,

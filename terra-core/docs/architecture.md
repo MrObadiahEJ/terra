@@ -11,7 +11,7 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-25, RFC-012 legacy sweep): `terra_registry` — 146 instructions, 62 `#[account]` types, 134 events, 220 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 9 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-25, RFC-012 legacy sweep + B6 program-boundary split): `terra_registry` — 147 instructions, 62 `#[account]` types, 135 events, 220 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
@@ -58,7 +58,7 @@ terra_identity/
 ├── helpers.rs                # count_unique_validators + unit tests
 └── instructions/
     ├── bind_identity.rs
-    ├── succession.rs
+    ├── succession.rs          # request/endorse/cancel/claim — identity-only (B6)
     └── guardianship.rs       # RFC-010 court guardianship
 ```
 
@@ -235,6 +235,16 @@ EXECUTE (after timelock + endorsements)
 5. **Deprecation bridge (closed 2026-09-25):** the legacy `Attestation` account and its `attest` / `rotate_validators` / `register_document` / `migrate_attestation_to_claim` / `migrate_attestations` instructions were hard-removed; the claim pipeline (Claim → Evidence → Observation → VerificationAttestation) is the only path.
 6. **Remaining-accounts hygiene:** Session, quorum_config, reputation, and observation loaders verify `acc.owner == &crate::ID` before deserialize.
 
+## Program Boundary Rules (B6, 2026-09-25)
+
+The two programs are strictly layered — no program may write another's accounts:
+
+1. **`terra_registry` reads `terra_identity` (read-only):** `is_authorized_holder()` resolves Identity PDAs via `remaining_accounts`; ownership and provenance checks deserialize identity state without mutating it.
+2. **`terra_registry` invokes `terra_identity` via CPI:** `claim_succession_with_parcels` claims a succession (CPI into `terra_identity::claim_succession` with the hard-coded discriminator const) and then re-points the registry-owned `["ownership", parcel]` `Rights` PDAs to the successor — one atomic transaction; either leg failing rolls both back.
+3. **`terra_identity` has no dependency on `terra_registry`** and never reads or writes registry state. Its stale pre-RRR `Parcel` mirror was deleted in B6; the `Parcel*` identity error codes are retained (29 codes unchanged) for IDL/error stability.
+4. **New cross-cutting flows follow the same shape:** the registry-side instruction composes (CPI + registry-owned writes only); the identity-side instruction stays identity-only. CPI targets are explicit `UncheckedAccount` fields checked with `require_keys_eq!`, and the callee program account is included in the outer instruction's metas.
+5. **Test layout:** identity-subject tests (bind, succession endorse/claim/cancel, guardianship) live in `programs/terra_identity/tests/integration.rs` (B6 split, 23 tests). Composition tests live at the end of `programs/terra_registry/tests/integration.rs` (`b6_composite_*`, incl. atomic-rollback and error-mapping cases).
+
 ## Error Codes
 
 - `terra_registry`: **220** custom codes in `TerraError` (starts at Anchor 6000; ends with `NothingToRefund`).
@@ -274,11 +284,12 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Complete as of 2026-09-23:**
 - All modules in the map above are implemented; source counts (§Source counts) match `dev`.
+- 2026-09-25: RFC-012 legacy sweep (commit `72d052d`) and the B6 program-boundary split are merged — see §Program Boundary Rules above; identity-subject tests moved to `terra_identity/tests/integration.rs`.
 - RFC-012 Phase 0 (contract + `rfc012_structure` 21 tests) and Phase 1 (unique validator sets, endorsement binding, ownership checks, admin constraints) — see SECURITY.md and RFC-012 §8.
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 146/62/134/220 as of the RFC-012 legacy sweep, 2026-09-25).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 147/62/135/220 as of the B6 program-boundary split, 2026-09-25).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

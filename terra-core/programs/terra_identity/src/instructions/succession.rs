@@ -173,10 +173,11 @@ pub fn cancel_succession(ctx: Context<crate::CancelSuccession>) -> Result<()> {
 /// Claim a passation once both the grace period has elapsed AND the required
 /// number of validators have endorsed it.
 ///
-/// Optionally accepts parcel accounts as remaining_accounts. Each parcel
-/// whose `owner` matches the current identity owner is transferred to the
-/// successor. This keeps succession proportional — only explicitly provided
-/// parcels are updated, not the entire registry.
+/// Identity-domain only: this program never reads or writes registry state.
+/// Parcels held by the previous owner are moved by the registry-side
+/// composite instruction `claim_succession_with_parcels`, which CPIs into
+/// this instruction. Layering rule (B6): the registry composes identity;
+/// identity never depends on registry.
 pub fn claim_succession(ctx: Context<crate::ClaimSuccession>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let succession = &ctx.accounts.succession;
@@ -201,26 +202,6 @@ pub fn claim_succession(ctx: Context<crate::ClaimSuccession>) -> Result<()> {
 
     let previous = identity.owner;
     let successor = succession.successor;
-
-    // Transfer ownership of explicitly provided parcels to the successor.
-    // Each parcel must be a mutable UncheckedAccount whose data starts with
-    // the 8-byte Anchor discriminator, followed by borsh-encoded Parcel fields.
-    for account_info in ctx.remaining_accounts.iter() {
-        let data = account_info.try_borrow_data()?;
-        require!(data.len() >= 8 + 32, IdentityError::ParcelDataTooShort);
-        // Skip 8-byte Anchor discriminator, then read the Parcel fields.
-        // Parcel layout: id(32) + owner(32) + name(String) + ...
-        let slice = &data[8..];
-        let parcel: crate::state::Parcel = anchor_lang::AnchorDeserialize::try_from_slice(slice)
-            .map_err(|_| error!(IdentityError::ParcelDeserializeFailed))?;
-        require!(parcel.owner == previous, IdentityError::ParcelOwnerMismatch);
-        drop(data);
-        // Write the new owner into the parcel account data at the owner offset
-        // (8 discriminator + 32 id = offset 40).
-        let mut data = account_info.try_borrow_mut_data()?;
-        let owner_bytes = successor.to_bytes();
-        data[40..72].copy_from_slice(&owner_bytes);
-    }
 
     identity.owner = successor;
     identity.recovery = Pubkey::default();

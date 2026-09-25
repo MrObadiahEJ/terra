@@ -246,7 +246,7 @@ Verified on `dev` (2026-09-25, RRR migration): registry lib 116/116, identity li
 
 **Open / next (in priority order):**
 1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen is done (A2, 119/44/108/160; Phase 2, 128/49/115/169; Phase 3, 134/52/120/182; Phase 4, 135/53/121/184; Phase 5, 137/55/123/187; Phase 6, 138/55/124/191; Phase 7, 147/59/133/206; Phase 8, 153/64/139/220).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of the RFC-012 legacy sweep (146/62/134/220, 2026-09-25).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of the B6 program-boundary split (147/62/135/220, 2026-09-25).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).

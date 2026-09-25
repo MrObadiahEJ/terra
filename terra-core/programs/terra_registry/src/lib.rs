@@ -1078,6 +1078,130 @@ pub mod terra_registry {
         Ok(())
     }
 
+    // sha256("global:claim_succession")[..8] — Anchor instruction discriminator.
+    const CLAIM_SUCCESSION_DISCRIMINATOR: [u8; 8] = [90, 253, 80, 136, 147, 71, 124, 7];
+
+    /// Claim a succession AND transfer every ownership right it covers in one
+    /// atomic step (B6 boundary rule: identity state is only ever *composed*
+    /// from this program — never written directly).
+    ///
+    /// The identity-side claim runs as a CPI into
+    /// `terra_identity::claim_succession`, which enforces its own guards,
+    /// moves `identity.owner` to the successor, closes the Succession PDA
+    /// (rent to the signer) and emits `SuccessionClaimed`. Only afterwards
+    /// does this handler re-point the provided registry-owned ownership
+    /// Rights PDAs from the previous identity owner to the successor.
+    ///
+    /// `remaining_accounts` = ownership Rights PDAs (`["ownership", parcel]`).
+    /// Each must be held either by the previous identity-owner wallet
+    /// (re-pointed to the successor) or by the Identity PDA itself (skipped —
+    /// it already follows the identity). If the CPI fails, no rights are
+    /// written; if a rights write fails, the CPI rolls back. Atomic.
+    pub fn claim_succession_with_parcels(ctx: Context<ClaimSuccessionWithParcels>) -> Result<()> {
+        let identity_key = ctx.accounts.identity.key();
+        require_keys_eq!(
+            ctx.accounts.identity_program.key(),
+            terra_identity::ID,
+            TerraError::NotOwner
+        );
+        require!(
+            ctx.accounts.identity.owner == &terra_identity::ID,
+            TerraError::NotOwner
+        );
+        require!(
+            ctx.accounts.succession.owner == &terra_identity::ID,
+            TerraError::NotOwner
+        );
+
+        // Capture the pre-claim values now: the CPI closes the Succession
+        // PDA and moves `identity.owner`, after which neither is readable.
+        let identity: Identity = {
+            let data = ctx.accounts.identity.try_borrow_data()?;
+            let slice = if data.len() >= 8 { &data[8..] } else { &data };
+            anchor_lang::AnchorDeserialize::try_from_slice(slice)
+                .map_err(|_| error!(TerraError::IdentityMismatch))?
+        };
+        let previous = identity.owner;
+        let succession: Succession = {
+            let data = ctx.accounts.succession.try_borrow_data()?;
+            let slice = if data.len() >= 8 { &data[8..] } else { &data };
+            anchor_lang::AnchorDeserialize::try_from_slice(slice)
+                .map_err(|_| error!(TerraError::IdentityMismatch))?
+        };
+        require!(
+            succession.identity == identity_key,
+            TerraError::IdentityMismatch
+        );
+        let successor = succession.successor;
+        require!(
+            ctx.accounts.signer.key() == successor,
+            TerraError::NotAuthorized
+        );
+
+        // CPI into the identity program (program boundary: registry composes
+        // identity; the callee re-validates owner, discriminator, seeds and
+        // all succession guards before touching its own state).
+        let ix = anchor_lang::solana_program::instruction::Instruction {
+            program_id: terra_identity::ID,
+            accounts: vec![
+                anchor_lang::solana_program::instruction::AccountMeta::new(identity_key, false),
+                anchor_lang::solana_program::instruction::AccountMeta::new(
+                    ctx.accounts.succession.key(),
+                    false,
+                ),
+                anchor_lang::solana_program::instruction::AccountMeta::new(successor, true),
+                anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                    ctx.accounts.system_program.key(),
+                    false,
+                ),
+            ],
+            data: CLAIM_SUCCESSION_DISCRIMINATOR.to_vec(),
+        };
+        anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.identity.to_account_info(),
+                ctx.accounts.succession.to_account_info(),
+                ctx.accounts.signer.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+
+        // Registry-owned writes only: re-point ownership holders.
+        let mut transferred: u8 = 0;
+        for info in ctx.remaining_accounts.iter() {
+            require_keys_eq!(*info.owner, crate::ID, TerraError::NotOwner);
+            let rights: Rights = {
+                let data = info.try_borrow_data()?;
+                let mut slice: &[u8] = &data;
+                <Rights as anchor_lang::AccountDeserialize>::try_deserialize(&mut slice)?
+            };
+            require!(
+                rights.rights_kind == right_kind::OWNERSHIP,
+                TerraError::InvalidRightKind
+            );
+            if rights.holder == identity_key {
+                // Held by the Identity PDA itself: it follows the identity
+                // automatically now that identity.owner has moved.
+                continue;
+            }
+            require!(rights.holder == previous, TerraError::NotAuthorized);
+            let mut rights = rights;
+            rights.holder = successor;
+            let mut data = info.try_borrow_mut_data()?;
+            let mut writer: &mut [u8] = &mut data;
+            rights.try_serialize(&mut writer)?;
+            transferred += 1;
+        }
+
+        emit!(SuccessionParcelsTransferred {
+            identity: identity_key,
+            successor,
+            transferred,
+        });
+        Ok(())
+    }
+
     /// Force-transfer a parcel's ownership away from a non-compliant owner, per
     /// a court order. This is deliberately heavier than a normal transfer:
     /// at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must
@@ -2546,6 +2670,22 @@ pub struct AttachParcel<'info> {
     /// CHECK: Identity account owned by terra_identity program. Deserialized manually in handler.
     pub identity: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimSuccessionWithParcels<'info> {
+    /// CHECK: identity PDA owned by terra_identity — deserialized manually;
+    /// mutated only by the CPI into terra_identity::claim_succession.
+    #[account(mut)]
+    pub identity: UncheckedAccount<'info>,
+    /// CHECK: succession PDA owned by terra_identity — closed by the CPI.
+    #[account(mut)]
+    pub succession: UncheckedAccount<'info>,
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+    /// CHECK: the terra_identity program account — must be present in the
+    /// transaction so the CPI can resolve the callee program.
+    pub identity_program: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -5478,6 +5618,15 @@ pub struct ParcelAttached {
     pub identity: Pubkey,
     pub parcel: Pubkey,
     pub owner: Pubkey,
+}
+
+// Emitted by claim_succession_with_parcels (B6): ownership Rights
+// re-pointed after the identity-side succession claim (CPI) succeeded.
+#[event]
+pub struct SuccessionParcelsTransferred {
+    pub identity: Pubkey,
+    pub successor: Pubkey,
+    pub transferred: u8,
 }
 
 #[event]
