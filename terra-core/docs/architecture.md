@@ -16,13 +16,14 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-25, RFC-012 legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 148 instructions, 62 `#[account]` types, 135 events, 220 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-26, RFC-012 Phase 9 device identities after legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 154 instructions, 63 `#[account]` types, 141 events, 225 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (220 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (225 codes)
+├── device_identity.rs        # RFC-012 Phase 9 device identity registry
 ├── task_economics.rs         # RFC-012 Phase 8 quotes/escrow/claims/refunds + coverage subsidy
 ├── fraud_governance.rs       # RFC-012 Phase 7 fraud report/committee/appeal/restriction
 ├── evidence_manifest.rs     # RFC-012 Phase 5 evidence manifest/artifacts
@@ -153,6 +154,12 @@ terra_identity/
 |---------|-----------|-------------|
 | `EvidenceManifest` | `["evidence_manifest", task_id, submitter, nonce]` | Structured artifact list + root hash |
 | `EvidenceArtifact` | `["evidence_artifact", manifest, artifact_index]` | One photo/document/video/model/geometry |
+
+### RFC-012 Phase 9 — Device Identity
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `DeviceIdentity` | `["device_identity", owner, device_nonce]` | Device key, capture source, capabilities, calibration, status (u16 LE nonce) |
 
 ### Identity Program
 
@@ -294,7 +301,7 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 148/62/135/220 as of the P0-2 removal-endorsement path, 2026-09-25).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 154/63/141/225 as of RFC-012 Phase 9, 2026-09-26).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).

@@ -256,6 +256,7 @@ pub use terra_identity::state::Identity;
 pub use terra_identity::state::Succession;
 
 pub mod cross_border;
+pub mod device_identity;
 pub mod dispute;
 pub mod escrow;
 pub mod evidence_manifest;
@@ -2354,6 +2355,56 @@ pub mod terra_registry {
 
     pub fn refund_task_escrow(ctx: Context<RefundTaskEscrow>) -> Result<()> {
         task_economics::refund_task_escrow(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // Physical infrastructure (RFC-012 Phase 9)
+    // -----------------------------------------------------------------------
+
+    pub fn register_device(
+        ctx: Context<RegisterDevice>,
+        device_nonce: u16,
+        device_key: Pubkey,
+        source: u8,
+        capabilities: u64,
+        metadata_ref: String,
+    ) -> Result<()> {
+        device_identity::register_device(
+            ctx,
+            device_nonce,
+            device_key,
+            source,
+            capabilities,
+            metadata_ref,
+        )
+    }
+
+    pub fn update_device(
+        ctx: Context<UpdateDevice>,
+        capabilities: u64,
+        metadata_ref: String,
+    ) -> Result<()> {
+        device_identity::update_device(ctx, capabilities, metadata_ref)
+    }
+
+    pub fn rotate_device_key(ctx: Context<RotateDeviceKey>, new_device_key: Pubkey) -> Result<()> {
+        device_identity::rotate_device_key(ctx, new_device_key)
+    }
+
+    pub fn set_device_status(ctx: Context<SetDeviceStatus>, status: u8) -> Result<()> {
+        device_identity::set_device_status(ctx, status)
+    }
+
+    pub fn set_device_calibration(
+        ctx: Context<SetDeviceCalibration>,
+        calibration_hash: [u8; 32],
+        calibrated_at: i64,
+    ) -> Result<()> {
+        device_identity::set_device_calibration(ctx, calibration_hash, calibrated_at)
+    }
+
+    pub fn verify_device(ctx: Context<VerifyDevice>) -> Result<()> {
+        device_identity::verify_device(ctx)
     }
 
     // -----------------------------------------------------------------------
@@ -5255,6 +5306,87 @@ pub struct RefundTaskEscrow<'info> {
 }
 
 // ---------------------------------------------------------------------------
+// Physical infrastructure contexts (RFC-012 Phase 9)
+// ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+#[instruction(device_nonce: u16)]
+pub struct RegisterDevice<'info> {
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + device_identity::DeviceIdentity::INIT_SPACE,
+        seeds = [b"device_identity", owner.key().as_ref(), &device_nonce.to_le_bytes()],
+        bump,
+    )]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateDevice<'info> {
+    #[account(
+        mut,
+        seeds = [b"device_identity", device.owner.as_ref(), &device.device_nonce.to_le_bytes()],
+        bump,
+        constraint = device.owner == owner.key() @ TerraError::NotDeviceOwner,
+    )]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct RotateDeviceKey<'info> {
+    #[account(
+        mut,
+        seeds = [b"device_identity", device.owner.as_ref(), &device.device_nonce.to_le_bytes()],
+        bump,
+        constraint = device.owner == owner.key() @ TerraError::NotDeviceOwner,
+    )]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetDeviceStatus<'info> {
+    #[account(
+        mut,
+        seeds = [b"device_identity", device.owner.as_ref(), &device.device_nonce.to_le_bytes()],
+        bump,
+        constraint = device.owner == owner.key() @ TerraError::NotDeviceOwner,
+    )]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SetDeviceCalibration<'info> {
+    #[account(
+        mut,
+        seeds = [b"device_identity", device.owner.as_ref(), &device.device_nonce.to_le_bytes()],
+        bump,
+        constraint = device.owner == owner.key() @ TerraError::NotDeviceOwner,
+    )]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    pub owner: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct VerifyDevice<'info> {
+    #[account(mut)]
+    pub device: Account<'info, device_identity::DeviceIdentity>,
+    #[account(
+        seeds = [b"validator_profile", validator.key().as_ref()],
+        bump,
+        constraint = profile.wallet == validator.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub validator: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit contexts
 // ---------------------------------------------------------------------------
 
@@ -6327,6 +6459,61 @@ pub struct TaskEscrowRefunded {
 }
 
 // ---------------------------------------------------------------------------
+// Physical infrastructure events (RFC-012 Phase 9)
+// ---------------------------------------------------------------------------
+
+#[event]
+pub struct DeviceRegistered {
+    pub device: Pubkey,
+    pub owner: Pubkey,
+    pub device_key: Pubkey,
+    pub source: u8,
+    pub registered_at: i64,
+}
+
+#[event]
+pub struct DeviceUpdated {
+    pub device: Pubkey,
+    pub owner: Pubkey,
+    pub capabilities: u64,
+    pub updated_at: i64,
+}
+
+#[event]
+pub struct DeviceKeyRotated {
+    pub device: Pubkey,
+    pub owner: Pubkey,
+    pub old_device_key: Pubkey,
+    pub new_device_key: Pubkey,
+    pub rotated_at: i64,
+}
+
+#[event]
+pub struct DeviceStatusChanged {
+    pub device: Pubkey,
+    pub owner: Pubkey,
+    pub old_status: u8,
+    pub new_status: u8,
+    pub changed_at: i64,
+}
+
+#[event]
+pub struct DeviceCalibrationSet {
+    pub device: Pubkey,
+    pub owner: Pubkey,
+    pub calibration_hash: [u8; 32],
+    pub calibrated_at: i64,
+}
+
+#[event]
+pub struct DeviceVerified {
+    pub device: Pubkey,
+    pub verified_by: Pubkey,
+    pub verify_version: u32,
+    pub verified_at: i64,
+}
+
+// ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
 
@@ -6999,6 +7186,18 @@ pub enum TerraError {
     ClaimWindowNotClosed,
     #[msg("No refundable lamports remain in the escrow vault")]
     NothingToRefund,
+
+    // Physical infrastructure (RFC-012 Phase 9)
+    #[msg("Device metadata reference exceeds the maximum length")]
+    DeviceMetadataTooLong,
+    #[msg("Device key must not be the zero key")]
+    InvalidDeviceKey,
+    #[msg("Invalid device status value")]
+    InvalidDeviceStatus,
+    #[msg("Device is revoked — this operation is no longer allowed")]
+    DeviceRevoked,
+    #[msg("Signer is not the device owner")]
+    NotDeviceOwner,
 }
 
 #[cfg(test)]

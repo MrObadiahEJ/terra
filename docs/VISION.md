@@ -25,18 +25,18 @@ Related: [`../README.md`](../README.md) (repo status) ·
 
 ---
 
-## Where we are today (verified 2026-09-25)
+## Where we are today (verified 2026-09-26)
 
 | Layer | State |
 |-------|-------|
-| On-chain programs | `terra_registry` **148 instructions · 62 accounts · 135 events · 220 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
+| On-chain programs | `terra_registry` **154 instructions · 63 accounts · 141 events · 225 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
 | Protocol specs | **RFC-003 → RFC-012 all delivered** (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture) |
-| Hardening | RFC-012 **Phases 0–8 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path |
-| Tests | Registry BPF integration **281/281**, identity BPF **23/23**, unit libs **112 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
+| Hardening | RFC-012 **Phases 0–9 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path |
+| Tests | Registry BPF integration **283/283**, identity BPF **23/23**, unit libs **118 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
 | Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
 | Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, investor progress page (`/progress`), typed API client, wallet adapter |
-| Next | **RFC-012 Phase 9 — physical infrastructure** (devices, imagery, 3D scanning), then Phase 10 (cross-border privacy); Devnet deployment; mainnet gates (RFC-005 reconfirm, ZK audit) |
+| Next | **RFC-012 Phase 10 — cross-border privacy** (jurisdiction bindings, ZK identity/ownership, selective disclosure), then spatial-intelligence tooling; Devnet deployment; mainnet gates (RFC-005 reconfirm, ZK audit) |
 
 ---
 
@@ -449,14 +449,14 @@ tamper-evident **coordination and history layer**:
 
 | Stage | Name | Status | Anchored in |
 |-------|------|--------|-------------|
-| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-012, 281 on-chain tests |
+| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-012, 283 on-chain tests |
 | **1** | Protocol hardening | ✅ **Done** | RFC-012 Phases 0–8, Tier A1–A3, B6 boundary, P0-2 removal path — security, tasks, observations, provenance, routing, reputation, economics |
-| **2** | Physical Terra | ⬜ **NEXT** | RFC-012 Phase 9 — smartphones, GNSS, cameras, drones, survey devices, satellite imagery, 3D scanning (reuses Phase 4 observation sources/provenance) |
+| **2** | Physical Terra | ✅ **Done** | RFC-012 Phase 9 — device identity registry (`DeviceIdentity` PDAs: keys, capabilities, calibration, validator verification) covering smartphones, GNSS, cameras, drones, survey devices (reuses Phase 4 observation sources/provenance) |
 | **3** | Spatial intelligence | ⬜ Planned | Raw observation → AI/GIS → geometry → parcel → SpatialAsset → 3D model (computer vision, photogrammetry, remote sensing, LiDAR) |
 | **4** | Digital twin | ⬜ Planned | Identity + geometry + elevation + structure + evidence + history + relationships per spatial entity (`SpatialAsset`, `GeometryVersion`, `ThreeDModel`, `SpatialSnapshot` already specified) |
 | **5** | 3D / vertical / subsurface | ⬜ Planned | Surface → buildings → floors → units → airspace → underground (product roadmap: legal 3D/air-rights layer) |
 | **6** | Jurisdiction integration | ⬜ Planned | Country configurations: tenure, legal categories, authorities, credentials, evidence rules (product roadmap: country config layer) |
-| **7** | Cross-border Terra | ⬜ Planned | RFC-012 Phase 10 — jurisdiction bindings, ZK identity/ownership, selective disclosure |
+| **7** | Cross-border Terra | ⬜ **NEXT** | RFC-012 Phase 10 — jurisdiction bindings, ZK identity/ownership, selective disclosure |
 | **8** | Transaction layer | 🟡 **Seeded** | RFC-004 escrow delivered; marketplaces, finance, insurance, leasing to build on verified spatial assets |
 | **9** | Terra infrastructure | ⬜ Future | Terra becomes the shared layer others build on (Anchor analogy): Terra-powered finance, insurance, government services, PropTech, agriculture |
 | **10** | Global physical-world network | ⬜ Future | Not a global land registry — **a global interoperable trust layer for physical reality**: land, buildings, infrastructure, agriculture, natural resources, environment, borders, physical assets |

@@ -26194,6 +26194,453 @@ async fn phase8_refund_paths() {
 }
 
 // ===========================================================================
+// RFC-012 Phase 9: physical infrastructure — device identity registry
+// ===========================================================================
+
+fn device_identity_pda(owner: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"device_identity", owner.as_ref(), &nonce.to_le_bytes()],
+        &PROGRAM_ID,
+    )
+}
+
+fn register_device_data(
+    nonce: u16,
+    device_key: &Pubkey,
+    source: u8,
+    capabilities: u64,
+    metadata: &str,
+) -> Vec<u8> {
+    let mut d = discriminator("global", "register_device").to_vec();
+    d.extend_from_slice(&nonce.to_le_bytes());
+    d.extend_from_slice(device_key.as_ref());
+    d.push(source);
+    d.extend_from_slice(&capabilities.to_le_bytes());
+    d.extend_from_slice(&borsh_ser(&metadata.to_string()));
+    d
+}
+
+#[tokio::test]
+async fn phase9_register_update_calibrate_verify_lifecycle() {
+    use terra_registry::device_identity::{self, DeviceIdentity};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    let device_key = Keypair::new().pubkey();
+    let nonce: u16 = 0;
+    let (device_pk, _) = device_identity_pda(&payer.pubkey(), nonce);
+    let caps = device_identity::device_capability::GNSS | device_identity::device_capability::PHOTO;
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: register_device_data(nonce, &device_key, 2, caps, "ipfs://device-meta-1"),
+        },
+    )
+    .await;
+    res.expect("register_device failed");
+
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.owner, payer.pubkey());
+    assert_eq!(dev.device_nonce, nonce);
+    assert_eq!(dev.device_key, device_key);
+    assert_eq!(
+        dev.source,
+        terra_registry::observation_v2::observation_source::CAMERA
+    );
+    assert_eq!(dev.capabilities, caps);
+    assert_eq!(dev.metadata_ref, "ipfs://device-meta-1");
+    assert_eq!(dev.status, device_identity::device_status::ACTIVE);
+    assert!(!dev.verified);
+    assert_eq!(dev.verify_version, 0);
+    assert_eq!(dev.calibration_hash, [0u8; 32]);
+
+    // Owner updates capabilities + metadata.
+    let new_caps = device_identity::device_capability::RTK;
+    let mut data = discriminator("global", "update_device").to_vec();
+    data.extend_from_slice(&new_caps.to_le_bytes());
+    data.extend_from_slice(&borsh_ser(&"ipfs://device-meta-2".to_string()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("update_device failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.capabilities, new_caps);
+    assert_eq!(dev.metadata_ref, "ipfs://device-meta-2");
+
+    // Owner records calibration.
+    let mut data = discriminator("global", "set_device_calibration").to_vec();
+    data.extend_from_slice(&[9u8; 32]);
+    data.extend_from_slice(&1_700_000_000i64.to_le_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set_device_calibration failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.calibration_hash, [9u8; 32]);
+    assert_eq!(dev.calibrated_at, 1_700_000_000);
+
+    // Owner rotates the device signing key.
+    let rotated_key = Keypair::new().pubkey();
+    let mut data = discriminator("global", "rotate_device_key").to_vec();
+    data.extend_from_slice(rotated_key.as_ref());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("rotate_device_key failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.device_key, rotated_key);
+
+    // A registered validator verifies the device (claim → fact).
+    let validator = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &validator).await;
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data: discriminator("global", "verify_device").to_vec(),
+        },
+    )
+    .await;
+    res.expect("verify_device failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert!(dev.verified);
+    assert_eq!(dev.verified_by, validator.pubkey());
+    assert_eq!(dev.verify_version, 1);
+
+    // Suspend → resume → revoke.
+    let mut data = discriminator("global", "set_device_status").to_vec();
+    data.push(device_identity::device_status::SUSPENDED);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("suspend failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.status, device_identity::device_status::SUSPENDED);
+
+    let mut data = discriminator("global", "set_device_status").to_vec();
+    data.push(device_identity::device_status::REVOKED);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("revoke failed");
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.status, device_identity::device_status::REVOKED);
+
+    // Terminal: verify and update are rejected after revocation.
+    let res = process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data: discriminator("global", "verify_device").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6223, "verify after revoke must fail");
+
+    let mut data = discriminator("global", "update_device").to_vec();
+    data.extend_from_slice(&1u64.to_le_bytes());
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6223, "update after revoke must fail");
+}
+
+#[tokio::test]
+async fn phase9_device_guards() {
+    use terra_registry::device_identity::{self, DeviceIdentity};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    // Register once so the PDA exists for guard checks.
+    let device_key = Keypair::new().pubkey();
+    let nonce: u16 = 1;
+    let (device_pk, _) = device_identity_pda(&payer.pubkey(), nonce);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: register_device_data(nonce, &device_key, 0, 1, "ipfs://a"),
+        },
+    )
+    .await
+    .expect("register_device failed");
+
+    // Stranger cannot update / rotate / change status / calibrate (6224).
+    let stranger = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund stranger");
+
+    let mut data = discriminator("global", "update_device").to_vec();
+    data.extend_from_slice(&1u64.to_le_bytes());
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(stranger.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6224, "stranger update must fail");
+
+    let mut data = discriminator("global", "rotate_device_key").to_vec();
+    data.extend_from_slice(Keypair::new().pubkey().as_ref());
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(stranger.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6224, "stranger rotate must fail");
+
+    let mut data = discriminator("global", "set_device_status").to_vec();
+    data.push(device_identity::device_status::SUSPENDED);
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(stranger.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6224, "stranger status change must fail");
+
+    // Zero device key rejected (6221) — fresh nonce, init rolls back with tx.
+    let (pk2, _) = device_identity_pda(&payer.pubkey(), 2);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(pk2, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: register_device_data(2, &Pubkey::default(), 0, 1, "ipfs://a"),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6221, "zero device key must fail");
+
+    // Invalid source (99) → 6182 (reused Phase 4 error).
+    let (pk3, _) = device_identity_pda(&payer.pubkey(), 3);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(pk3, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: register_device_data(3, &Keypair::new().pubkey(), 99, 1, "ipfs://a"),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6182, "invalid source must fail");
+
+    // Over-long metadata (129 bytes) → 6220.
+    let (pk4, _) = device_identity_pda(&payer.pubkey(), 4);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(pk4, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: register_device_data(4, &Keypair::new().pubkey(), 0, 1, &"x".repeat(129)),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6220, "over-long metadata must fail");
+
+    // Invalid status value → 6222.
+    let mut data = discriminator("global", "set_device_status").to_vec();
+    data.push(9u8);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6222, "invalid status must fail");
+
+    // Empty calibration hash → 6014 (reused EmptyContentHash).
+    let mut data = discriminator("global", "set_device_calibration").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&0i64.to_le_bytes());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6014, "empty calibration hash must fail");
+
+    // verify_device requires a validator profile (no profile → seeds fail).
+    let no_profile = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &no_profile.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund no_profile");
+    let (missing_profile, _) = validator_profile_pda(&no_profile.pubkey());
+    let res = process(
+        &mut ctx,
+        &no_profile,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(device_pk, false),
+                AccountMeta::new_readonly(missing_profile, false),
+                AccountMeta::new(no_profile.pubkey(), true),
+            ],
+            data: discriminator("global", "verify_device").to_vec(),
+        },
+    )
+    .await;
+    assert!(res.is_err(), "verify without a validator profile must fail");
+
+    // Device account still intact after all rejections.
+    let dev: DeviceIdentity = read_account(&ctx, device_pk).await;
+    assert_eq!(dev.status, device_identity::device_status::ACTIVE);
+    assert!(!dev.verified);
+}
+
+// ===========================================================================
 // B6: program-boundary tests — claim_succession_with_parcels (registry CPIs
 // into terra_identity::claim_succession, then writes only registry accounts)
 // ===========================================================================

@@ -8965,6 +8965,88 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "register_device",
+      "discriminator": [
+        210,
+        151,
+        56,
+        68,
+        22,
+        158,
+        90,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "device_nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "device_nonce",
+          "type": "u16"
+        },
+        {
+          "name": "device_key",
+          "type": "pubkey"
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "capabilities",
+          "type": "u64"
+        },
+        {
+          "name": "metadata_ref",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "register_jurisdiction",
       "discriminator": [
         6,
@@ -10588,6 +10670,69 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "rotate_device_key",
+      "discriminator": [
+        96,
+        133,
+        177,
+        36,
+        92,
+        46,
+        59,
+        153
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "device.owner",
+                "account": "DeviceIdentity"
+              },
+              {
+                "kind": "account",
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_device_key",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "route_task",
       "discriminator": [
         10,
@@ -10810,6 +10955,141 @@ export const terraRegistry: Idl = {
         {
           "name": "max_subsidy_bps",
           "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "set_device_calibration",
+      "discriminator": [
+        117,
+        26,
+        56,
+        40,
+        77,
+        121,
+        194,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "device.owner",
+                "account": "DeviceIdentity"
+              },
+              {
+                "kind": "account",
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "calibration_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "calibrated_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "set_device_status",
+      "discriminator": [
+        151,
+        78,
+        75,
+        125,
+        26,
+        121,
+        118,
+        57
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "device.owner",
+                "account": "DeviceIdentity"
+              },
+              {
+                "kind": "account",
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
         }
       ]
     },
@@ -13026,6 +13306,73 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "update_device",
+      "discriminator": [
+        30,
+        154,
+        166,
+        184,
+        200,
+        216,
+        194,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  118,
+                  105,
+                  99,
+                  101,
+                  95,
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "device.owner",
+                "account": "DeviceIdentity"
+              },
+              {
+                "kind": "account",
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "capabilities",
+          "type": "u64"
+        },
+        {
+          "name": "metadata_ref",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "update_infrastructure",
       "docs": [
         "Set the parcel's infrastructure flag bitmask together with the canonical",
@@ -13862,6 +14209,63 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "verify_device",
+      "discriminator": [
+        103,
+        113,
+        98,
+        245,
+        141,
+        231,
+        98,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "device",
+          "writable": true
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "verify_jurisdiction_membership",
       "discriminator": [
         130,
@@ -14451,6 +14855,19 @@ export const terraRegistry: Idl = {
         174,
         166,
         63
+      ]
+    },
+    {
+      "name": "DeviceIdentity",
+      "discriminator": [
+        6,
+        98,
+        9,
+        166,
+        229,
+        128,
+        194,
+        58
       ]
     },
     {
@@ -15389,6 +15806,84 @@ export const terraRegistry: Idl = {
         183,
         146,
         214
+      ]
+    },
+    {
+      "name": "DeviceCalibrationSet",
+      "discriminator": [
+        92,
+        152,
+        193,
+        158,
+        131,
+        143,
+        73,
+        231
+      ]
+    },
+    {
+      "name": "DeviceKeyRotated",
+      "discriminator": [
+        220,
+        43,
+        143,
+        107,
+        183,
+        120,
+        161,
+        59
+      ]
+    },
+    {
+      "name": "DeviceRegistered",
+      "discriminator": [
+        221,
+        90,
+        2,
+        153,
+        72,
+        98,
+        71,
+        181
+      ]
+    },
+    {
+      "name": "DeviceStatusChanged",
+      "discriminator": [
+        47,
+        92,
+        8,
+        190,
+        132,
+        76,
+        125,
+        174
+      ]
+    },
+    {
+      "name": "DeviceUpdated",
+      "discriminator": [
+        19,
+        61,
+        200,
+        102,
+        163,
+        178,
+        2,
+        158
+      ]
+    },
+    {
+      "name": "DeviceVerified",
+      "discriminator": [
+        119,
+        100,
+        199,
+        37,
+        44,
+        117,
+        220,
+        189
       ]
     },
     {
@@ -17974,6 +18469,31 @@ export const terraRegistry: Idl = {
       "code": 6219,
       "name": "NothingToRefund",
       "msg": "No refundable lamports remain in the escrow vault"
+    },
+    {
+      "code": 6220,
+      "name": "DeviceMetadataTooLong",
+      "msg": "Device metadata reference exceeds the maximum length"
+    },
+    {
+      "code": 6221,
+      "name": "InvalidDeviceKey",
+      "msg": "Device key must not be the zero key"
+    },
+    {
+      "code": 6222,
+      "name": "InvalidDeviceStatus",
+      "msg": "Invalid device status value"
+    },
+    {
+      "code": 6223,
+      "name": "DeviceRevoked",
+      "msg": "Device is revoked \u2014 this operation is no longer allowed"
+    },
+    {
+      "code": 6224,
+      "name": "NotDeviceOwner",
+      "msg": "Signer is not the device owner"
     }
   ],
   "types": [
@@ -19325,6 +19845,278 @@ export const terraRegistry: Idl = {
           {
             "name": "verified_by",
             "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceCalibrationSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "calibration_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "calibrated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceIdentity",
+      "docs": [
+        "A registered capture device (phone, GNSS receiver, drone, survey",
+        "instrument, 3D scanner, \u2026) owned by a wallet.",
+        "",
+        "PDA: `[\"device_identity\", owner, device_nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "docs": [
+              "Wallet that registered (and controls) the device."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "device_nonce",
+            "docs": [
+              "PDA seed companion \u2014 one device per (owner, nonce)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "device_key",
+            "docs": [
+              "The device's Ed25519 public key (signs observation envelopes)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "source",
+            "docs": [
+              "Phase 4 `observation_source` code the device captures as."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "capabilities",
+            "docs": [
+              "Declared capability bitfield (`device_capability::*`)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "metadata_ref",
+            "docs": [
+              "Model/firmware metadata reference (IPFS CID or URL)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "calibration_hash",
+            "docs": [
+              "SHA-256 of the latest calibration certificate (all-zero = never)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "calibrated_at",
+            "docs": [
+              "When the calibration certificate was issued (0 = never)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "`device_status` \u2014 ACTIVE / SUSPENDED / REVOKED."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "verified",
+            "docs": [
+              "A validator has verified this registration (claim \u2260 fact until then)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "verified_by",
+            "docs": [
+              "Validator wallet that last verified."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "verify_version",
+            "docs": [
+              "Monotonic counter, bumped on each verification."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceKeyRotated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_device_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_device_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "rotated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "device_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "source",
+            "type": "u8"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_status",
+            "type": "u8"
+          },
+          {
+            "name": "new_status",
+            "type": "u8"
+          },
+          {
+            "name": "changed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "capabilities",
+            "type": "u64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeviceVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "device",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "verify_version",
+            "type": "u32"
           },
           {
             "name": "verified_at",
