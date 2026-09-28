@@ -63,7 +63,7 @@ cd ../terra-core && make idl
 ```
 
 **Synced:** checked-in IDL matches source (RFC-012 Phase 10, **2026-09-28**):
-**158 instructions / 65 accounts / 145 events / 231 errors**. Re-run `make idl`
+**161 instructions / 67 accounts / 148 events / 237 errors**. Re-run `make idl`
 (and re-sync `src/idl/` types) before shipping client changes that depend on
 new instructions, accounts, events, or error codes.
 

@@ -16,13 +16,13 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-28, RFC-012 Phase 10 cross-border after legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 158 instructions, 65 `#[account]` types, 145 events, 231 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-28, Vision Stage 3 Phase A spatial assets after RFC-012 Phase 10 cross-border + legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 161 instructions, 67 `#[account]` types, 148 events, 237 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (231 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (237 codes)
 ├── device_identity.rs        # RFC-012 Phase 9 device identity registry
 ├── task_economics.rs         # RFC-012 Phase 8 quotes/escrow/claims/refunds + coverage subsidy
 ├── fraud_governance.rs       # RFC-012 Phase 7 fraud report/committee/appeal/restriction
@@ -31,6 +31,7 @@ terra_registry/
 ├── observation_v2.rs         # RFC-012 Phase 4 multi-source ObservationV2
 ├── verification_task.rs      # RFC-012 Phase 3 task PDAs
 ├── cross_border.rs           # Cross-border identity binding + jurisdiction bindings (Phase 10)
+├── spatial_asset.rs          # Vision Stage 3 Phase A: SpatialAsset + GeometryVersion (RFC-013)
 ├── dispute.rs                # Parcel dispute filing, freeze, adjudicate, execute
 ├── escrow.rs                 # Parcel escrow (create, deposit, accept, settle, cancel)
 ├── staking.rs                # Validator staking pool, slashing, rewards
@@ -170,6 +171,13 @@ terra_identity/
 
 `ValidatorProfile.jurisdiction: [u8; 2]` (self-declared, `[0,0]`=undeclared) gates `route_task` when a requirement scopes a country (trailing binding slot, stride `3 + need_geo + 2*need_cap + need_juris`).
 
+### Vision Stage 3 Phase A — Spatial Assets (RFC-013)
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `SpatialAsset` | `["spatial_asset", parcel]` | 3D/4D extension of a parcel: dimensionality (2D/2.5D/3D), elevation envelope (mm), append cursor, latest geometry hash — one per parcel, permissionless init |
+| `GeometryVersion` | `["geometry_version", asset, version_u32_le]` | Append-only geometry history (max 64): hash + source (survey/drone/LiDAR/photogrammetry/AI/…) + dimension + storage_reference; permissionless claim, validator `verified` fact |
+
 ### Identity Program
 
 | Account | Program | Description |
@@ -268,7 +276,7 @@ The two programs are strictly layered — no program may write another's account
 
 ## Error Codes
 
-- `terra_registry`: **220** custom codes in `TerraError` (starts at Anchor 6000; ends with `NothingToRefund`).
+- `terra_registry`: **237** custom codes in `TerraError` (starts at Anchor 6000; ends with `GeometryAlreadyVerified`).
 - `terra_identity`: **29** custom codes in `IdentityError` (starts at 6000; ends with `DuplicateValidator`).
 
 ## Constants
@@ -310,10 +318,10 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 158/65/145/231 as of RFC-012 Phase 10, 2026-09-28).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 161/67/148/237 as of Vision Stage 3 Phase A, 2026-09-28).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).
-6. **RFC-012 Phases 2–10 are complete** — when adding entities, update this module map, migration map, and `rfc012_structure` tests. Start from RFC-012 §8–§10; handoff in §8.1.
+6. **Vision Stage 3 Phases B–E** — evidence-linked geometry, snapshots, ThreeDModel, AI/GIS loop per [RFC-013](../../docs/rfc-013-spatial-intelligence-pipeline.md) §7; when adding entities, update this module map, migration map, and `rfc012_structure` tests. RFC-012 Phases 0–10 complete (handoff §8.1).
 
 Entry point for new contributors/AI: root `README.md` → “How to continue (handoff)”.

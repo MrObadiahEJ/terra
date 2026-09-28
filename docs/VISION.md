@@ -21,7 +21,8 @@ touching anything else in this repository.
 
 Related: [`../README.md`](../README.md) (repo status) ·
 [`rfc-012-global-physical-digital-trust-architecture.md`](rfc-012-global-physical-digital-trust-architecture.md)
-(the architecture contract) · [`../terra-core/SECURITY.md`](../terra-core/SECURITY.md).
+(the architecture contract) · [`rfc-013-spatial-intelligence-pipeline.md`](rfc-013-spatial-intelligence-pipeline.md)
+(Stage 3 spatial pipeline) · [`../terra-core/SECURITY.md`](../terra-core/SECURITY.md).
 
 ---
 
@@ -29,14 +30,14 @@ Related: [`../README.md`](../README.md) (repo status) ·
 
 | Layer | State |
 |-------|-------|
-| On-chain programs | `terra_registry` **158 instructions · 65 accounts · 145 events · 231 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
-| Protocol specs | **RFC-003 → RFC-012 all delivered** (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture) |
-| Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path |
-| Tests | Registry BPF integration **286/286**, identity BPF **23/23**, unit libs **123 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
+| On-chain programs | `terra_registry` **161 instructions · 67 accounts · 148 events · 237 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
+| Protocol specs | **RFC-003 → RFC-013** — 003–012 delivered (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture), RFC-013 (spatial pipeline) Phase A delivered |
+| Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path + **Vision Stage 3 Phase A** (spatial assets, versioned geometry) |
+| Tests | Registry BPF integration **288/288**, identity BPF **23/23**, unit libs **128 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
 | Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
 | Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, investor progress page (`/progress`), typed API client, wallet adapter |
-| Next | **Devnet deployment** (both programs + wallet wiring), then spatial-intelligence tooling; mainnet gates (RFC-005 reconfirm, ZK audit) |
+| Next | Vision Stage 3 Phases B–E (evidence-linked geometry → snapshots → 3D models → AI/GIS loop) per [RFC-013](rfc-013-spatial-intelligence-pipeline.md); **devnet deployment** (both programs + wallet wiring); mainnet gates (RFC-005 reconfirm, ZK audit) |
 
 ---
 
@@ -449,10 +450,10 @@ tamper-evident **coordination and history layer**:
 
 | Stage | Name | Status | Anchored in |
 |-------|------|--------|-------------|
-| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-012, 286 on-chain tests |
+| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-013, 288 on-chain tests |
 | **1** | Protocol hardening | ✅ **Done** | RFC-012 Phases 0–8, Tier A1–A3, B6 boundary, P0-2 removal path — security, tasks, observations, provenance, routing, reputation, economics |
 | **2** | Physical Terra | ✅ **Done** | RFC-012 Phase 9 — device identity registry (`DeviceIdentity` PDAs: keys, capabilities, calibration, validator verification) covering smartphones, GNSS, cameras, drones, survey devices (reuses Phase 4 observation sources/provenance) |
-| **3** | Spatial intelligence | ⬜ Planned | Raw observation → AI/GIS → geometry → parcel → SpatialAsset → 3D model (computer vision, photogrammetry, remote sensing, LiDAR) |
+| **3** | Spatial intelligence | 🟡 **In progress** | Raw observation → AI/GIS → geometry → parcel → SpatialAsset → 3D model (computer vision, photogrammetry, remote sensing, LiDAR). Phase A delivered: on-chain `SpatialAsset` + `GeometryVersion` ([RFC-013](rfc-013-spatial-intelligence-pipeline.md)); pipeline phases B–E pending |
 | **4** | Digital twin | ⬜ Planned | Identity + geometry + elevation + structure + evidence + history + relationships per spatial entity (`SpatialAsset`, `GeometryVersion`, `ThreeDModel`, `SpatialSnapshot` already specified) |
 | **5** | 3D / vertical / subsurface | ⬜ Planned | Surface → buildings → floors → units → airspace → underground (product roadmap: legal 3D/air-rights layer) |
 | **6** | Jurisdiction integration | ⬜ Planned | Country configurations: tenure, legal categories, authorities, credentials, evidence rules (product roadmap: country config layer) |
@@ -473,13 +474,14 @@ tamper-evident **coordination and history layer**:
 | Geo engine | `terra-core/geo-engine` | OSM fusion, road-access digests anchored on-chain |
 | Frontend | `terra-web` | Cesium globe (2D Leaflet fallback), investor progress page `/progress`, wallet adapter, typed API client |
 | Architecture contract | `docs/rfc-012-…` | core invariant, entity catalog, design rules, phases 0–10 |
+| Spatial pipeline | `docs/rfc-013-…` | spatial intelligence (Stage 3): SpatialAsset/GeometryVersion, geometry provenance, 4D history |
 | Protocol specs | `docs/rfc-003…011` | vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK |
 | Repo status & commands | `../README.md`, `../terra-core/README.md` | current numbers, CI, run/test instructions |
 | Security posture | `../terra-core/SECURITY.md` | closed findings, open mainnet gates |
 
 **Reading order for a new human or AI:** this file → root `README.md` →
 `terra-core/SECURITY.md` → `terra-core/README.md` → `terra-core/docs/architecture.md`
-→ `docs/rfc-012-…` §8.1 handoff → individual RFCs.
+→ `docs/rfc-012-…` §8.1 handoff → individual RFCs → `docs/rfc-013-…` for the spatial pipeline.
 
 ---
 

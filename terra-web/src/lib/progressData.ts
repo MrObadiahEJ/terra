@@ -3,7 +3,7 @@
  *
  * Source of truth: /README.md (Roadmap, Protocol Catalog, Source counts) and
  * terra-core/docs/architecture.md. Figures below were verified 2026-09-28
- * on dev (CI green, registry 286/286, identity 23/23); RELEASE tracks main.
+ * on dev (CI green, registry 288/288, identity 23/23); RELEASE tracks main.
  * Re-verify with `make idl` + `make test-fast` before updating numbers.
  */
 
@@ -45,14 +45,14 @@ export const RELEASE = {
 export const HERO = {
   title: 'Terra — Protocol Progress',
   subtitle:
-    'Infrastructure for a verifiable digital representation of the physical world: an open physical-world trust and spatial protocol giving real-world entities persistent spatial identity and verifiable history. Land is the first domain — ISO 19152 (LADM) data model, on-chain rights with validator attestations, identity and guardianship, a ten-RFC suite — built, tested, and promoted to a stable main release.',
+    'Infrastructure for a verifiable digital representation of the physical world: an open physical-world trust and spatial protocol giving real-world entities persistent spatial identity and verifiable history. Land is the first domain — ISO 19152 (LADM) data model, on-chain rights with validator attestations, identity and guardianship, an eleven-RFC suite — built, tested, and promoted to a stable main release.',
 }
 
 export const METRICS: Metric[] = [
   {
-    value: '158',
+    value: '161',
     label: 'registry instructions',
-    detail: '65 accounts · 145 events · 231 error codes — terra_registry',
+    detail: '67 accounts · 148 events · 237 error codes — terra_registry',
   },
   {
     value: '8',
@@ -60,19 +60,19 @@ export const METRICS: Metric[] = [
     detail: '2 accounts · 8 events · 29 error codes — terra_identity',
   },
   {
-    value: '286/286',
+    value: '288/288',
     label: 'on-chain integration tests',
     detail: 'registry 100% green · identity 23/23 · incl. atomicity & composite paths',
   },
   {
-    value: '222',
+    value: '227',
     label: 'unit · structure · API tests',
-    detail: '129 program lib · 21 RFC-012 structure · 4 geo-engine · 68 API',
+    detail: '134 program lib · 21 RFC-012 structure · 4 geo-engine · 68 API',
   },
   {
-    value: '10',
+    value: '11',
     label: 'protocol RFCs specified',
-    detail: 'RFC-003 vault → RFC-012 global trust architecture, all delivered',
+    detail: 'RFC-003 vault → RFC-012 architecture delivered · RFC-013 spatial pipeline (Phase A)',
   },
   {
     value: '4/4',
@@ -108,6 +108,7 @@ export const ROADMAP: RoadmapGroup[] = [
       },
       { done: true, label: 'Tier A1–A3 — security residuals, IDL resync, test/CI baseline' },
       { done: true, label: 'RFC-012 Phase 10 — cross-border: jurisdiction bindings, routing gate, span records' },
+      { done: true, label: 'RFC-013 Phase A — spatial assets & versioned geometry (Vision Stage 3 in progress)' },
     ],
   },
   {
@@ -193,13 +194,20 @@ export const PROTOCOLS: Protocol[] = [
     status: 'Phases 0–10',
     delivered: true,
   },
+  {
+    rfc: 'RFC-013',
+    name: 'Spatial intelligence pipeline',
+    note: 'Vision Stage 3: SpatialAsset + GeometryVersion on-chain (Phase A); pipeline phases B–E planned.',
+    status: 'Phase A',
+    delivered: true,
+  },
 ]
 
 export const SECURITY_CLOSED: Finding[] = [
   { label: 'Critical / High / Medium findings closed (Tier A1 security residuals)' },
   { label: 'Session-audit guards — M-2 · L-1 · C-4 closed' },
   { label: 'Unique validator sets + endorsement binding (P0-1, P0-2 removal path)' },
-  { label: 'IDL regenerated to source — 158 / 65 / 145 / 231 matches code' },
+  { label: 'IDL regenerated to source — 161 / 67 / 148 / 237 matches code' },
   { label: 'Composite atomicity — claim-succession-with-parcels, atomic subdivide & credit, reclaim-succeeded-swap' },
 ]
 
@@ -211,7 +219,7 @@ export const SECURITY_OPEN: Finding[] = [
 
 export const NEXT_MILESTONE = {
   title: 'Devnet deployment rehearsal',
-  body: 'RFC-012 Phase 10 cross-border shipped on dev (registry at 158 instructions): deploy both programs to a devnet validator and wire the wallet adapter through the task flow. Mainnet gates (staking reconfirm, ZK audit) follow.',
+  body: 'RFC-012 Phases 0–10 and Vision Stage 3 Phase A (spatial assets, RFC-013) shipped on dev (registry at 161 instructions): deploy both programs to a devnet validator and wire the wallet adapter through the task flow. Mainnet gates (staking reconfirm, ZK audit) follow.',
   tags: ['Program deploy', 'Wallet wiring', 'Mainnet gates'],
 }
 
@@ -241,7 +249,7 @@ export const ARCHITECTURE: Layer[] = [
     title: 'On-chain — Solana / Anchor',
     body: 'Two programs hold minimal state: parcel rights, attestations, quorum, escrow, staking, disputes, ZK. Off-chain validation is anchored as hashes.',
     tags: [
-      'terra_registry · 158 instructions',
+      'terra_registry · 161 instructions',
       'terra_identity · 8 instructions',
       'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage',
       '68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4',

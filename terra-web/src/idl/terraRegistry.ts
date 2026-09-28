@@ -1022,6 +1022,122 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "append_geometry_version",
+      "discriminator": [
+        130,
+        154,
+        224,
+        216,
+        162,
+        208,
+        164,
+        163
+      ],
+      "accounts": [
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset.parcel",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "geometry_version",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  101,
+                  111,
+                  109,
+                  101,
+                  116,
+                  114,
+                  121,
+                  95,
+                  118,
+                  101,
+                  114,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "path": "asset.geometry_version_count",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "dimension",
+          "type": "u8"
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "assign_task_validator",
       "discriminator": [
         217,
@@ -6536,6 +6652,100 @@ export const terraRegistry: Idl = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "init_spatial_asset",
+      "discriminator": [
+        202,
+        140,
+        58,
+        139,
+        229,
+        206,
+        0,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "docs": [
+            "The parcel to extend (self-pinned: its own PDA seeds)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registrar",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "dimensionality",
+          "type": "u8"
+        },
+        {
+          "name": "elevation_min_mm",
+          "type": "i32"
+        },
+        {
+          "name": "elevation_max_mm",
+          "type": "i32"
+        }
+      ]
     },
     {
       "name": "init_validator_profile",
@@ -14650,6 +14860,129 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
+      "name": "verify_geometry_version",
+      "discriminator": [
+        71,
+        36,
+        152,
+        213,
+        205,
+        229,
+        137,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "geometry_version",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  101,
+                  111,
+                  109,
+                  101,
+                  116,
+                  114,
+                  121,
+                  95,
+                  118,
+                  101,
+                  114,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "geometry_version.asset",
+                "account": "GeometryVersion"
+              },
+              {
+                "kind": "account",
+                "path": "geometry_version.version",
+                "account": "GeometryVersion"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset.parcel",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "verify_jurisdiction_membership",
       "discriminator": [
         130,
@@ -15398,6 +15731,19 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "GeometryVersion",
+      "discriminator": [
+        78,
+        143,
+        35,
+        194,
+        97,
+        213,
+        195,
+        216
+      ]
+    },
+    {
       "name": "GuardianClaim",
       "discriminator": [
         75,
@@ -15629,6 +15975,19 @@ export const terraRegistry: Idl = {
         159,
         87,
         218
+      ]
+    },
+    {
+      "name": "SpatialAsset",
+      "discriminator": [
+        143,
+        133,
+        148,
+        4,
+        118,
+        50,
+        10,
+        170
       ]
     },
     {
@@ -16674,6 +17033,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "GeometryVersionAppended",
+      "discriminator": [
+        80,
+        64,
+        84,
+        239,
+        254,
+        110,
+        6,
+        57
+      ]
+    },
+    {
+      "name": "GeometryVersionVerified",
+      "discriminator": [
+        169,
+        60,
+        89,
+        147,
+        17,
+        205,
+        122,
+        243
+      ]
+    },
+    {
       "name": "GuardianClaimCreated",
       "discriminator": [
         101,
@@ -17308,6 +17693,19 @@ export const terraRegistry: Idl = {
         153,
         139,
         77
+      ]
+    },
+    {
+      "name": "SpatialAssetCreated",
+      "discriminator": [
+        92,
+        105,
+        247,
+        37,
+        169,
+        73,
+        194,
+        173
       ]
     },
     {
@@ -18986,6 +19384,36 @@ export const terraRegistry: Idl = {
       "code": 6230,
       "name": "UndeclaredJurisdiction",
       "msg": "Validator profile or requirement jurisdiction is undeclared"
+    },
+    {
+      "code": 6231,
+      "name": "InvalidSpatialDimension",
+      "msg": "Spatial dimension must be 0 (2D), 1 (2.5D) or 2 (3D)"
+    },
+    {
+      "code": 6232,
+      "name": "InvalidGeometrySource",
+      "msg": "Unknown geometry source"
+    },
+    {
+      "code": 6233,
+      "name": "GeometryVersionMismatch",
+      "msg": "Geometry version index or parent asset does not match"
+    },
+    {
+      "code": 6234,
+      "name": "GeometryVersionsFull",
+      "msg": "Spatial asset has reached the maximum number of geometry versions"
+    },
+    {
+      "code": 6235,
+      "name": "InvalidElevationRange",
+      "msg": "Elevation range is invalid (min > max)"
+    },
+    {
+      "code": 6236,
+      "name": "GeometryAlreadyVerified",
+      "msg": "Geometry version is already verified"
     }
   ],
   "types": [
@@ -22232,6 +22660,172 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "GeometryVersion",
+      "docs": [
+        "One append-only entry in a spatial asset's geometry history",
+        "(RFC-012 \u00a75 `GeometryVersion`).",
+        "",
+        "PDA: `[\"geometry_version\", asset, version_le_bytes]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "The owning `SpatialAsset` PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "docs": [
+              "Redundant parcel key for cheap off-chain joins."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "docs": [
+              "0-based append index."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "geometry_hash",
+            "docs": [
+              "SHA-256 canonical digest of the off-chain geometry document."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "docs": [
+              "`geometry_source` provenance code."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "dimension",
+            "docs": [
+              "`spatial_dimension` of this observation layer."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "storage_reference",
+            "docs": [
+              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 128 chars."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "submitted_by",
+            "docs": [
+              "Whoever paid to anchor this claim (permissionless)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "verified",
+            "docs": [
+              "Claim \u2192 fact: true once a registered validator verified it."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "verified_by",
+            "docs": [
+              "Verifying validator wallet (zero until verified)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GeometryVersionAppended",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "geometry_version",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "geometry_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "type": "u8"
+          },
+          {
+            "name": "dimension",
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GeometryVersionVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "geometry_version",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "GuardianClaim",
       "docs": [
         "Bridge between the guardian/court system and the verification pipeline.",
@@ -24913,6 +25507,105 @@ export const terraRegistry: Idl = {
             "docs": [
               "When the report was resolved (0 if pending)."
             ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SpatialAsset",
+      "docs": [
+        "The 3D/4D extension of a parcel (RFC-012 \u00a75 `SpatialAsset`).",
+        "",
+        "PDA: `[\"spatial_asset\", parcel]` \u2014 exactly one per parcel."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "docs": [
+              "The Parcel PDA this asset extends."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Registrar that initialized the asset (future lifecycle authority)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "dimensionality",
+            "docs": [
+              "Highest supported dimensionality: `spatial_dimension`."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "elevation_min_mm",
+            "docs": [
+              "Minimum elevation of the asset envelope, millimetres (may be < 0)."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "elevation_max_mm",
+            "docs": [
+              "Maximum elevation of the asset envelope, millimetres (>= min)."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "geometry_version_count",
+            "docs": [
+              "Append-only cursor: next version index (0..=MAX_GEOMETRY_VERSIONS)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "latest_geometry",
+            "docs": [
+              "Geometry hash of the newest version (all-zero until the first append)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SpatialAssetCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "dimensionality",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
             "type": "i64"
           }
         ]

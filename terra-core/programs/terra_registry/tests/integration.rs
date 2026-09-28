@@ -27639,3 +27639,446 @@ async fn phase10_record_cross_border_verification() {
     .await;
     assert_custom_error(res, 6230, "undeclared jurisdiction record must fail");
 }
+
+// ---------------------------------------------------------------------------
+// Stage 3 (RFC-013): spatial assets & versioned geometry
+// ---------------------------------------------------------------------------
+
+fn spatial_asset_pda(parcel_pk: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"spatial_asset", parcel_pk.as_ref()], &PROGRAM_ID)
+}
+
+fn geometry_version_pda(asset_pk: &Pubkey, version: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"geometry_version",
+            asset_pk.as_ref(),
+            &version.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+async fn stage3_register_parcel(
+    ctx: &mut ProgramTestContext,
+    owner: &Keypair,
+    id_byte: u8,
+) -> Pubkey {
+    let id = [id_byte; 32];
+    let geo = [1u8; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+    process(
+        ctx,
+        owner,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(owner.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&id);
+                d.extend_from_slice(&borsh_ser(&format!("Parcel {id_byte}")));
+                d.extend_from_slice(&geo);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+    parcel_pk
+}
+
+fn stage3_init_ix(
+    parcel_pk: &Pubkey,
+    registrar: &Pubkey,
+    dimensionality: u8,
+    elevation_min_mm: i32,
+    elevation_max_mm: i32,
+) -> Instruction {
+    let (asset_pk, _) = spatial_asset_pda(parcel_pk);
+    let mut data = discriminator("global", "init_spatial_asset").to_vec();
+    data.push(dimensionality);
+    data.extend_from_slice(&elevation_min_mm.to_le_bytes());
+    data.extend_from_slice(&elevation_max_mm.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(asset_pk, false),
+            AccountMeta::new_readonly(*parcel_pk, false),
+            AccountMeta::new(*registrar, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stage3_append_ix(
+    asset_pk: &Pubkey,
+    payer: &Pubkey,
+    version: u32,
+    geometry_hash: &[u8; 32],
+    source: u8,
+    dimension: u8,
+    storage_reference: &str,
+) -> Instruction {
+    let (entry_pk, _) = geometry_version_pda(asset_pk, version);
+    let mut data = discriminator("global", "append_geometry_version").to_vec();
+    data.extend_from_slice(geometry_hash);
+    data.push(source);
+    data.push(dimension);
+    data.extend_from_slice(&borsh_ser(&storage_reference.to_string()));
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*asset_pk, false),
+            AccountMeta::new(entry_pk, false),
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+fn stage3_verify_ix(asset_pk: &Pubkey, entry_pk: &Pubkey, validator: &Pubkey) -> Instruction {
+    let (profile_pk, _) = validator_profile_pda(validator);
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*entry_pk, false),
+            AccountMeta::new(*asset_pk, false),
+            AccountMeta::new_readonly(profile_pk, false),
+            AccountMeta::new_readonly(*validator, true),
+        ],
+        data: discriminator("global", "verify_geometry_version").to_vec(),
+    }
+}
+
+#[tokio::test]
+async fn stage3_spatial_asset_lifecycle() {
+    use terra_registry::spatial_asset::{
+        geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+    };
+
+    let (mut ctx, payer) = setup().await;
+
+    // --- init happy path (2.5D envelope, below-sea-level min) -------------
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 210).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(
+            &parcel,
+            &payer.pubkey(),
+            spatial_dimension::D2_5,
+            -50,
+            1_200_000,
+        ),
+    )
+    .await
+    .expect("init spatial asset");
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert_eq!(a.parcel, parcel);
+    assert_eq!(a.authority, payer.pubkey());
+    assert_eq!(a.dimensionality, spatial_dimension::D2_5);
+    assert_eq!(a.elevation_min_mm, -50);
+    assert_eq!(a.elevation_max_mm, 1_200_000);
+    assert_eq!(a.geometry_version_count, 0);
+    assert_eq!(a.latest_geometry, [0u8; 32]);
+    assert!(a.created_at > 0);
+
+    // duplicate init collides on the parcel-derived PDA.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(&parcel, &payer.pubkey(), spatial_dimension::D2_5, 0, 10),
+    )
+    .await;
+    assert!(res.is_err(), "duplicate spatial asset must fail");
+
+    // invalid dimension rejected in the handler (fresh parcel PDA).
+    let p2 = stage3_register_parcel(&mut ctx, &payer, 211).await;
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(&p2, &payer.pubkey(), 9, 0, 10),
+    )
+    .await;
+    assert_custom_error(res, 6231, "invalid dimensionality must fail");
+
+    // inverted elevation range rejected.
+    let p3 = stage3_register_parcel(&mut ctx, &payer, 212).await;
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(&p3, &payer.pubkey(), spatial_dimension::D3, 100, 50),
+    )
+    .await;
+    assert_custom_error(res, 6235, "inverted elevation range must fail");
+
+    // --- append v0 (2D survey claim) --------------------------------------
+    let h0 = [3u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://geo0",
+        ),
+    )
+    .await
+    .expect("append v0");
+    let (entry0_pk, _) = geometry_version_pda(&asset_pk, 0);
+    let e0: GeometryVersion = read_account(&ctx, entry0_pk).await;
+    assert_eq!(e0.asset, asset_pk);
+    assert_eq!(e0.parcel, parcel);
+    assert_eq!(e0.version, 0);
+    assert_eq!(e0.geometry_hash, h0);
+    assert_eq!(e0.source, geometry_source::SURVEY);
+    assert_eq!(e0.dimension, spatial_dimension::D2);
+    assert_eq!(e0.storage_reference, "ipfs://geo0");
+    assert_eq!(e0.submitted_by, payer.pubkey());
+    assert!(e0.submitted_at > 0);
+    assert!(!e0.verified);
+    assert_eq!(e0.verified_by, Pubkey::default());
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert_eq!(a.geometry_version_count, 1);
+    assert_eq!(a.latest_geometry, h0);
+
+    // stale/wrong version index → seeds mismatch (cursor is append-only).
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            5,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://stale",
+        ),
+    )
+    .await;
+    assert!(res.is_err(), "wrong version index must fail");
+
+    // 3D version exceeds a 2.5D asset → 6231.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::LIDAR,
+            spatial_dimension::D3,
+            "ipfs://too-tall",
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6231, "3D version on 2.5D asset must fail");
+
+    // unknown source → 6232.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            9,
+            spatial_dimension::D2,
+            "ipfs://bad-src",
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6232, "unknown geometry source must fail");
+
+    // all-zero geometry hash → 6002.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0u8; 32],
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://zero",
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6002, "zero geometry hash must fail");
+
+    // empty storage reference → 6134.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "",
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6134, "empty storage reference must fail");
+
+    // --- append v1 (2.5D lidar layer) -------------------------------------
+    let h1 = [4u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h1,
+            geometry_source::LIDAR,
+            spatial_dimension::D2_5,
+            "s3://terra/geo1.laz",
+        ),
+    )
+    .await
+    .expect("append v1");
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert_eq!(a.geometry_version_count, 2);
+    assert_eq!(a.latest_geometry, h1);
+
+    // --- cap: cursor at MAX_GEOMETRY_VERSIONS → 6234 -----------------------
+    let mut acc = ctx
+        .banks_client
+        .get_account(asset_pk)
+        .await
+        .unwrap()
+        .expect("asset account");
+    // disc(8) + parcel(32) + authority(32) + dim(1) + min(4) + max(4) = 81.
+    acc.data[81..85].copy_from_slice(&64u32.to_le_bytes());
+    ctx.set_account(&asset_pk, &acc.into());
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            64,
+            &h1,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://full",
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6234, "cap-exhausted append must fail");
+}
+
+#[tokio::test]
+async fn stage3_geometry_version_verification() {
+    use terra_registry::spatial_asset::{
+        geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+    };
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 220).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(
+            &parcel,
+            &payer.pubkey(),
+            spatial_dimension::D3,
+            -1_000,
+            900_000,
+        ),
+    )
+    .await
+    .expect("init spatial asset");
+    let h0 = [9u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &h0,
+            geometry_source::PHOTOGRAMMETRY,
+            spatial_dimension::D3,
+            "s3://terra/model0.geojson",
+        ),
+    )
+    .await
+    .expect("append v0");
+    let (entry_pk, _) = geometry_version_pda(&asset_pk, 0);
+
+    // Unregistered signer cannot verify (no validator profile PDA).
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_verify_ix(&asset_pk, &entry_pk, &payer.pubkey()),
+    )
+    .await;
+    assert!(res.is_err(), "non-validator verify must fail");
+
+    // Registered validator verifies (claim → fact).
+    let v = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v).await;
+    process(
+        &mut ctx,
+        &v,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v.pubkey()),
+    )
+    .await
+    .expect("verify geometry version");
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(e.verified);
+    assert_eq!(e.verified_by, v.pubkey());
+    assert!(e.verified_at > 0);
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert!(a.updated_at > 0);
+
+    // Double-verify is rejected.
+    let res = process(
+        &mut ctx,
+        &v,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6236, "double verify must fail");
+
+    // An entry from asset A cannot be verified against asset B.
+    let parcel_b = stage3_register_parcel(&mut ctx, &payer, 221).await;
+    let (asset_b_pk, _) = spatial_asset_pda(&parcel_b);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(&parcel_b, &payer.pubkey(), spatial_dimension::D2, 0, 10),
+    )
+    .await
+    .expect("init asset B");
+    let res = process(
+        &mut ctx,
+        &v,
+        stage3_verify_ix(&asset_b_pk, &entry_pk, &v.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6233, "cross-asset verify must fail");
+}

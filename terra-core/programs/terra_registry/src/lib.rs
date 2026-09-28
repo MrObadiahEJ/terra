@@ -265,6 +265,7 @@ pub mod observation_v2;
 pub mod quorum;
 pub mod recovery;
 pub mod routing;
+pub mod spatial_asset;
 pub mod staking;
 pub mod subdivision;
 pub mod task_economics;
@@ -1865,6 +1866,39 @@ pub mod terra_registry {
         validator: Pubkey,
     ) -> Result<()> {
         cross_border::record_cross_border_verification(ctx, task_id, req_index, validator)
+    }
+
+    // -----------------------------------------------------------------------
+    // Spatial assets & versioned geometry (RFC-013, Vision Stage 3)
+    // -----------------------------------------------------------------------
+
+    pub fn init_spatial_asset(
+        ctx: Context<InitSpatialAsset>,
+        dimensionality: u8,
+        elevation_min_mm: i32,
+        elevation_max_mm: i32,
+    ) -> Result<()> {
+        spatial_asset::init_spatial_asset(ctx, dimensionality, elevation_min_mm, elevation_max_mm)
+    }
+
+    pub fn append_geometry_version(
+        ctx: Context<AppendGeometryVersion>,
+        geometry_hash: [u8; 32],
+        source: u8,
+        dimension: u8,
+        storage_reference: String,
+    ) -> Result<()> {
+        spatial_asset::append_geometry_version(
+            ctx,
+            geometry_hash,
+            source,
+            dimension,
+            storage_reference,
+        )
+    }
+
+    pub fn verify_geometry_version(ctx: Context<VerifyGeometryVersion>) -> Result<()> {
+        spatial_asset::verify_geometry_version(ctx)
     }
 
     // -----------------------------------------------------------------------
@@ -3484,6 +3518,89 @@ pub struct RecordCrossBorderVerification<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+// ---------------------------------------------------------------------------
+// Spatial asset contexts (RFC-013, Vision Stage 3)
+// ---------------------------------------------------------------------------
+
+/// Permissionless: the asset is an anchor, not authority (grants no rights).
+#[derive(Accounts)]
+pub struct InitSpatialAsset<'info> {
+    #[account(
+        init,
+        payer = registrar,
+        space = 8 + spatial_asset::SpatialAsset::INIT_SPACE,
+        seeds = [b"spatial_asset", parcel.key().as_ref()],
+        bump
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    /// The parcel to extend (self-pinned: its own PDA seeds).
+    #[account(
+        seeds = [b"parcel", parcel.id.as_ref()],
+        bump,
+    )]
+    pub parcel: Account<'info, Parcel>,
+    #[account(mut)]
+    pub registrar: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Permissionless append — version index is derived from the asset cursor
+/// (append-only, capped at `MAX_GEOMETRY_VERSIONS`).
+#[derive(Accounts)]
+pub struct AppendGeometryVersion<'info> {
+    #[account(
+        mut,
+        seeds = [b"spatial_asset", asset.parcel.as_ref()],
+        bump,
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + spatial_asset::GeometryVersion::INIT_SPACE,
+        seeds = [
+            b"geometry_version",
+            asset.key().as_ref(),
+            &asset.geometry_version_count.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub geometry_version: Account<'info, spatial_asset::GeometryVersion>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Registered validator verifies an anchored geometry version (claim → fact).
+#[derive(Accounts)]
+pub struct VerifyGeometryVersion<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"geometry_version",
+            geometry_version.asset.as_ref(),
+            &geometry_version.version.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub geometry_version: Account<'info, spatial_asset::GeometryVersion>,
+    #[account(
+        mut,
+        seeds = [b"spatial_asset", asset.parcel.as_ref()],
+        bump,
+        constraint = asset.key() == geometry_version.asset
+            @ TerraError::GeometryVersionMismatch
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    #[account(
+        seeds = [b"validator_profile", validator.key().as_ref()],
+        bump,
+        constraint = profile.wallet == validator.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub validator: Signer<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -6710,6 +6827,34 @@ pub struct ValidatorJurisdictionSet {
     pub updated_at: i64,
 }
 
+#[event]
+pub struct SpatialAssetCreated {
+    pub asset: Pubkey,
+    pub parcel: Pubkey,
+    pub dimensionality: u8,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct GeometryVersionAppended {
+    pub geometry_version: Pubkey,
+    pub asset: Pubkey,
+    pub version: u32,
+    pub geometry_hash: [u8; 32],
+    pub source: u8,
+    pub dimension: u8,
+    pub submitted_by: Pubkey,
+    pub submitted_at: i64,
+}
+
+#[event]
+pub struct GeometryVersionVerified {
+    pub geometry_version: Pubkey,
+    pub asset: Pubkey,
+    pub verified_by: Pubkey,
+    pub verified_at: i64,
+}
+
 // ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
@@ -7409,6 +7554,18 @@ pub enum TerraError {
     InvalidBindingExpiry,
     #[msg("Validator profile or requirement jurisdiction is undeclared")]
     UndeclaredJurisdiction,
+    #[msg("Spatial dimension must be 0 (2D), 1 (2.5D) or 2 (3D)")]
+    InvalidSpatialDimension,
+    #[msg("Unknown geometry source")]
+    InvalidGeometrySource,
+    #[msg("Geometry version index or parent asset does not match")]
+    GeometryVersionMismatch,
+    #[msg("Spatial asset has reached the maximum number of geometry versions")]
+    GeometryVersionsFull,
+    #[msg("Elevation range is invalid (min > max)")]
+    InvalidElevationRange,
+    #[msg("Geometry version is already verified")]
+    GeometryAlreadyVerified,
 }
 
 #[cfg(test)]

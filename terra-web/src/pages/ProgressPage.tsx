@@ -185,7 +185,7 @@ export default function ProgressPage() {
         <footer className="pp-foot">
           Figures generated from source — `make idl` (IDL counts), `make test-fast`
           + integration suites (tests), GitHub Actions (CI). Verified {RELEASE.date} against{' '}
-          {RELEASE.branch} = {RELEASE.commit}. Protocol specs live in docs/rfc-003…rfc-012.
+          {RELEASE.branch} = {RELEASE.commit}. Protocol specs live in docs/rfc-003…rfc-013.
         </footer>
       </div>
     </div>
