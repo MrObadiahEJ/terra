@@ -44,7 +44,7 @@ green on `dev` and `main` (fmt, `clippy -D warnings`, registry/identity lib
 unit tests, RFC-012 structural, geo, API unit tests incl. live-PostGIS
 migration run, `tsc --noEmit`).
 
-**Complete on `dev` (verified 2026-09-26):** RFC-012 **Phases 0–9** (architecture
+**Complete on `dev` (verified 2026-09-28):** RFC-012 **Phases 0–10** (architecture
 contract, security hardening, generalized validator PDAs, verification tasks,
 multi-source observations, evidence provenance, dynamic routing, reputation
 governance, economic/resource layer, **device identities**, **cross-border bindings**), **Tier A1–A3** (security residuals, IDL
@@ -58,11 +58,11 @@ geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 **Frontend:** investor demo page at `/progress`, 3D Cesium globe with automatic
 2D Leaflet fallback when WebGL is unavailable, typed API client, wallet adapter.
 
-Verified tests on `dev` (2026-09-26):
+Verified tests on `dev` (2026-09-28):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 118 |
+| `terra-registry` lib unit tests | 123 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 23 |
@@ -101,7 +101,7 @@ This repo is self-describing for a new contributor or agent — read in order:
 
 Do not invent instruction/account/event/error counts or test totals — regenerate
 from source (`rg`, `cargo test`, `make idl`) or trust the tables above (verified
-2026-09-26). Prefer small incremental commits on `dev`; keep tests green before
+2026-09-28). Prefer small incremental commits on `dev`; keep tests green before
 merging to `main`.
 
 ## Branching Strategy
@@ -266,7 +266,7 @@ createdb -h localhost -p 5433 -U terra terra_dev
 ```bash
 cd terra-core
 cargo check -p terra-registry            # on-chain program (native)
-cargo test -p terra-registry --lib       # 118 unit tests
+cargo test -p terra-registry --lib       # 123 unit tests
 cargo test -p terra-identity --lib       # 6 unit tests
 cargo test -p terra-api                  # 68 API unit tests
 DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
