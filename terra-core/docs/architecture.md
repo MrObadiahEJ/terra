@@ -16,13 +16,13 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
 
-**Source counts** (as of 2026-09-26, RFC-012 Phase 9 device identities after legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 154 instructions, 63 `#[account]` types, 141 events, 225 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
+**Source counts** (as of 2026-09-28, RFC-012 Phase 10 cross-border after legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 158 instructions, 65 `#[account]` types, 145 events, 231 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 
 ## Module Map
 
 ```
 terra_registry/
-├── lib.rs                    # Entry point, context structs, TerraError (225 codes)
+├── lib.rs                    # Entry point, context structs, TerraError (231 codes)
 ├── device_identity.rs        # RFC-012 Phase 9 device identity registry
 ├── task_economics.rs         # RFC-012 Phase 8 quotes/escrow/claims/refunds + coverage subsidy
 ├── fraud_governance.rs       # RFC-012 Phase 7 fraud report/committee/appeal/restriction
@@ -30,7 +30,7 @@ terra_registry/
 ├── routing.rs               # RFC-012 Phase 6 multi-factor dynamic routing
 ├── observation_v2.rs         # RFC-012 Phase 4 multi-source ObservationV2
 ├── verification_task.rs      # RFC-012 Phase 3 task PDAs
-├── cross_border.rs           # Cross-border jurisdiction + identity binding
+├── cross_border.rs           # Cross-border identity binding + jurisdiction bindings (Phase 10)
 ├── dispute.rs                # Parcel dispute filing, freeze, adjudicate, execute
 ├── escrow.rs                 # Parcel escrow (create, deposit, accept, settle, cancel)
 ├── staking.rs                # Validator staking pool, slashing, rewards
@@ -122,7 +122,7 @@ terra_identity/
 | `GenesisRequest` | `["genesis_request", country_code]` | Genesis confirmation |
 | `Jurisdiction` | `["jurisdiction", country_code]` | Cross-border jurisdiction |
 | `JurisdictionBinding` | `["cross_border_identity", jurisdiction_key, identity_hash]` | Identity binding |
-| `CrossBorderVerification` | `["cross_border_verification", binding]` | Cross-border verification |
+| `CrossBorderVerification` | `["cross_border_verification", binding]` | Cross-border identity verification (bridge; 2 seeds) |
 
 ### RFC-012 Phase 2 — Validator Profiles
 
@@ -160,6 +160,15 @@ terra_identity/
 | Account | PDA Seeds | Description |
 |---------|-----------|-------------|
 | `DeviceIdentity` | `["device_identity", owner, device_nonce]` | Device key, capture source, capabilities, calibration, status (u16 LE nonce) |
+
+### RFC-012 Phase 10 — Cross-Border Jurisdiction Links
+
+| Account | PDA Seeds | Description |
+|---------|-----------|-------------|
+| `CrossBorderBinding` | `["cross_border_binding", country_min, country_max]` | Canonical ordered country pair; both authorities sign; ACTIVE/SUSPENDED/REVOKED (terminal), optional expiry |
+| `CrossBorderSpanRecord` | `["cross_border_verification", task_id, validator]` | Permissionless auditable cross-jurisdiction span (3 seeds — distinct from the bridge's 2-seed PDA); RFC-012 §5 entity `CrossBorderVerification` |
+
+`ValidatorProfile.jurisdiction: [u8; 2]` (self-declared, `[0,0]`=undeclared) gates `route_task` when a requirement scopes a country (trailing binding slot, stride `3 + need_geo + 2*need_cap + need_juris`).
 
 ### Identity Program
 
@@ -301,10 +310,10 @@ See also: [RFC-012](../../docs/rfc-012-global-physical-digital-trust-architectur
 
 **Next work (do not skip order):**
 1. Security residuals before mainnet: RFC-005 staking reconfirm, ZK audit (SECURITY.md Recommendations). M-2/L-1/C-4 closed in A1; IDL regen done in A2; test/CI baseline done in A3 (`make test-fast`).
-2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 154/63/141/225 as of RFC-012 Phase 9, 2026-09-26).
+2. `make idl` — refresh `terra-web/src/idl/` after any program edit (checked-in IDL matches 158/65/145/231 as of RFC-012 Phase 10, 2026-09-28).
 3. Devnet: `./deploy.sh devnet` + local `solana-test-validator` (AVX required).
 4. ZK: pick circuit (Groth16/PLONK), external audit — `zk.rs` is structural only.
 5. RFC-005 staking: governance reconfirm before mainnet (code path exists).
-6. **RFC-012 Phase 2+** — new PDAs from RFC-012 §10 (`ValidatorProfile`, presence, tasks, …); update this module map, migration map, and `rfc012_structure` tests when adding entities. Start from RFC-012 §8–§10.
+6. **RFC-012 Phases 2–10 are complete** — when adding entities, update this module map, migration map, and `rfc012_structure` tests. Start from RFC-012 §8–§10; handoff in §8.1.
 
 Entry point for new contributors/AI: root `README.md` → “How to continue (handoff)”.

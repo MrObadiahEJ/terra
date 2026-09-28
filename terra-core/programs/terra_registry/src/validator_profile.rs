@@ -105,6 +105,11 @@ pub struct ValidatorProfile {
     /// Free-form operator note (device class, org, …) — not used for selection.
     #[max_len(128)]
     pub note: String,
+    /// ISO 3166-1 alpha-2 home/operating jurisdiction (RFC-012 Phase 10);
+    /// `[0,0]` = undeclared. Self-declared claim — routing treats it as the
+    /// validator's country for jurisdiction-scoped tasks and cross-border
+    /// binding checks; fraud governance handles abuse.
+    pub jurisdiction: [u8; 2],
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -247,6 +252,7 @@ pub fn init_validator_profile(
     p.tier = profile_tier::NEW;
     p.identity_hash = identity_hash;
     p.note = note;
+    p.jurisdiction = [0, 0];
     p.created_at = now;
     p.updated_at = now;
 
@@ -254,6 +260,25 @@ pub fn init_validator_profile(
         wallet: p.wallet,
         tier: p.tier,
         initialized_at: now,
+    });
+    Ok(())
+}
+
+/// Declare / update the validator's operating jurisdiction (RFC-012 Phase 10).
+/// Self-declared like presence; `[0,0]` clears the declaration.
+pub fn set_validator_jurisdiction(
+    ctx: Context<crate::SetValidatorJurisdiction>,
+    jurisdiction: [u8; 2],
+) -> Result<()> {
+    let now = Clock::get()?.unix_timestamp;
+    let p = &mut ctx.accounts.profile;
+    p.jurisdiction = jurisdiction;
+    p.updated_at = now;
+
+    emit!(crate::ValidatorJurisdictionSet {
+        wallet: p.wallet,
+        jurisdiction,
+        updated_at: now,
     });
     Ok(())
 }

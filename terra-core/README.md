@@ -153,7 +153,7 @@ terra-core/
 │   ├── terra_registry/         # Core registry program
 │   │   ├── src/
 │   │   │   ├── lib.rs          # Entry point, contexts, error codes (225)
-│   │   │   ├── cross_border.rs # Cross-border identity bridge
+│   │   │   ├── cross_border.rs # Cross-border identity bridge + jurisdiction bindings (Phase 10)
 │   │   │   ├── device_identity.rs # Device identity registry (Phase 9)
 │   │   │   ├── dispute.rs      # Parcel dispute system
 │   │   │   ├── escrow.rs       # Parcel escrow (buy/sell)
@@ -165,7 +165,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 283 BPF integration tests
+│   │       ├── integration.rs  # 286 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -223,21 +223,21 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 118 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, … |
+| terra-registry lib | 123 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 23 | BPF happy paths + guard rails |
-| terra-registry integration | 283 | Full instruction matrix (long-running) |
+| terra-registry integration | 286 | Full instruction matrix (long-running) |
 | terra-api | 68 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-26): registry lib 118/118, identity lib 6/6, rfc012
-21/21, API 68/68, geo 4/4, registry BPF suite 283/283, identity BPF 23/23,
+Verified on `dev` (2026-09-28): registry lib 123/123, identity lib 6/6, rfc012
+21/21, API 68/68, geo 4/4, registry BPF suite 286/286, identity BPF 23/23,
 `cargo fmt` + `clippy -D warnings` clean, `cargo build-sbf` OK, checked-in IDL
-matches source at **154/63/141/225**, `tsc --noEmit` clean, CI 4/4 green on
+matches source at **158/65/145/231**, `tsc --noEmit` clean, CI 4/4 green on
 `dev` and `main`. Fast baseline: `make test-fast`.
 
-## Current Status (as of 2026-09-26)
+## Current Status (as of 2026-09-28)
 
 **Done:**
 - All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).
@@ -254,22 +254,23 @@ matches source at **154/63/141/225**, `tsc --noEmit` clean, CI 4/4 green on
 - **RFC-012 legacy sweep** (2026-09-25): removed legacy account/instruction surface (incl. `jail_validator`/`unjail_validator`), IDL re-synced **146/62/134/220**.
 - **B6 program boundary** (2026-09-25): identity concerns split into the `terra_identity` program boundary, IDL **147/62/135/220**.
 - **P0-2 removal-endorsement path** (2026-09-25): `endorse_validator_removal` shipped, IDL **148/62/135/220**.
-- RFC-012 **Phase 9** (physical infrastructure, 2026-09-26): `device_identity.rs` with `DeviceIdentity` PDA (seeds `["device_identity", owner, device_nonce(u16)]`); 6 instructions (`register_device`, `update_device`, `rotate_device_key`, `set_device_status`, `set_device_calibration`, `verify_device` — validator-profile-gated); capability bitfield GNSS/PHOTO/VIDEO/LIDAR/IMU/RTK/SCANNER_3D/THERMAL; status ACTIVE/SUSPENDED/REVOKED (terminal); errors 6220–6224 (reuses 6182/6014); 6 unit tests + 2 BPF tests (`phase9_*`); IDL **154/63/141/225** — current synced state.
+- RFC-012 **Phase 9** (physical infrastructure, 2026-09-26): `device_identity.rs` with `DeviceIdentity` PDA (seeds `["device_identity", owner, device_nonce(u16)]`); 6 instructions (`register_device`, `update_device`, `rotate_device_key`, `set_device_status`, `set_device_calibration`, `verify_device` — validator-profile-gated); capability bitfield GNSS/PHOTO/VIDEO/LIDAR/IMU/RTK/SCANNER_3D/THERMAL; status ACTIVE/SUSPENDED/REVOKED (terminal); errors 6220–6224 (reuses 6182/6014); 6 unit tests + 2 BPF tests (`phase9_*`); IDL **154/63/141/225**.
+- RFC-012 **Phase 10** (cross-border + privacy, 2026-09-28): `ValidatorProfile.jurisdiction` (self-declared, `[0,0]`=undeclared) + `set_validator_jurisdiction`; `CrossBorderBinding` PDA (dual-authority treaty sign, ACTIVE/SUSPENDED/REVOKED terminal, optional expiry) + `set_cross_border_binding_status`; `CrossBorderSpanRecord` PDA (`["cross_border_verification", task_id, validator]`) + permissionless `record_cross_border_verification`; `route_task` jurisdiction gate (trailing binding slot, stride `3 + need_geo + 2*need_cap + need_juris`, soft-fail); errors 6225–6230 (reuses 6010/6088/6089/6091/6180/6214); 5 unit tests + 3 BPF tests (`phase10_*`); IDL **158/65/145/231** — current synced state.
 - PostGIS mirror API (21 route modules, migrations `0001`…`0026`) + geo-engine + workspace CI green on `dev` and `main`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen chain through Phase 9 is current (**154/63/141/225**, 2026-09-26).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of RFC-012 Phase 9 (154/63/141/225, 2026-09-26).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK circuit choice (RFC-006/011). L-3 is cosmetic only. IDL regen chain through Phase 10 is current (**158/65/145/231**, 2026-09-28).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of RFC-012 Phase 10 (158/65/145/231, 2026-09-28).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK circuit selection + external audit (RFC-006/011) — proof bytes still opaque, no on-chain Groth16.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
-6. **RFC-012 Phase 10 — cross-border/privacy (NEXT)** — see [RFC-012 §8](../../docs/rfc-012-global-physical-digital-trust-architecture.md) and the stage map in [`docs/VISION.md`](../../docs/VISION.md).
+6. **Vision Stage 3+ product layers** — spatial intelligence (Stage 3), legal 3D/air-rights (Stage 5), country config (Stage 6) — see the stage map in [`docs/VISION.md`](../../docs/VISION.md); RFC-012 Phases 0–10 are complete, handoff in [RFC-012 §8.1](../../docs/rfc-012-global-physical-digital-trust-architecture.md).
 
 Anyone picking this up: start from [`docs/VISION.md`](../../docs/VISION.md) (north star), then root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 
 ## Error Codes
 
-- **terra_registry:** 225 custom error codes (`TerraError` in `lib.rs`).
+- **terra_registry:** 231 custom error codes (`TerraError` in `lib.rs`).
 - **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License

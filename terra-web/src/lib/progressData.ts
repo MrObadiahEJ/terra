@@ -2,8 +2,8 @@
  * Static investor-facing progress data.
  *
  * Source of truth: /README.md (Roadmap, Protocol Catalog, Source counts) and
- * terra-core/docs/architecture.md. Figures below were verified 2026-09-26
- * on dev (CI green, registry 283/283, identity 23/23); RELEASE tracks main.
+ * terra-core/docs/architecture.md. Figures below were verified 2026-09-28
+ * on dev (CI green, registry 286/286, identity 23/23); RELEASE tracks main.
  * Re-verify with `make idl` + `make test-fast` before updating numbers.
  */
 
@@ -50,9 +50,9 @@ export const HERO = {
 
 export const METRICS: Metric[] = [
   {
-    value: '154',
+    value: '158',
     label: 'registry instructions',
-    detail: '63 accounts · 141 events · 225 error codes — terra_registry',
+    detail: '65 accounts · 145 events · 231 error codes — terra_registry',
   },
   {
     value: '8',
@@ -60,14 +60,14 @@ export const METRICS: Metric[] = [
     detail: '2 accounts · 8 events · 29 error codes — terra_identity',
   },
   {
-    value: '283/283',
+    value: '286/286',
     label: 'on-chain integration tests',
     detail: 'registry 100% green · identity 23/23 · incl. atomicity & composite paths',
   },
   {
-    value: '217',
+    value: '222',
     label: 'unit · structure · API tests',
-    detail: '124 program lib · 21 RFC-012 structure · 4 geo-engine · 68 API',
+    detail: '129 program lib · 21 RFC-012 structure · 4 geo-engine · 68 API',
   },
   {
     value: '10',
@@ -107,7 +107,7 @@ export const ROADMAP: RoadmapGroup[] = [
         label: 'RFC-012 Phases 0–9 — architecture contract, hardening, boundary & composite-atomicity completion, device identities',
       },
       { done: true, label: 'Tier A1–A3 — security residuals, IDL resync, test/CI baseline' },
-      { done: false, label: 'RFC-012 Phase 10 — cross-border privacy (ZK identity, selective disclosure)' },
+      { done: true, label: 'RFC-012 Phase 10 — cross-border: jurisdiction bindings, routing gate, span records' },
     ],
   },
   {
@@ -189,8 +189,8 @@ export const PROTOCOLS: Protocol[] = [
   {
     rfc: 'RFC-012',
     name: 'Global physical-digital trust architecture',
-    note: 'Phases 0–9 of 10 complete — Phase 10 (cross-border privacy) is next.',
-    status: 'Phases 0–9',
+    note: 'Phases 0–10 complete on dev — devnet deployment and mainnet gates next.',
+    status: 'Phases 0–10',
     delivered: true,
   },
 ]
@@ -199,7 +199,7 @@ export const SECURITY_CLOSED: Finding[] = [
   { label: 'Critical / High / Medium findings closed (Tier A1 security residuals)' },
   { label: 'Session-audit guards — M-2 · L-1 · C-4 closed' },
   { label: 'Unique validator sets + endorsement binding (P0-1, P0-2 removal path)' },
-  { label: 'IDL regenerated to source — 154 / 63 / 141 / 225 matches code' },
+  { label: 'IDL regenerated to source — 158 / 65 / 145 / 231 matches code' },
   { label: 'Composite atomicity — claim-succession-with-parcels, atomic subdivide & credit, reclaim-succeeded-swap' },
 ]
 
@@ -211,8 +211,8 @@ export const SECURITY_OPEN: Finding[] = [
 
 export const NEXT_MILESTONE = {
   title: 'Devnet deployment rehearsal',
-  body: 'Phase 9 device identities shipped on dev (registry at 154 instructions): deploy both programs to a devnet validator, wire the wallet adapter through the task flow, then RFC-012 Phase 10 (cross-border privacy, ZK identity/ownership, selective disclosure). Mainnet gates (staking reconfirm, ZK audit) follow.',
-  tags: ['Program deploy', 'Wallet wiring', 'Phase 10 cross-border', 'Mainnet gates'],
+  body: 'RFC-012 Phase 10 cross-border shipped on dev (registry at 158 instructions): deploy both programs to a devnet validator and wire the wallet adapter through the task flow. Mainnet gates (staking reconfirm, ZK audit) follow.',
+  tags: ['Program deploy', 'Wallet wiring', 'Mainnet gates'],
 }
 
 export const VISION = {
@@ -241,7 +241,7 @@ export const ARCHITECTURE: Layer[] = [
     title: 'On-chain — Solana / Anchor',
     body: 'Two programs hold minimal state: parcel rights, attestations, quorum, escrow, staking, disputes, ZK. Off-chain validation is anchored as hashes.',
     tags: [
-      'terra_registry · 154 instructions',
+      'terra_registry · 158 instructions',
       'terra_identity · 8 instructions',
       'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage',
       '68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4',

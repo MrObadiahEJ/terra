@@ -2789,6 +2789,105 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "create_cross_border_binding",
+      "discriminator": [
+        165,
+        96,
+        179,
+        203,
+        103,
+        54,
+        74,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  105,
+                  110,
+                  100,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "country_min"
+              },
+              {
+                "kind": "arg",
+                "path": "country_max"
+              }
+            ]
+          }
+        },
+        {
+          "name": "jurisdiction_min"
+        },
+        {
+          "name": "jurisdiction_max"
+        },
+        {
+          "name": "authority_min",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority_max",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "country_min",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "country_max",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "create_escrow",
       "discriminator": [
         253,
@@ -8539,6 +8638,189 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "record_cross_border_verification",
+      "discriminator": [
+        243,
+        167,
+        81,
+        52,
+        73,
+        2,
+        176,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "verification",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  114,
+                  111,
+                  115,
+                  115,
+                  95,
+                  98,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  118,
+                  101,
+                  114,
+                  105,
+                  102,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requirement"
+        },
+        {
+          "name": "assignment",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "task_id"
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "binding"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "task_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "req_index",
+          "type": "u8"
+        },
+        {
+          "name": "validator",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "record_session_attestation",
       "discriminator": [
         210,
@@ -10959,6 +11241,41 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "set_cross_border_binding_status",
+      "discriminator": [
+        192,
+        154,
+        102,
+        0,
+        127,
+        23,
+        171,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "binding",
+          "writable": true
+        },
+        {
+          "name": "jurisdiction_min"
+        },
+        {
+          "name": "jurisdiction_max"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "set_device_calibration",
       "discriminator": [
         117,
@@ -11434,6 +11751,73 @@ export const terraRegistry: Idl = {
         {
           "name": "status",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "set_validator_jurisdiction",
+      "docs": [
+        "Declare / update the validator's operating jurisdiction (RFC-012 Phase 10)."
+      ],
+      "discriminator": [
+        112,
+        18,
+        100,
+        16,
+        206,
+        107,
+        219,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
         }
       ]
     },
@@ -14845,6 +15229,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "CrossBorderBinding",
+      "discriminator": [
+        90,
+        184,
+        2,
+        152,
+        183,
+        229,
+        63,
+        32
+      ]
+    },
+    {
+      "name": "CrossBorderSpanRecord",
+      "discriminator": [
+        224,
+        66,
+        12,
+        25,
+        121,
+        238,
+        123,
+        191
+      ]
+    },
+    {
       "name": "CrossBorderVerification",
       "discriminator": [
         183,
@@ -15744,6 +16154,32 @@ export const terraRegistry: Idl = {
       ]
     },
     {
+      "name": "CrossBorderBindingCreated",
+      "discriminator": [
+        16,
+        33,
+        97,
+        130,
+        88,
+        12,
+        166,
+        16
+      ]
+    },
+    {
+      "name": "CrossBorderBindingStatusChanged",
+      "discriminator": [
+        107,
+        106,
+        174,
+        210,
+        243,
+        208,
+        12,
+        80
+      ]
+    },
+    {
       "name": "CrossBorderIdentityBound",
       "discriminator": [
         19,
@@ -15793,6 +16229,19 @@ export const terraRegistry: Idl = {
         65,
         209,
         11
+      ]
+    },
+    {
+      "name": "CrossBorderVerificationRecorded",
+      "discriminator": [
+        255,
+        211,
+        5,
+        15,
+        188,
+        194,
+        90,
+        103
       ]
     },
     {
@@ -17119,6 +17568,19 @@ export const terraRegistry: Idl = {
         121,
         114,
         72
+      ]
+    },
+    {
+      "name": "ValidatorJurisdictionSet",
+      "discriminator": [
+        146,
+        222,
+        204,
+        105,
+        21,
+        42,
+        7,
+        147
       ]
     },
     {
@@ -18494,6 +18956,36 @@ export const terraRegistry: Idl = {
       "code": 6224,
       "name": "NotDeviceOwner",
       "msg": "Signer is not the device owner"
+    },
+    {
+      "code": 6225,
+      "name": "InvalidJurisdictionPair",
+      "msg": "Country pair is invalid (equal, reversed, or mismatched)"
+    },
+    {
+      "code": 6226,
+      "name": "InvalidBindingStatus",
+      "msg": "Invalid cross-border binding status value"
+    },
+    {
+      "code": 6227,
+      "name": "SameJurisdiction",
+      "msg": "Verification must span two different jurisdictions"
+    },
+    {
+      "code": 6228,
+      "name": "JurisdictionMismatch",
+      "msg": "Jurisdiction accounts or binding do not match the required pair"
+    },
+    {
+      "code": 6229,
+      "name": "InvalidBindingExpiry",
+      "msg": "Cross-border binding expiry must be in the future (or 0)"
+    },
+    {
+      "code": 6230,
+      "name": "UndeclaredJurisdiction",
+      "msg": "Validator profile or requirement jurisdiction is undeclared"
     }
   ],
   "types": [
@@ -19641,6 +20133,144 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "CrossBorderBinding",
+      "docs": [
+        "Jurisdiction-to-jurisdiction recognition link (RFC-012 \u00a75 `CrossBorderBinding`).",
+        "",
+        "PDA: `[\"cross_border_binding\", country_min, country_max]` \u2014 the country pair",
+        "is stored canonically ordered, so one PDA exists per unordered pair and",
+        "routing can derive it from `TaskRequirement.jurisdiction` + profile",
+        "jurisdiction without extra lookups."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "country_min",
+            "docs": [
+              "Smaller of the two ISO 3166-1 alpha-2 codes (2 bytes)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "country_max",
+            "docs": [
+              "Larger of the two codes."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "jurisdiction_min",
+            "docs": [
+              "Jurisdiction PDA of `country_min`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "jurisdiction_max",
+            "docs": [
+              "Jurisdiction PDA of `country_max`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "`binding_status` \u2014 ACTIVE / SUSPENDED / REVOKED (terminal)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Unix expiry (0 = none)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderBindingCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_min",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "country_max",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderBindingStatusChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "updated_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "CrossBorderIdentityBound",
       "type": {
         "kind": "struct",
@@ -19763,6 +20393,74 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "CrossBorderSpanRecord",
+      "docs": [
+        "A verification that spanned two jurisdictions (RFC-012 \u00a75",
+        "`CrossBorderVerification`) \u2014 the auditable record that a validator from",
+        "`country_home` produced a result for a task requiring `country_required`",
+        "under an ACTIVE `CrossBorderBinding`.",
+        "",
+        "PDA: `[\"cross_border_verification\", task_id, validator]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "req_index",
+            "type": "u8"
+          },
+          {
+            "name": "country_home",
+            "docs": [
+              "The validator's declared `ValidatorProfile.jurisdiction`."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "country_required",
+            "docs": [
+              "The task requirement's jurisdiction."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "binding",
+            "docs": [
+              "The `CrossBorderBinding` PDA that authorized the span."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "recorded_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "CrossBorderVerification",
       "docs": [
         "Bridges cross-border identity bindings into the verification pipeline.",
@@ -19820,6 +20518,57 @@ export const terraRegistry: Idl = {
           },
           {
             "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrossBorderVerificationRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "verification",
+            "type": "pubkey"
+          },
+          {
+            "name": "task_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "country_home",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "country_required",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "binding",
+            "type": "pubkey"
+          },
+          {
+            "name": "recorded_at",
             "type": "i64"
           }
         ]
@@ -25368,6 +26117,31 @@ export const terraRegistry: Idl = {
       }
     },
     {
+      "name": "ValidatorJurisdictionSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ValidatorNominated",
       "type": {
         "kind": "struct",
@@ -25651,6 +26425,21 @@ export const terraRegistry: Idl = {
               "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
             ],
             "type": "string"
+          },
+          {
+            "name": "jurisdiction",
+            "docs": [
+              "ISO 3166-1 alpha-2 home/operating jurisdiction (RFC-012 Phase 10);",
+              "`[0,0]` = undeclared. Self-declared claim \u2014 routing treats it as the",
+              "validator's country for jurisdiction-scoped tasks and cross-border",
+              "binding checks; fraud governance handles abuse."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
           },
           {
             "name": "created_at",

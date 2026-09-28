@@ -1839,6 +1839,35 @@ pub mod terra_registry {
     }
 
     // -----------------------------------------------------------------------
+    // Cross-border jurisdiction links (RFC-012 Phase 10)
+    // -----------------------------------------------------------------------
+
+    pub fn create_cross_border_binding(
+        ctx: Context<CreateCrossBorderBinding>,
+        country_min: [u8; 2],
+        country_max: [u8; 2],
+        expires_at: i64,
+    ) -> Result<()> {
+        cross_border::create_cross_border_binding(ctx, country_min, country_max, expires_at)
+    }
+
+    pub fn set_cross_border_binding_status(
+        ctx: Context<SetCrossBorderBindingStatus>,
+        status: u8,
+    ) -> Result<()> {
+        cross_border::set_cross_border_binding_status(ctx, status)
+    }
+
+    pub fn record_cross_border_verification(
+        ctx: Context<RecordCrossBorderVerification>,
+        task_id: [u8; 32],
+        req_index: u8,
+        validator: Pubkey,
+    ) -> Result<()> {
+        cross_border::record_cross_border_verification(ctx, task_id, req_index, validator)
+    }
+
+    // -----------------------------------------------------------------------
     // Parcel subdivision & amalgamation (RFC-008)
     // -----------------------------------------------------------------------
 
@@ -2007,6 +2036,14 @@ pub mod terra_registry {
         note: String,
     ) -> Result<()> {
         validator_profile::update_validator_profile(ctx, identity_hash, note)
+    }
+
+    /// Declare / update the validator's operating jurisdiction (RFC-012 Phase 10).
+    pub fn set_validator_jurisdiction(
+        ctx: Context<SetValidatorJurisdiction>,
+        jurisdiction: [u8; 2],
+    ) -> Result<()> {
+        validator_profile::set_validator_jurisdiction(ctx, jurisdiction)
     }
 
     pub fn set_validator_profile_tier(
@@ -3339,6 +3376,116 @@ pub struct RebindCrossBorderIdentity<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// Cross-border jurisdiction links contexts (RFC-012 Phase 10)
+// -----------------------------------------------------------------------
+
+/// Both jurisdiction authorities sign (treaty semantics); the PDA pins the
+/// canonically ordered country pair so exactly one link exists per pair.
+#[derive(Accounts)]
+#[instruction(country_min: [u8; 2], country_max: [u8; 2], expires_at: i64)]
+pub struct CreateCrossBorderBinding<'info> {
+    #[account(
+        init,
+        payer = authority_min,
+        space = 8 + cross_border::CrossBorderBinding::INIT_SPACE,
+        seeds = [b"cross_border_binding".as_ref(), &country_min, &country_max],
+        bump
+    )]
+    pub binding: Account<'info, cross_border::CrossBorderBinding>,
+    pub jurisdiction_min: Account<'info, cross_border::Jurisdiction>,
+    pub jurisdiction_max: Account<'info, cross_border::Jurisdiction>,
+    #[account(
+        mut,
+        constraint = authority_min.key() == jurisdiction_min.authority
+            @ TerraError::NotAuthorized
+    )]
+    pub authority_min: Signer<'info>,
+    #[account(
+        constraint = authority_max.key() == jurisdiction_max.authority
+            @ TerraError::NotAuthorized
+    )]
+    pub authority_max: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Either authority may suspend/revoke/reactivate. Both Jurisdiction
+/// accounts are pinned to the ones stored on the binding, so a foreign
+/// authority cannot pass two of its own jurisdictions to satisfy the
+/// OR-signer check. REVOKED is terminal (handler).
+#[derive(Accounts)]
+pub struct SetCrossBorderBindingStatus<'info> {
+    #[account(mut)]
+    pub binding: Account<'info, cross_border::CrossBorderBinding>,
+    #[account(
+        constraint = jurisdiction_min.key() == binding.jurisdiction_min
+            @ TerraError::JurisdictionMismatch
+    )]
+    pub jurisdiction_min: Account<'info, cross_border::Jurisdiction>,
+    #[account(
+        constraint = jurisdiction_max.key() == binding.jurisdiction_max
+            @ TerraError::JurisdictionMismatch
+    )]
+    pub jurisdiction_max: Account<'info, cross_border::Jurisdiction>,
+    #[account(
+        constraint = authority.key() == jurisdiction_min.authority
+            || authority.key() == jurisdiction_max.authority
+            @ TerraError::NotAuthorized
+    )]
+    pub authority: Signer<'info>,
+}
+
+/// Permissionless auditable record — every fact is proven by the accounts
+/// (completed assignment + declared profile + requirement + ACTIVE binding).
+#[derive(Accounts)]
+#[instruction(task_id: [u8; 32], req_index: u8, validator: Pubkey)]
+pub struct RecordCrossBorderVerification<'info> {
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + cross_border::CrossBorderSpanRecord::INIT_SPACE,
+        seeds = [
+            b"cross_border_verification".as_ref(),
+            task_id.as_ref(),
+            validator.as_ref(),
+        ],
+        bump
+    )]
+    pub verification: Account<'info, cross_border::CrossBorderSpanRecord>,
+    #[account(
+        seeds = [b"task".as_ref(), task_id.as_ref()],
+        bump,
+        constraint = task.task_id == task_id @ TerraError::InvalidTaskRequirement
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(
+        seeds = [b"task_requirement".as_ref(), task_id.as_ref(), &[req_index]],
+        bump,
+        constraint = requirement.task_id == task_id
+            && requirement.req_index == req_index
+            @ TerraError::InvalidTaskRequirement
+    )]
+    pub requirement: Account<'info, verification_task::TaskRequirement>,
+    #[account(
+        seeds = [
+            b"task_assignment".as_ref(),
+            task_id.as_ref(),
+            validator.as_ref(),
+        ],
+        bump
+    )]
+    pub assignment: Account<'info, verification_task::TaskAssignment>,
+    #[account(
+        seeds = [b"validator_profile".as_ref(), validator.as_ref()],
+        bump,
+        constraint = profile.wallet == validator @ TerraError::NotAuthorized
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub binding: Account<'info, cross_border::CrossBorderBinding>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 // ---------------------------------------------------------------------------
 // Subdivision/Amalgamation contexts (RFC-008)
 // ---------------------------------------------------------------------------
@@ -4384,6 +4531,20 @@ pub struct InitValidatorProfile<'info> {
 
 #[derive(Accounts)]
 pub struct UpdateValidatorProfile<'info> {
+    #[account(
+        mut,
+        seeds = [b"validator_profile", wallet.key().as_ref()],
+        bump,
+        constraint = profile.wallet == wallet.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub wallet: Signer<'info>,
+}
+
+/// Self-declared operating jurisdiction (RFC-012 Phase 10) — same trust
+/// model as presence: a claim that fraud governance can act on.
+#[derive(Accounts)]
+pub struct SetValidatorJurisdiction<'info> {
     #[account(
         mut,
         seeds = [b"validator_profile", wallet.key().as_ref()],
@@ -6513,6 +6674,42 @@ pub struct DeviceVerified {
     pub verified_at: i64,
 }
 
+// Cross-border jurisdiction link events (RFC-012 Phase 10)
+#[event]
+pub struct CrossBorderBindingCreated {
+    pub binding: Pubkey,
+    pub country_min: [u8; 2],
+    pub country_max: [u8; 2],
+    pub expires_at: i64,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct CrossBorderBindingStatusChanged {
+    pub binding: Pubkey,
+    pub status: u8,
+    pub updated_by: Pubkey,
+    pub updated_at: i64,
+}
+
+#[event]
+pub struct CrossBorderVerificationRecorded {
+    pub verification: Pubkey,
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub country_home: [u8; 2],
+    pub country_required: [u8; 2],
+    pub binding: Pubkey,
+    pub recorded_at: i64,
+}
+
+#[event]
+pub struct ValidatorJurisdictionSet {
+    pub wallet: Pubkey,
+    pub jurisdiction: [u8; 2],
+    pub updated_at: i64,
+}
+
 // ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
@@ -7198,6 +7395,20 @@ pub enum TerraError {
     DeviceRevoked,
     #[msg("Signer is not the device owner")]
     NotDeviceOwner,
+
+    // Cross-border jurisdiction links (RFC-012 Phase 10)
+    #[msg("Country pair is invalid (equal, reversed, or mismatched)")]
+    InvalidJurisdictionPair,
+    #[msg("Invalid cross-border binding status value")]
+    InvalidBindingStatus,
+    #[msg("Verification must span two different jurisdictions")]
+    SameJurisdiction,
+    #[msg("Jurisdiction accounts or binding do not match the required pair")]
+    JurisdictionMismatch,
+    #[msg("Cross-border binding expiry must be in the future (or 0)")]
+    InvalidBindingExpiry,
+    #[msg("Validator profile or requirement jurisdiction is undeclared")]
+    UndeclaredJurisdiction,
 }
 
 #[cfg(test)]

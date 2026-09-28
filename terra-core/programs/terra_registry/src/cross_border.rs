@@ -406,6 +406,264 @@ pub fn rebind_cross_border_identity(
 }
 
 // ---------------------------------------------------------------------------
+// RFC-012 Phase 10 — cross-border jurisdiction links & spanning verifications
+// ---------------------------------------------------------------------------
+
+/// Lifecycle of a jurisdiction-to-jurisdiction link (`CrossBorderBinding`).
+pub mod binding_status {
+    pub const ACTIVE: u8 = 0;
+    pub const SUSPENDED: u8 = 1;
+    /// Terminal — no further transitions.
+    pub const REVOKED: u8 = 2;
+    pub const MAX: u8 = REVOKED;
+}
+
+/// Canonical ordering of a country pair: lexicographic (min, max).
+/// Keeps the PDA `["cross_border_binding", min, max]` unique per unordered pair.
+pub fn order_country_pair(a: [u8; 2], b: [u8; 2]) -> ([u8; 2], [u8; 2]) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+pub fn is_valid_binding_status(status: u8) -> bool {
+    status <= binding_status::MAX
+}
+
+/// ACTIVE ↔ SUSPENDED, both may be REVOKED; REVOKED is terminal.
+/// Setting the same status is an idempotent no-op update.
+pub fn can_transition_binding(from: u8, to: u8) -> bool {
+    use binding_status::*;
+    if from == REVOKED {
+        return false;
+    }
+    if to > MAX {
+        return false;
+    }
+    matches!(
+        (from, to),
+        (ACTIVE, ACTIVE)
+            | (ACTIVE, SUSPENDED)
+            | (ACTIVE, REVOKED)
+            | (SUSPENDED, SUSPENDED)
+            | (SUSPENDED, ACTIVE)
+            | (SUSPENDED, REVOKED)
+    )
+}
+
+/// `expires_at == 0` means no expiry.
+pub fn binding_is_expired(expires_at: i64, now: i64) -> bool {
+    expires_at != 0 && now >= expires_at
+}
+
+/// Jurisdiction-to-jurisdiction recognition link (RFC-012 §5 `CrossBorderBinding`).
+///
+/// PDA: `["cross_border_binding", country_min, country_max]` — the country pair
+/// is stored canonically ordered, so one PDA exists per unordered pair and
+/// routing can derive it from `TaskRequirement.jurisdiction` + profile
+/// jurisdiction without extra lookups.
+#[account]
+#[derive(InitSpace)]
+pub struct CrossBorderBinding {
+    /// Smaller of the two ISO 3166-1 alpha-2 codes (2 bytes).
+    pub country_min: [u8; 2],
+    /// Larger of the two codes.
+    pub country_max: [u8; 2],
+    /// Jurisdiction PDA of `country_min`.
+    pub jurisdiction_min: Pubkey,
+    /// Jurisdiction PDA of `country_max`.
+    pub jurisdiction_max: Pubkey,
+    /// `binding_status` — ACTIVE / SUSPENDED / REVOKED (terminal).
+    pub status: u8,
+    /// Unix expiry (0 = none).
+    pub expires_at: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// A verification that spanned two jurisdictions (RFC-012 §5
+/// `CrossBorderVerification`) — the auditable record that a validator from
+/// `country_home` produced a result for a task requiring `country_required`
+/// under an ACTIVE `CrossBorderBinding`.
+///
+/// PDA: `["cross_border_verification", task_id, validator]`.
+#[account]
+#[derive(InitSpace)]
+pub struct CrossBorderSpanRecord {
+    pub task_id: [u8; 32],
+    pub validator: Pubkey,
+    pub req_index: u8,
+    /// The validator's declared `ValidatorProfile.jurisdiction`.
+    pub country_home: [u8; 2],
+    /// The task requirement's jurisdiction.
+    pub country_required: [u8; 2],
+    /// The `CrossBorderBinding` PDA that authorized the span.
+    pub binding: Pubkey,
+    pub recorded_at: i64,
+}
+
+/// Both jurisdictions sign (treaty semantics): authority of each Jurisdiction
+/// PDA must sign; countries must be distinct and canonically ordered; both
+/// must be ACTIVE; expiry must be in the future (or 0).
+pub fn create_cross_border_binding(
+    ctx: Context<crate::CreateCrossBorderBinding>,
+    country_min: [u8; 2],
+    country_max: [u8; 2],
+    expires_at: i64,
+) -> Result<()> {
+    require!(
+        country_min != country_max && country_min < country_max,
+        TerraError::InvalidJurisdictionPair
+    );
+    let now = Clock::get()?.unix_timestamp;
+    require!(
+        expires_at == 0 || expires_at > now,
+        TerraError::InvalidBindingExpiry
+    );
+    let jm = &ctx.accounts.jurisdiction_min;
+    let jx = &ctx.accounts.jurisdiction_max;
+    require!(jm.key() != jx.key(), TerraError::InvalidJurisdictionPair);
+    require!(
+        jm.status == jurisdiction_status::ACTIVE && jx.status == jurisdiction_status::ACTIVE,
+        TerraError::InvalidJurisdictionStatus
+    );
+    require!(
+        [jm.country_code[0], jm.country_code[1]] == country_min,
+        TerraError::InvalidJurisdictionPair
+    );
+    require!(
+        [jx.country_code[0], jx.country_code[1]] == country_max,
+        TerraError::InvalidJurisdictionPair
+    );
+
+    let b = &mut ctx.accounts.binding;
+    b.country_min = country_min;
+    b.country_max = country_max;
+    b.jurisdiction_min = jm.key();
+    b.jurisdiction_max = jx.key();
+    b.status = binding_status::ACTIVE;
+    b.expires_at = expires_at;
+    b.created_at = now;
+    b.updated_at = now;
+
+    emit!(crate::CrossBorderBindingCreated {
+        binding: b.key(),
+        country_min,
+        country_max,
+        expires_at,
+        created_at: now,
+    });
+    Ok(())
+}
+
+/// Suspend / revoke / reactivate a binding. Either authority may act;
+/// REVOKED is terminal. Context pins both Jurisdiction accounts to the
+/// ones stored on the binding so a foreign authority cannot pass two of
+/// its own jurisdictions to satisfy the OR-signer check.
+pub fn set_cross_border_binding_status(
+    ctx: Context<crate::SetCrossBorderBindingStatus>,
+    status: u8,
+) -> Result<()> {
+    require!(
+        is_valid_binding_status(status),
+        TerraError::InvalidBindingStatus
+    );
+    let b = &mut ctx.accounts.binding;
+    require!(
+        can_transition_binding(b.status, status),
+        TerraError::BindingAlreadyRevoked
+    );
+    let now = Clock::get()?.unix_timestamp;
+    b.status = status;
+    b.updated_at = now;
+
+    emit!(crate::CrossBorderBindingStatusChanged {
+        binding: b.key(),
+        status,
+        updated_by: ctx.accounts.authority.key(),
+        updated_at: now,
+    });
+    Ok(())
+}
+
+/// Permissionless auditable record: anyone may pay rent to record that a
+/// completed/submitted assignment spanned two jurisdictions under an ACTIVE
+/// binding (the accounts prove every fact — no trusted recorder).
+pub fn record_cross_border_verification(
+    ctx: Context<crate::RecordCrossBorderVerification>,
+    task_id: [u8; 32],
+    req_index: u8,
+    validator: Pubkey,
+) -> Result<()> {
+    let task = &ctx.accounts.task;
+    require!(task.task_id == task_id, TerraError::InvalidTaskRequirement);
+    let req = &ctx.accounts.requirement;
+    require!(
+        req.task_id == task_id && req.req_index == req_index,
+        TerraError::InvalidTaskRequirement
+    );
+    let assignment = &ctx.accounts.assignment;
+    require!(
+        assignment.status == crate::verification_task::assignment_status::SUBMITTED
+            || assignment.status == crate::verification_task::assignment_status::RELEASED,
+        TerraError::AssignmentNotSubmitted
+    );
+    let profile = &ctx.accounts.profile;
+    require!(profile.wallet == validator, TerraError::NotAuthorized);
+
+    let home = profile.jurisdiction;
+    let required = req.jurisdiction;
+    require!(
+        home != [0, 0] && required != [0, 0],
+        TerraError::UndeclaredJurisdiction
+    );
+    require!(home != required, TerraError::SameJurisdiction);
+
+    let (c_min, c_max) = order_country_pair(home, required);
+    let (expected, _) = Pubkey::find_program_address(
+        &[b"cross_border_binding", c_min.as_ref(), c_max.as_ref()],
+        &crate::ID,
+    );
+    require_keys_eq!(
+        ctx.accounts.binding.key(),
+        expected,
+        TerraError::JurisdictionMismatch
+    );
+    let binding = &ctx.accounts.binding;
+    require!(
+        binding.status == binding_status::ACTIVE,
+        TerraError::BindingRevoked
+    );
+    require!(
+        !binding_is_expired(binding.expires_at, Clock::get()?.unix_timestamp),
+        TerraError::BindingExpired
+    );
+
+    let now = Clock::get()?.unix_timestamp;
+    let v = &mut ctx.accounts.verification;
+    v.task_id = task_id;
+    v.validator = validator;
+    v.req_index = req_index;
+    v.country_home = home;
+    v.country_required = required;
+    v.binding = binding.key();
+    v.recorded_at = now;
+
+    emit!(crate::CrossBorderVerificationRecorded {
+        verification: v.key(),
+        task_id,
+        validator,
+        country_home: home,
+        country_required: required,
+        binding: v.binding,
+        recorded_at: now,
+    });
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
 
@@ -489,5 +747,45 @@ mod tests {
     #[test]
     fn max_reason_len_is_128() {
         assert_eq!(MAX_REASON_LEN, 128);
+    }
+
+    #[test]
+    fn binding_status_values_are_contiguous() {
+        assert_eq!(binding_status::ACTIVE, 0);
+        assert_eq!(binding_status::SUSPENDED, 1);
+        assert_eq!(binding_status::REVOKED, 2);
+        assert_eq!(binding_status::MAX, 2);
+        assert!(is_valid_binding_status(0));
+        assert!(is_valid_binding_status(2));
+        assert!(!is_valid_binding_status(3));
+    }
+
+    #[test]
+    fn country_pair_ordering_is_canonical() {
+        assert_eq!(order_country_pair(*b"CM", *b"KE"), (*b"CM", *b"KE"));
+        assert_eq!(order_country_pair(*b"KE", *b"CM"), (*b"CM", *b"KE"));
+        assert_eq!(order_country_pair(*b"AA", *b"AA"), (*b"AA", *b"AA"));
+    }
+
+    #[test]
+    fn binding_transitions_respect_revoked_terminal() {
+        use binding_status::*;
+        assert!(can_transition_binding(ACTIVE, SUSPENDED));
+        assert!(can_transition_binding(ACTIVE, REVOKED));
+        assert!(can_transition_binding(SUSPENDED, ACTIVE));
+        assert!(can_transition_binding(SUSPENDED, REVOKED));
+        assert!(can_transition_binding(ACTIVE, ACTIVE)); // idempotent
+        assert!(!can_transition_binding(REVOKED, ACTIVE));
+        assert!(!can_transition_binding(REVOKED, SUSPENDED));
+        assert!(!can_transition_binding(REVOKED, REVOKED));
+        assert!(!can_transition_binding(ACTIVE, 9)); // out of range
+    }
+
+    #[test]
+    fn binding_expiry_zero_means_never() {
+        assert!(!binding_is_expired(0, 1_700_000_000));
+        assert!(!binding_is_expired(1_800_000_000, 1_700_000_000));
+        assert!(binding_is_expired(1_700_000_000, 1_700_000_000)); // boundary
+        assert!(binding_is_expired(1_600_000_000, 1_700_000_000));
     }
 }

@@ -99,18 +99,35 @@ pub fn passes_geo(
     distance_m(p.latitude_e7, p.longitude_e7, center_lat_e7, center_lon_e7) <= u64::from(radius_m)
 }
 
-/// Jurisdiction filter: `[0,0]` = any; else candidate profile must be in
-/// the required country. Profiles do not yet store jurisdiction — Phase 6
-/// treats non-zero jurisdiction as a soft pass with a TODO for Phase 10
-/// (cross-border bindings). Kept as a pure hook so Phase 10 can tighten it.
-pub fn passes_jurisdiction(_required: [u8; 2]) -> bool {
-    // Any: pass. Non-zero: pass until profile carries jurisdiction (Phase 10).
-    true
+/// Jurisdiction gate (RFC-012 Phase 10, replaces the Phase 6 soft-pass stub):
+/// `[0,0]` required = any. Otherwise the candidate's declared profile
+/// jurisdiction must equal the required country, or a validated ACTIVE
+/// `CrossBorderBinding` between the two countries must exist
+/// (`binding_ok`, derived from the per-candidate binding slot).
+/// Undeclared candidate jurisdiction (`[0,0]`) never satisfies a scoped task.
+pub fn passes_jurisdiction(
+    required: [u8; 2],
+    profile_jurisdiction: [u8; 2],
+    binding_ok: bool,
+) -> bool {
+    if required == [0, 0] {
+        return true;
+    }
+    if profile_jurisdiction == [0, 0] {
+        return false;
+    }
+    if profile_jurisdiction == required {
+        return true;
+    }
+    binding_ok
 }
 
 /// Composite multi-factor eligibility (order matches Design Rule 3).
 /// `candidate_level` is `Some` only when a capability PDA was supplied.
 /// `reputation_score` is 0 when no reputation PDA was supplied.
+/// `binding_ok` is the validated cross-border binding slot (always true when
+/// the requirement has no jurisdiction constraint).
+#[allow(clippy::too_many_arguments)]
 pub fn is_eligible(
     requirement: &TaskRequirement,
     profile: &ValidatorProfile,
@@ -118,13 +135,14 @@ pub fn is_eligible(
     reputation_score: u16,
     candidate_level: Option<u8>,
     presence: Option<&ValidatorPresence>,
+    binding_ok: bool,
     now: i64,
 ) -> bool {
     passes_availability(availability.status)
         && passes_tier(profile.tier, requirement.min_tier)
         && passes_reputation(reputation_score, requirement.min_reputation)
         && passes_capability(requirement.capability_code, candidate_level)
-        && passes_jurisdiction(requirement.jurisdiction)
+        && passes_jurisdiction(requirement.jurisdiction, profile.jurisdiction, binding_ok)
         && passes_geo(
             requirement.radius_m,
             requirement.center_lat_e7,
@@ -197,6 +215,32 @@ fn deser<T: anchor_lang::AccountDeserialize>(ai: &AccountInfo) -> Result<T> {
     T::try_deserialize(&mut slice)
 }
 
+/// Validate the per-candidate `CrossBorderBinding` slot (RFC-012 Phase 10).
+/// Soft-fails (`false`) on owner/PDA/pair/status/expiry mismatch so the
+/// candidate simply loses eligibility instead of aborting the whole route.
+fn binding_slot_ok(ai: &AccountInfo, required: [u8; 2], home: [u8; 2], now: i64) -> bool {
+    if ai.owner != &crate::ID {
+        return false;
+    }
+    let b: crate::cross_border::CrossBorderBinding = match deser(ai) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+    let (c_min, c_max) = crate::cross_border::order_country_pair(required, home);
+    if b.country_min != c_min || b.country_max != c_max {
+        return false;
+    }
+    let (expected, _) = Pubkey::find_program_address(
+        &[b"cross_border_binding", c_min.as_ref(), c_max.as_ref()],
+        &crate::ID,
+    );
+    if *ai.key != expected {
+        return false;
+    }
+    b.status == crate::cross_border::binding_status::ACTIVE
+        && !crate::cross_border::binding_is_expired(b.expires_at, now)
+}
+
 // ---------------------------------------------------------------------------
 // Instruction handler
 // ---------------------------------------------------------------------------
@@ -212,6 +256,7 @@ fn deser<T: anchor_lang::AccountDeserialize>(ai: &AccountInfo) -> Result<T> {
 ///   [presence]     if requirement.radius_m > 0
 ///   [capability]   if requirement.capability_code != CAPABILITY_ANY
 ///   [restriction]  if requirement.capability_code != CAPABILITY_ANY
+///   [binding]      if requirement.jurisdiction != [0,0]  (Phase 10 gate)
 /// ```
 /// The optional `restriction` slot is a `CapabilityRestriction` PDA. If deser
 /// fails (empty account / wrong type) it is treated as "no restriction".
@@ -265,10 +310,12 @@ pub fn route_task(
     require!(chosen != t.requester, TerraError::SelfTaskAssignment);
 
     // Stride: reputation always; +presence if geo; +capability if specific code;
-    // +restriction when a specific capability code is required (Phase 7 gate).
+    // +restriction when a specific capability code is required (Phase 7 gate);
+    // +binding when the requirement scopes a jurisdiction (Phase 10 gate).
     let need_geo = req.radius_m > 0;
     let need_cap = req.capability_code != CAPABILITY_ANY;
-    let stride = 3 + need_geo as usize + 2 * need_cap as usize;
+    let need_juris = req.jurisdiction != [0, 0];
+    let stride = 3 + need_geo as usize + 2 * need_cap as usize + need_juris as usize;
     let expected_len = stride * candidates.len();
     require!(
         ctx.remaining_accounts.len() == expected_len,
@@ -338,7 +385,24 @@ pub fn route_task(
                 // random pick still works among free candidates.
                 continue;
             }
+            cursor += 1;
         }
+
+        // Phase 10 gate: when the requirement scopes a jurisdiction, the
+        // segment carries a trailing binding slot. Ignored when the candidate
+        // is in the required country itself; otherwise it must be the valid
+        // ACTIVE CrossBorderBinding for (required, candidate) — soft-fail
+        // (ineligible) on any mismatch.
+        let binding_ok = if need_juris {
+            let ai = &ctx.remaining_accounts[cursor];
+            if profile.jurisdiction == req.jurisdiction {
+                true // same country — slot is filler
+            } else {
+                binding_slot_ok(ai, req.jurisdiction, profile.jurisdiction, now)
+            }
+        } else {
+            true
+        };
 
         let ok = is_eligible(
             req,
@@ -347,6 +411,7 @@ pub fn route_task(
             reputation_score,
             candidate_level,
             presence_ref.as_ref(),
+            binding_ok,
             now,
         );
         if ok {
@@ -538,5 +603,23 @@ mod tests {
         let s2 = route_seed(&task, &bh, 2);
         assert_ne!(s1, s2);
         assert_eq!(route_seed(&task, &bh, 1), s1);
+    }
+
+    #[test]
+    fn jurisdiction_gate_truth_table() {
+        // Any requirement passes regardless of declaration or binding.
+        assert!(passes_jurisdiction([0, 0], [0, 0], false));
+        assert!(passes_jurisdiction([0, 0], *b"KE", false));
+
+        // Scoped requirement + candidate in the required country.
+        assert!(passes_jurisdiction(*b"CM", *b"CM", false));
+
+        // Scoped requirement + undeclared candidate → fail (even with binding).
+        assert!(!passes_jurisdiction(*b"CM", [0, 0], true));
+        assert!(!passes_jurisdiction(*b"CM", [0, 0], false));
+
+        // Scoped requirement + foreign candidate → needs a valid binding.
+        assert!(passes_jurisdiction(*b"CM", *b"KE", true));
+        assert!(!passes_jurisdiction(*b"CM", *b"KE", false));
     }
 }

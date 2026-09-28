@@ -26989,3 +26989,653 @@ async fn b6_composite_claim_rejects_non_ownership_right() {
         .unwrap()
         .is_some());
 }
+
+// ---------------------------------------------------------------------------
+// RFC-012 Phase 10 — cross-border + privacy (jurisdiction gates, bindings,
+// spanning verifications)
+// ---------------------------------------------------------------------------
+
+fn cb_binding_pda(country_min: &[u8; 2], country_max: &[u8; 2]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"cross_border_binding", country_min, country_max],
+        &PROGRAM_ID,
+    )
+}
+
+fn cb_verification_pda(task_id: &[u8; 32], validator: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"cross_border_verification", task_id, validator.as_ref()],
+        &PROGRAM_ID,
+    )
+}
+
+async fn phase10_register_jurisdiction(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    registry: &Pubkey,
+    cc: &[u8; 2],
+    name: &str,
+) -> Pubkey {
+    let mut country_code = [0u8; 16];
+    country_code[..2].copy_from_slice(cc);
+    let (jurisdiction, _) = jurisdiction_pda(&country_code);
+    let mut data = discriminator("global", "register_jurisdiction").to_vec();
+    data.extend_from_slice(&country_code);
+    data.extend_from_slice(&borsh_ser(&name.to_string()));
+    data.extend_from_slice(&borsh_ser(&"QmSchema".to_string()));
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    data.extend_from_slice(&[41u8; 32]);
+    data.extend_from_slice(&borsh_ser(&0u8));
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(jurisdiction, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(*registry, false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_jurisdiction");
+    jurisdiction
+}
+
+fn phase10_create_binding_ix(
+    signer: &Pubkey,
+    jurisdiction_min: &Pubkey,
+    jurisdiction_max: &Pubkey,
+    country_min: [u8; 2],
+    country_max: [u8; 2],
+    expires_at: i64,
+) -> Instruction {
+    let (binding, _) = cb_binding_pda(&country_min, &country_max);
+    let mut data = discriminator("global", "create_cross_border_binding").to_vec();
+    data.extend_from_slice(&country_min);
+    data.extend_from_slice(&country_max);
+    data.extend_from_slice(&expires_at.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(binding, false),
+            AccountMeta::new_readonly(*jurisdiction_min, false),
+            AccountMeta::new_readonly(*jurisdiction_max, false),
+            AccountMeta::new(*signer, true),
+            AccountMeta::new(*signer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+fn phase10_set_status_ix(
+    binding: &Pubkey,
+    jurisdiction_min: &Pubkey,
+    jurisdiction_max: &Pubkey,
+    authority: &Pubkey,
+    status: u8,
+) -> Instruction {
+    let mut data = discriminator("global", "set_cross_border_binding_status").to_vec();
+    data.push(status);
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*binding, false),
+            AccountMeta::new_readonly(*jurisdiction_min, false),
+            AccountMeta::new_readonly(*jurisdiction_max, false),
+            AccountMeta::new(*authority, true),
+        ],
+        data,
+    }
+}
+
+/// Create a task with a single requirement scoped to `jurisdiction`.
+async fn phase10_create_task_with_req(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    task_id: &[u8; 32],
+    jurisdiction: [u8; 2],
+) {
+    let subject = Pubkey::new_unique();
+    let (task_pk, _) = task_pda(task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+    let data = create_task_data(
+        task_id,
+        &subject,
+        terra_registry::verification_task::task_class::PHYSICAL,
+        1_000_000,
+        deadline,
+        &[1u8; 32],
+        1,
+    );
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task (phase10)");
+
+    let (req_pk, _) = task_requirement_pda(task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0); // req_index
+    data.push(terra_registry::verification_task::CAPABILITY_ANY);
+    data.extend_from_slice(&0u16.to_le_bytes()); // min_reputation
+    data.push(0); // min_tier
+    data.extend_from_slice(&jurisdiction);
+    data.extend_from_slice(&0u32.to_le_bytes()); // radius_m (no geo)
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&8000u16.to_le_bytes());
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add requirement (phase10)");
+}
+
+/// route_task with the Phase 10 stride (profile, availability, reputation,
+/// binding) for a single candidate. `binding_slot` is the trailing account.
+async fn phase10_route(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    task_id: &[u8; 32],
+    validator: &Pubkey,
+    binding_slot: Pubkey,
+) -> Result<(), solana_program_test::BanksClientError> {
+    let (task_pk, _) = task_pda(task_id);
+    let (req_pk, _) = task_requirement_pda(task_id, 0);
+    let (assign_pk, _) = task_assignment_pda(task_id, validator);
+    let (profile_pk, _) = validator_profile_pda(validator);
+    let (avail_pk, _) = validator_availability_pda(validator);
+    let data = route_task_data(task_id, 0, &[*validator], validator, 1);
+    process(
+        ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(*validator, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                // remaining_accounts (stride 4): profile, availability,
+                // reputation stand-in, binding slot
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(binding_slot, false),
+            ],
+            data,
+        },
+    )
+    .await
+}
+
+/// Declare the validator's home jurisdiction on its profile.
+async fn phase10_set_jurisdiction(
+    ctx: &mut ProgramTestContext,
+    validator: &Keypair,
+    jurisdiction: [u8; 2],
+) {
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "set_validator_jurisdiction").to_vec();
+    data.extend_from_slice(&jurisdiction);
+    process(
+        ctx,
+        validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set_validator_jurisdiction");
+}
+
+async fn phase10_submit(ctx: &mut ProgramTestContext, task_id: &[u8; 32], validator: &Keypair) {
+    let (task_pk, _) = task_pda(task_id);
+    let (assign_pk, _) = task_assignment_pda(task_id, &validator.pubkey());
+    let mut data = discriminator("global", "submit_task_result").to_vec();
+    data.extend_from_slice(task_id);
+    data.push(terra_registry::verification_task::task_outcome::PASS);
+    data.extend_from_slice(&[7u8; 32]);
+    process(
+        ctx,
+        validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit_task_result (phase10)");
+}
+
+#[tokio::test]
+async fn phase10_cross_border_binding_lifecycle() {
+    use terra_registry::cross_border::{self, CrossBorderBinding};
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let jm = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"CM", "Cameroon").await;
+    let jx = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"NG", "Nigeria").await;
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+
+    // Reversed pair rejected before anything is created.
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jx, &jm, *b"NG", *b"CM", 0),
+    )
+    .await;
+    assert_custom_error(res, 6225, "reversed country pair must fail");
+
+    // Past expiry rejected.
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(
+            &payer.pubkey(),
+            &jm,
+            &jx,
+            *b"CM",
+            *b"NG",
+            clock.unix_timestamp - 100,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6229, "past expiry must fail");
+
+    // Happy path: both authorities (= payer/admin here) sign.
+    let (binding_pk, _) = cb_binding_pda(b"CM", b"NG");
+    process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jm, &jx, *b"CM", *b"NG", 0),
+    )
+    .await
+    .expect("create binding");
+    let b: CrossBorderBinding = read_account(&ctx, binding_pk).await;
+    assert_eq!(b.country_min, *b"CM");
+    assert_eq!(b.country_max, *b"NG");
+    assert_eq!(b.jurisdiction_min, jm);
+    assert_eq!(b.jurisdiction_max, jx);
+    assert_eq!(b.status, cross_border::binding_status::ACTIVE);
+
+    // Duplicate create collides on the canonical PDA.
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jm, &jx, *b"CM", *b"NG", 0),
+    )
+    .await;
+    assert!(res.is_err(), "duplicate binding must fail");
+
+    // Invalid status value rejected.
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_set_status_ix(&binding_pk, &jm, &jx, &payer.pubkey(), 9),
+    )
+    .await;
+    assert_custom_error(res, 6226, "invalid binding status must fail");
+
+    // ACTIVE → SUSPENDED → REVOKED (terminal).
+    process(
+        &mut ctx,
+        &payer,
+        phase10_set_status_ix(
+            &binding_pk,
+            &jm,
+            &jx,
+            &payer.pubkey(),
+            cross_border::binding_status::SUSPENDED,
+        ),
+    )
+    .await
+    .expect("suspend binding");
+    let b: CrossBorderBinding = read_account(&ctx, binding_pk).await;
+    assert_eq!(b.status, cross_border::binding_status::SUSPENDED);
+
+    process(
+        &mut ctx,
+        &payer,
+        phase10_set_status_ix(
+            &binding_pk,
+            &jm,
+            &jx,
+            &payer.pubkey(),
+            cross_border::binding_status::REVOKED,
+        ),
+    )
+    .await
+    .expect("revoke binding");
+    let b: CrossBorderBinding = read_account(&ctx, binding_pk).await;
+    assert_eq!(b.status, cross_border::binding_status::REVOKED);
+
+    // REVOKED is terminal — no transition out.
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_set_status_ix(
+            &binding_pk,
+            &jm,
+            &jx,
+            &payer.pubkey(),
+            cross_border::binding_status::ACTIVE,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6091, "transition out of REVOKED must fail");
+}
+
+#[tokio::test]
+async fn phase10_routing_jurisdiction_gate() {
+    use terra_registry::validator_profile::ValidatorProfile;
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let jm = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"CM", "Cameroon").await;
+    let jx = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"NG", "Nigeria").await;
+
+    // ACTIVE binding CM↔NG.
+    let (binding_pk, _) = cb_binding_pda(b"CM", b"NG");
+    process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jm, &jx, *b"CM", *b"NG", 0),
+    )
+    .await
+    .expect("create binding");
+
+    // Validator with declared home = CM (also asserts set/readback).
+    let validator = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &validator).await;
+    phase10_set_jurisdiction(&mut ctx, &validator, *b"CM").await;
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let profile: ValidatorProfile = read_account(&ctx, profile_pk).await;
+    assert_eq!(profile.jurisdiction, *b"CM");
+
+    // 1. Foreign task (NG) + valid ACTIVE binding → eligible → assigned.
+    let task_ok = [0xA1u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_ok, *b"NG").await;
+    phase10_route(&mut ctx, &payer, &task_ok, &validator.pubkey(), binding_pk)
+        .await
+        .expect("route with valid binding");
+    let (_, assignment_status) = {
+        let (assign_pk, _) = task_assignment_pda(&task_ok, &validator.pubkey());
+        let a: terra_registry::verification_task::TaskAssignment =
+            read_account(&ctx, assign_pk).await;
+        (a.task_id, a.status)
+    };
+    assert_eq!(
+        assignment_status,
+        terra_registry::verification_task::assignment_status::ASSIGNED
+    );
+
+    // 2. Foreign task + wrong binding-slot account → soft-fail → 6187.
+    let task_bad = [0xA2u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_bad, *b"NG").await;
+    let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
+    let res = phase10_route(&mut ctx, &payer, &task_bad, &validator.pubkey(), avail_pk).await;
+    assert_custom_error(res, 6187, "foreign task without binding must fail");
+
+    // 3. Same-country task (CM) → binding slot is filler (any account).
+    let task_same = [0xA3u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_same, *b"CM").await;
+    phase10_route(&mut ctx, &payer, &task_same, &validator.pubkey(), avail_pk)
+        .await
+        .expect("route same-country with filler slot");
+
+    // 4. Undeclared profile (home [0,0]) never satisfies a scoped task.
+    let undeclared = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &undeclared).await;
+    let task_und = [0xA4u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_und, *b"NG").await;
+    let res = phase10_route(
+        &mut ctx,
+        &payer,
+        &task_und,
+        &undeclared.pubkey(),
+        binding_pk,
+    )
+    .await;
+    assert_custom_error(res, 6187, "undeclared jurisdiction must fail routing");
+}
+
+#[tokio::test]
+async fn phase10_record_cross_border_verification() {
+    use terra_registry::cross_border::{self, CrossBorderSpanRecord};
+    use terra_registry::validator_profile::ValidatorProfile;
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let jm = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"CM", "Cameroon").await;
+    let jx = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"NG", "Nigeria").await;
+
+    // ACTIVE binding CM↔NG + validator home = CM.
+    let (binding_pk, _) = cb_binding_pda(b"CM", b"NG");
+    process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jm, &jx, *b"CM", *b"NG", 0),
+    )
+    .await
+    .expect("create binding");
+    let v1 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v1).await;
+    phase10_set_jurisdiction(&mut ctx, &v1, *b"CM").await;
+
+    let phase10_record = |task_id: [u8; 32], validator: &Pubkey, binding: Pubkey| {
+        let (verification_pk, _) = cb_verification_pda(&task_id, validator);
+        let (task_pk, _) = task_pda(&task_id);
+        let (req_pk, _) = task_requirement_pda(&task_id, 0);
+        let (assign_pk, _) = task_assignment_pda(&task_id, validator);
+        let (profile_pk, _) = validator_profile_pda(validator);
+        let mut data = discriminator("global", "record_cross_border_verification").to_vec();
+        data.extend_from_slice(&task_id);
+        data.push(0);
+        data.extend_from_slice(validator.as_ref());
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(verification_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(assign_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(binding, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        }
+    };
+
+    // A: foreign task, assignment still ASSIGNED → 6214.
+    let task_a = [0xB1u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_a, *b"NG").await;
+    phase10_route(&mut ctx, &payer, &task_a, &v1.pubkey(), binding_pk)
+        .await
+        .expect("route A");
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_a, &v1.pubkey(), binding_pk),
+    )
+    .await;
+    assert_custom_error(res, 6214, "record before submit must fail");
+
+    // Submit → record happy path.
+    phase10_submit(&mut ctx, &task_a, &v1).await;
+    process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_a, &v1.pubkey(), binding_pk),
+    )
+    .await
+    .expect("record happy path");
+    let (verification_pk, _) = cb_verification_pda(&task_a, &v1.pubkey());
+    let vrec: CrossBorderSpanRecord = read_account(&ctx, verification_pk).await;
+    assert_eq!(vrec.task_id, task_a);
+    assert_eq!(vrec.validator, v1.pubkey());
+    assert_eq!(vrec.req_index, 0);
+    assert_eq!(vrec.country_home, *b"CM");
+    assert_eq!(vrec.country_required, *b"NG");
+    assert_eq!(vrec.binding, binding_pk);
+    assert!(vrec.recorded_at > 0);
+
+    // B: same jurisdiction (home NG == required NG) → 6227.
+    let v2 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v2).await;
+    phase10_set_jurisdiction(&mut ctx, &v2, *b"NG").await;
+    let task_b = [0xB2u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_b, *b"NG").await;
+    let (avail2, _) = validator_availability_pda(&v2.pubkey());
+    phase10_route(&mut ctx, &payer, &task_b, &v2.pubkey(), avail2)
+        .await
+        .expect("route B (same country)");
+    phase10_submit(&mut ctx, &task_b, &v2).await;
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_b, &v2.pubkey(), binding_pk),
+    )
+    .await;
+    assert_custom_error(res, 6227, "same-jurisdiction record must fail");
+
+    // C: wrong binding pair (CM↔GH) → 6228.
+    let jgh = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"GH", "Ghana").await;
+    let (binding_gh, _) = cb_binding_pda(b"CM", b"GH");
+    process(
+        &mut ctx,
+        &payer,
+        phase10_create_binding_ix(&payer.pubkey(), &jm, &jgh, *b"CM", *b"GH", 0),
+    )
+    .await
+    .expect("create CM-GH binding");
+    let task_c = [0xB3u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_c, *b"NG").await;
+    phase10_route(&mut ctx, &payer, &task_c, &v1.pubkey(), binding_pk)
+        .await
+        .expect("route C");
+    phase10_submit(&mut ctx, &task_c, &v1).await;
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_c, &v1.pubkey(), binding_gh),
+    )
+    .await;
+    assert_custom_error(res, 6228, "mismatched binding must fail");
+
+    // D: binding suspended → 6089.
+    let task_d = [0xB4u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_d, *b"NG").await;
+    phase10_route(&mut ctx, &payer, &task_d, &v1.pubkey(), binding_pk)
+        .await
+        .expect("route D");
+    phase10_submit(&mut ctx, &task_d, &v1).await;
+    process(
+        &mut ctx,
+        &payer,
+        phase10_set_status_ix(
+            &binding_pk,
+            &jm,
+            &jx,
+            &payer.pubkey(),
+            cross_border::binding_status::SUSPENDED,
+        ),
+    )
+    .await
+    .expect("suspend binding");
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_d, &v1.pubkey(), binding_pk),
+    )
+    .await;
+    assert_custom_error(res, 6089, "suspended binding record must fail");
+
+    // E: undeclared profile → 6230 (direct assign — routing would never pick it).
+    let v3 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v3).await;
+    let (profile3, _) = validator_profile_pda(&v3.pubkey());
+    let p3: ValidatorProfile = read_account(&ctx, profile3).await;
+    assert_eq!(p3.jurisdiction, [0u8; 2]);
+    let task_e = [0xB5u8; 32];
+    phase10_create_task_with_req(&mut ctx, &payer, &task_e, *b"NG").await;
+    let (task_e_pk, _) = task_pda(&task_e);
+    let (assign_e, _) = task_assignment_pda(&task_e, &v3.pubkey());
+    let mut data = discriminator("global", "assign_task_validator").to_vec();
+    data.extend_from_slice(&task_e);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_e, false),
+                AccountMeta::new(task_e_pk, false),
+                AccountMeta::new_readonly(v3.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("assign undeclared validator");
+    phase10_submit(&mut ctx, &task_e, &v3).await;
+    let res = process(
+        &mut ctx,
+        &payer,
+        phase10_record(task_e, &v3.pubkey(), binding_pk),
+    )
+    .await;
+    assert_custom_error(res, 6230, "undeclared jurisdiction record must fail");
+}

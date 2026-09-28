@@ -62,8 +62,8 @@ changing `terra-core/programs/terra_registry`, regenerate from the repo:
 cd ../terra-core && make idl
 ```
 
-**Synced:** checked-in IDL matches source (RFC-012 Phase 9, **2026-09-26**):
-**154 instructions / 63 accounts / 141 events / 225 errors**. Re-run `make idl`
+**Synced:** checked-in IDL matches source (RFC-012 Phase 10, **2026-09-28**):
+**158 instructions / 65 accounts / 145 events / 231 errors**. Re-run `make idl`
 (and re-sync `src/idl/` types) before shipping client changes that depend on
 new instructions, accounts, events, or error codes.
 
@@ -77,7 +77,7 @@ with 2D Leaflet fallback on WebGL failure, `/progress` investor page driven by
 **Next (for anyone continuing without prior context):**
 1. After program edits: `cd ../terra-core && make idl`, then re-sync `src/idl/` types (`terraRegistry.ts` is generated from `terra_registry.json`) — do not hand-edit the JSON.
 2. Wire wallet signing to the deployed program IDs (root README / `Anchor.toml`); no live devnet deployment yet.
-3. Extend pages/components against new API routes as RFC-012 Phase 9 lands (21 route modules today; list lives in `terra-core/api/src/routes/`).
+3. Extend pages/components against new API routes (21 route modules today; list lives in `terra-core/api/src/routes/`); RFC-012 Phases 0–10 are on `dev` — next is devnet deployment + wallet wiring.
 4. Keep `pnpm exec tsc --noEmit` and `pnpm lint` green (CI runs the typecheck).
 
 Source of truth for protocol behavior: [`../docs/VISION.md`](../docs/VISION.md) →
