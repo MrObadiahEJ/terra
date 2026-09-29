@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { PublicKey } from '@solana/web3.js'
 import { sha256Bytes, sha256Hex } from '../../lib/geo'
+import { reportTx } from '../../lib/txStore'
 import { ClipboardCheck, Gavel, RotateCcw, Search, ShieldQuestion } from 'lucide-react'
 
 // --- program constants (verification/*.rs) ---------------------------------
@@ -23,6 +24,17 @@ const CLAIM_STATUS = ['SUBMITTED', 'UNDER_VERIFICATION', 'VERIFIED', 'REJECTED',
 const STATUS_CLASS = ['warn', 'info', 'ok', 'err', 'warn'] as const
 
 const CHALLENGE_STATUS = ['FILED', 'UNDER_REVIEW', 'UPHELD', 'OVERTURNED'] as const
+
+// Successful lifecycle events → the on-chain instruction that emits them.
+const EVENT_IX: Record<string, string> = {
+  ClaimCreated: 'create_claim',
+  EvidenceAdded: 'add_evidence_artifact',
+  ObservationSubmitted: 'submit_observation_v2',
+  VerificationAttestationSubmitted: 'submit_attestation',
+  ClaimVerified: 'verify_claim',
+  ChallengeFiled: 'file_challenge',
+  ChallengeVoteRecorded: 'record_challenge_vote',
+}
 
 interface Attestation {
   validator: number
@@ -80,6 +92,7 @@ export default function VerificationPipeline() {
   const [err, setErr] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const seq = useRef(0)
+  const actionIx = useRef('unknown_instruction')
 
   const [claimType, setClaimType] = useState(0)
   const [required, setRequired] = useState(2)
@@ -87,8 +100,11 @@ export default function VerificationPipeline() {
   const [confs, setConfs] = useState([90, 85, 80])
   const [challengeVotes, setChallengeVotes] = useState(2)
 
-  const push = (event: string, detail: string, tone: LogEntry['tone'] = 'info') =>
+  const push = (event: string, detail: string, tone: LogEntry['tone'] = 'info') => {
     setLog((l) => [{ id: ++seq.current, event, detail, tone }, ...l])
+    const ix = EVENT_IX[event]
+    if (ix) reportTx(ix, true, `${event} — ${detail}`)
+  }
 
   const reset = () => {
     setClaim(null)
@@ -112,6 +128,7 @@ export default function VerificationPipeline() {
   const fail = (m: string) => {
     setErr(m)
     setNotice(null)
+    reportTx(actionIx.current, false, m)
   }
   const ok = (m: string) => {
     setNotice(m)
@@ -120,6 +137,7 @@ export default function VerificationPipeline() {
 
   // 1) create_claim ---------------------------------------------------------
   const createClaim = async () => {
+    actionIx.current = 'create_claim'
     const statementHash = await sha256Hex(`statement:${claimType}:demo-parcel`)
     const claimId = await sha256Hex(`claim:${claimType}:demo-parcel`)
     if (claimId === '0'.repeat(64)) return fail('EmptyClaimId (6128)')
@@ -147,6 +165,7 @@ export default function VerificationPipeline() {
 
   // 2) add_evidence ---------------------------------------------------------
   const addEvidence = (type: number) => {
+    actionIx.current = 'add_evidence_artifact'
     const e = statusOk([0, 1])
     if (e) return fail(e)
     if (type < 0 || type > 12) return fail('InvalidEvidenceType (6133)')
@@ -157,6 +176,7 @@ export default function VerificationPipeline() {
 
   // 3) submit_observation ---------------------------------------------------
   const submitObservation = () => {
+    actionIx.current = 'submit_observation_v2'
     const e = statusOk([0, 1])
     if (e) return fail(e)
     const first = claim!.observationCount === 0
@@ -176,6 +196,7 @@ export default function VerificationPipeline() {
 
   // 4) submit_attestation ---------------------------------------------------
   const submitAttestation = (v: number) => {
+    actionIx.current = 'submit_attestation'
     const e = statusOk([0, 1])
     if (e) return fail(e)
     const result = results[v]
@@ -199,6 +220,7 @@ export default function VerificationPipeline() {
 
   // 5) verify_claim ---------------------------------------------------------
   const verifyClaim = () => {
+    actionIx.current = 'verify_claim'
     if (!claim) return fail('InvalidClaimStatus (6131): no claim')
     if (claim.status !== 0 && claim.status !== 1) {
       return fail(`InvalidClaimStatus (6131): claim.status = ${CLAIM_STATUS[claim.status]}`)
@@ -220,6 +242,7 @@ export default function VerificationPipeline() {
 
   // 6) file_challenge / vote_challenge -------------------------------------
   const fileChallenge = async () => {
+    actionIx.current = 'file_challenge'
     if (!claim) return fail('InvalidClaimStatus (6131): no claim')
     if (claim.status !== 2) {
       return fail(
@@ -248,6 +271,7 @@ export default function VerificationPipeline() {
   }
 
   const vote = (v: number, uphold: boolean) => {
+    actionIx.current = 'record_challenge_vote'
     if (!challenge) return fail('InvalidClaimStatus (6131): no challenge')
     if (challenge.status > 1) {
       return fail(`InvalidClaimStatus (6131): challenge is ${CHALLENGE_STATUS[challenge.status]}`)

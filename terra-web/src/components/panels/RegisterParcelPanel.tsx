@@ -6,6 +6,7 @@ import { getProgram, parcelPda } from '../../lib/program'
 import { api, type OffChainParcel, type ReachabilityResult } from '../../lib/api'
 import { bytesToHex } from '../../lib/codec'
 import { sha256Hex, polygonAreaM2, polygonCentroid, type LonLat } from '../../lib/geo'
+import { reportTx } from '../../lib/txStore'
 import type { DrawVertex } from '../map/TerraGlobe'
 import { PencilRuler, Square, Loader2 } from 'lucide-react'
 
@@ -93,11 +94,12 @@ export default function RegisterParcelPanel({
       }
       addLocalParcel(local)
 
-      setMsg(
+      const demoMsg =
         `Demo parcel stored ${savedToApi ? 'locally + API' : 'on this device'} · ` +
-          `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(4)}, ${centroid[0].toFixed(4)} · ` +
-          `sha256 ${geometryHash.slice(0, 16)}…`,
-      )
+        `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(4)}, ${centroid[0].toFixed(4)} · ` +
+        `sha256 ${geometryHash.slice(0, 16)}…`
+      setMsg(demoMsg)
+      reportTx('register_parcel', true, demoMsg)
       onClearDrawing()
       setName('')
     } catch (e) {
@@ -165,7 +167,9 @@ export default function RegisterParcelPanel({
         )
       }
 
-      setMsg(`Parcel registered on-chain: ${sig.slice(0, 12)}…`)
+      const regMsg = `Parcel registered on-chain: ${sig.slice(0, 12)}…`
+      setMsg(regMsg)
+      reportTx('register_parcel', true, regMsg, { sig })
       await refreshParcels()
       onClearDrawing()
       setName('')

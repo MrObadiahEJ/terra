@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Globe2, RotateCcw } from 'lucide-react'
+import { Globe2, Radio, RotateCcw } from 'lucide-react'
+import { reportTx } from '../../lib/txStore'
 
 // --- country helpers (cross_border.rs: [u8;2] ISO-3166-1 alpha-2 bytes) -----
 
@@ -307,6 +308,32 @@ export default function CrossBorderGate() {
       <div className="lab-grid">
         <VerdictCard title="route_task — candidate eligibility (soft-fail filter)" verdict={route} />
         <VerdictCard title="record_cross_border_verification — auditable span record" verdict={span} />
+      </div>
+
+      <div className="lab-card mt-3 flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
+            <Radio size={14} /> Broadcast the span record
+          </h3>
+          <p className="text-[11px] text-muted mt-1">
+            Sends the current verdict to the demo chain:{' '}
+            {span.ok ? 'confirmed span record' : 'fails with the guard error above'}.
+          </p>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={() =>
+            reportTx(
+              'record_cross_border_verification',
+              span.ok,
+              span.ok
+                ? `CrossBorderVerificationRecorded — ${req} ⇄ ${home} binding=${binding}`
+                : span.headline,
+            )
+          }
+        >
+          <Radio size={13} /> Sign &amp; send
+        </button>
       </div>
     </div>
   )

@@ -38,6 +38,12 @@ export default function Navbar() {
         >
           Lab
         </NavLink>
+        <NavLink
+          to="/transactions"
+          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+        >
+          Transactions
+        </NavLink>
       </nav>
 
       <div className="ml-auto flex items-center gap-2">

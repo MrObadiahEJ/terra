@@ -9,6 +9,7 @@ import {
   type LabResult,
 } from '../../lib/labStore'
 import { sha256Bytes, sha256Hex, type LonLat } from '../../lib/geo'
+import { reportTx } from '../../lib/txStore'
 import { Boxes, FilePlus2, BadgeCheck, RotateCcw } from 'lucide-react'
 
 // --- borsh-style account serialization (Anchor layout, little-endian) -------
@@ -270,16 +271,16 @@ export default function GeometryVault() {
               <button
                 className="btn btn-primary w-full justify-center"
                 disabled={disabled}
-                onClick={() =>
-                  setMsg(
-                    v.initAsset(
-                      keys?.authorityB58 ?? '',
-                      dim,
-                      Math.round(elevMin * 1000),
-                      Math.round(elevMax * 1000),
-                    ),
+                onClick={() => {
+                  const r = v.initAsset(
+                    keys?.authorityB58 ?? '',
+                    dim,
+                    Math.round(elevMin * 1000),
+                    Math.round(elevMax * 1000),
                   )
-                }
+                  setMsg(r)
+                  reportTx('init_spatial_asset', r.ok, r.msg)
+                }}
               >
                 Initialize asset
               </button>
@@ -329,17 +330,17 @@ export default function GeometryVault() {
               <button
                 className="btn btn-primary w-full justify-center"
                 disabled={disabled}
-                onClick={async () =>
-                  setMsg(
-                    await v.appendVersion(
-                      shape,
-                      source,
-                      vDim,
-                      activeStorageRef,
-                      keys?.validatorB58 ?? 'payer',
-                    ),
+                onClick={async () => {
+                  const r = await v.appendVersion(
+                    shape,
+                    source,
+                    vDim,
+                    activeStorageRef,
+                    keys?.validatorB58 ?? 'payer',
                   )
-                }
+                  setMsg(r)
+                  reportTx('append_geometry_version', r.ok, r.msg)
+                }}
               >
                 Anchor version {nextIndex}
               </button>
@@ -392,7 +393,9 @@ export default function GeometryVault() {
                             disabled={!keys}
                             onClick={(e) => {
                               e.stopPropagation()
-                              setMsg(v.verifyVersion(entry.version, keys?.validatorB58 ?? 'validator'))
+                              const r = v.verifyVersion(entry.version, keys?.validatorB58 ?? 'validator')
+                              setMsg(r)
+                              reportTx('verify_geometry_version', r.ok, r.msg)
                             }}
                           >
                             <BadgeCheck size={12} /> Verify
