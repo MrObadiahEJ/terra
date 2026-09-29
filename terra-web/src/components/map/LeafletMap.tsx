@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import * as L from 'leaflet'
 import {
   MapContainer,
   TileLayer,
@@ -41,6 +42,19 @@ function ClickHandler({
       onVertexAdd({ lon: e.latlng.lng, lat: e.latlng.lat })
     },
   })
+  return null
+}
+
+/** Default zoom control sits top-left where the stats pill overlaps it. */
+function ZoomBottomLeft() {
+  const map = useMap()
+  useEffect(() => {
+    const control = L.control.zoom({ position: 'bottomleft' })
+    control.addTo(map)
+    return () => {
+      control.remove()
+    }
+  }, [map])
   return null
 }
 
@@ -89,9 +103,11 @@ export default function LeafletMap({
     <MapContainer
       center={CENTER}
       zoom={DEFAULT_ZOOM}
+      zoomControl={false}
       className="leaflet-container"
       style={{ width: '100%', height: '100%' }}
     >
+      <ZoomBottomLeft />
       <TileLayer
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="© OpenStreetMap contributors"

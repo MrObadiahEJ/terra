@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
 import ProgressPage from './pages/ProgressPage'
+import LabPage from './pages/LabPage'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
 
@@ -24,6 +25,7 @@ function App() {
         <Routes>
           <Route path="/" element={<GlobePage />} />
           <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/lab" element={<LabPage />} />
         </Routes>
       </div>
     </BrowserRouter>

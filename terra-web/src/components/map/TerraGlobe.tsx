@@ -23,6 +23,8 @@ interface TerraGlobeProps {
   onDrawVertexAdd: (v: DrawVertex) => void
   onParcelClick: (id: string) => void
   focus?: { longitude: number; latitude: number; height: number } | null
+  /** Reports WebGL status upward: error message on fallback, null on success. */
+  onWebGLStatus?: (msg: string | null) => void
 }
 
 export default function TerraGlobe({
@@ -34,11 +36,16 @@ export default function TerraGlobe({
   onDrawVertexAdd,
   onParcelClick,
   focus,
+  onWebGLStatus,
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const drawingRef = useRef(false)
   const [webglError, setWebglError] = useState<string | null>(null)
+  const onWebGLStatusRef = useRef(onWebGLStatus)
+  useEffect(() => {
+    onWebGLStatusRef.current = onWebGLStatus
+  })
 
   // ---- init viewer ---------------------------------------------------------
   useEffect(() => {
@@ -82,11 +89,18 @@ export default function TerraGlobe({
     } catch (err) {
       // WebGL unavailable (no GPU / acceleration disabled / remote session).
       // Show a fallback panel instead of letting the error kill the app.
-      setWebglError(err instanceof Error ? err.message : String(err))
+      // React reuses this same <div> for the fallback shell (both branches
+      // render a div), so purge Cesium's partially-built viewer + error panel
+      // — otherwise the dead widget DOM overlays the 2D map.
+      containerRef.current?.replaceChildren()
+      const msg = err instanceof Error ? err.message : String(err)
+      setWebglError(msg)
+      onWebGLStatusRef.current?.(msg)
       return
     }
 
     viewerRef.current = viewer
+    onWebGLStatusRef.current?.(null)
 
     return () => {
       viewer.destroy()
@@ -245,12 +259,27 @@ export default function TerraGlobe({
     })
   }, [focus])
 
+  // Cesium may append its error panel asynchronously after the constructor
+  // throws; keep purging leftover widget DOM so it can't overlay the 2D map.
+  // (The fallback branch reuses this same div — React sees `div` → `div`.)
+  useEffect(() => {
+    if (!webglError) return
+    const el = containerRef.current
+    if (!el) return
+    const clean = () => {
+      el.querySelectorAll(
+        ':scope > .cesium-viewer, :scope > .cesium-widget, :scope > .cesium-widget-errorPanel',
+      ).forEach((n) => n.remove())
+    }
+    clean()
+    const mo = new MutationObserver(clean)
+    mo.observe(el, { childList: true })
+    return () => mo.disconnect()
+  }, [webglError])
+
   if (webglError) {
     return (
       <div className="globe-shell">
-        <div className="globe-notice">
-          WebGL unavailable — showing the 2D map ({webglError}).
-        </div>
         <div className="globe-map">
           <LeafletMap
             offChainParcels={offChainParcels}

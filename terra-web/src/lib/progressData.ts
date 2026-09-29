@@ -89,6 +89,7 @@ export const ROADMAP: RoadmapGroup[] = [
       { done: true, label: 'Phase 2 — PostGIS fusion, OSM ingestion, geo-engine' },
       { done: true, label: 'Phase 3 — road-access validation + on-chain digest anchor' },
       { done: true, label: 'Phase 4 — identity, succession, rotation, forfeiture' },
+      { done: true, label: 'Frontend demo layer — /lab experiments + offline demo-data globe (wallet-less)' },
       { done: false, label: 'Phase 5 — legal 3D / air-rights layer' },
       { done: false, label: 'Phase 6 — country configuration layer' },
       { done: false, label: 'Phase 7/8 — regional expansion → global platform' },

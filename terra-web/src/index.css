@@ -119,6 +119,7 @@ a {
 .relative { position: relative; }
 .left-3 { left: 12px; }
 .top-3 { top: 12px; }
+.right-3 { right: 12px; }
 .pointer-events-none { pointer-events: none; }
 
 .flex { display: flex; }
@@ -581,6 +582,14 @@ a {
   .pp-title { font-size: 20px; }
 }
 
+.min-h-14 {
+  min-height: 3.5rem;
+}
+/* wallet-adapter ships its own button CSS — keep the label on one line */
+header .wallet-adapter-button {
+  white-space: nowrap;
+}
+
 /* ---- globe fallback (WebGL unavailable → 2D Leaflet map) ----------------- */
 .globe-shell {
   display: flex;
@@ -606,3 +615,275 @@ a {
   height: 100%;
   background: #aad3df;
 }
+.globe-stage {
+  position: relative;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+/* Leaflet's map panes are z-index 200–700; the overlays must beat them
+   (z-index: auto would paint underneath the tiles and never show). */
+.globe-stats,
+.globe-chips {
+  z-index: 900;
+}
+
+/* ---- globe page layout (responsive: sidebar stacks on narrow screens) ---- */
+.globe-layout {
+  display: flex;
+  height: calc(100vh - 3.5rem);
+}
+.globe-side {
+  width: 360px;
+  border-left: 1px solid var(--border);
+}
+@media (max-width: 860px) {
+  .globe-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .globe-layout > main {
+    /* main carries .flex-1 (flex-basis: 0) which would collapse it in a
+       column container — an explicit basis is required to keep the map tall. */
+    flex: 0 0 58vh;
+    height: 58vh;
+  }
+  .globe-side {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+@media (max-width: 560px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  /* stats (top-left) and layer chips would collide on a phone: park the
+     chips along the bottom edge of the map instead. */
+  .globe-chips {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    justify-content: center;
+  }
+}
+
+/* ---- Terra Lab (/lab) ---------------------------------------------------- */
+.lab {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 20px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+.lab-head { margin-bottom: 14px; }
+.lab-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0 0 6px;
+}
+.lab-sub {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 760px;
+  margin: 0;
+  line-height: 1.5;
+}
+.lab-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.lab-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+}
+.lab-tab:hover { color: var(--ink); }
+.lab-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.lab-tab-hint { font-size: 10px; color: var(--muted); font-weight: 400; }
+.lab-main { min-height: 320px; }
+.lab-foot {
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.lab-body { position: relative; }
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.lab-col { min-width: 0; }
+.lab-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.lab-shape {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+.lab-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.lab-badge-ok { background: #d1fae5; color: #065f46; }
+.lab-badge-info { background: #e0e7ff; color: #3730a3; }
+.lab-badge-warn { background: #fef3c7; color: #92400e; }
+.lab-badge-err { background: #fee2e2; color: #991b1b; }
+.lab-version {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.lab-version:hover { background: var(--bg); }
+.lab-version.active { border-color: var(--accent); background: #ecfdf5; }
+.lab-validator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.lab-field-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.lab-field-row {
+  display: grid;
+  grid-template-columns: 90px minmax(150px, 1.1fr) 1.4fr;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.lab-field-row:last-child { border-bottom: none; }
+.lab-field-row:nth-child(odd) { background: var(--bg); }
+.hexdump {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.55;
+  background: #111827;
+  color: #d1d5db;
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  margin: 0;
+  white-space: pre;
+}
+.lab-quorum { display: flex; gap: 4px; }
+.lab-quorum-cell {
+  width: 26px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--border);
+}
+.lab-quorum-cell.on { background: var(--accent); }
+.lab-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lab-log-entry {
+  border-left: 3px solid var(--border);
+  padding: 4px 8px;
+  background: var(--bg);
+  border-radius: 0 4px 4px 0;
+  font-size: 11px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.lab-log-entry.tone-ok { border-left-color: var(--accent); }
+.lab-log-entry.tone-warn { border-left-color: #f59e0b; }
+.lab-log-entry.tone-err { border-left-color: #ef4444; }
+.lab-log-entry.tone-info { border-left-color: #6366f1; }
+.lab-msg {
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.lab-msg.ok { background: #d1fae5; color: #065f46; }
+.lab-msg.err { background: #fee2e2; color: #991b1b; }
+.lab-gates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lab-gates li {
+  display: grid;
+  grid-template-columns: 16px minmax(120px, auto) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 7px;
+  border-radius: 5px;
+  background: var(--bg);
+}
+.lab-gates .gate-mark { font-weight: 700; text-align: center; }
+.gate-pass .gate-mark { color: #059669; }
+.gate-fail .gate-mark { color: #dc2626; }
+.gate-skip .gate-mark { color: var(--muted); }
+.gate-fail { background: #fef2f2; }
+@media (max-width: 860px) {
+  .lab { padding: 14px 12px 40px; }
+  .lab-grid { grid-template-columns: 1fr; }
+  .lab-field-row { grid-template-columns: 70px 1fr; }
+  .lab-field-row span:last-child { grid-column: 1 / -1; }
+}
+
+.lab-attestation {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lab-attestation-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lab-attestation-controls .select-input { flex: 1 1 auto; min-width: 0; }
+.lab-attestation-controls .text-input { width: 70px; flex: 0 0 auto; }

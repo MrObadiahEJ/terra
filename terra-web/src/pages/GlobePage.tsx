@@ -3,9 +3,11 @@ import TerraGlobe, { type DrawVertex } from '../components/map/TerraGlobe'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
+import OffChainParcelPanel from '../components/panels/OffChainParcelPanel'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
 import { api, type RoadRow, type PoiRow } from '../lib/api'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
+import { ChevronDown, ChevronUp, Route, MapPin, Square } from 'lucide-react'
 
 export default function GlobePage() {
   const {
@@ -16,13 +18,19 @@ export default function GlobePage() {
     loadStats,
     selectedParcel,
     selectParcel,
+    selectedOffChain,
+    selectOffChain,
+    demoMode,
   } = useAppStore()
 
   const [drawing, setDrawing] = useState(false)
+  const [webglStatus, setWebglStatus] = useState<string | null>(null)
   const [drawVertices, setDrawVertices] = useState<DrawVertex[]>([])
   const [roads, setRoads] = useState<RoadRow[]>([])
   const [pois, setPois] = useState<PoiRow[]>([])
+  const [layersDemo, setLayersDemo] = useState(false)
   const [tab, setTab] = useState<'register' | 'browse'>('browse')
+  const [showLayers, setShowLayers] = useState({ parcels: true, roads: true, pois: true })
 
   // Initial load of off-chain data + stats.
   useEffect(() => {
@@ -31,20 +39,52 @@ export default function GlobePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Roads/POIs with bundled demo fallback (API down or empty database).
   useEffect(() => {
     let cancelled = false
+    let demo = false
     api
       .roads()
-      .then((r) => !cancelled && setRoads(r))
-      .catch(() => {})
+      .then((r) => {
+        if (cancelled) return
+        if (r.length === 0) {
+          demo = true
+          setRoads(DEMO_ROADS)
+        } else {
+          setRoads(r)
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        demo = true
+        setRoads(DEMO_ROADS)
+      })
     api
       .poisFusion()
-      .then((p) => !cancelled && setPois(p))
-      .catch(() => {})
+      .then((p) => {
+        if (cancelled) return
+        if (p.length === 0) {
+          demo = true
+          setPois(DEMO_POIS)
+        } else {
+          setPois(p)
+        }
+        if (demo) setLayersDemo(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setPois(DEMO_POIS)
+        setLayersDemo(true)
+      })
     return () => {
       cancelled = true
     }
   }, [])
+
+  const shownParcels = showLayers.parcels ? offChainParcels : []
+  const shownRoads = showLayers.roads ? roads : []
+  const shownPois = showLayers.pois ? pois : []
+  const usingDemo = demoMode || layersDemo
 
   const selectedSummary = useMemo(() => {
     if (!selectedParcel) return null
@@ -55,47 +95,82 @@ export default function GlobePage() {
   const onSelectParcel = (p: OnChainParcelItem) => selectParcel(p)
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* 3D globe */}
-      <main className="flex-1 relative">
+    <div className="globe-layout">
+      {/* 3D globe (2D Leaflet fallback without WebGL) */}
+      <main className="flex-1 relative flex flex-col">
+        {webglStatus && (
+          <div className="globe-notice">
+            WebGL unavailable — showing the 2D map. Cesium: {webglStatus}
+          </div>
+        )}
+        <div className="globe-stage">
         <TerraGlobe
-          offChainParcels={offChainParcels}
-          roads={roads}
-          pois={pois}
+          offChainParcels={shownParcels}
+          roads={shownRoads}
+          pois={shownPois}
           drawing={drawing}
           drawVertices={drawVertices}
           onDrawVertexAdd={(v) => setDrawVertices((vs) => [...vs, v])}
           onParcelClick={(id) => {
             const off = offChainParcels.find((p) => p.id === id)
-            if (off) {
-              // Link the off-chain geometry record to its on-chain ownership by
-              // matching on holder + name (both are written at registration time).
-              const onchain = useAppStore
-                .getState()
-                .parcels.find(
-                  (p) =>
-                    p.holder === off.holder &&
-                    p.account.name === off.name,
-                )
-              if (onchain) selectParcel(onchain)
-            }
+            if (!off) return
+            // Link the off-chain geometry record to its on-chain ownership by
+            // matching on holder + name (both are written at registration time).
+            const onchain = useAppStore
+              .getState()
+              .parcels.find((p) => p.holder === off.holder && p.account.name === off.name)
+            if (onchain) selectParcel(onchain)
+            else selectOffChain(off)
           }}
+          onWebGLStatus={setWebglStatus}
         />
 
         {/* stats overlay */}
-        {(geoStats?.roads || fusionStats?.roads) && (
-          <div className="absolute top-3 left-3 bg-surface/90 backdrop-blur rounded-lg shadow px-3 py-2 text-[11px] pointer-events-none">
-            <div className="flex gap-3">
-              <span>🏛️ Roads: <b>{fusionStats?.roads ?? geoStats?.roads ?? 0}</b></span>
-              <span>📍 POIs: <b>{fusionStats?.pois ?? geoStats?.pois ?? 0}</b></span>
-              <span>📏 {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km` : 'OSM off'}</span>
-            </div>
-          </div>
-        )}
+        <div className="globe-stats absolute top-3 left-3 bg-surface/90 rounded-lg shadow px-3 py-2 text-[11px] pointer-events-none flex flex-wrap gap-3 items-center">
+          <span>
+            🗺️ Parcels: <b>{offChainParcels.length}</b>
+          </span>
+          <span>
+            🛣️ Roads: <b>{fusionStats?.roads ?? geoStats?.roads ?? roads.length}</b>
+          </span>
+          <span>
+            📍 POIs: <b>{fusionStats?.pois ?? geoStats?.pois ?? pois.length}</b>
+          </span>
+          <span>
+            📏 {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km` : 'OSM off'}
+          </span>
+          {usingDemo && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+              demo data
+            </span>
+          )}
+        </div>
+
+        {/* layer toggles */}
+        <div className="globe-chips absolute top-3 right-3 bg-surface/90 rounded-lg shadow px-2 py-1.5 flex gap-1 text-[11px]">
+          {(
+            [
+              ['parcels', 'Parcels', Square],
+              ['roads', 'Roads', Route],
+              ['pois', 'POIs', MapPin],
+            ] as const
+          ).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              className={`btn btn-ghost px-2 py-1 gap-1 ${showLayers[key] ? 'text-emerald-700' : 'text-muted'}`}
+              onClick={() => setShowLayers((s) => ({ ...s, [key]: !s[key] }))}
+              title={`Toggle ${label}`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
+        </div>
+        </div>
       </main>
 
       {/* Sidebar */}
-      <aside className="w-[360px] border-l bg-surface flex flex-col shrink-0">
+      <aside className="globe-side bg-surface flex flex-col">
         <div className="flex border-b">
           {(['register', 'browse'] as const).map((t) => (
             <button
@@ -143,8 +218,22 @@ export default function GlobePage() {
                 </div>
               )}
             </>
+          ) : selectedOffChain ? (
+            <>
+              <div className="flex items-center justify-between px-3 pt-2">
+                <span className="text-[12px] text-muted">Selected map parcel</span>
+                <button
+                  className="btn btn-ghost p-1"
+                  onClick={() => selectOffChain(null)}
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <OffChainParcelPanel parcel={selectedOffChain} />
+            </>
           ) : (
-            <ParcelListPanel onSelect={onSelectParcel} />
+            <ParcelListPanel onSelect={onSelectParcel} onSelectOffChain={selectOffChain} />
           )}
         </div>
 

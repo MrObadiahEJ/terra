@@ -13,7 +13,7 @@ export default function Navbar() {
   }, [publicKey, refreshParcels])
 
   return (
-    <header className="flex items-center gap-3 px-4 h-14 border-b bg-surface shrink-0">
+    <header className="flex flex-wrap items-center gap-3 px-4 min-h-14 border-b bg-surface shrink-0">
       <div className="flex items-center gap-2 font-semibold tracking-tight">
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
         Terra
@@ -31,6 +31,12 @@ export default function Navbar() {
           className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
         >
           Progress
+        </NavLink>
+        <NavLink
+          to="/lab"
+          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+        >
+          Lab
         </NavLink>
       </nav>
 

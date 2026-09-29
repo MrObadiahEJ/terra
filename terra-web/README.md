@@ -11,7 +11,7 @@ map view, and the investor progress page.
 - **React 19** + **TypeScript** + **Vite**
 - **CesiumJS** (3D globe) with automatic **2D Leaflet fallback** when WebGL is unavailable (zero new dependencies — `react-leaflet` was already installed; see `components/map/LeafletMap.tsx`)
 - **Solana wallet adapter** (`@solana/web3.js`, `@coral-xyz/anchor`)
-- **Zustand** state, **React Router** (`BrowserRouter`: `/` → globe, `/progress` → investor demo)
+- **Zustand** state, **React Router** (`BrowserRouter`: `/` → globe, `/progress` → investor demo, `/lab` → interactive experiments)
 - **pnpm** package manager
 - **No CSS framework** — `src/index.css` contains a hand-rolled utility stylesheet (~97 classes) plus app styles; there is no Tailwind and none may be added
 
@@ -52,6 +52,7 @@ terra-web/src/
 |-------|------|---------|
 | `/` | `GlobePage` → `TerraGlobe` | Cesium 3D globe with parcels/roads/POIs + draw mode; if WebGL fails, shows an amber notice and renders the **2D Leaflet map** instead (same data, fully interactive) |
 | `/progress` | `ProgressPage` | Investor/demo document: vision, architecture (3 layers + program IDs), 5 flagship scenarios, live-globe CTA, metrics, roadmap, module catalog, security posture — all content lives in `lib/progressData.ts` |
+| `/lab` | `LabPage` | Three hands-on experiments (`components/lab/`): **Geometry Vault** (init/append/verify with real guard errors + `sha256` digests + borsh byte inspector), **Verification pipeline** (claim → evidence → observation → attestations → quorum → challenge, authentic event log), **Cross-border gate** (jurisdiction/binding routing verdicts). Deep-links: `?tab=vault\|pipeline\|crossborder` |
 
 ## IDL
 

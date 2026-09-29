@@ -3,8 +3,9 @@ import { Transaction } from '@solana/web3.js'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
 import { getProgram, parcelPda } from '../../lib/program'
-import { api, type ReachabilityResult } from '../../lib/api'
+import { api, type OffChainParcel, type ReachabilityResult } from '../../lib/api'
 import { bytesToHex } from '../../lib/codec'
+import { sha256Hex, polygonAreaM2, polygonCentroid, type LonLat } from '../../lib/geo'
 import type { DrawVertex } from '../map/TerraGlobe'
 import { PencilRuler, Square, Loader2 } from 'lucide-react'
 
@@ -32,8 +33,79 @@ export default function RegisterParcelPanel({
   const [err, setErr] = useState<string | null>(null)
   const [report, setReport] = useState<ReachabilityResult | null>(null)
 
-  const canSubmit =
-    publicKey !== null && name.trim() !== '' && drawVertices.length >= 3
+  const addLocalParcel = useAppStore((s) => s.addLocalParcel)
+
+  const canSubmit = name.trim() !== '' && drawVertices.length >= 3
+
+  /** Closed ring [lon, lat] from the drawn vertices. */
+  const buildRing = (): LonLat[] => {
+    const ring = drawVertices.map((v) => [v.lon, v.lat] as LonLat)
+    ring.push(ring[0])
+    return ring
+  }
+
+  /**
+   * Offline demo registration (no wallet / no API): same real SHA-256 hashes
+   * and geometry metrics as the on-chain flow, stored on this device and
+   * shown immediately on the globe.
+   */
+  const onDemoRegister = async () => {
+    setBusy(true)
+    setMsg(null)
+    setErr(null)
+    setReport(null)
+    try {
+      const ring = buildRing()
+      const geometry = { type: 'Polygon', coordinates: [ring] }
+
+      // Same derivation as the on-chain flow: id over the geometry, hash over
+      // the ring — both real SHA-256, computed locally.
+      const idHex = await sha256Hex(JSON.stringify(geometry))
+      const geometryHash = await sha256Hex(JSON.stringify(ring))
+      const area = polygonAreaM2(ring)
+      const centroid = polygonCentroid(ring)
+      const now = new Date().toISOString()
+
+      // Best-effort persistence when the API happens to be up.
+      let savedToApi = false
+      try {
+        await api.createParcel({
+          name: name.trim(),
+          holder: 'demo:local',
+          status: 'registered',
+          geometry,
+        })
+        savedToApi = true
+        await refreshOffChain()
+      } catch {
+        // offline — the local record below is enough for the demo
+      }
+
+      const local: OffChainParcel = {
+        id: idHex,
+        name: name.trim(),
+        holder: 'demo:local',
+        status: 'registered',
+        geometry: JSON.stringify(geometry),
+        area_m2: area,
+        created_at: now,
+        updated_at: now,
+      }
+      addLocalParcel(local)
+
+      setMsg(
+        `Demo parcel stored ${savedToApi ? 'locally + API' : 'on this device'} · ` +
+          `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(4)}, ${centroid[0].toFixed(4)} · ` +
+          `sha256 ${geometryHash.slice(0, 16)}…`,
+      )
+      onClearDrawing()
+      setName('')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Demo registration failed')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const onRegister = async () => {
     if (!publicKey) return
@@ -43,8 +115,7 @@ export default function RegisterParcelPanel({
     setReport(null)
     try {
       // Build a closed ring [lon, lat] from the drawn vertices.
-      const ring = [...drawVertices.map((v) => [v.lon, v.lat] as [number, number])]
-      ring.push(ring[0])
+      const ring = buildRing()
       const geometry = { type: 'Polygon', coordinates: [ring] }
 
       // 1) 32-byte parcel id = sha256 over the geometry (stable, unique).
@@ -113,7 +184,10 @@ export default function RegisterParcelPanel({
       </div>
 
       {!publicKey && (
-        <p className="text-[12px] text-amber-700">Connect a wallet to register parcels on-chain.</p>
+        <p className="text-[12px] text-amber-700">
+          No wallet? Use the demo register below — real SHA-256 hashes and geometry metrics,
+          stored on this device.
+        </p>
       )}
 
       <div className="flex gap-2">
@@ -146,10 +220,14 @@ export default function RegisterParcelPanel({
       <button
         className="btn btn-primary w-full justify-center"
         disabled={!canSubmit || busy}
-        onClick={onRegister}
+        onClick={publicKey ? onRegister : onDemoRegister}
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : null}
-        {busy ? 'Registering…' : 'Register on-chain'}
+        {busy
+          ? 'Registering…'
+          : publicKey
+            ? 'Register on-chain'
+            : 'Demo register (local)'}
       </button>
 
       {report && (
