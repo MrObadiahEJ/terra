@@ -55,9 +55,11 @@ admin/authority constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL
 synced to source (161/67/148/237), and CI covers registry/identity lib + rfc012 +
 geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
-**Frontend:** investor demo page at `/progress`, interactive `/lab` experiments
-(geometry vault + on-disk byte inspector, verification pipeline lifecycle,
-cross-border routing gate), 3D Cesium globe with automatic 2D Leaflet fallback
+**Frontend:** interactive `/lab` experiments
+(geometry vault with on-disk byte inspector + WebGL-free SVG 3D land skeleton,
+verification pipeline lifecycle, cross-border routing gate), demo chain explorer at
+`/transactions` (simulated feed, land-version timeline, wallet-signed txs verified on
+devnet), 3D Cesium globe with automatic 2D Leaflet fallback
 when WebGL is unavailable, bundled demo-data fallback so the globe works on any
 device without a wallet or running API, typed API client, wallet adapter.
 
@@ -366,12 +368,13 @@ The stage map (0–10) and long-term direction live in
 - [x] RFC-012 legacy sweep — removed legacy account/instruction surface, IDL 146/62/134/220 (2026-09-25)
 - [x] B6 program-boundary split — `terra_identity` program isolation, IDL 147/62/135/220 (2026-09-25)
 - [x] P0-2 removal-endorsement path — `endorse_validator_removal`, IDL **148/62/135/220** (2026-09-25)
-- [x] Frontend investor demo — `/progress` page, hand-rolled utility CSS, vision/architecture/scenarios sections (2026-09-25)
+- [x] Frontend investor demo — `/progress` page, hand-rolled utility CSS, vision/architecture/scenarios sections (2026-09-25; **page removed 2026-09-30** — superseded by `/lab` + `/transactions`, content folded into this README)
 - [x] Frontend resilience — graceful WebGL failure + automatic **2D Leaflet fallback** (zero new deps, 2026-09-25)
 - [x] RFC-012 Phase 9 — physical infrastructure (2026-09-26): device_identity.rs `DeviceIdentity` PDA + register/update/rotate/status/calibration/verify; errors 6220–6224, IDL **154/63/141/225**
 - [x] RFC-012 Phase 10 — cross-border + privacy (2026-09-28): `ValidatorProfile.jurisdiction` + `set_validator_jurisdiction`; `CrossBorderBinding` PDA (dual-authority treaty sign, ACTIVE/SUSPENDED/REVOKED); `CrossBorderSpanRecord` (permissionless auditable span); `route_task` jurisdiction gate (trailing binding slot in stride); errors 6225–6230, IDL **158/65/145/231**
 - [x] Vision Stage 3 Phase A — spatial intelligence foundations (2026-09-28): `spatial_asset.rs` `SpatialAsset` + `GeometryVersion` PDAs; `init_spatial_asset` / `append_geometry_version` / `verify_geometry_version`; errors 6231–6236; RFC-013 written; IDL **161/67/148/237**
 - [x] Frontend demo layer (2026-09-29): `/lab` interactive experiments (geometry vault with live `sha256` digits + borsh byte inspector mirroring the on-chain layout, verification pipeline lifecycle with authentic event log & error codes, cross-border gate), offline demo-data globe (wallet-less, API-less), local demo parcel registration, responsive/mobile layout fixes
+- [x] Frontend transactions explorer (2026-09-30): `/transactions` simulated chain feed (base58 signatures, accounts, Anchor-style logs, exact error codes), broadcast composer with failure injection, toasts, **land-version timeline** (anchored → verified states with per-version WebGL-free SVG isometric 3D skeletons), wallet-signed txs marked `LIVE` with devnet status + Solana Explorer link, realtime validator-API/devnet pills; **WebGL-free 3D land skeleton** added to `/lab` Geometry Vault; `/progress` page removed
 
 **Next (in order):**
 

@@ -10,6 +10,7 @@ import {
 } from '../../lib/labStore'
 import { sha256Bytes, sha256Hex, type LonLat } from '../../lib/geo'
 import { reportTx } from '../../lib/txStore'
+import IsoLandSkeleton from './IsoLandSkeleton'
 import { Boxes, FilePlus2, BadgeCheck, RotateCcw } from 'lucide-react'
 
 // --- borsh-style account serialization (Anchor layout, little-endian) -------
@@ -157,6 +158,14 @@ export default function GeometryVault() {
   }, [])
 
   const shape = useMemo(() => labShape(v.shapeIndex), [v.shapeIndex])
+  // What the 3D skeleton shows: the inspected anchored version, else the next shape.
+  const isoRing = useMemo(() => {
+    if (inspected !== null) {
+      const e = v.versions.find((x) => x.version === inspected)
+      if (e) return e.ring
+    }
+    return shape
+  }, [inspected, v.versions, shape])
   const [digest, setDigest] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -468,6 +477,22 @@ export default function GeometryVault() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* WebGL-free 3D representation: plain SVG isometric wireframe. */}
+      <div className="lab-card mt-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <h3 className="text-[13px] font-semibold">3D land skeleton — SVG isometric (no WebGL)</h3>
+          <span className="lab-badge lab-badge-info">
+            {inspected === null ? 'current shape' : `GeometryVersion v${inspected}`}
+          </span>
+        </div>
+        <IsoLandSkeleton ring={isoRing} elevMinM={Math.round(elevMin)} elevMaxM={Math.round(elevMax)} />
+        <p className="text-[10px] text-muted mt-1">
+          Extruded wireframe of {inspected === null ? 'the shape to anchor next' : `version v${inspected}`} —
+          ground plane, per-vertex pillars, surface fan and centre axis. Renders on any device with a browser,
+          including environments where Cesium/WebGL is unavailable.
+        </p>
       </div>
 
       {msg && (

@@ -169,7 +169,7 @@ export default function RegisterParcelPanel({
 
       const regMsg = `Parcel registered on-chain: ${sig.slice(0, 12)}…`
       setMsg(regMsg)
-      reportTx('register_parcel', true, regMsg, { sig })
+      reportTx('register_parcel', true, regMsg, { sig, source: 'wallet' })
       await refreshParcels()
       onClearDrawing()
       setName('')

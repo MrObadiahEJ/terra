@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
-import ProgressPage from './pages/ProgressPage'
 import LabPage from './pages/LabPage'
 import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
@@ -11,7 +10,6 @@ import { useAppStore } from './store/appStore'
 
 const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
-  '/progress': 'Terra — Progress',
   '/lab': 'Terra Lab — Interactive demos',
   '/transactions': 'Terra — Transactions',
 }
@@ -42,9 +40,9 @@ function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<GlobePage />} />
-          <Route path="/progress" element={<ProgressPage />} />
           <Route path="/lab" element={<LabPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toasts />
       </div>

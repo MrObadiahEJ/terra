@@ -1,7 +1,7 @@
 # Terra Web
 
 React 19 + Vite frontend for Terra — claims, parcels, verification, a Cesium/Leaflet
-map view, and the investor progress page.
+map view, and the demo transactions explorer.
 
 > Part of Terra — read [`../docs/VISION.md`](../docs/VISION.md) (the north star)
 > first, then the [root `../README.md`](../README.md) for repo status.
@@ -11,7 +11,7 @@ map view, and the investor progress page.
 - **React 19** + **TypeScript** + **Vite**
 - **CesiumJS** (3D globe) with automatic **2D Leaflet fallback** when WebGL is unavailable (zero new dependencies — `react-leaflet` was already installed; see `components/map/LeafletMap.tsx`)
 - **Solana wallet adapter** (`@solana/web3.js`, `@coral-xyz/anchor`)
-- **Zustand** state, **React Router** (`BrowserRouter`: `/` → globe, `/progress` → investor demo, `/lab` → interactive experiments)
+- **Zustand** state, **React Router** (`BrowserRouter`: `/` → globe, `/lab` → interactive experiments, `/transactions` → demo chain explorer)
 - **pnpm** package manager
 - **No CSS framework** — `src/index.css` contains a hand-rolled utility stylesheet (~97 classes) plus app styles; there is no Tailwind and none may be added
 
@@ -36,10 +36,10 @@ directly: `./node_modules/.bin/vite build` (type check via `npx tsc --noEmit`).
 terra-web/src/
 ├── App.tsx                 # Router shell (BrowserRouter)
 ├── main.tsx                # Entry
-├── pages/                  # Route pages: GlobePage (/), ProgressPage (/progress)
+├── pages/                  # Route pages: GlobePage (/), LabPage (/lab), TransactionsPage (/transactions)
 ├── components/             # UI + map/globe
 │   └── map/                # TerraGlobe (Cesium), LeafletMap (2D fallback)
-├── lib/                    # API client (api.ts), progressData.ts (static demo doc)
+├── lib/                    # API client (api.ts), txStore (demo chain feed), labStore (Lab experiments)
 ├── store/                  # Zustand stores
 ├── idl/                    # terra_registry.json + generated types
 ├── leaflet.d.ts            # minimal module shim (no @types/leaflet installed)
@@ -51,8 +51,8 @@ terra-web/src/
 | Route | Page | Purpose |
 |-------|------|---------|
 | `/` | `GlobePage` → `TerraGlobe` | Cesium 3D globe with parcels/roads/POIs + draw mode; if WebGL fails, shows an amber notice and renders the **2D Leaflet map** instead (same data, fully interactive) |
-| `/progress` | `ProgressPage` | Investor/demo document: vision, architecture (3 layers + program IDs), 5 flagship scenarios, live-globe CTA, metrics, roadmap, module catalog, security posture — all content lives in `lib/progressData.ts` |
-| `/lab` | `LabPage` | Three hands-on experiments (`components/lab/`): **Geometry Vault** (init/append/verify with real guard errors + `sha256` digests + borsh byte inspector), **Verification pipeline** (claim → evidence → observation → attestations → quorum → challenge, authentic event log), **Cross-border gate** (jurisdiction/binding routing verdicts). Deep-links: `?tab=vault\|pipeline\|crossborder` |
+| `/lab` | `LabPage` | Three hands-on experiments (`components/lab/`): **Geometry Vault** (init/append/verify with real guard errors + `sha256` digests + borsh byte inspector + **WebGL-free SVG isometric 3D land skeleton**), **Verification pipeline** (claim → evidence → observation → attestations → quorum → challenge, authentic event log), **Cross-border gate** (jurisdiction/binding routing verdicts). Deep-links: `?tab=vault\|pipeline\|crossborder` |
+| `/transactions` | `TransactionsPage` | Demo chain explorer: simulated tx feed (signatures, accounts, Anchor-style program logs, exact `TerraError` codes), broadcast composer with failure injection, wallet-signed txs marked `LIVE` + devnet status check + Solana Explorer link, **Land versions tab** (every anchored geometry version through time: anchored → verified states, per-version 3D skeleton), realtime pills for validator API + devnet RPC |
 
 ## IDL
 
@@ -71,9 +71,11 @@ new instructions, accounts, events, or error codes.
 ## Current Status & Next Steps
 
 **Done:** React 19 + Vite shell, typed API client (`src/lib/api.ts`), Cesium globe
-with 2D Leaflet fallback on WebGL failure, `/progress` investor page driven by
-`lib/progressData.ts`, wallet adapter wiring, hand-rolled utility CSS,
-`tsc --noEmit` clean on `dev`.
+with 2D Leaflet fallback on WebGL failure, `/lab` interactive experiments (incl. a
+WebGL-free SVG isometric 3D land skeleton), `/transactions` demo chain explorer
+(simulated feed + land-version timeline + devnet-checked wallet txs), wallet
+adapter wiring, hand-rolled utility CSS, `tsc --noEmit` clean on `dev`.
+(The old `/progress` investor page was removed 2026-09-30 — its content lives in the root README.)
 
 **Next (for anyone continuing without prior context):**
 1. After program edits: `cd ../terra-core && make idl`, then re-sync `src/idl/` types (`terraRegistry.ts` is generated from `terra_registry.json`) — do not hand-edit the JSON.

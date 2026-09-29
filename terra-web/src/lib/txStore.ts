@@ -8,6 +8,8 @@ import { persist } from 'zustand/middleware'
 import { TERRA_PROGRAM_ID } from './constants'
 
 export type TxStatus = 'confirmed' | 'failed'
+/** demo = simulated locally; wallet = really signed + sent via the wallet adapter. */
+export type TxSource = 'demo' | 'wallet'
 
 export interface TxAccount {
   pubkey: string
@@ -28,6 +30,7 @@ export interface DemoTx {
   accounts: TxAccount[]
   logs: string[]
   error?: { code: string | null; name: string }
+  source?: TxSource
 }
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -235,6 +238,7 @@ export const useTxStore = create<TxState>()(
 export interface ReportOpts {
   signer?: string
   sig?: string
+  source?: TxSource
   instructionLabel?: string
 }
 
@@ -263,6 +267,7 @@ export function reportTx(instruction: string, ok: boolean, summary: string, opts
     accounts: accountsFor(instruction, signer),
     logs: buildLogs(instruction, ok, summary, computeUnits, err),
     error: err ? { code: err.code, name: err.name } : undefined,
+    source: opts.source ?? 'demo',
   }
   state.push(tx)
   return tx

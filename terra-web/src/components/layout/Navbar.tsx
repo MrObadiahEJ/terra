@@ -27,12 +27,6 @@ export default function Navbar() {
           Globe
         </NavLink>
         <NavLink
-          to="/progress"
-          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-        >
-          Progress
-        </NavLink>
-        <NavLink
           to="/lab"
           className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
         >

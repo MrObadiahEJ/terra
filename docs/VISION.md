@@ -36,7 +36,7 @@ Related: [`../README.md`](../README.md) (repo status) ·
 | Tests | Registry BPF integration **288/288**, identity BPF **23/23**, unit libs **128 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
 | Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
-| Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, investor progress page (`/progress`), typed API client, wallet adapter |
+| Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, `/lab` interactive experiments (incl. WebGL-free SVG 3D land skeleton), `/transactions` demo chain explorer, typed API client, wallet adapter |
 | Next | Vision Stage 3 Phases B–E (evidence-linked geometry → snapshots → 3D models → AI/GIS loop) per [RFC-013](rfc-013-spatial-intelligence-pipeline.md); **devnet deployment** (both programs + wallet wiring); mainnet gates (RFC-005 reconfirm, ZK audit) |
 
 ---
@@ -472,7 +472,7 @@ tamper-evident **coordination and history layer**:
 | Identity program | `terra-core/programs/terra_identity` | identity, succession, guardianship (RFC-010) |
 | Mirror + API | `terra-core/api` | PostGIS mirror of every on-chain account, REST `/api/v1`, spatial endpoints |
 | Geo engine | `terra-core/geo-engine` | OSM fusion, road-access digests anchored on-chain |
-| Frontend | `terra-web` | Cesium globe (2D Leaflet fallback), investor progress page `/progress`, wallet adapter, typed API client |
+| Frontend | `terra-web` | Cesium globe (2D Leaflet fallback), `/lab` experiments + `/transactions` explorer, wallet adapter, typed API client |
 | Architecture contract | `docs/rfc-012-…` | core invariant, entity catalog, design rules, phases 0–10 |
 | Spatial pipeline | `docs/rfc-013-…` | spatial intelligence (Stage 3): SpatialAsset/GeometryVersion, geometry provenance, 4D history |
 | Protocol specs | `docs/rfc-003…011` | vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK |
