@@ -7222,6 +7222,8 @@ export const terraRegistry: Idl = {
         "at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must",
         "sign this transaction themselves, and the order is bound to a",
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
+        "F4: every declared validator must also be a member of the on-chain",
+        "`ValidatorRegistry` \u2014 a self-declared key set can never form a quorum.",
         "",
         "This is how validators collectively inform the chain that land no longer",
         "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
@@ -7284,6 +7286,40 @@ export const terraRegistry: Idl = {
               {
                 "kind": "account",
                 "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "docs": [
+            "On-chain validator registry (F4): every declared forfeit validator",
+            "must be a member of `registry.validators`."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
               }
             ]
           }

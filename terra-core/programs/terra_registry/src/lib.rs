@@ -1241,6 +1241,8 @@ pub mod terra_registry {
     /// at least `MIN_FORFEIT_VALIDATORS` (2) of the declared validators must
     /// sign this transaction themselves, and the order is bound to a
     /// `case_hash` (e.g. SHA-256 of the court order document) for auditability.
+    /// F4: every declared validator must also be a member of the on-chain
+    /// `ValidatorRegistry` — a self-declared key set can never form a quorum.
     ///
     /// This is how validators collectively inform the chain that land no longer
     /// belongs to someone who refuses to release it — e.g. repossession by a
@@ -1278,6 +1280,18 @@ pub mod terra_registry {
             (threshold as usize) <= count as usize,
             TerraError::InvalidThreshold
         );
+
+        // F4: the declared signer set must be a subset of the on-chain
+        // registry — colluding, unregistered keys can never form a quorum.
+        for &v in validators.iter() {
+            if v == Pubkey::default() {
+                continue;
+            }
+            require!(
+                ctx.accounts.registry.validators.contains(&v),
+                TerraError::NotValidator
+            );
+        }
 
         // Self-dealing check: holder cannot sign as validator.
         let signers = quorum::verify_quorum_signers(
@@ -2863,6 +2877,10 @@ pub struct JudicialForfeiture<'info> {
         bump
     )]
     pub ownership: Account<'info, Rights>,
+    /// On-chain validator registry (F4): every declared forfeit validator
+    /// must be a member of `registry.validators`.
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     /// Relaying authority (court clerk / govt channel). Must NOT be the owner.
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,

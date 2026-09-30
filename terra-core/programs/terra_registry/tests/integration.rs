@@ -3155,6 +3155,10 @@ async fn judicial_forfeiture_transfers_ownership() {
     .await
     .expect("fund val2");
 
+    // F4: judicial validators must be registered members.
+    add_validator_ok(&mut ctx, &payer, &val1.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &val2.pubkey()).await;
+
     let case_hash = [42u8; 32];
     let new_owner = Keypair::new();
 
@@ -3175,6 +3179,7 @@ async fn judicial_forfeiture_transfers_ownership() {
         accounts: vec![
             AccountMeta::new(parcel, false),
             AccountMeta::new(ownership_pda(&parcel), false),
+            AccountMeta::new_readonly(registry, false),
             AccountMeta::new(authority.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             // remaining_accounts: both validator signers
@@ -3223,6 +3228,11 @@ async fn judicial_forfeiture_rejects_owner_as_authority() {
     .await
     .expect("fund val2");
 
+    // F4: register the validators so the failure reason is the self-forfeit
+    // guard below, not the registry-membership guard.
+    add_validator_ok(&mut ctx, &payer, &val1.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &val2.pubkey()).await;
+
     let case_hash = [99u8; 32];
     let new_owner = Keypair::new();
 
@@ -3243,6 +3253,7 @@ async fn judicial_forfeiture_rejects_owner_as_authority() {
         accounts: vec![
             AccountMeta::new(parcel, false),
             AccountMeta::new(ownership_pda(&parcel), false),
+            AccountMeta::new_readonly(registry, false),
             AccountMeta::new(owner.pubkey(), true),
             AccountMeta::new_readonly(system_program_id(), false),
             // remaining_accounts: both validator signers
@@ -3254,6 +3265,89 @@ async fn judicial_forfeiture_rejects_owner_as_authority() {
 
     let res = process_with(&mut ctx, &owner, &[&owner, &val1, &val2], ix).await;
     assert!(res.is_err(), "owner should not be able to self-forfeit");
+}
+
+#[tokio::test]
+async fn judicial_forfeiture_rejects_unregistered_validators() {
+    // F4: colluding, UNREGISTERED keys plus any relay authority must not be
+    // able to force-transfer a parcel — the declared quorum has to be a
+    // subset of the on-chain ValidatorRegistry.
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    let owner = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &owner.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund owner");
+    let parcel = register_parcel_ok(&mut ctx, &owner, registry).await;
+
+    let authority = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &authority.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund authority");
+
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &val1.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund val1");
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &val2.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund val2");
+    // Deliberately NOT added to the registry — they are just two colluding
+    // keys that all sign.
+
+    let case_hash = [7u8; 32];
+    let new_owner = Keypair::new();
+
+    let mut data = discriminator("global", "judicial_forfeiture").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.extend_from_slice(&new_owner.pubkey().to_bytes());
+    data.push(2u8);
+    let mut vals = [Pubkey::default(); 8];
+    vals[0] = val1.pubkey();
+    vals[1] = val2.pubkey();
+    for v in &vals {
+        data.extend_from_slice(&v.to_bytes());
+    }
+
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(parcel, false),
+            AccountMeta::new(ownership_pda(&parcel), false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(authority.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+            AccountMeta::new_readonly(val1.pubkey(), true),
+            AccountMeta::new_readonly(val2.pubkey(), true),
+        ],
+        data,
+    };
+
+    let res = process_with(&mut ctx, &authority, &[&authority, &val1, &val2], ix).await;
+    assert_custom_error(res, 6028, "unregistered judicial validators");
+    assert_eq!(
+        holder_of(&ctx, &parcel).await,
+        owner.pubkey(),
+        "holder must be unchanged after rejected forfeiture"
+    );
 }
 
 // ===========================================================================
