@@ -372,7 +372,63 @@ fn register_ix(id: &[u8; 32], name: &str, geo: &[u8; 32], payer: &Pubkey) -> Ins
     }
 }
 
+/// ProgramTest loads the prebuilt `.so` artifacts from `target/deploy`
+/// (processors are `None`), so editing `src/` without re-running
+/// `anchor build --skip-lint` makes this suite silently test stale
+/// on-chain code. Compare mtimes once per test process and fail loudly.
+fn assert_program_so_fresh() {
+    use std::sync::Once;
+    static CHECK: Once = Once::new();
+    CHECK.call_once(|| {
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let newest_rs = |dir: &std::path::Path| -> std::time::SystemTime {
+            let mut newest = std::time::UNIX_EPOCH;
+            let mut stack = vec![dir.to_path_buf()];
+            while let Some(d) = stack.pop() {
+                let Ok(entries) = std::fs::read_dir(&d) else {
+                    continue;
+                };
+                for e in entries.flatten() {
+                    let p = e.path();
+                    if p.is_dir() {
+                        stack.push(p);
+                    } else if p.extension().is_some_and(|x| x == "rs") {
+                        if let Ok(m) = e.metadata().and_then(|m| m.modified()) {
+                            if m > newest {
+                                newest = m;
+                            }
+                        }
+                    }
+                }
+            }
+            newest
+        };
+        let mut newest_src = std::time::UNIX_EPOCH;
+        for dir in [manifest.join("src"), manifest.join("../terra_identity/src")] {
+            newest_src = newest_src.max(newest_rs(&dir));
+        }
+        for name in ["terra_registry.so", "terra_identity.so"] {
+            let so = manifest.join("../../target/deploy").join(name);
+            let m = std::fs::metadata(&so)
+                .and_then(|m| m.modified())
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "{} missing — run: cd terra-core && anchor build --skip-lint",
+                        so.display()
+                    )
+                });
+            assert!(
+                m >= newest_src,
+                "{} is older than the newest .rs under programs/*/src — stale build.\n\
+                 Run: cd terra-core && anchor build --skip-lint",
+                so.display()
+            );
+        }
+    });
+}
+
 async fn setup() -> (ProgramTestContext, Keypair) {
+    assert_program_so_fresh();
     let mut pt = ProgramTest::new("terra_registry", PROGRAM_ID, None);
     pt.add_program("terra_registry", PROGRAM_ID, None);
     pt.add_program("terra_identity", IDENTITY_PROGRAM_ID, None);
