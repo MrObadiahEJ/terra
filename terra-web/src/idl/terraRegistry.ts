@@ -7899,6 +7899,40 @@ export const terraRegistry: Idl = {
           }
         },
         {
+          "name": "registry",
+          "docs": [
+            "On-chain validator registry (F3): committee pool members must be",
+            "registered validators."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "appellant",
           "writable": true,
           "signer": true
@@ -7987,6 +8021,40 @@ export const terraRegistry: Idl = {
               {
                 "kind": "account",
                 "path": "report"
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "docs": [
+            "On-chain validator registry (F3): committee pool members must be",
+            "registered validators."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
               }
             ]
           }

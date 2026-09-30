@@ -8,8 +8,11 @@ slot is, whether it is enforced, and what was fixed vs. left open.
 **Rules honored:** no architecture redesign, no RRR rework, no `Parcel.owner`
 reintroduction, no new `TerraError` variants (code = 6000 + variant index,
 237 variants, append-only). All fixes reuse existing variants (`6190
-RouteAccountMismatch`, `6019 IdentityMismatch`), so **no IDL change** — the
-frontend / tx-prep layer needs no update.
+RouteAccountMismatch`, `6019 IdentityMismatch`, `6028 NotValidator`).
+F1/F2/F6/F7/F8 are behaviour-only (no IDL change); F4 (`judicial_forfeiture`)
+and F3 (`open_fraud_review`/`open_appeal_review`) add a `registry` account —
+the IDL was regenerated and synced to `terra-web` (F5 needed no IDL change;
+`file_dispute` already carried the registry).
 
 ---
 
@@ -19,7 +22,7 @@ frontend / tx-prep layer needs no update.
 |----|------|-------|----------|--------|
 | F1 | `routing.rs` + `fraud_governance.rs` `deser()` | No `ai.owner == &crate::ID` check — a foreign program could forge discriminator+body data (profiles, availability, reputation, capability, committee pools) | High | **Fixed** |
 | F2 | `routing.rs` route_task capability-restriction slot | Fail-open: any undeserializable slot counted as "no restriction", so junk could mask an ACTIVE `CapabilityRestriction` | High | **Fixed** |
-| F3 | `fraud_governance.rs` `open_fraud_review` / `open_appeal_review` | No registry account in the instruction → committee pool membership is not bounded by `registry.validators` | Medium (residual) | Open — mitigated by F1 |
+| F3 | `fraud_governance.rs` `open_fraud_review` / `open_appeal_review` | No registry account in the instruction → committee pool membership is not bounded by `registry.validators` | Medium (residual) | **Fixed** — registry account + membership check on pool entry |
 | F4 | `lib.rs` `judicial_forfeiture` | `validators` + `threshold` are instruction args; no registry account → any `MIN_FORFEIT_THRESHOLD` keys colluding with any relay authority can force-transfer a parcel | High (design) | **Fixed** — registry membership binding |
 | F5 | `dispute.rs` `file_dispute` | `validators` arg stored without cross-checking `registry.validators` → declared quorum set is unbound at file time | Medium (design) | **Fixed** — registry cross-check at file time |
 | F6 | `vault.rs` `deserialize_identity()` | No owner check despite callers' `/// CHECK:` comments → forged `Identity{owner,recovery}` → bogus vaults / future identity-PDA squatting | Medium | **Fixed** |
@@ -86,14 +89,16 @@ Contract now enforced per slot:
   capability code, derive and pass that PDA for every candidate slot.*
 * binding: `binding_slot_ok` already checked owner + PDA before this pass.
 
-### Pattern 4 — fraud committee pool (`fraud_governance.rs`) — F1 FIXED, F3 residual
+### Pattern 4 — fraud committee pool (`fraud_governance.rs`) — F1 + F3 FIXED
 
 Builders: `open_fraud_review` (356–357) and `open_appeal_review` (613–614),
 pairs `(profile, reputation)`.
 
 Contract: both desers now owner-checked (F1); `rep.validator == profile.wallet`;
-accused excluded; `filter_committee_pool` (min reputation) then seeded
-`select_committee`. Residual = F3 (membership not registry-bound).
+accused/appellant excluded; each remaining candidate's wallet must be in
+`registry.validators` (F3: new `registry` account, `NotValidator` 6028 —
+membership checked on pool entry, so 6190/6194 ordering is preserved);
+`filter_committee_pool` (min reputation) then seeded `select_committee`.
 
 ### Pattern 5 — succession iterate (`lib.rs:1192`, `claim_succession`) — SOLID
 
@@ -125,10 +130,16 @@ checks — no change.
   * restriction slot — canonical-PDA `require!` before optional deser (F2)
 * `programs/terra_registry/src/fraud_governance.rs`
   * `deser()` — same owner check (F1); covers both pool builders
+  * `open_fraud_review` / `open_appeal_review` — every pool entrant (after
+    the accused/appellant exclusion) must be in `registry.validators`,
+    else `NotValidator` (F3); check sits after the 6190 deser/rep checks
+    inside the loop, so existing reject codes are unchanged
 * `programs/terra_registry/src/vault.rs`
   * `deserialize_identity()` — `require_keys_eq!(owner, terra_identity::ID,
     IdentityMismatch)` (F6)
 * `programs/terra_registry/src/lib.rs`
+  * `OpenFraudReview` / `OpenAppealReview` — new `registry` account (seeds
+    `validator_registry`), inserted before the signer (F3) → **IDL change**
   * `attach_parcel` — owner check before identity deser (F7)
   * `grant_identity_right` — owner check before identity deser (F8)
   * `judicial_forfeiture` — `registry` account (seeds `validator_registry`)
@@ -159,19 +170,28 @@ semantics — they just can no longer read foreign-owned data.
 | `judicial_forfeiture_rejects_unregistered_validators` | F4: colluding unregistered keys + relay authority → 6028 (`NotValidator`), holder unchanged |
 | `judicial_forfeiture_transfers_ownership` (updated) | registered validator quorum still succeeds after the binding |
 | `file_dispute_rejects_unregistered_validators` | F5: unregistered declared quorum → 6028, parcel stays REGISTERED, no dispute PDA |
+| `open_fraud_review_rejects_unregistered_pool` | F3: well-formed but unregistered pool profiles → 6028, no `ReviewCase`, report stays not-`UNDER_REVIEW` |
 
-Each corrupts a real account's owner via `ctx.set_account` while keeping the
-data (incl. discriminator) intact — the exact pre-fix bypass.
+Success-path updates: the fraud/pool sites (`phase7_*`, the foreign-profile
+test) and dispute sites now pass the new registry account; pool-based
+`phase7` tests register their 6 pool validators (4 bootstrap via
+`add_validator_ok`, then 2 via `add_validator_consensus_ok` — propose +
+endorsements — since the registry flips to PEER_CONSENSUS after 4 adds).
+
+The first five rows each corrupt a real account's owner via
+`ctx.set_account` while keeping the data (incl. discriminator) intact — the
+exact pre-fix bypass.
 
 ## 5. Findings — open recommendations & status
 
-* **F3 (low/medium residual):** add `registry: Account<ValidatorRegistry>`
-  to `OpenFraudReview`/`OpenAppealReview` and require every pool profile's
-  wallet ∈ `registry.validators` (or derive the pool from the registry).
-  Today the residual is bounded by F1: reputation accounts are created only
-  through the admin-gated `InitializeValidatorReputation` path. Verify
-  whether `remove_validator` closes/invalidates the reputation account; if
-  not, stale validators can linger in pools.
+* **F3 — DONE (see §3 / §4):** `OpenFraudReview`/`OpenAppealReview` now
+  carry the registry account and `open_fraud_review`/`open_appeal_review`
+  reject any pool entrant not in `registry.validators` (test: 6028, no
+  partial write). Verified why this mattered: `remove_validator`
+  (`validator_registry.rs:370`) only removes the wallet from
+  `registry.validators` — it does **not** close or invalidate the
+  reputation/profile accounts, so removed validators linger as stale pool
+  candidates; F3 now excludes them at pool-entry time.
 * **F4 — DONE (see §3 / §4):** `JudicialForfeiture` now takes the
   registry account and rejects any declared validator not in
   `registry.validators` (test: 6028, holder unchanged).
@@ -187,11 +207,11 @@ cd terra-core
 cargo fmt --check
 cargo clippy -- -D warnings              # CI-exact (libs only — CI does not lint test targets)
 cargo test -p terra-registry --lib       # 131 unit tests
-cargo test -p terra-registry --test integration   # 301 tests, --test-threads=1 in CI
+cargo test -p terra-registry --test integration   # 302 tests, --test-threads=1 in CI
 anchor build --skip-lint                 # CI build path (fresh .so needed before running tests)
 ```
 
-Latest local run: 301/301 integration, 131/131 lib, fmt clean, clippy clean.
+Latest local run: 302/302 integration, 131/131 lib, fmt clean, clippy clean.
 TS smoke tests (`make test-ts`) require a local validator — `solana-test-validator`
 core-dumps on this machine (no AVX); CI/devnet only.
 

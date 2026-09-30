@@ -5208,6 +5208,10 @@ pub struct OpenFraudReview<'info> {
         bump,
     )]
     pub review: Account<'info, fraud_governance::ReviewCase>,
+    /// On-chain validator registry (F3): committee pool members must be
+    /// registered validators.
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub reporter: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -5347,6 +5351,10 @@ pub struct OpenAppealReview<'info> {
         bump,
     )]
     pub review: Account<'info, fraud_governance::ReviewCase>,
+    /// On-chain validator registry (F3): committee pool members must be
+    /// registered validators.
+    #[account(seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     #[account(mut)]
     pub appellant: Signer<'info>,
     pub system_program: Program<'info, System>,

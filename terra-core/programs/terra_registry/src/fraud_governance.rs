@@ -360,6 +360,12 @@ pub fn open_fraud_review(ctx: Context<crate::OpenFraudReview>) -> Result<()> {
             TerraError::RouteAccountMismatch
         );
         if profile.wallet != ctx.accounts.report.accused {
+            // F3: committee pool members must be registered validators —
+            // stale/removed validators lingering as profiles can't enter.
+            require!(
+                ctx.accounts.registry.validators.contains(&profile.wallet),
+                TerraError::NotValidator
+            );
             pool.push(profile.wallet);
             scores.push(rep.reputation_score);
         }
@@ -618,6 +624,11 @@ pub fn open_appeal_review(ctx: Context<crate::OpenAppealReview>) -> Result<()> {
         );
         // Exclude appellant from their own appeal committee.
         if profile.wallet != ctx.accounts.appeal.appellant {
+            // F3: committee pool members must be registered validators.
+            require!(
+                ctx.accounts.registry.validators.contains(&profile.wallet),
+                TerraError::NotValidator
+            );
             pool.push(profile.wallet);
             scores.push(rep.reputation_score);
         }

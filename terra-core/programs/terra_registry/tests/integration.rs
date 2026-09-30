@@ -751,6 +751,64 @@ async fn add_validator_ok(ctx: &mut ProgramTestContext, payer: &Keypair, validat
         .expect("add_validator failed");
 }
 
+/// Add a validator once the registry is in PEER_CONSENSUS mode (unilateral
+/// bootstrap adds no longer apply): propose, collect endorsements from
+/// existing validators, then admit. `endorsers` must contain at least
+/// `consensus_required(n)` distinct registered validators.
+async fn add_validator_consensus_ok(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    validator: &Pubkey,
+    endorsers: &[&Keypair],
+) {
+    let (registry, _) = registry_pda();
+    let (endorsement, _) = endorsement_pda(&registry, validator);
+
+    let mut data = discriminator("global", "propose_validator").to_vec();
+    data.extend_from_slice(&borsh_ser(validator));
+    process(
+        &mut *ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(*validator, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose_validator failed");
+
+    for e in endorsers {
+        endorse_add(ctx, &registry, validator, *e).await;
+    }
+
+    let mut data = discriminator("global", "add_validator_to_registry").to_vec();
+    data.extend_from_slice(&borsh_ser(validator));
+    process(
+        &mut *ctx,
+        payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+                AccountMeta::new_readonly(*validator, false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add_validator (peer-consensus) failed");
+}
+
 async fn read_account<T: AccountDeserialize>(ctx: &ProgramTestContext, key: Pubkey) -> T {
     let acc = ctx
         .banks_client
@@ -25707,6 +25765,7 @@ async fn phase7_open_review_needs_committee() {
 
     // Open review with empty remaining_accounts → CommitteeTooSmall (6194).
     let (review_pk, _) = review_case_pda(&report_pk);
+    let (registry, _) = registry_pda();
     let res = process(
         &mut ctx,
         &reporter,
@@ -25715,6 +25774,7 @@ async fn phase7_open_review_needs_committee() {
             accounts: vec![
                 AccountMeta::new(report_pk, false),
                 AccountMeta::new(review_pk, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(reporter.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
@@ -25755,6 +25815,16 @@ async fn phase7_vote_double_and_not_member() {
         pool.push(v);
     }
 
+    // F3: committee pool members must be registered validators — 4 bootstrap
+    // adds, then 2 via peer-consensus endorsements.
+    for v in pool.iter().take(4) {
+        add_validator_ok(&mut ctx, &payer, &v.pubkey()).await;
+    }
+    let (registry_pk, _) = registry_pda();
+    let endorsers = [&pool[0], &pool[1], &pool[2], &pool[3]];
+    add_validator_consensus_ok(&mut ctx, &payer, &pool[4].pubkey(), &endorsers).await;
+    add_validator_consensus_ok(&mut ctx, &payer, &pool[5].pubkey(), &endorsers).await;
+
     let nonce = 3u16;
     let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
     let mut data = discriminator("global", "submit_fraud_report").to_vec();
@@ -25784,6 +25854,7 @@ async fn phase7_vote_double_and_not_member() {
     let mut accounts = vec![
         AccountMeta::new(report_pk, false),
         AccountMeta::new(review_pk, false),
+        AccountMeta::new_readonly(registry_pk, false),
         AccountMeta::new(reporter.pubkey(), true),
         AccountMeta::new_readonly(system_program_id(), false),
     ];
@@ -26007,6 +26078,15 @@ async fn phase7_upheld_demotes_not_jails() {
         pool.push(v);
     }
 
+    // F3: committee pool members must be registered validators — 4 bootstrap
+    // adds, then 2 via peer-consensus endorsements.
+    for v in pool.iter().take(4) {
+        add_validator_ok(&mut ctx, &payer, &v.pubkey()).await;
+    }
+    let endorsers = [&pool[0], &pool[1], &pool[2], &pool[3]];
+    add_validator_consensus_ok(&mut ctx, &payer, &pool[4].pubkey(), &endorsers).await;
+    add_validator_consensus_ok(&mut ctx, &payer, &pool[5].pubkey(), &endorsers).await;
+
     let nonce = 0u16;
     let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
     let mut data = discriminator("global", "submit_fraud_report").to_vec();
@@ -26036,6 +26116,7 @@ async fn phase7_upheld_demotes_not_jails() {
     let mut accounts = vec![
         AccountMeta::new(report_pk, false),
         AccountMeta::new(review_pk, false),
+        AccountMeta::new_readonly(registry, false),
         AccountMeta::new(reporter.pubkey(), true),
         AccountMeta::new_readonly(system_program_id(), false),
     ];
@@ -29148,9 +29229,11 @@ async fn remaining_accounts_fraud_foreign_profile_rejected() {
     }
 
     let (review_pk, _) = review_case_pda(&report_pk);
+    let (registry, _) = registry_pda();
     let mut ix_accounts = vec![
         AccountMeta::new(report_pk, false),
         AccountMeta::new(review_pk, false),
+        AccountMeta::new_readonly(registry, false),
         AccountMeta::new(reporter.pubkey(), true),
         AccountMeta::new_readonly(system_program_id(), false),
     ];
@@ -29777,5 +29860,104 @@ async fn file_dispute_rejects_unregistered_validators() {
             .unwrap()
             .is_none(),
         "no dispute account must exist"
+    );
+}
+
+// ===========================================================================
+// F3: open_fraud_review committee pool must be registry members
+// ===========================================================================
+
+#[tokio::test]
+async fn open_fraud_review_rejects_unregistered_pool() {
+    use terra_registry::fraud_governance::FraudReport;
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund reporter");
+
+    let nonce = 9u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[2u8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::COLLUSION);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit");
+
+    // Two well-formed pool candidates — profiles + reputations created the
+    // normal way, but the wallets were NEVER added to the registry.
+    let mut remaining: Vec<AccountMeta> = Vec::new();
+    for _ in 0..2 {
+        let v = Keypair::new();
+        phase7_init_validator(&mut ctx, &payer, &v).await;
+        let (profile_pk, _) = validator_profile_pda(&v.pubkey());
+        let (rep_pk, _) = validator_reputation_pda(&v.pubkey());
+        remaining.push(AccountMeta::new_readonly(profile_pk, false));
+        remaining.push(AccountMeta::new_readonly(rep_pk, false));
+    }
+
+    let (review_pk, _) = review_case_pda(&report_pk);
+    let (registry, _) = registry_pda();
+    let mut ix_accounts = vec![
+        AccountMeta::new(report_pk, false),
+        AccountMeta::new(review_pk, false),
+        AccountMeta::new_readonly(registry, false),
+        AccountMeta::new(reporter.pubkey(), true),
+        AccountMeta::new_readonly(system_program_id(), false),
+    ];
+    ix_accounts.extend(remaining);
+
+    let res = process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: ix_accounts,
+            data: discriminator("global", "open_fraud_review").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6028, "unregistered committee pool members");
+
+    // No partial write: no review case, report not under review.
+    assert!(
+        ctx.banks_client
+            .get_account(review_pk)
+            .await
+            .unwrap()
+            .is_none(),
+        "no review case must exist"
+    );
+    let report: FraudReport = read_account(&ctx, report_pk).await;
+    assert_ne!(
+        report.status,
+        terra_registry::fraud_governance::fraud_status::UNDER_REVIEW,
+        "report must not flip to UNDER_REVIEW"
     );
 }
