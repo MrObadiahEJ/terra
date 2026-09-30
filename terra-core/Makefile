@@ -1,4 +1,4 @@
-.PHONY: build test test-ts test-fast lint deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-ts test-fast lint ci deploy deploy-devnet deploy-mainnet clean idl
 
 # Build all programs
 build:
@@ -28,6 +28,25 @@ test-fast:
 	cargo test -p terra-registry --test rfc012_structure
 	cargo test -p terra-geo
 	cargo test -p terra-api
+
+# Exact local mirror of .github/workflows/ci.yml (all 4 jobs: lib-tests,
+# api-tests, api-build, frontend). Run this before pushing to dev/main.
+# Notes:
+# - sqlx migrate is best-effort: creating the postgis extension needs
+#   superuser; CI's container has it, a local `terra` DB user may not.
+#   CI still runs the migration strictly.
+# - tsc runs from node_modules directly because pnpm hangs on this machine.
+ci:
+	cargo fmt --check
+	cargo clippy -- -D warnings
+	cargo test -p terra-registry --lib
+	cargo test -p terra-identity --lib
+	cargo test -p terra-registry --test rfc012_structure
+	cargo test -p terra-geo
+	-@sqlx migrate run --source api/migrations || echo "note: sqlx migrate skipped locally (DB permissions) — CI runs it strictly"
+	cargo test -p terra-api
+	cargo build -p terra-api
+	cd ../terra-web && ./node_modules/.bin/tsc --noEmit
 
 # Auto-fix lint issues
 fix:
