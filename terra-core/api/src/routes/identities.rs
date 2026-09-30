@@ -787,6 +787,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn guardianship_requires_three_endorsements() {
         assert!(is_guardianship_kind(3));
         assert!(is_guardianship_kind(4));

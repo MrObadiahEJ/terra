@@ -423,6 +423,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn min_dispute_validators_prevents_unilateral_filing() {
         assert!(
             MIN_DISPUTE_VALIDATORS >= 2,

@@ -651,6 +651,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn min_max_escrow_amounts() {
         assert_eq!(MIN_ESCROW_AMOUNT, 100_000_000); // 0.1 SOL
         assert_eq!(MAX_ESCROW_AMOUNT, 1_000_000_000_000); // 1M SOL

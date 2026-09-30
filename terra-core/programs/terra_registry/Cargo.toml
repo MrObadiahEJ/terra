@@ -24,7 +24,7 @@ terra-identity = { path = "../terra_identity", features = ["no-entrypoint"] }
 
 [dev-dependencies]
 ed25519-dalek = "2.2"
-solana-program-test = "3.0.0"
+solana-program-test = { version = "3.0.0", features = ["agave-unstable-api"] }
 solana-sdk = "3.0.0"
 solana-sdk-ids = "3.0.0"
 borsh = "1.0"

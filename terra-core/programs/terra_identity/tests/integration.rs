@@ -132,9 +132,10 @@ fn bind_identity_ix(identity_hash: &[u8; 32], recovery: &Pubkey, owner: &Pubkey)
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn request_succession_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     successor: &Pubkey,
     kind: u8,
     grace_secs: i64,
@@ -170,7 +171,7 @@ fn request_succession_ix(
 
 fn endorse_succession_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     successor: &Pubkey,
     validator: &Keypair,
 ) -> Instruction {
@@ -190,7 +191,7 @@ fn endorse_succession_ix(
 
 fn cancel_succession_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     successor: &Pubkey,
     signer: &Pubkey,
 ) -> Instruction {
@@ -210,7 +211,7 @@ fn cancel_succession_ix(
 
 fn claim_succession_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     successor: &Keypair,
 ) -> Instruction {
     let (succ_pk, _) = succession_pda(identity, &successor.pubkey());
@@ -227,9 +228,10 @@ fn claim_succession_ix(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn request_court_guardianship_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     successor: &Pubkey,
     grace_secs: i64,
     required_validations: u8,
@@ -266,7 +268,7 @@ fn request_court_guardianship_ix(
 
 fn revoke_guardianship_ix(
     identity: &Pubkey,
-    identity_hash: &[u8; 32],
+    _identity_hash: &[u8; 32],
     new_owner: &Pubkey,
     revoker: &Pubkey,
 ) -> Instruction {
@@ -1483,7 +1485,7 @@ async fn setup_succession(
 /// Helper: endorse a succession.
 async fn endorse(
     ctx: &mut ProgramTestContext,
-    payer: &Keypair,
+    _payer: &Keypair,
     id_pda: Pubkey,
     succ_pda: Pubkey,
     validator: &Keypair,

@@ -779,7 +779,7 @@ mod tests {
         let mut released = 0u64;
         let mut claims = Vec::new();
         for i in 0..required {
-            let shares = required - i as u8;
+            let shares = required - i;
             let share = next_share(total - released, shares);
             released += share;
             claims.push(share);
@@ -826,6 +826,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn escrow_status_values_distinct_from_zero() {
         // 0 marks a fresh init_if_needed account; funded must be non-zero.
         assert_ne!(task_escrow_status::FUNDED, 0);

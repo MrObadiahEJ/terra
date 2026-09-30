@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn distinct_countries_counting() {
-        let confirmations = vec![
+        let confirmations = [
             GenesisConfirmation {
                 validator: Pubkey::new_unique(),
                 country_code: *b"US",

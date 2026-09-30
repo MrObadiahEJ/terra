@@ -619,7 +619,7 @@ mod tests {
     fn note_length_guard_matches_const() {
         let ok = "x".repeat(MAX_PROFILE_NOTE_LEN);
         let bad = "x".repeat(MAX_PROFILE_NOTE_LEN + 1);
-        assert!(ok.as_bytes().len() <= MAX_PROFILE_NOTE_LEN);
-        assert!(bad.as_bytes().len() > MAX_PROFILE_NOTE_LEN);
+        assert!(ok.len() <= MAX_PROFILE_NOTE_LEN);
+        assert!(bad.len() > MAX_PROFILE_NOTE_LEN);
     }
 }

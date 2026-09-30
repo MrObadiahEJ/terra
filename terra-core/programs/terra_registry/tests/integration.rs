@@ -16,14 +16,13 @@ use terra_registry::{
     subdivision::{self, SubdivisionRecord},
     validator_registry::{self, ValidatorRegistry},
     verification::{
-        self, attestation::attestation_result, audit_trail::audit_action, challenge_status,
-        claim::claim_status, claim::claim_type,
-        cross_border_bridge::cross_border_verification_status, evidence::evidence_type,
+        attestation::attestation_result, audit_trail::audit_action, challenge_status,
+        claim::claim_status, claim::claim_type, evidence::evidence_type,
         guardian_claim::guardian_claim_status, guardian_claim::guardian_type,
         observer::observer_status, quorum_voting::quorum_vote_choice, session::session_status,
-        validator_status, AuditEntry, Challenge, Claim, CrossBorderVerification, Evidence,
-        GuardianClaim, Observation, Observer, QuorumConfig, QuorumTally, QuorumVote,
-        ValidatorReputation, VerificationAttestation, VerificationSession,
+        validator_status, AuditEntry, Challenge, Claim, Evidence, GuardianClaim, Observation,
+        Observer, QuorumConfig, QuorumTally, ValidatorReputation, VerificationAttestation,
+        VerificationSession,
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
@@ -340,6 +339,7 @@ fn discriminator(namespace: &str, name: &str) -> [u8; 8] {
 }
 
 /// Build an Instruction targeting the terra_identity program.
+#[allow(dead_code)]
 fn identity_ix(accounts: Vec<AccountMeta>, data: Vec<u8>) -> Instruction {
     Instruction {
         program_id: IDENTITY_PROGRAM_ID,
@@ -536,7 +536,7 @@ async fn process_attested(
 async fn register_parcel_ok(
     ctx: &mut ProgramTestContext,
     owner: &Keypair,
-    registry: Pubkey,
+    _registry: Pubkey,
 ) -> Pubkey {
     let id: [u8; 32] = [200u8; 32]; // unique per test context
     let geo: [u8; 32] = [1u8; 32];
@@ -841,7 +841,7 @@ async fn add_validator_consensus_ok(
     .expect("propose_validator failed");
 
     for e in endorsers {
-        endorse_add(ctx, &registry, validator, *e).await;
+        endorse_add(ctx, &registry, validator, e).await;
     }
 
     let mut data = discriminator("global", "add_validator_to_registry").to_vec();
@@ -3598,7 +3598,7 @@ async fn dispute_lifecycle_owner_wins() {
     assert_eq!(d.outcome, 0); // OWNER_WINS
 
     // 4. Execute judgment — admin executes, parcel returns to REGISTERED.
-    let mut exec_data = discriminator("global", "execute_judgment").to_vec();
+    let exec_data = discriminator("global", "execute_judgment").to_vec();
     // extend with nothing — execute_judgment takes no extra args
     process(
         &mut ctx,
@@ -3978,7 +3978,7 @@ async fn escrow_seller_cancel_before_deposit() {
 #[tokio::test]
 async fn request_court_guardianship_creates_succession() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
 
     // Bind identity with recovery = payer.
     let identity_hash = [30u8; 32];
@@ -4374,8 +4374,6 @@ async fn update_jurisdiction_changes_status() {
 
 #[tokio::test]
 async fn cancel_escrow_buyer_deposited_refund() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
-
     let (mut ctx, payer) = setup().await;
 
     let seller = Keypair::new();
@@ -4511,8 +4509,6 @@ async fn cancel_escrow_buyer_deposited_refund() {
 
 #[tokio::test]
 async fn mutual_cancel_escrow_refunds_buyer() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
-
     let (mut ctx, payer) = setup().await;
 
     let seller = Keypair::new();
@@ -4658,8 +4654,6 @@ async fn mutual_cancel_escrow_refunds_buyer() {
 
 #[tokio::test]
 async fn settle_escrow_rejects_before_deadline() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
-
     let (mut ctx, payer) = setup().await;
 
     let seller = Keypair::new();
@@ -4887,8 +4881,6 @@ async fn create_vault_happy_path() {
 
 #[tokio::test]
 async fn cancel_shard_rotation_by_initiator() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
 
     // Bind identity.
@@ -4914,7 +4906,7 @@ async fn cancel_shard_rotation_by_initiator() {
     .expect("bind_identity");
 
     let (vault_pk, _) = vault_record_pda(&identity);
-    let h1 = Keypair::new().pubkey();
+    let _h1 = Keypair::new().pubkey();
     let h2 = Keypair::new().pubkey();
     let h3 = Keypair::new().pubkey();
     let orig_hash: [u8; 32] = [44u8; 32];
@@ -5021,7 +5013,7 @@ async fn ping_shard_updates_last_ping() {
 
     let (vault_pk, _) = vault_record_pda(&identity);
     let h1 = Keypair::new().pubkey();
-    let h2 = Keypair::new().pubkey();
+    let _h2 = Keypair::new().pubkey();
     let hash: [u8; 32] = [46u8; 32];
 
     // Create vault with payer as shard holder.
@@ -5050,7 +5042,7 @@ async fn ping_shard_updates_last_ping() {
     .expect("create_vault");
 
     let v_before: VaultRecord = read_account(&ctx, vault_pk).await;
-    let ts_before = v_before.last_ping_at;
+    let _ts_before = v_before.last_ping_at;
 
     // Ping shard (advance a few slots to ensure time passes PING_INTERVAL_SECS).
     // PING_INTERVAL_SECS = 7 days = 604800 seconds. In test validator each slot
@@ -5084,8 +5076,6 @@ async fn ping_shard_updates_last_ping() {
 
 #[tokio::test]
 async fn renew_right_extends_expiry() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
-
     let (mut ctx, payer) = setup().await;
 
     let holder = Keypair::new();
@@ -5229,8 +5219,6 @@ async fn sweep_permanent_right_rejected() {
 
 #[tokio::test]
 async fn expire_escrow_rejects_before_deadline() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
-
     let (mut ctx, payer) = setup().await;
 
     let seller = Keypair::new();
@@ -5642,8 +5630,6 @@ async fn invalidate_proof_happy_path() {
 
 #[tokio::test]
 async fn endorse_shard_rotation_happy_path() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
 
     // Bind identity.
@@ -6101,8 +6087,6 @@ async fn revoke_jurisdictional_identity_happy_path() {
 
 #[tokio::test]
 async fn authorize_vault_access_happy_path() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
 
     // Bind identity.
@@ -6398,7 +6382,7 @@ async fn claim_rewards_happy_path() {
     let claimable_rpt_delta = pool_before.reward_per_token_stored;
 
     // Claim rewards.
-    let mut data = discriminator("global", "claim_rewards").to_vec();
+    let data = discriminator("global", "claim_rewards").to_vec();
     process(
         &mut ctx,
         &payer,
@@ -6440,14 +6424,14 @@ async fn verification_full_e2e() {
     create_registry_ok(&mut ctx, &payer).await;
 
     // Register a parcel.
-    let id: [u8; 32] = [242u8; 32];
+    let _id: [u8; 32] = [242u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
 
     // --- create_claim ---
     let claim_id: [u8; 32] = [1u8; 32];
-    let (claim_pk, claim_bump) = claim_pda(&parcel_pk, &claim_id);
+    let (claim_pk, _claim_bump) = claim_pda(&parcel_pk, &claim_id);
     let stmt_hash: [u8; 32] = [3u8; 32];
-    let required: u8 = 2;
+    let _required: u8 = 2;
 
     process(
         &mut ctx,
@@ -6721,7 +6705,7 @@ async fn verify_claim_quorum_not_reached() {
     // Create registry (needed for quorum config).
     create_registry_ok(&mut ctx, &payer).await;
 
-    let id: [u8; 32] = [243u8; 32];
+    let _id: [u8; 32] = [243u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
 
     let claim_id: [u8; 32] = [2u8; 32];
@@ -6855,7 +6839,7 @@ async fn verify_claim_quorum_not_reached() {
 async fn add_evidence_wrong_submitter_fails() {
     let (mut ctx, payer) = setup().await;
 
-    let id: [u8; 32] = [244u8; 32];
+    let _id: [u8; 32] = [244u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
 
     let claim_id: [u8; 32] = [3u8; 32];
@@ -6927,7 +6911,7 @@ async fn add_evidence_wrong_submitter_fails() {
 async fn duplicate_observation_same_validator_fails() {
     let (mut ctx, payer) = setup().await;
 
-    let id: [u8; 32] = [245u8; 32];
+    let _id: [u8; 32] = [245u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
 
     let claim_id: [u8; 32] = [4u8; 32];
@@ -7033,7 +7017,7 @@ async fn duplicate_observation_same_validator_fails() {
 #[tokio::test]
 async fn session_open_and_record_evidence() {
     let (mut ctx, payer) = setup().await;
-    let id: [u8; 32] = [250u8; 32];
+    let _id: [u8; 32] = [250u8; 32];
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
 
     // Create a claim first.
@@ -11229,6 +11213,7 @@ fn slashing_report_pda(pool: &Pubkey, reporter: &Pubkey, evidence: &[u8; 32]) ->
     )
 }
 
+#[allow(dead_code)]
 fn treasury_pda(registry: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[b"treasury", registry.as_ref()], &PROGRAM_ID)
 }
@@ -12760,7 +12745,7 @@ async fn cancel_escrow_rejects_wrong_creator() {
     let (escrow_vault, _) = escrow_vault_pda(&escrow_pk);
 
     // Non-seller (buyer) tries to cancel CREATED status.
-    let mut data = discriminator("global", "cancel_escrow").to_vec();
+    let data = discriminator("global", "cancel_escrow").to_vec();
     let res = process(
         &mut ctx,
         &buyer,
@@ -13420,7 +13405,7 @@ async fn migrate_rights_rejects_same_parcel() {
     .await
     .expect("register");
     let (pk, _) = parcel_pda(&id);
-    let mut data = discriminator("global", "migrate_rights").to_vec();
+    let data = discriminator("global", "migrate_rights").to_vec();
     let res = process(
         &mut ctx,
         &payer,
@@ -14553,7 +14538,7 @@ async fn revoke_rejects_reason_too_long() {
 #[tokio::test]
 async fn cast_quorum_vote_rejects_invalid_choice() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
 
     // Create a claim.
@@ -14611,7 +14596,7 @@ async fn cast_quorum_vote_rejects_invalid_choice() {
 #[tokio::test]
 async fn cast_quorum_vote_rejects_already_resolved() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
 
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
@@ -14679,7 +14664,7 @@ async fn cast_quorum_vote_rejects_already_resolved() {
 #[tokio::test]
 async fn finalize_quorum_rejects_quorum_not_reached() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
 
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
@@ -14755,7 +14740,7 @@ async fn finalize_quorum_rejects_quorum_not_reached() {
 #[tokio::test]
 async fn finalize_quorum_rejects_claim_already_verified() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
     add_validator_ok(&mut ctx, &payer, &payer.pubkey()).await;
 
     let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
@@ -17503,8 +17488,6 @@ async fn zk_verify_rejects_root_version_mismatch() {
 
 #[tokio::test]
 async fn vault_ping_rejects_interval_not_elapsed() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
 
     // Bind identity
@@ -17605,8 +17588,6 @@ async fn vault_ping_rejects_interval_not_elapsed() {
 
 #[tokio::test]
 async fn vault_rotate_rejects_self_endorsement() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
     let h2 = Keypair::new();
     let h3 = Keypair::new();
@@ -17725,8 +17706,6 @@ async fn vault_rotate_rejects_self_endorsement() {
 
 #[tokio::test]
 async fn vault_rotate_rejects_already_endorsed() {
-    use terra_registry::vault::VaultRecord;
-
     let (mut ctx, payer) = setup().await;
     let h2 = Keypair::new();
     let h3 = Keypair::new();
@@ -18167,7 +18146,7 @@ fn transfer_ix(parcel_pk: &Pubkey, owner: &Pubkey, new_owner: &Pubkey) -> Instru
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
-            AccountMeta::new(ownership_pda(&*parcel_pk), false),
+            AccountMeta::new(ownership_pda(parcel_pk), false),
             AccountMeta::new(*owner, true),
             AccountMeta::new(*new_owner, false),
         ],
@@ -18183,7 +18162,7 @@ fn update_status_ix(parcel_pk: &Pubkey, owner: &Pubkey, status: u8) -> Instructi
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
-            AccountMeta::new_readonly(ownership_pda(&*parcel_pk), false),
+            AccountMeta::new_readonly(ownership_pda(parcel_pk), false),
             AccountMeta::new(*owner, true),
         ],
         data,
@@ -18210,7 +18189,7 @@ fn grant_right_ix(
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(*parcel_pk, false),
-            AccountMeta::new_readonly(ownership_pda(&*parcel_pk), false),
+            AccountMeta::new_readonly(ownership_pda(parcel_pk), false),
             AccountMeta::new(rights_pk, false),
             AccountMeta::new(*owner, true),
             AccountMeta::new_readonly(system_program_id(), false),
@@ -18286,7 +18265,7 @@ async fn ownership_invariant_o2_identity_rights_authorizes() {
     let parcel_id: [u8; 32] = [0xBB; 32];
     let identity_hash: [u8; 32] = [0xBB; 32];
 
-    let (parcel_pk, identity_pk, ir_pk) =
+    let (parcel_pk, _identity_pk, _ir_pk) =
         setup_identity_owner(&mut ctx, &payer, parcel_id, identity_hash).await;
 
     // The identity owner (payer) should be able to authorize via remaining_accounts.
@@ -20557,7 +20536,7 @@ async fn edge_case_c2_non_owner_sweep_rejected() {
 #[tokio::test]
 async fn edge_case_c3_dispute_sets_disputed_status() {
     let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let _registry = create_registry_ok(&mut ctx, &payer).await;
     let parcel_id: [u8; 32] = [0xC3; 32];
     let (parcel_pk, _) = parcel_pda(&parcel_id);
 
@@ -22654,7 +22633,7 @@ async fn e2e_f3_rights_time_bound_lifecycle() {
 /// Helper: endorse a succession (identity program).
 async fn endorse(
     ctx: &mut ProgramTestContext,
-    payer: &Keypair,
+    _payer: &Keypair,
     id_pda: Pubkey,
     succ_pda: Pubkey,
     validator: &Keypair,
@@ -22807,7 +22786,7 @@ async fn setup_peer_registry(
     // payer (admin) is validator 0.
     add_validator_ok(ctx, payer, &payer.pubkey()).await;
     validators.push(Keypair::new()); // placeholder 0, not used
-    for i in 1..count {
+    for _i in 1..count {
         let v = Keypair::new();
         add_validator_ok(ctx, payer, &v.pubkey()).await;
         // Fund so the validator can sign its own endorsement transactions.
@@ -22831,7 +22810,7 @@ async fn endorse_add(
     endorser: &Keypair,
 ) {
     let (endorsement, _) = endorsement_pda(registry, target);
-    let mut data = discriminator("global", "endorse_validator_add").to_vec();
+    let data = discriminator("global", "endorse_validator_add").to_vec();
     process(
         ctx,
         endorser,
@@ -22857,7 +22836,7 @@ async fn endorse_remove(
     endorser: &Keypair,
 ) {
     let (endorsement, _) = endorsement_pda(registry, target);
-    let mut data = discriminator("global", "endorse_validator_removal").to_vec();
+    let data = discriminator("global", "endorse_validator_removal").to_vec();
     process(
         ctx,
         endorser,
@@ -22938,8 +22917,8 @@ async fn p0_2_add_endorsement_cannot_authorize_removal() {
     .expect("propose_validator (add) failed");
 
     // 3 endorsements meet the required ceil(2*4/3)=3 quorum.
-    endorse_add(&mut ctx, &registry, &target.pubkey(), &v2).await;
-    endorse_add(&mut ctx, &registry, &target.pubkey(), &v3).await;
+    endorse_add(&mut ctx, &registry, &target.pubkey(), v2).await;
+    endorse_add(&mut ctx, &registry, &target.pubkey(), v3).await;
     endorse_add(&mut ctx, &registry, &target.pubkey(), &payer).await;
 
     // Admit the validator via the ADD endorsement.
@@ -22969,7 +22948,7 @@ async fn p0_2_add_endorsement_cannot_authorize_removal() {
     data.extend_from_slice(&borsh_ser(&target.pubkey()));
     let res = process(
         &mut ctx,
-        &v2,
+        v2,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -23040,7 +23019,7 @@ async fn p0_2_remove_proposal_rejects_unregistered_target() {
 async fn p0_2_remove_endorsement_cannot_authorize_add() {
     let (mut ctx, payer) = setup().await;
     let (registry, validators) = setup_peer_registry(&mut ctx, &payer, 4).await;
-    let v2 = &validators[2];
+    let _v2 = &validators[2];
     let v3 = &validators[3];
 
     // Create a REMOVE proposal for validator v3.
@@ -23093,14 +23072,14 @@ async fn p0_2_removal_duplicate_endorser_rejected() {
     propose_removal_ok(&mut ctx, &payer, &registry, &target.pubkey()).await;
 
     // First removal endorsement succeeds.
-    endorse_remove(&mut ctx, &registry, &target.pubkey(), &v2).await;
+    endorse_remove(&mut ctx, &registry, &target.pubkey(), v2).await;
 
     // Same endorser again — rejected (AlreadyEndorsedRotation).
     let (endorsement, _) = endorsement_pda(&registry, &target.pubkey());
-    let mut data = discriminator("global", "endorse_validator_removal").to_vec();
+    let data = discriminator("global", "endorse_validator_removal").to_vec();
     let res = process(
         &mut ctx,
-        &v2,
+        v2,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -23284,7 +23263,7 @@ async fn phase2_presence_rejects_stranger_signer() {
 
 #[tokio::test]
 async fn phase2_declare_capability_then_admin_verify() {
-    use terra_registry::validator_profile::{self, ValidatorCapability, ValidatorProfile};
+    use terra_registry::validator_profile::{self, ValidatorCapability};
 
     let (mut ctx, payer) = setup().await;
     let registry = create_registry_ok(&mut ctx, &payer).await;
@@ -23398,7 +23377,7 @@ async fn phase2_declare_capability_then_admin_verify() {
 #[tokio::test]
 async fn phase2_availability_and_edge() {
     use terra_registry::validator_profile::{
-        self, ValidatorAvailability, ValidatorProfile, ValidatorRelationshipEdge,
+        self, ValidatorAvailability, ValidatorRelationshipEdge,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -23698,7 +23677,7 @@ async fn phase3_create_requirement_assign_submit_complete() {
     assert_eq!(task.requirement_count, 1);
 
     // Wrong append index rejected (expect 179 = RequirementIndexMismatch).
-    let (req1_pk, _) = task_requirement_pda(&task_id, 1);
+    let (_req1_pk, _) = task_requirement_pda(&task_id, 1);
     let mut data = discriminator("global", "add_task_requirement").to_vec();
     data.push(1); // skip 0→1 already used; 1 is correct after count=1, use wrong: try index 5
     data.push(255); // CAPABILITY_ANY
@@ -24192,7 +24171,7 @@ fn observation_v2_data(
 #[tokio::test]
 async fn phase4_submit_multi_source_observations_and_read_back() {
     use terra_registry::observation_v2::{self, ObservationV2};
-    use terra_registry::verification_task::{self, VerificationTask};
+    use terra_registry::verification_task::{self};
 
     let (mut ctx, payer) = setup().await;
     let subject_acct = Pubkey::new_unique();
@@ -24741,7 +24720,7 @@ async fn phase5_manifest_and_artifacts_read_back() {
     use terra_registry::evidence_manifest::{
         self, EvidenceArtifact, EvidenceManifest, MAX_MANIFEST_ARTIFACTS,
     };
-    use terra_registry::verification_task::{self, VerificationTask};
+    use terra_registry::verification_task::{self};
 
     let (mut ctx, payer) = setup().await;
     let subject_acct = Pubkey::new_unique();
@@ -25584,6 +25563,7 @@ fn capability_restriction_pda(wallet: &Pubkey, capability_code: u8) -> (Pubkey, 
     )
 }
 
+#[allow(dead_code)]
 fn appeal_pda(restriction: &Pubkey, appellant: &Pubkey, nonce: u16) -> (Pubkey, u8) {
     Pubkey::find_program_address(
         &[
@@ -26009,7 +25989,7 @@ async fn phase7_vote_double_and_not_member() {
     assert_custom_error(res, 6197, "double vote must fail");
 
     // Finalize too early (only 1/5) → 6198.
-    let mut data = discriminator("global", "finalize_fraud_review").to_vec();
+    let data = discriminator("global", "finalize_fraud_review").to_vec();
     let (restriction_pk, _) = capability_restriction_pda(&accused.pubkey(), report.capability_code);
     let (cap_pk, _) = validator_capability_pda(&accused.pubkey(), report.capability_code);
     let (profile_pk, _) = validator_profile_pda(&accused.pubkey());
@@ -26219,7 +26199,7 @@ async fn phase7_upheld_demotes_not_jails() {
 
     // Finalize → demotion (no jail).
     let (restriction_pk, _) = capability_restriction_pda(&accused.pubkey(), cap_code);
-    let mut data = discriminator("global", "finalize_fraud_review").to_vec();
+    let data = discriminator("global", "finalize_fraud_review").to_vec();
     process(
         &mut ctx,
         &payer,
@@ -26277,7 +26257,7 @@ async fn phase7_upheld_demotes_not_jails() {
 
     // Rehab is time-locked: 30-day window has not elapsed → 6204.
     let (rehab_profile_pk, _) = validator_profile_pda(&accused.pubkey());
-    let mut data = discriminator("global", "rehabilitate_restriction").to_vec();
+    let data = discriminator("global", "rehabilitate_restriction").to_vec();
     let res = process(
         &mut ctx,
         &accused,

@@ -917,7 +917,7 @@ mod tests {
     #[test]
     fn duplicate_validator_rejected() {
         let v1 = Pubkey::new_unique();
-        let validators = vec![v1];
+        let validators = [v1];
         assert!(validators.contains(&v1));
     }
 

@@ -401,12 +401,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn empty_zone_rejected() {
         assert!(0i32 <= 0);
         assert!(5i32 > 0);
     }
 
     #[test]
+    #[allow(clippy::const_is_empty)]
     fn purpose_length_bounds() {
         assert!("subsidy_qualification".len() <= 128);
         assert!("".is_empty());
