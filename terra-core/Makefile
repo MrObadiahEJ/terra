@@ -1,4 +1,4 @@
-.PHONY: build test test-fast lint deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-ts test-fast lint deploy deploy-devnet deploy-mainnet clean idl
 
 # Build all programs
 build:
@@ -7,6 +7,12 @@ build:
 # Run Rust integration tests
 test:
 	cargo test --test integration -- --test-threads=1
+
+# TS E2E smoke test of the RRR ownership model (client-side account checks).
+# Needs: npm install, `make idl`, a local `solana-test-validator` (AVX CPU)
+# with the program deployed via `make deploy-localnet`.
+test-ts:
+	./node_modules/.bin/ts-mocha -p tsconfig.json tests/terra_registry.ts
 
 # Run lint checks
 lint:
