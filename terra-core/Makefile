@@ -1,4 +1,4 @@
-.PHONY: build test test-ts test-fast lint ci deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-ts test-fast lint ci prune deploy deploy-devnet deploy-mainnet clean idl
 
 # Build all programs
 build:
@@ -52,6 +52,24 @@ ci:
 fix:
 	cargo fmt
 	cargo clippy --workspace --all-targets --fix --allow-dirty
+
+# Free disk on constrained machines: regenerable debug artifacts only.
+# Each integration test binary is ~500MB and a new one is linked per
+# source change; target/debug/incremental is fully regenerable.
+# Keeps the two newest integration binaries (registry + identity) so the
+# next test run only relinks what changed. Never touches target/deploy,
+# target/idl, or cargo registry caches.
+prune:
+	rm -rf target/debug/incremental
+	@cd target/debug/deps && \
+	keep=$$(find . -maxdepth 1 -name 'integration-*' -type f -executable \
+	  ! -name '*.tmp*' -printf '%T@ %f\n' 2>/dev/null | sort -rn | head -2 \
+	  | cut -d' ' -f2- | tr '\n' ' '); \
+	for f in integration-*; do \
+		case " $$keep " in *" $$f "*) ;; *) rm -f "$$f";; esac; \
+	done; \
+	echo "pruned target/debug/incremental + stale integration binaries"
+	@df -h /home | tail -1
 
 # Generate IDLs only (-o JSON → target/idl; workspace `anchor build`
 # pulls host-only deps via api/geo members and can fail on getrandom/SBF)
