@@ -114,6 +114,16 @@ pub fn file_dispute(
         TerraError::InvalidThreshold
     );
 
+    // F5: the declared dispute quorum must be a subset of the on-chain
+    // registry, so freeze/adjudicate verification operates on a
+    // registry-derived set instead of caller-chosen keys.
+    for &v in validators.iter() {
+        if v == Pubkey::default() {
+            continue;
+        }
+        require!(registry.validators.contains(&v), TerraError::NotValidator);
+    }
+
     // Parcel must be in REGISTERED status to be disputed.
     require!(
         ctx.accounts.parcel.status == parcel_status::REGISTERED,

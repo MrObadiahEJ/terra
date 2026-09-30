@@ -3396,6 +3396,10 @@ async fn dispute_lifecycle_owner_wins() {
     .await
     .expect("fund val2");
 
+    // F5: dispute quorum must consist of registered validators.
+    add_validator_ok(&mut ctx, &payer, &val1.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &val2.pubkey()).await;
+
     let case_hash = [77u8; 32];
     let (dispute_pda, _) = dispute_pda(&parcel_pk, &case_hash);
 
@@ -3547,6 +3551,10 @@ async fn dispute_cancel_by_filer() {
     )
     .await
     .expect("fund val2");
+
+    // F5: dispute quorum must consist of registered validators.
+    add_validator_ok(&mut ctx, &payer, &val1.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &val2.pubkey()).await;
 
     let case_hash = [88u8; 32];
     let (dispute_pda, _) = dispute_pda(&parcel_pk, &case_hash);
@@ -18966,8 +18974,12 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
     let (registry_pk, _) = registry_pda();
 
     let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
+    let juror_a = Keypair::new();
+    let juror_b = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &juror_a.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &juror_b.pubkey()).await;
+    validators[0] = juror_a.pubkey();
+    validators[1] = juror_b.pubkey();
     let res = process(
         &mut ctx,
         &payer,
@@ -20468,8 +20480,12 @@ async fn edge_case_c3_dispute_sets_disputed_status() {
         Pubkey::find_program_address(&[b"dispute", parcel_pk.as_ref(), &case_hash], &PROGRAM_ID);
     let (registry_pk, _) = registry_pda();
     let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
+    let juror_a = Keypair::new();
+    let juror_b = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &juror_a.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &juror_b.pubkey()).await;
+    validators[0] = juror_a.pubkey();
+    validators[1] = juror_b.pubkey();
     process(
         &mut ctx,
         &payer,
@@ -20543,8 +20559,12 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
         Pubkey::find_program_address(&[b"dispute", parcel_pk.as_ref(), &case_hash], &PROGRAM_ID);
     let (registry_pk, _) = registry_pda();
     let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
+    let juror_a = Keypair::new();
+    let juror_b = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &juror_a.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &juror_b.pubkey()).await;
+    validators[0] = juror_a.pubkey();
+    validators[1] = juror_b.pubkey();
 
     // First dispute succeeds.
     process(
@@ -21337,8 +21357,12 @@ async fn cross_module_d3_dispute_lifecycle() {
     let (dispute_pk, _) =
         Pubkey::find_program_address(&[b"dispute", parcel_pk.as_ref(), &case_hash], &PROGRAM_ID);
     let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
+    let juror_a = Keypair::new();
+    let juror_b = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &juror_a.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &juror_b.pubkey()).await;
+    validators[0] = juror_a.pubkey();
+    validators[1] = juror_b.pubkey();
     process(
         &mut ctx,
         &payer,
@@ -22126,8 +22150,12 @@ async fn e2e_f1_full_parcel_lifecycle() {
     let (dispute_pk, _) =
         Pubkey::find_program_address(&[b"dispute", parcel_pk.as_ref(), &case_hash], &PROGRAM_ID);
     let mut validators = [Pubkey::default(); 8];
-    validators[0] = Keypair::new().pubkey();
-    validators[1] = Keypair::new().pubkey();
+    let juror_a = Keypair::new();
+    let juror_b = Keypair::new();
+    add_validator_ok(&mut ctx, &payer, &juror_a.pubkey()).await;
+    add_validator_ok(&mut ctx, &payer, &juror_b.pubkey()).await;
+    validators[0] = juror_a.pubkey();
+    validators[1] = juror_b.pubkey();
     process(
         &mut ctx,
         &buyer,
@@ -29679,4 +29707,75 @@ async fn zk_generate_rejects_invalid_root_attestation() {
     .expect("valid root attestation must be accepted");
     let zone: ZoneSet = read_account(&ctx, zone_set).await;
     assert_eq!(zone.current_root_version, 1);
+}
+
+// ===========================================================================
+// F5: file_dispute declared quorum must be registry members
+// ===========================================================================
+
+#[tokio::test]
+async fn file_dispute_rejects_unregistered_validators() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+
+    let owner = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        // Enough for parcel + ownership rent AND the dispute PDA init.
+        fund_ix(&payer.pubkey(), &owner.pubkey(), 50_000_000),
+    )
+    .await
+    .expect("fund owner");
+    let parcel = register_parcel_ok(&mut ctx, &owner, registry).await;
+
+    // Two colluding keys that are NOT registered validators.
+    let val1 = Keypair::new();
+    let val2 = Keypair::new();
+
+    let case_hash = [5u8; 32];
+    let (dispute_pda, _) = dispute_pda(&parcel, &case_hash);
+
+    let mut validators = [Pubkey::default(); 8];
+    validators[0] = val1.pubkey();
+    validators[1] = val2.pubkey();
+
+    let mut data = discriminator("global", "file_dispute").to_vec();
+    data.extend_from_slice(&case_hash);
+    data.push(2u8);
+    for v in &validators {
+        data.extend_from_slice(&v.to_bytes());
+    }
+
+    let ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(dispute_pda, false),
+            AccountMeta::new(parcel, false),
+            AccountMeta::new_readonly(ownership_pda(&parcel), false),
+            AccountMeta::new_readonly(registry, false),
+            AccountMeta::new(owner.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    };
+
+    let res = process(&mut ctx, &owner, ix).await;
+    assert_custom_error(res, 6028, "unregistered dispute validators");
+
+    // No partial write: parcel stays REGISTERED, no dispute account created.
+    let p: Parcel = read_account(&ctx, parcel).await;
+    assert_eq!(
+        p.status,
+        parcel_status::REGISTERED,
+        "parcel must stay registered after rejected filing"
+    );
+    assert!(
+        ctx.banks_client
+            .get_account(dispute_pda)
+            .await
+            .unwrap()
+            .is_none(),
+        "no dispute account must exist"
+    );
 }

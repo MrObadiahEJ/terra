@@ -21,7 +21,7 @@ frontend / tx-prep layer needs no update.
 | F2 | `routing.rs` route_task capability-restriction slot | Fail-open: any undeserializable slot counted as "no restriction", so junk could mask an ACTIVE `CapabilityRestriction` | High | **Fixed** |
 | F3 | `fraud_governance.rs` `open_fraud_review` / `open_appeal_review` | No registry account in the instruction → committee pool membership is not bounded by `registry.validators` | Medium (residual) | Open — mitigated by F1 |
 | F4 | `lib.rs` `judicial_forfeiture` | `validators` + `threshold` are instruction args; no registry account → any `MIN_FORFEIT_THRESHOLD` keys colluding with any relay authority can force-transfer a parcel | High (design) | **Fixed** — registry membership binding |
-| F5 | `dispute.rs` `file_dispute` | `validators` arg stored without cross-checking `registry.validators` → declared quorum set is unbound at file time | Medium (design) | Open — needs registry cross-check |
+| F5 | `dispute.rs` `file_dispute` | `validators` arg stored without cross-checking `registry.validators` → declared quorum set is unbound at file time | Medium (design) | **Fixed** — registry cross-check at file time |
 | F6 | `vault.rs` `deserialize_identity()` | No owner check despite callers' `/// CHECK:` comments → forged `Identity{owner,recovery}` → bogus vaults / future identity-PDA squatting | Medium | **Fixed** |
 | F7 | `lib.rs` `attach_parcel` | Identity slot read with no program-owner check; `identity.owner == signer` gate is forgeable → provenance pollution / PDA squatting | Medium | **Fixed** |
 | F8 | `lib.rs` `grant_identity_right` | "valid Identity PDA" claimed but never verified (no owner check) → forged identity binds into `IdentityRights` | Medium | **Fixed** |
@@ -137,7 +137,11 @@ checks — no change.
     `>= MIN_FORFEIT_VALIDATORS` — binding membership makes every accepted
     threshold ≥2 a quorum of *registered* validators transitively
   * (earlier P0 batch: stale `rights_count` doc comment corrected)
-* `programs/terra_registry/tests/integration.rs` — 5 adversarial tests (below)
+* `programs/terra_registry/src/dispute.rs`
+  * `file_dispute` — every declared quorum validator must be in
+    `registry.validators` (F5); check sits after the threshold guards so
+    existing reject codes (6016 etc.) are unchanged
+* `programs/terra_registry/tests/integration.rs` — adversarial tests (below)
 * `tests/terra_registry.ts`, `Makefile` — earlier P0-TEST-01 batch
 
 Soft-fail callers (`.ok()`, `Err(_) => default`) keep optional-account
@@ -154,6 +158,7 @@ semantics — they just can no longer read foreign-owned data.
 | `attach_and_grant_foreign_identity_rejected` | attach → 6019; grant → 6019 + no `IdentityRights` |
 | `judicial_forfeiture_rejects_unregistered_validators` | F4: colluding unregistered keys + relay authority → 6028 (`NotValidator`), holder unchanged |
 | `judicial_forfeiture_transfers_ownership` (updated) | registered validator quorum still succeeds after the binding |
+| `file_dispute_rejects_unregistered_validators` | F5: unregistered declared quorum → 6028, parcel stays REGISTERED, no dispute PDA |
 
 Each corrupts a real account's owner via `ctx.set_account` while keeping the
 data (incl. discriminator) intact — the exact pre-fix bypass.
@@ -170,10 +175,10 @@ data (incl. discriminator) intact — the exact pre-fix bypass.
 * **F4 — DONE (see §3 / §4):** `JudicialForfeiture` now takes the
   registry account and rejects any declared validator not in
   `registry.validators` (test: 6028, holder unchanged).
-* **F5:** cross-check `file_dispute`'s `validators` arg against
-  `registry.validators` at file time (add the registry account to the
-  dispute struct), so freeze/adjudicate quorum verification operates on a
-  registry-derived set.
+* **F5 — DONE (see §3 / §4):** `file_dispute` now rejects declared
+  validators missing from `registry.validators` (test: 6028, parcel
+  unchanged). Existing dispute suites register their jurors via
+  `add_validator_ok`.
 
 ## 6. Verification
 
@@ -182,11 +187,11 @@ cd terra-core
 cargo fmt --check
 cargo clippy -- -D warnings              # CI-exact (libs only — CI does not lint test targets)
 cargo test -p terra-registry --lib       # 131 unit tests
-cargo test -p terra-registry --test integration   # 300 tests, --test-threads=1 in CI
+cargo test -p terra-registry --test integration   # 301 tests, --test-threads=1 in CI
 anchor build --skip-lint                 # CI build path (fresh .so needed before running tests)
 ```
 
-Latest local run: 300/300 integration, 131/131 lib, fmt clean, clippy clean.
+Latest local run: 301/301 integration, 131/131 lib, fmt clean, clippy clean.
 TS smoke tests (`make test-ts`) require a local validator — `solana-test-validator`
 core-dumps on this machine (no AVX); CI/devnet only.
 
