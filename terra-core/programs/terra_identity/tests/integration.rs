@@ -50,7 +50,54 @@ fn system_program_id() -> Pubkey {
     solana_sdk_ids::system_program::id()
 }
 
+/// ProgramTest loads the prebuilt `target/deploy/terra_identity.so`
+/// (processor is `None`), so editing `src/` without re-running
+/// `anchor build --skip-lint` makes this suite silently test stale
+/// on-chain code. Compare mtimes once per test process and fail loudly.
+fn assert_program_so_fresh() {
+    use std::sync::Once;
+    static CHECK: Once = Once::new();
+    CHECK.call_once(|| {
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut newest_src = std::time::UNIX_EPOCH;
+        let mut stack = vec![manifest.join("src")];
+        while let Some(d) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&d) else {
+                continue;
+            };
+            for e in entries.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    if let Ok(m) = e.metadata().and_then(|m| m.modified()) {
+                        if m > newest_src {
+                            newest_src = m;
+                        }
+                    }
+                }
+            }
+        }
+        let so = manifest.join("../../target/deploy/terra_identity.so");
+        let m = std::fs::metadata(&so)
+            .and_then(|m| m.modified())
+            .unwrap_or_else(|_| {
+                panic!(
+                    "{} missing — run: cd terra-core && anchor build --skip-lint",
+                    so.display()
+                )
+            });
+        assert!(
+            m >= newest_src,
+            "{} is older than the newest .rs under programs/terra_identity/src — stale build.\n\
+             Run: cd terra-core && anchor build --skip-lint",
+            so.display()
+        );
+    });
+}
+
 async fn setup() -> (ProgramTestContext, Keypair) {
+    assert_program_so_fresh();
     let mut pt = ProgramTest::new("terra_identity", PROGRAM_ID, None);
     pt.set_compute_max_units(200_000);
     let ctx = pt.start_with_context().await;
