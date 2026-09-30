@@ -118,6 +118,37 @@ before deser; pairs must be even-length; expected PDA per source account.
 | `attach_parcel` (lib.rs:~1076) | only `identity.owner == signer` | owner check added (F7) |
 | `grant_identity_right` (lib.rs:~972) | deser only ("valid Identity PDA" unverified) | owner check added (F8) |
 
+### Completion census — every `UncheckedAccount` slot (both programs)
+
+Full sweep after F1–F8 to confirm no reader was missed:
+
+* `terra_registry` has **50** `UncheckedAccount` fields (lib.rs) + the 8
+  audited data-read helpers; `terra_identity` has **1**.
+* All **23 raw data-read sites** (`try_borrow_data` / `try_from_slice` /
+  `try_deserialize`) are covered: the F1/F6/F7/F8 fixes, Pattern 1
+  (`is_authorized_holder` — owner checked at lib.rs:199 before deser),
+  Pattern 5 (`claim_succession_with_parcels` — owner checks on identity,
+  succession, and `identity_program.key() == terra_identity::ID` before
+  deser/CPI; rights PDAs owner-checked in the remaining-accounts loop),
+  Pattern 6 (`verify_rights_account` / `migrate_rights`), and
+  `task_economics::deser_policy` (owner + empty, pre-existing).
+* Every other unchecked slot is a **pubkey target** (`seller`, `buyer`,
+  `accused`, `validator`, `authority`, `reporter`, `zone_id`, …): only
+  `.key()` is ever read — nothing to forge. No CPI besides the audited
+  `claim_succession_with_parcels` invoke.
+* Write paths need no check: the runtime rejects data mutation of
+  foreign-owned accounts (`ExternalAccountDataModified`).
+* ZK: `verify_precompiled_ed25519` requires
+  `instructions.key == INSTRUCTIONS_SYSVAR_ID` (6087) before
+  `load_instruction_at_checked` — a fake sysvar account cannot be
+  substituted.
+* `terra_identity`: no `remaining_accounts`; its single `UncheckedAccount`
+  (`new_owner` in `RevokeGuardianship`) is never data-read (the handler
+  uses the instruction argument), and `ExecuteRevokeGuardianship` demands
+  a `Signer` matching `identity.pending_new_owner`.
+
+**Result: no open findings remain in this audit class (F1–F8 all Fixed).**
+
 Other `deser_policy` (task_economics.rs:260) already had `owner + empty`
 checks — no change.
 
