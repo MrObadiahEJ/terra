@@ -141,6 +141,178 @@ pub struct CredentialNullifier {
 }
 
 // ---------------------------------------------------------------------------
+// Signature verification (P0-ZK)
+//
+// RFC-011 §6.2/§8.3 require an Ed25519 authority signature over every
+// committed Merkle root. Until the Poseidon/Groth16 circuit is wired (RFC-011
+// §6.3 "verified by the circuit" — deferred to audit), proof presentations
+// are verified as Ed25519 statements instead of being blindly hashed:
+//
+// * root attestation message  = merkle_root || version (RFC-011 §6.2, LE)
+// * ownership proof statement  = DOMAIN || zone_set || merkle_root ||
+//   root_version || nullifier || prover || purpose || disclosure,
+//   signed by the PROVER (binds the presentation to the prover's key)
+// * credential proof statement = DOMAIN || credential_hash || nullifier ||
+//   region_registry || prover || purpose || disclosure, signed by the PROVER
+//
+// Statement encodings are length-delimited and domain-tagged so no two
+// statement kinds can collide. Third parties can re-verify proof_data
+// offline from transaction bytes.
+//
+// Signatures are verified by the Solana runtime's native Ed25519 precompile
+// (agave-precompiles, ~0 program CU). In-program curve math with
+// ed25519-dalek exceeds the 1.4M CU per-transaction ceiling on SBF, so each
+// instruction takes an `instructions` sysvar account, locates the matching
+// precompile instruction in the current transaction, and requires it to
+// resolve entirely within that instruction (u16::MAX / self index) so the
+// runtime checked exactly (signer, statement, signature). Transaction
+// atomicity guarantees the precompile runs — an invalid signature aborts the
+// whole transaction, including any state writes. Anything unmatched is
+// rejected with TerraError::InvalidProofData.
+// ---------------------------------------------------------------------------
+
+const OWNERSHIP_PROOF_DOMAIN: &[u8] = b"TERRA_ZK_OWNERSHIP_PROOF_V1";
+const CREDENTIAL_PROOF_DOMAIN: &[u8] = b"TERRA_ZK_CREDENTIAL_PROOF_V1";
+
+/// RFC-011 §6.2: `sign(new_merkle_root || zone_set.current_root_version)`.
+/// Version is little-endian (Solana convention); the signer must know the
+/// version *after* the increment this instruction performs.
+pub fn root_attestation_message(merkle_root: &[u8; 32], version: u32) -> [u8; 36] {
+    let mut msg = [0u8; 36];
+    msg[..32].copy_from_slice(merkle_root);
+    msg[32..].copy_from_slice(&version.to_le_bytes());
+    msg
+}
+
+fn push_str(buf: &mut Vec<u8>, s: &str) {
+    // Length-delimited: purpose is variable-length and must not shift the
+    // fields after it.
+    buf.push(s.len() as u8);
+    buf.extend_from_slice(s.as_bytes());
+}
+
+/// Canonical ownership-proof statement (see module docs). Returns the exact
+/// bytes the prover must sign and the program verifies.
+pub fn ownership_proof_statement(
+    zone_set: &Pubkey,
+    merkle_root: &[u8; 32],
+    root_version: u32,
+    nullifier_hash: &[u8; 32],
+    prover: &Pubkey,
+    proof_purpose: &str,
+    disclosure_type: u8,
+) -> Vec<u8> {
+    let mut m = Vec::with_capacity(
+        OWNERSHIP_PROOF_DOMAIN.len() + 32 + 32 + 4 + 32 + 32 + 1 + proof_purpose.len() + 1,
+    );
+    m.extend_from_slice(OWNERSHIP_PROOF_DOMAIN);
+    m.extend_from_slice(zone_set.as_ref());
+    m.extend_from_slice(merkle_root);
+    m.extend_from_slice(&root_version.to_le_bytes());
+    m.extend_from_slice(nullifier_hash);
+    m.extend_from_slice(prover.as_ref());
+    push_str(&mut m, proof_purpose);
+    m.push(disclosure_type);
+    m
+}
+
+/// Canonical credential-proof statement (see module docs).
+pub fn credential_proof_statement(
+    credential_hash: &[u8; 32],
+    nullifier_hash: &[u8; 32],
+    region_registry: &Pubkey,
+    prover: &Pubkey,
+    purpose: &str,
+    disclosure_type: u8,
+) -> Vec<u8> {
+    let mut m = Vec::with_capacity(
+        CREDENTIAL_PROOF_DOMAIN.len() + 32 + 32 + 32 + 32 + 1 + purpose.len() + 1,
+    );
+    m.extend_from_slice(CREDENTIAL_PROOF_DOMAIN);
+    m.extend_from_slice(credential_hash);
+    m.extend_from_slice(nullifier_hash);
+    m.extend_from_slice(region_registry.as_ref());
+    m.extend_from_slice(prover.as_ref());
+    push_str(&mut m, purpose);
+    m.push(disclosure_type);
+    m
+}
+
+/// Parse an Ed25519 precompile instruction that references only its own data
+/// (`u16::MAX` or its own instruction index — the same convention the runtime
+/// verifier in `agave-precompiles` uses for `u16::MAX`). Returns
+/// `(pubkey, signature, message)` slices from the instruction data.
+fn parse_ed25519_self_attestation(
+    data: &[u8],
+    self_index: usize,
+) -> Option<(&[u8; 32], &[u8; 64], &[u8])> {
+    // [0]=num_signatures, [1]=padding, [2..16]=Ed25519SignatureOffsets,
+    // pubkey@16, signature@48, message@112 (see solana-ed25519-program).
+    if data.len() < 16 + 32 + 64 || data[0] != 1 {
+        return None;
+    }
+    let o = &data[2..16];
+    let so = u16::from_le_bytes(o[0..2].try_into().ok()?) as usize;
+    let si = u16::from_le_bytes(o[2..4].try_into().ok()?);
+    let po = u16::from_le_bytes(o[4..6].try_into().ok()?) as usize;
+    let pi = u16::from_le_bytes(o[6..8].try_into().ok()?);
+    let mo = u16::from_le_bytes(o[8..10].try_into().ok()?) as usize;
+    let ms = u16::from_le_bytes(o[10..12].try_into().ok()?) as usize;
+    let mi = u16::from_le_bytes(o[12..14].try_into().ok()?);
+    let refers_self = |idx: u16| idx == u16::MAX || idx as usize == self_index;
+    if !refers_self(si) || !refers_self(pi) || !refers_self(mi) {
+        return None;
+    }
+    let pk = <&[u8; 32]>::try_from(data.get(po..po + 32)?).ok()?;
+    let sig = <&[u8; 64]>::try_from(data.get(so..so + 64)?).ok()?;
+    Some((pk, sig, data.get(mo..mo + ms)?))
+}
+
+/// Locate the runtime Ed25519 precompile instruction attesting exactly
+/// (`expected_signer`, `expected_message`, `expected_signature`) in the
+/// current transaction and accept it. The runtime performs the actual
+/// signature verification when the precompile executes; atomicity ties that
+/// success to this instruction's state writes. `instructions` must be the
+/// Instructions sysvar.
+#[allow(deprecated)] // solana-program 3.0 re-exports of the instructions sysvar
+pub fn verify_precompiled_ed25519(
+    instructions: &AccountInfo,
+    expected_signer: &Pubkey,
+    expected_message: &[u8],
+    expected_signature: &[u8],
+) -> Result<()> {
+    use solana_program::sysvar::instructions::{
+        load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID,
+    };
+    require_keys_eq!(
+        *instructions.key,
+        INSTRUCTIONS_SYSVAR_ID,
+        TerraError::InvalidProofData
+    );
+    // A transaction fits at most ~60 instructions; the loader errors out of
+    // range (after the address check above, errors are end-of-list).
+    const MAX_IX_SCAN: usize = 64;
+    for i in 0..MAX_IX_SCAN {
+        let ix = match load_instruction_at_checked(i, instructions) {
+            Ok(ix) => ix,
+            Err(_) => break,
+        };
+        if ix.program_id != solana_program::ed25519_program::ID {
+            continue;
+        }
+        if let Some((pk, sig, msg)) = parse_ed25519_self_attestation(&ix.data, i) {
+            if pk == expected_signer.as_ref()
+                && msg == expected_message
+                && sig.as_slice() == expected_signature
+            {
+                return Ok(());
+            }
+        }
+    }
+    err!(TerraError::InvalidProofData)
+}
+
+// ---------------------------------------------------------------------------
 // Legacy Handlers (ZoneSet)
 // ---------------------------------------------------------------------------
 
@@ -204,6 +376,7 @@ pub fn generate_ownership_root(
     new_snapshot_cid: String,
     new_snapshot_hash: [u8; 32],
     commitment_count: u32,
+    authority_signature: [u8; 64],
 ) -> Result<()> {
     require!(
         !new_merkle_root.iter().all(|b| *b == 0),
@@ -225,17 +398,30 @@ pub fn generate_ownership_root(
         TerraError::UnauthorizedZoneAuthority
     );
 
+    // RFC-011 §6.2: the committed root must carry the zone authority's
+    // Ed25519 signature over `new_merkle_root || version` (§8.3 — prevents
+    // accepting a root that was never authorized off-chain).
+    let new_version = zone_set.current_root_version.saturating_add(1);
+    let attestation = root_attestation_message(&new_merkle_root, new_version);
+    verify_precompiled_ed25519(
+        &ctx.accounts.instructions,
+        &zone_set.authority,
+        &attestation,
+        &authority_signature,
+    )?;
+
     let now = Clock::get()?.unix_timestamp;
-    zone_set.current_root_version = zone_set.current_root_version.saturating_add(1);
+    zone_set.current_root_version = new_version;
     zone_set.parcel_count = commitment_count;
     zone_set.updated_at = now;
 
     let root = &mut ctx.accounts.ownership_root;
     root.merkle_root = new_merkle_root;
-    root.version = zone_set.current_root_version;
+    root.version = new_version;
     root.commitment_count = commitment_count;
     root.snapshot_cid = new_snapshot_cid.clone();
     root.snapshot_hash = new_snapshot_hash;
+    root.authority_signature = authority_signature;
     root.updated_at = now;
 
     emit!(OwnershipRootUpdated {
@@ -284,8 +470,33 @@ pub fn verify_ownership_proof(
     );
     require!(root.commitment_count > 0, TerraError::EmptyZoneSet);
 
+    // P0-ZK: proof_data must be the prover's Ed25519 signature over the
+    // canonical statement (zone, root, version, nullifier, prover, purpose,
+    // disclosure) — not an opaque blob. Verified via the runtime Ed25519
+    // precompile (locate in the Instructions sysvar, match signer/statement/
+    // signature). Checked after the size/version guards so existing error
+    // semantics (ProofTooLarge / RootVersionMismatch / InvalidProofPurpose /
+    // InvalidDisclosureType) are preserved.
+    let statement = ownership_proof_statement(
+        &ctx.accounts.zone_set.key(),
+        &root.merkle_root,
+        root.version,
+        &nullifier_hash,
+        &ctx.accounts.prover.key(),
+        &proof_purpose,
+        disclosure_type,
+    );
+    verify_precompiled_ed25519(
+        &ctx.accounts.instructions,
+        &ctx.accounts.prover.key(),
+        &statement,
+        &proof_data,
+    )?;
+
     let now = Clock::get()?.unix_timestamp;
-    let proof_hash = solana_program::hash::hash(&proof_data).to_bytes();
+    let proof_hash =
+        solana_program::hash::hash(&[statement.as_slice(), proof_data.as_slice()].concat())
+            .to_bytes();
 
     let record = &mut ctx.accounts.nullifier_record;
     record.nullifier_hash = nullifier_hash;
@@ -535,6 +746,24 @@ pub fn verify_credential(
         TerraError::AlreadyEndorsedRotation
     );
 
+    // P0-ZK: proof_data must be the prover's Ed25519 signature over the
+    // canonical credential statement (hash, nullifier, registry, prover,
+    // purpose, disclosure) — verified via the runtime Ed25519 precompile.
+    let statement = credential_proof_statement(
+        &credential.credential_hash,
+        &credential.nullifier_hash,
+        &credential.region_registry,
+        &credential.prover,
+        &credential.purpose,
+        credential.disclosure_type,
+    );
+    verify_precompiled_ed25519(
+        &ctx.accounts.instructions,
+        &credential.prover,
+        &statement,
+        &proof_data,
+    )?;
+
     let now = Clock::get()?.unix_timestamp;
 
     nullifier.nullifier_hash = credential.nullifier_hash;
@@ -544,7 +773,9 @@ pub fn verify_credential(
     credential.consumed = true;
     credential.version = credential.version.saturating_add(1);
 
-    let proof_hash = solana_program::hash::hash(&proof_data).to_bytes();
+    let proof_hash =
+        solana_program::hash::hash(&[statement.as_slice(), proof_data.as_slice()].concat())
+            .to_bytes();
 
     emit!(super::CredentialVerified {
         credential_hash: credential.credential_hash,
@@ -639,5 +870,78 @@ mod tests {
         let n1 = solana_program::hash::hash(&input).to_bytes();
         let n2 = solana_program::hash::hash(&input).to_bytes();
         assert_eq!(n1, n2);
+    }
+
+    #[test]
+    fn root_attestation_message_layout() {
+        let msg = root_attestation_message(&[7u8; 32], 0x01020304);
+        assert_eq!(&msg[..32], &[7u8; 32]);
+        assert_eq!(&msg[32..], &[4, 3, 2, 1]);
+    }
+
+    #[test]
+    fn statements_are_domain_separated_and_length_delimited() {
+        let zone = Pubkey::new_unique();
+        let prover = Pubkey::new_unique();
+        let reg = Pubkey::new_unique();
+        let own = ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "a", 0);
+        let cred = credential_proof_statement(&[1u8; 32], &[2u8; 32], &reg, &prover, "a", 0);
+        assert_ne!(
+            &own[..OWNERSHIP_PROOF_DOMAIN.len()],
+            &cred[..CREDENTIAL_PROOF_DOMAIN.len()]
+        );
+
+        // purpose shifting must not move trailing fields ambiguously:
+        // "ab"+[0] vs "a"+[0,?] cannot collide because purpose is length-prefixed.
+        let a = ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "a", 1);
+        let ab = ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "ab", 1);
+        assert_ne!(a, ab);
+        // Same inputs → same bytes (deterministic).
+        assert_eq!(
+            a,
+            ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "a", 1)
+        );
+    }
+
+    #[test]
+    fn ed25519_self_attestation_layout() {
+        // Exact layout produced by solana-ed25519-program's
+        // new_ed25519_instruction_with_signature (u16::MAX = "this ix").
+        let mut data = vec![1u8, 0];
+        data.extend_from_slice(&48u16.to_le_bytes()); // signature offset
+        data.extend_from_slice(&u16::MAX.to_le_bytes()); // signature ix index
+        data.extend_from_slice(&16u16.to_le_bytes()); // pubkey offset
+        data.extend_from_slice(&u16::MAX.to_le_bytes()); // pubkey ix index
+        data.extend_from_slice(&112u16.to_le_bytes()); // message offset
+        data.extend_from_slice(&7u16.to_le_bytes()); // message size
+        data.extend_from_slice(&u16::MAX.to_le_bytes()); // message ix index
+        data.extend_from_slice(&[3u8; 32]); // pubkey
+        data.extend_from_slice(&[4u8; 64]); // signature
+        data.extend_from_slice(b"hello-!"); // message (7 bytes)
+
+        let (pk, sig, msg) =
+            parse_ed25519_self_attestation(&data, 0).expect("self-referencing layout parses");
+        assert_eq!(pk, &[3u8; 32]);
+        assert_eq!(sig, &[4u8; 64]);
+        assert_eq!(msg, b"hello-!");
+
+        // Explicit self index (instead of u16::MAX) also accepted.
+        // Offset table bytes: [2..4]=sig_off, [4..6]=sig_ix, [6..8]=pk_off,
+        // [8..10]=pk_ix, [10..12]=msg_off, [12..14]=msg_size, [14..16]=msg_ix.
+        let mut data2 = data.clone();
+        data2[8..10].copy_from_slice(&1u16.to_le_bytes()); // pubkey ix index = 1
+        assert!(parse_ed25519_self_attestation(&data2, 1).is_some());
+
+        // Cross-instruction references must be rejected: the runtime could
+        // then verify bytes we did not inspect.
+        let mut data3 = data.clone();
+        data3[8..10].copy_from_slice(&0u16.to_le_bytes()); // pubkey ix index = 0 (self=1)
+        assert!(parse_ed25519_self_attestation(&data3, 1).is_none());
+
+        // Truncated / malformed data rejected.
+        assert!(parse_ed25519_self_attestation(&data[..20], 0).is_none());
+        let mut data4 = data.clone();
+        data4[0] = 2; // multi-signature layout not parsed
+        assert!(parse_ed25519_self_attestation(&data4, 0).is_none());
     }
 }

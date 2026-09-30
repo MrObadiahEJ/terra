@@ -6245,6 +6245,13 @@ export const terraRegistry: Idl = {
         {
           "name": "authority",
           "signer": true
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "(must be the Instructions sysvar holding this transaction's",
+            "Ed25519 precompile attestation for the new root)."
+          ]
         }
       ],
       "args": [
@@ -6273,6 +6280,15 @@ export const terraRegistry: Idl = {
         {
           "name": "commitment_count",
           "type": "u32"
+        },
+        {
+          "name": "authority_signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
         }
       ]
     },
@@ -14697,6 +14713,13 @@ export const terraRegistry: Idl = {
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "(must be the Instructions sysvar holding this transaction's",
+            "Ed25519 precompile attestation of the credential statement)."
+          ]
         }
       ],
       "args": [
@@ -15159,13 +15182,23 @@ export const terraRegistry: Idl = {
           "name": "authority",
           "docs": [
             "Zone authority co-sign: every accepted proof is explicitly attested.",
-            "(Circuit-level verification is deferred to audit; see RFC-011.)"
+            "`proof_data` is separately verified as the prover's Ed25519 signature",
+            "over the canonical statement via the runtime precompile (P0-ZK",
+            "interim; Poseidon/Groth16 circuit verification remains deferred to",
+            "audit \u2014 see RFC-011 \u00a76.3)."
           ],
           "signer": true
         },
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "(must be the Instructions sysvar holding this transaction's",
+            "Ed25519 precompile attestation of the proof statement)."
+          ]
         }
       ],
       "args": [
@@ -24160,8 +24193,10 @@ export const terraRegistry: Idl = {
           {
             "name": "rights_count",
             "docs": [
-              "Monotonic nonce for the parcel's non-ownership Rights PDAs",
-              "(`[\"rights\", parcel, nonce]`). Never decremented."
+              "Count of the parcel's non-ownership Rights PDAs (`[\"rights\", parcel,",
+              "nonce]`): `grant_right` requires `nonce == rights_count` and",
+              "increments it; `revoke_right` decrements it so a closed nonce can be",
+              "reused by a later grant."
             ],
             "type": "u8"
           },

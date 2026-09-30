@@ -209,7 +209,12 @@ pub fn draw_bps(seed: &[u8; 32], validator: &Pubkey) -> u16 {
 }
 
 /// Deserialize an Anchor account from an `AccountInfo` (remaining_accounts).
+/// Only program-owned accounts are accepted: a foreign program can forge a
+/// matching discriminator + body otherwise (docs/remaining-accounts-matrix.md,
+/// finding F1). Soft-fail callers (`.ok()` / `Err(_) => default`) keep their
+/// optional-account semantics; hard callers (`?`) now reject foreign slots.
 fn deser<T: anchor_lang::AccountDeserialize>(ai: &AccountInfo) -> Result<T> {
+    require!(ai.owner == &crate::ID, TerraError::RouteAccountMismatch);
     let data = ai.try_borrow_data()?;
     let mut slice: &[u8] = data.as_ref();
     T::try_deserialize(&mut slice)
@@ -374,6 +379,22 @@ pub fn route_task(
         // blocks routing. Deser failure = no restriction (account optional).
         if need_cap {
             let ai = &ctx.remaining_accounts[cursor];
+            // F2: the slot must be the canonical (wallet, code) restriction
+            // PDA — existing account or never-created ghost. Without this,
+            // any undeserializable slot masks an existing restriction
+            // (fail-open). Legitimate callers derive the PDA from the IDL.
+            let (expected_restriction, _) = Pubkey::find_program_address(
+                &[
+                    b"capability_restriction",
+                    cand.as_ref(),
+                    &[req.capability_code],
+                ],
+                &crate::ID,
+            );
+            require!(
+                *ai.key == expected_restriction,
+                TerraError::RouteAccountMismatch
+            );
             let restriction: Option<crate::fraud_governance::CapabilityRestriction> =
                 deser(ai).ok();
             if crate::fraud_governance::blocks_capability(

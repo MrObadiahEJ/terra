@@ -416,6 +416,67 @@ async fn process_with(
     ctx.banks_client.process_transaction(tx).await.map(|_| ())
 }
 
+async fn process_multi(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    ixs: &[Instruction],
+) -> Result<(), solana_program_test::BanksClientError> {
+    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        ixs,
+        Some(&payer.pubkey()),
+        &[payer],
+        ctx.last_blockhash,
+    );
+    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+}
+
+fn instructions_meta() -> AccountMeta {
+    AccountMeta::new_readonly(solana_program::sysvar::instructions::id(), false)
+}
+
+/// Runtime Ed25519 precompile instruction (exact solana-ed25519-program
+/// layout: [1, 0] + 7 u16 offsets (u16::MAX = "this ix") + pk + sig + msg).
+fn ed25519_ix(signer: &Keypair, message: &[u8]) -> Instruction {
+    use ed25519_dalek::Signer;
+    let sig = keypair_signing_key(signer).sign(message);
+    let mut data = vec![1u8, 0];
+    data.extend_from_slice(&48u16.to_le_bytes()); // signature offset
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
+    data.extend_from_slice(&16u16.to_le_bytes()); // pubkey offset
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
+    data.extend_from_slice(&112u16.to_le_bytes()); // message offset
+    data.extend_from_slice(&(message.len() as u16).to_le_bytes());
+    data.extend_from_slice(&u16::MAX.to_le_bytes());
+    data.extend_from_slice(signer.pubkey().as_ref());
+    data.extend_from_slice(sig.to_bytes().as_ref());
+    data.extend_from_slice(message);
+    Instruction {
+        program_id: solana_program::ed25519_program::ID,
+        accounts: vec![],
+        data,
+    }
+}
+
+/// Send a proof-bearing instruction: prepend the Ed25519 precompile
+/// attestation and append the Instructions sysvar account (the last field
+/// of each proof-bearing Accounts struct).
+async fn process_attested(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    attestation_key: &Keypair,
+    attestation_message: &[u8],
+    mut ix: Instruction,
+) -> Result<(), solana_program_test::BanksClientError> {
+    ix.accounts.push(instructions_meta());
+    process_multi(
+        ctx,
+        payer,
+        &[ed25519_ix(attestation_key, attestation_message), ix],
+    )
+    .await
+}
+
 async fn register_parcel_ok(
     ctx: &mut ProgramTestContext,
     owner: &Keypair,
@@ -925,6 +986,57 @@ async fn guardianship_guards_and_revocation() {
     );
 }
 
+// --- P0-ZK: Ed25519 proof helpers -----------------------------------------
+fn keypair_signing_key(kp: &Keypair) -> ed25519_dalek::SigningKey {
+    let seed: [u8; 32] = kp.to_bytes()[..32].try_into().unwrap();
+    ed25519_dalek::SigningKey::from_bytes(&seed)
+}
+
+/// RFC-011 §6.2 root attestation: sign(merkle_root || version LE).
+fn root_attestation_sig(kp: &Keypair, merkle_root: &[u8; 32], version: u32) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    let msg = zk::root_attestation_message(merkle_root, version);
+    keypair_signing_key(kp).sign(&msg).to_bytes().to_vec()
+}
+
+/// Prover signature over the canonical ownership-proof statement.
+#[allow(clippy::too_many_arguments)]
+fn ownership_proof_data(
+    kp: &Keypair,
+    zone_set: &Pubkey,
+    merkle_root: &[u8; 32],
+    root_version: u32,
+    nullifier_hash: &[u8; 32],
+    purpose: &str,
+    disclosure_type: u8,
+) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    let stmt = zk::ownership_proof_statement(
+        zone_set,
+        merkle_root,
+        root_version,
+        nullifier_hash,
+        &kp.pubkey(),
+        purpose,
+        disclosure_type,
+    );
+    keypair_signing_key(kp).sign(&stmt).to_bytes().to_vec()
+}
+
+/// Prover signature over the canonical credential-proof statement.
+fn credential_proof_data(kp: &Keypair, cred: &zk::ThresholdCredential) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    let stmt = zk::credential_proof_statement(
+        &cred.credential_hash,
+        &cred.nullifier_hash,
+        &cred.region_registry,
+        &cred.prover,
+        &cred.purpose,
+        cred.disclosure_type,
+    );
+    keypair_signing_key(kp).sign(&stmt).to_bytes().to_vec()
+}
+
 #[tokio::test]
 async fn zk_register_generate_verify_double_use() {
     let (mut ctx, payer) = setup().await;
@@ -968,9 +1080,13 @@ async fn zk_register_generate_verify_double_use() {
     data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
     data.extend_from_slice(&[12u8; 32]);
     data.extend_from_slice(&borsh_ser(&5u32));
-    process(
+    let att_sig = root_attestation_sig(&payer, &merkle_root, 1);
+    data.extend_from_slice(&att_sig);
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&merkle_root, 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -989,13 +1105,111 @@ async fn zk_register_generate_verify_double_use() {
     assert_eq!(root_acc.version, 1);
     assert_eq!(root_acc.commitment_count, 5);
     assert_eq!(root_acc.merkle_root, merkle_root);
+    assert_eq!(root_acc.authority_signature.to_vec(), att_sig);
 
     // verify_ownership_proof(proof, nullifier, version = 1, purpose, disclosure = 0)
     let nullifier = [13u8; 32];
     let (nullifier_rec, _) = nullifier_pda(&nullifier);
+    // --- P0-ZK adversarial cases (all must fail before any state write) ---
+    let accounts_v = || {
+        vec![
+            AccountMeta::new_readonly(zone_set, false),
+            AccountMeta::new_readonly(root, false),
+            AccountMeta::new(nullifier_rec, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ]
+    };
+    let mk_verify = |proof: Vec<u8>| {
+        let mut data = discriminator("global", "verify_ownership_proof").to_vec();
+        data.extend_from_slice(&borsh_ser(&proof));
+        data.extend_from_slice(&nullifier);
+        data.extend_from_slice(&borsh_ser(&1u32));
+        data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
+        data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: accounts_v(),
+            data,
+        }
+    };
+
+    let stmt_subsidy = zk::ownership_proof_statement(
+        &zone_set,
+        &[11u8; 32],
+        1,
+        &nullifier,
+        &payer.pubkey(),
+        "subsidy",
+        zk::disclosure_type::MEMBERSHIP,
+    );
+    let stmt_vote = zk::ownership_proof_statement(
+        &zone_set,
+        &[11u8; 32],
+        1,
+        &nullifier,
+        &payer.pubkey(),
+        "vote",
+        zk::disclosure_type::MEMBERSHIP,
+    );
+
+    // Garbage proof_data of valid length -> InvalidProofData (6087).
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &stmt_subsidy,
+        mk_verify(vec![9u8; 64]),
+    )
+    .await;
+    assert_custom_error(res, 6087, "garbage proof signature");
+
+    // Correct statement signed by a DIFFERENT key -> 6087.
+    let rogue = Keypair::new();
+    let rogue_sig = ownership_proof_data(
+        &rogue,
+        &zone_set,
+        &[11u8; 32],
+        1,
+        &nullifier,
+        "subsidy",
+        zk::disclosure_type::MEMBERSHIP,
+    );
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &rogue,
+        &stmt_subsidy,
+        mk_verify(rogue_sig),
+    )
+    .await;
+    assert_custom_error(res, 6087, "proof signed by wrong key");
+
+    // Tampered purpose: signature covers "vote" but ix says "subsidy" -> 6087.
+    let tampered = ownership_proof_data(
+        &payer,
+        &zone_set,
+        &[11u8; 32],
+        1,
+        &nullifier,
+        "vote",
+        zk::disclosure_type::MEMBERSHIP,
+    );
+    let res = process_attested(&mut ctx, &payer, &payer, &stmt_vote, mk_verify(tampered)).await;
+    assert_custom_error(res, 6087, "tampered proof purpose");
+
     let verify_ix = || {
         let mut data = discriminator("global", "verify_ownership_proof").to_vec();
-        data.extend_from_slice(&borsh_ser(&vec![9u8; 64]));
+        data.extend_from_slice(&borsh_ser(&ownership_proof_data(
+            &payer,
+            &zone_set,
+            &[11u8; 32],
+            1,
+            &nullifier,
+            "subsidy",
+            zk::disclosure_type::MEMBERSHIP,
+        )));
         data.extend_from_slice(&nullifier);
         data.extend_from_slice(&borsh_ser(&1u32));
         data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
@@ -1013,7 +1227,7 @@ async fn zk_register_generate_verify_double_use() {
             data,
         }
     };
-    process(&mut ctx, &payer, verify_ix())
+    process_attested(&mut ctx, &payer, &payer, &stmt_subsidy, verify_ix())
         .await
         .expect("verify_ownership_proof failed");
 
@@ -1035,7 +1249,7 @@ async fn zk_register_generate_verify_double_use() {
     ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
 
     // Same nullifier twice must fail (double-proving prevention).
-    process(&mut ctx, &payer, verify_ix())
+    process_attested(&mut ctx, &payer, &payer, &stmt_subsidy, verify_ix())
         .await
         .expect_err("double proof should fail");
 
@@ -1047,9 +1261,19 @@ async fn zk_register_generate_verify_double_use() {
     data.extend_from_slice(&borsh_ser(&"vote".to_string()));
     data.extend_from_slice(&borsh_ser(&zk::disclosure_type::RANGE));
     let (other_rec, _) = nullifier_pda(&[14u8; 32]);
-    process(
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::ownership_proof_statement(
+            &zone_set,
+            &[11u8; 32],
+            0,
+            &[14u8; 32],
+            &payer.pubkey(),
+            "vote",
+            zk::disclosure_type::RANGE,
+        ),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -1091,7 +1315,8 @@ async fn zk_register_generate_verify_double_use() {
     data.extend_from_slice(&borsh_ser(&"QmEvil".to_string()));
     data.extend_from_slice(&[16u8; 32]);
     data.extend_from_slice(&borsh_ser(&5u32));
-    let ix = Instruction {
+    data.extend_from_slice(&[0u8; 64]); // dummy (authority check fails first)
+    let mut ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
             AccountMeta::new(zone_set, false),
@@ -1101,8 +1326,12 @@ async fn zk_register_generate_verify_double_use() {
         ],
         data,
     };
+    ix.accounts.push(instructions_meta());
     let tx = Transaction::new_signed_with_payer(
-        &[ix],
+        &[
+            ed25519_ix(&payer, &zk::root_attestation_message(&[15u8; 32], 2)),
+            ix,
+        ],
         Some(&intruder.pubkey()),
         &[&intruder],
         ctx.last_blockhash,
@@ -1437,7 +1666,10 @@ fn assert_custom_error(
             err,
             solana_program_test::BanksClientError::TransactionError(
                 solana_sdk::transaction::TransactionError::InstructionError(
-                    0,
+                    // Any instruction index: proof-bearing transactions put
+                    // the Ed25519 precompile at index 0, so the program
+                    // instruction lands at index 1.
+                    _idx,
                     solana_sdk::instruction::InstructionError::Custom(c)
                 )
             ) if c == code
@@ -2425,10 +2657,22 @@ async fn credential_lifecycle() {
     // 4. Verify credential (nullifies it).
     let nullifier_hash = cred.nullifier_hash;
     let (null_pda, _) = credential_nullifier_pda(&nullifier_hash);
+    let proof_sig = credential_proof_data(&payer, &cred);
+    let cred_stmt = zk::credential_proof_statement(
+        &cred.credential_hash,
+        &cred.nullifier_hash,
+        &cred.region_registry,
+        &cred.prover,
+        &cred.purpose,
+        cred.disclosure_type,
+    );
 
-    process(
+    // P0-ZK: garbage proof_data of valid length -> InvalidProofData (6087).
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &cred_stmt,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -2440,9 +2684,35 @@ async fn credential_lifecycle() {
             ],
             data: {
                 let mut d = discriminator("global", "verify_credential").to_vec();
-                let proof = b"proof_data";
+                let proof = vec![9u8; 64];
                 d.extend_from_slice(&(proof.len() as u32).to_le_bytes());
-                d.extend_from_slice(proof);
+                d.extend_from_slice(&proof);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(res, 6087, "garbage credential proof");
+
+    process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &cred_stmt,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cred_pda, false),
+                AccountMeta::new(null_pda, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "verify_credential").to_vec();
+                let proof = proof_sig.clone();
+                d.extend_from_slice(&(proof.len() as u32).to_le_bytes());
+                d.extend_from_slice(&proof);
                 d
             },
         },
@@ -2454,9 +2724,11 @@ async fn credential_lifecycle() {
     assert!(cred.consumed);
 
     // 5. Double-verify must fail.
-    let err = process(
+    let err = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &cred_stmt,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -5086,9 +5358,12 @@ async fn invalidate_proof_happy_path() {
     data.extend_from_slice(&borsh_ser(&"QmR".to_string()));
     data.extend_from_slice(&[45u8; 32]); // snapshot_hash
     data.extend_from_slice(&borsh_ser(&3u32));
-    process(
+    data.extend_from_slice(&root_attestation_sig(&payer, &[44u8; 32], 1));
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[44u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -5109,9 +5384,12 @@ async fn invalidate_proof_happy_path() {
     data2.extend_from_slice(&borsh_ser(&"QmR2".to_string()));
     data2.extend_from_slice(&[47u8; 32]); // snapshot_hash
     data2.extend_from_slice(&borsh_ser(&7u32));
-    process(
+    data2.extend_from_slice(&root_attestation_sig(&payer, &[46u8; 32], 2));
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[46u8; 32], 2),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16579,9 +16857,12 @@ async fn zk_generate_root_rejects_zero_commitments() {
     data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
     data.extend_from_slice(&[12u8; 32]);
     data.extend_from_slice(&borsh_ser(&0u32)); // zero commitments
-    let res = process(
+    data.extend_from_slice(&[0u8; 64]); // dummy (count check fails first)
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[11u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16633,9 +16914,11 @@ async fn zk_verify_rejects_empty_proof_data() {
     .unwrap();
 
     // generate_ownership_root
-    process(
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[11u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16650,6 +16933,7 @@ async fn zk_verify_rejects_empty_proof_data() {
                 d.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
                 d.extend_from_slice(&[12u8; 32]);
                 d.extend_from_slice(&borsh_ser(&1u32));
+                d.extend_from_slice(&root_attestation_sig(&payer, &[11u8; 32], 1));
                 d
             },
         },
@@ -16666,9 +16950,19 @@ async fn zk_verify_rejects_empty_proof_data() {
     data.extend_from_slice(&borsh_ser(&1u32));
     data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
     data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
-    let res = process(
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::ownership_proof_statement(
+            &zone_set,
+            &[11u8; 32],
+            1,
+            &nullifier,
+            &payer.pubkey(),
+            "subsidy",
+            zk::disclosure_type::MEMBERSHIP,
+        ),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16721,9 +17015,11 @@ async fn zk_verify_rejects_invalid_disclosure_type() {
     .unwrap();
 
     // generate_ownership_root
-    process(
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[11u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16738,6 +17034,7 @@ async fn zk_verify_rejects_invalid_disclosure_type() {
                 d.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
                 d.extend_from_slice(&[12u8; 32]);
                 d.extend_from_slice(&borsh_ser(&1u32));
+                d.extend_from_slice(&root_attestation_sig(&payer, &[11u8; 32], 1));
                 d
             },
         },
@@ -16754,9 +17051,19 @@ async fn zk_verify_rejects_invalid_disclosure_type() {
     data.extend_from_slice(&borsh_ser(&1u32));
     data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
     data.extend_from_slice(&borsh_ser(&3u8)); // invalid disclosure type
-    let res = process(
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::ownership_proof_statement(
+            &zone_set,
+            &[11u8; 32],
+            1,
+            &nullifier,
+            &payer.pubkey(),
+            "subsidy",
+            3,
+        ),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16809,9 +17116,11 @@ async fn zk_verify_rejects_invalid_proof_purpose() {
     .unwrap();
 
     // generate_ownership_root
-    process(
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[11u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16826,6 +17135,7 @@ async fn zk_verify_rejects_invalid_proof_purpose() {
                 d.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
                 d.extend_from_slice(&[12u8; 32]);
                 d.extend_from_slice(&borsh_ser(&1u32));
+                d.extend_from_slice(&root_attestation_sig(&payer, &[11u8; 32], 1));
                 d
             },
         },
@@ -16842,9 +17152,19 @@ async fn zk_verify_rejects_invalid_proof_purpose() {
     data.extend_from_slice(&borsh_ser(&1u32));
     data.extend_from_slice(&borsh_ser(&"".to_string())); // empty purpose
     data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
-    let res = process(
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::ownership_proof_statement(
+            &zone_set,
+            &[11u8; 32],
+            1,
+            &nullifier,
+            &payer.pubkey(),
+            "",
+            zk::disclosure_type::MEMBERSHIP,
+        ),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16897,9 +17217,11 @@ async fn zk_verify_rejects_root_version_mismatch() {
     .unwrap();
 
     // generate_ownership_root (version 1)
-    process(
+    process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::root_attestation_message(&[11u8; 32], 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -16914,6 +17236,7 @@ async fn zk_verify_rejects_root_version_mismatch() {
                 d.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
                 d.extend_from_slice(&[12u8; 32]);
                 d.extend_from_slice(&borsh_ser(&1u32));
+                d.extend_from_slice(&root_attestation_sig(&payer, &[11u8; 32], 1));
                 d
             },
         },
@@ -16930,9 +17253,19 @@ async fn zk_verify_rejects_root_version_mismatch() {
     data.extend_from_slice(&borsh_ser(&99u32)); // wrong version
     data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
     data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
-    let res = process(
+    let res = process_attested(
         &mut ctx,
         &payer,
+        &payer,
+        &zk::ownership_proof_statement(
+            &zone_set,
+            &[11u8; 32],
+            99,
+            &nullifier,
+            &payer.pubkey(),
+            "subsidy",
+            zk::disclosure_type::MEMBERSHIP,
+        ),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
@@ -18582,6 +18915,382 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
     )
     .await;
     assert!(res.is_ok(), "O14: owner can still operate during dispute");
+}
+
+// O15: Control transfer is instant — immediately after `transfer_parcel`
+// the previous holder is rejected (no dual-control window, no grace).
+#[tokio::test]
+async fn ownership_invariant_o15_old_holder_rejected_after_transfer() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xD1; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&id, "O15 Parcel", &[0xD2; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    let bob = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund bob");
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
+
+    // Old holder signs a mutation — rejected by the handler (6003 NotOwner).
+    let res = process(
+        &mut ctx,
+        &payer,
+        update_status_ix(&parcel_pk, &payer.pubkey(), parcel_status::FOR_SALE),
+    )
+    .await;
+    assert_custom_error(
+        res,
+        6003,
+        "O15: old holder must lose control after transfer",
+    );
+
+    // Old holder cannot transfer the parcel away either.
+    let res = process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &payer.pubkey()),
+    )
+    .await;
+    assert_custom_error(
+        res,
+        6003,
+        "O15: old holder must not re-transfer after transfer",
+    );
+
+    // The rejected attempts changed nothing.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::REGISTERED);
+
+    // New holder can operate.
+    process(
+        &mut ctx,
+        &bob,
+        update_status_ix(&parcel_pk, &bob.pubkey(), parcel_status::FOR_SALE),
+    )
+    .await
+    .expect("O15: new holder must be able to update status");
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(p.status, parcel_status::FOR_SALE);
+}
+
+// O16: A non-ownership Rights PDA cannot stand in for the canonical
+// ownership account. The account seeds bind `ownership` to
+// ["ownership", parcel]; a USAGE right lives at ["rights", parcel, nonce].
+#[tokio::test]
+async fn ownership_invariant_o16_rights_pda_cannot_substitute_for_ownership() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xE1; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&id, "O16 Parcel", &[0xE2; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Grant a USAGE right (nonce 0) so a second Rights PDA exists.
+    let rights_holder = Keypair::new().pubkey();
+    process(
+        &mut ctx,
+        &payer,
+        grant_right_ix(
+            &parcel_pk,
+            &payer.pubkey(),
+            0,
+            right_kind::USAGE,
+            &rights_holder,
+        ),
+    )
+    .await
+    .expect("grant usage right");
+    let (usage_pk, _) = rights_pda(&parcel_pk, 0);
+
+    // Attempt update_status with the USAGE right in the `ownership` slot.
+    let mut data = discriminator("global", "update_status").to_vec();
+    data.push(parcel_status::FOR_SALE);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(usage_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "O16: a usage right must not substitute for canonical ownership"
+    );
+
+    // The rejected substitution mutated nothing.
+    let p: Parcel = read_account(&ctx, parcel_pk).await;
+    assert_eq!(
+        p.status,
+        parcel_status::REGISTERED,
+        "O16: failed substitution must not mutate the parcel"
+    );
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
+
+    // Canonical ownership still authorizes.
+    process(
+        &mut ctx,
+        &payer,
+        update_status_ix(&parcel_pk, &payer.pubkey(), parcel_status::FOR_SALE),
+    )
+    .await
+    .expect("O16: canonical ownership must still authorize");
+}
+
+// O17: Subdivision cannot manufacture a child parcel from an unauthorized
+// signer. Setup mirrors the happy path (verified SUBDIVISION claim) so the
+// ONLY failing condition is authorization.
+#[tokio::test]
+async fn ownership_invariant_o17_unauthorized_subdivision_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let parent_id: [u8; 32] = [0xD7; 32];
+    let (parent_pk, _) = parcel_pda(&parent_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&parent_id, "O17 Parent", &[0xD8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register parent");
+
+    create_registry_ok(&mut ctx, &payer).await;
+    let claim_id: [u8; 32] = [0xD9; 32];
+    let claim_pk = verified_claim_ok(
+        &mut ctx,
+        &payer,
+        parent_pk,
+        claim_id,
+        claim_type::SUBDIVISION,
+    )
+    .await;
+
+    let stranger = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 50_000_000),
+    )
+    .await
+    .expect("fund stranger");
+
+    let new_id: [u8; 32] = [0xDA; 32];
+    let (sub_pk, _) = parcel_pda(&new_id);
+    let (record, _) = subdivision_pda(&parent_pk, &sub_pk);
+    let mut data = discriminator("global", "subdivide_parcel").to_vec();
+    data.extend_from_slice(&new_id);
+    data.extend_from_slice(&borsh_ser(&"Stolen child".to_string()));
+    data.extend_from_slice(&[0xDB; 32]);
+    data.extend_from_slice(&claim_id);
+
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parent_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parent_pk), false),
+                AccountMeta::new(sub_pk, false),
+                AccountMeta::new(ownership_pda(&sub_pk), false),
+                AccountMeta::new(record, false),
+                AccountMeta::new_readonly(claim_pk, false),
+                AccountMeta::new(stranger.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6003, "O17: unauthorized subdivision must be rejected");
+
+    // Nothing was manufactured and the parent is untouched.
+    assert!(
+        ctx.banks_client
+            .get_account(sub_pk)
+            .await
+            .unwrap()
+            .is_none(),
+        "O17: sub parcel must not be created"
+    );
+    assert!(
+        ctx.banks_client
+            .get_account(record)
+            .await
+            .unwrap()
+            .is_none(),
+        "O17: subdivision record must not be created"
+    );
+    let parent: Parcel = read_account(&ctx, parent_pk).await;
+    assert_eq!(parent.status, parcel_status::REGISTERED);
+    assert_eq!(holder_of(&ctx, &parent_pk).await, payer.pubkey());
+}
+
+// O18: migrate_rights cannot be driven by a non-holder — no arbitrary
+// Rights record may be manufactured onto another parcel.
+#[tokio::test]
+async fn ownership_invariant_o18_unauthorized_migrate_rights_rejected() {
+    let (mut ctx, payer) = setup().await;
+    let old_id: [u8; 32] = [0xE5; 32];
+    let (old_pk, _) = parcel_pda(&old_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&old_id, "O18 Old", &[0xE6; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register old");
+
+    let rights_holder = Keypair::new().pubkey();
+    process(
+        &mut ctx,
+        &payer,
+        grant_right_ix(
+            &old_pk,
+            &payer.pubkey(),
+            0,
+            right_kind::USAGE,
+            &rights_holder,
+        ),
+    )
+    .await
+    .expect("grant right");
+    let (old_rights, _) = rights_pda(&old_pk, 0);
+
+    let new_id: [u8; 32] = [0xE7; 32];
+    let (new_pk, _) = parcel_pda(&new_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&new_id, "O18 New", &[0xE8; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register new");
+    let (expect_new, _) =
+        Pubkey::find_program_address(&[b"rights".as_ref(), new_pk.as_ref(), &[0u8]], &PROGRAM_ID);
+
+    let stranger = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &stranger.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund stranger");
+
+    let res = process(
+        &mut ctx,
+        &stranger,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(old_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&old_pk), false),
+                AccountMeta::new(new_pk, false),
+                AccountMeta::new(stranger.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new(old_rights, false),
+                AccountMeta::new(expect_new, false),
+            ],
+            data: discriminator("global", "migrate_rights").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(
+        res,
+        6003,
+        "O18: unauthorized migrate_rights must be rejected",
+    );
+
+    // Source right intact; target never manufactured.
+    let old: Rights = read_account(&ctx, old_rights).await;
+    assert_eq!(old.holder, rights_holder);
+    assert_eq!(old.rights_kind, right_kind::USAGE);
+    assert!(
+        ctx.banks_client
+            .get_account(expect_new)
+            .await
+            .unwrap()
+            .is_none(),
+        "O18: target rights record must not be manufactured"
+    );
+}
+
+// O19: The canonical ownership right is permanent. `sweep_expired_rights`
+// structurally cannot close it (its seeds bind the sweep target to
+// ["rights", parcel, nonce]), and ownership never expires.
+#[tokio::test]
+async fn ownership_invariant_o19_ownership_not_sweepable() {
+    let (mut ctx, payer) = setup().await;
+    let id: [u8; 32] = [0xF1; 32];
+    let (parcel_pk, _) = parcel_pda(&id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(&id, "O19 Parcel", &[0xF2; 32], &payer.pubkey()),
+    )
+    .await
+    .expect("register_parcel");
+
+    // Pass the canonical ownership PDA as the sweep target.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "sweep_expired_rights").to_vec();
+                d.push(0u8);
+                d
+            },
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "O19: canonical ownership must not be sweepable"
+    );
+
+    // Ownership is intact: ACTIVE, permanent (expires_at = 0), same holder.
+    let o: Rights = read_account(&ctx, ownership_pda(&parcel_pk)).await;
+    assert_eq!(o.status, 0, "O19: ownership must stay ACTIVE");
+    assert_eq!(o.expires_at, 0, "O19: ownership must stay permanent");
+    assert_eq!(o.holder, payer.pubkey());
 }
 
 // ============================================================================
@@ -28081,4 +28790,799 @@ async fn stage3_geometry_version_verification() {
     )
     .await;
     assert_custom_error(res, 6233, "cross-asset verify must fail");
+}
+
+// ============================================================================
+// P0-REMAINING — remaining_accounts adversarial coverage
+// (docs/remaining-accounts-matrix.md, findings F1 / F2)
+// ============================================================================
+
+/// F1 (routing): a slot that deserializes correctly but is owned by a FOREIGN
+/// program must be rejected before it can be read as a validator profile.
+/// Pre-fix, discriminator + body were the only checks, so a foreign program
+/// could publish forged profile/availability data into the route.
+#[tokio::test]
+async fn remaining_accounts_route_foreign_profile_rejected() {
+    use terra_registry::validator_profile;
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator");
+
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile");
+
+    let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    let subject = Pubkey::new_unique();
+    let task_id = [43u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        1_000_000,
+        deadline,
+        &[1u8; 32],
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task");
+
+    let (req_pk, _) = task_requirement_pda(&task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0); // req_index
+    data.push(terra_registry::verification_task::CAPABILITY_ANY);
+    data.extend_from_slice(&0u16.to_le_bytes()); // min_reputation
+    data.push(0); // min_tier
+    data.extend_from_slice(&[0u8; 2]); // jurisdiction any
+    data.extend_from_slice(&0u32.to_le_bytes()); // radius_m = 0
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes()); // independence_bps
+    data.extend_from_slice(&8000u16.to_le_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add requirement");
+
+    // Corrupt ONLY the profile's owner — data (incl. discriminator) intact,
+    // which was sufficient to pass deser before the F1 fix.
+    let mut acc = ctx
+        .banks_client
+        .get_account(profile_pk)
+        .await
+        .unwrap()
+        .expect("profile account");
+    acc.owner = Pubkey::new_unique();
+    ctx.set_account(&profile_pk, &acc.into());
+
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+            ],
+            data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6190, "foreign-owned profile slot must be rejected");
+
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 0, "forged slot must not assign");
+}
+
+/// F1 (fraud): a foreign-owned profile inside the committee pool must abort
+/// open_fraud_review — forged pool data cannot be laundered into committee
+/// membership, and no review case is created.
+#[tokio::test]
+async fn remaining_accounts_fraud_foreign_profile_rejected() {
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+    let accused = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &accused).await;
+    let reporter = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &reporter.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund reporter");
+
+    let nonce = 0u16;
+    let (report_pk, _) = fraud_report_pda(&accused.pubkey(), &reporter.pubkey(), nonce);
+    let mut data = discriminator("global", "submit_fraud_report").to_vec();
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&[1u8; 32]);
+    data.push(terra_registry::fraud_governance::fraud_reason::COLLUSION);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    data.push(terra_registry::validator_profile::capability_code::GNSS);
+    process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(report_pk, false),
+                AccountMeta::new_readonly(accused.pubkey(), false),
+                AccountMeta::new(reporter.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("submit");
+
+    // 6 well-reputed pool validators; the FIRST profile's owner is flipped
+    // (data intact) so it deserializes but comes from a foreign program.
+    let mut remaining: Vec<AccountMeta> = Vec::new();
+    let mut flipped = false;
+    for _ in 0..6 {
+        let v = Keypair::new();
+        phase7_init_validator(&mut ctx, &payer, &v).await;
+        let (profile_pk, _) = validator_profile_pda(&v.pubkey());
+        let (rep_pk, _) = validator_reputation_pda(&v.pubkey());
+        if !flipped {
+            let mut acc = ctx
+                .banks_client
+                .get_account(profile_pk)
+                .await
+                .unwrap()
+                .expect("profile account");
+            acc.owner = Pubkey::new_unique();
+            ctx.set_account(&profile_pk, &acc.into());
+            flipped = true;
+        }
+        remaining.push(AccountMeta::new_readonly(profile_pk, false));
+        remaining.push(AccountMeta::new_readonly(rep_pk, false));
+    }
+
+    let (review_pk, _) = review_case_pda(&report_pk);
+    let mut ix_accounts = vec![
+        AccountMeta::new(report_pk, false),
+        AccountMeta::new(review_pk, false),
+        AccountMeta::new(reporter.pubkey(), true),
+        AccountMeta::new_readonly(system_program_id(), false),
+    ];
+    ix_accounts.extend(remaining);
+    let res = process(
+        &mut ctx,
+        &reporter,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: ix_accounts,
+            data: discriminator("global", "open_fraud_review").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6190, "foreign-owned pool profile must abort");
+
+    assert!(
+        ctx.banks_client
+            .get_account(review_pk)
+            .await
+            .unwrap()
+            .is_none(),
+        "no review case from a forged pool"
+    );
+}
+
+/// F2: the capability-restriction slot in route_task must be the canonical
+/// (wallet, code) restriction PDA. Pre-fix, any undeserializable slot was
+/// treated as "no restriction" (fail-open), so junk could mask an ACTIVE
+/// restriction. Junk now hard-fails; a canonical ghost PDA (never-created)
+/// keeps legitimate routes working.
+#[tokio::test]
+async fn remaining_accounts_route_restriction_slot_must_be_pda() {
+    use terra_registry::validator_profile;
+    use terra_registry::verification_task::{self, VerificationTask};
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let validator = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator");
+
+    // Profile + AVAILABLE (same as the happy route test).
+    let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
+    let mut data = discriminator("global", "init_validator_profile").to_vec();
+    data.extend_from_slice(&[0u8; 32]);
+    data.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init profile");
+
+    let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
+    let mut data = discriminator("global", "set_validator_availability").to_vec();
+    data.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("set availability");
+
+    // GNSS capability: self-declare, then admin-verify to VERIFIED
+    // (passes_capability needs OBSERVED..=MAX, not DECLARED).
+    let code = validator_profile::capability_code::GNSS;
+    let (cap_pk, _) = validator_capability_pda(&validator.pubkey(), code);
+    let mut data = discriminator("global", "declare_validator_capability").to_vec();
+    data.push(code);
+    data.push(validator_profile::capability_level::DECLARED);
+    data.extend_from_slice(&[0u8; 32]);
+    process(
+        &mut ctx,
+        &validator,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new(validator.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("declare capability");
+
+    let mut data = discriminator("global", "admin_verify_validator_capability").to_vec();
+    data.push(code);
+    data.push(validator_profile::capability_level::VERIFIED);
+    data.extend_from_slice(&[9u8; 32]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cap_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("admin verify");
+
+    // Task + requirement scoped to GNSS → need_cap → stride 5
+    // (profile, availability, reputation, capability, restriction).
+    let subject = Pubkey::new_unique();
+    let task_id = [0xA1u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+    let data = create_task_data(
+        &task_id,
+        &subject,
+        verification_task::task_class::PHYSICAL,
+        1_000_000,
+        deadline,
+        &[1u8; 32],
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task");
+
+    let (req_pk, _) = task_requirement_pda(&task_id, 0);
+    let mut data = discriminator("global", "add_task_requirement").to_vec();
+    data.push(0); // req_index
+    data.push(code); // GNSS → need_cap
+    data.extend_from_slice(&0u16.to_le_bytes()); // min_reputation
+    data.push(0); // min_tier
+    data.extend_from_slice(&[0u8; 2]); // jurisdiction any
+    data.extend_from_slice(&0u32.to_le_bytes()); // radius_m = 0
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0i32.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&8000u16.to_le_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("add requirement");
+
+    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+
+    // Attempt 1: junk restriction slot (not the canonical PDA) → hard fail.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+                AccountMeta::new_readonly(cap_pk, false),
+                AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk
+            ],
+            data: data.clone(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6190, "junk restriction slot must be rejected");
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(task.assigned_count, 0, "junk slot must not assign");
+
+    // Attempt 2: canonical ghost PDA (never-created restriction) → route works.
+    let (restriction_pk, _) = Pubkey::find_program_address(
+        &[
+            b"capability_restriction",
+            validator.pubkey().as_ref(),
+            &[code],
+        ],
+        &PROGRAM_ID,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(cap_pk, false),
+                AccountMeta::new_readonly(restriction_pk, false), // ghost PDA
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("route with canonical ghost restriction PDA");
+    let task: VerificationTask = read_account(&ctx, task_pk).await;
+    assert_eq!(
+        task.assigned_count, 1,
+        "canonical ghost PDA must not block a clean route"
+    );
+}
+
+/// F6 (vault): the subject slot must be owned by terra_identity. Real
+/// identity data under a foreign program owner must not satisfy
+/// create_vault's authorization gate (forged owner/recovery data, or
+/// pre-squatting a future identity PDA).
+#[tokio::test]
+async fn create_vault_foreign_identity_rejected() {
+    let (mut ctx, payer) = setup().await;
+
+    // Bind identity (same setup as the vault happy path).
+    let id_hash: [u8; 32] = [70u8; 32];
+    let (identity, _) = identity_pda(&id_hash);
+    let mut data = discriminator("global", "bind_identity").to_vec();
+    data.extend_from_slice(&id_hash);
+    data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Real identity DATA, foreign owner program.
+    let mut acc = ctx
+        .banks_client
+        .get_account(identity)
+        .await
+        .unwrap()
+        .expect("identity account");
+    acc.owner = Pubkey::new_unique();
+    ctx.set_account(&identity, &acc.into());
+
+    let (vault_pk, _) = vault_record_pda(&identity);
+    let h1 = Keypair::new().pubkey();
+    let h2 = Keypair::new().pubkey();
+    let h3 = Keypair::new().pubkey();
+    let hash: [u8; 32] = [42u8; 32];
+    let mut v_data = discriminator("global", "create_vault").to_vec();
+    v_data.extend_from_slice(&borsh_ser(&"ipfs://vault1".to_string()));
+    v_data.extend_from_slice(&hash);
+    v_data.push(0u8); // AES_256_GCM
+    v_data.extend_from_slice(&borsh_ser(&vec!["ipfs://s1".to_string()]));
+    v_data.extend_from_slice(&borsh_ser(&vec![h1, h2, h3]));
+    v_data.push(2u8); // threshold
+
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(vault_pk, false),
+                AccountMeta::new_readonly(identity, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: v_data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6019, "foreign-owned identity must be rejected");
+    assert!(
+        ctx.banks_client
+            .get_account(vault_pk)
+            .await
+            .unwrap()
+            .is_none(),
+        "no vault from a forged identity slot"
+    );
+}
+
+/// F7 + F8 (attach_parcel / grant_identity_right): the identity slot must be
+/// owned by terra_identity. Forged Identity{owner} data must not pass the
+/// `identity.owner == signer` gate or the "valid Identity PDA" gate.
+#[tokio::test]
+async fn attach_and_grant_foreign_identity_rejected() {
+    let (mut ctx, payer) = setup().await;
+
+    let parcel_id: [u8; 32] = [44u8; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    process(
+        &mut ctx,
+        &payer,
+        register_ix(
+            &parcel_id,
+            "Forged Slot Parcel",
+            &[6u8; 32],
+            &payer.pubkey(),
+        ),
+    )
+    .await
+    .expect("register_parcel");
+
+    let hash = [45u8; 32];
+    let (identity_pk, _) = identity_pda(&hash);
+    let mut bind_data = discriminator("global", "bind_identity").to_vec();
+    bind_data.extend_from_slice(&hash);
+    bind_data.extend_from_slice(&borsh_ser(&payer.pubkey()));
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: bind_data,
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // Real identity DATA, foreign owner program.
+    let mut acc = ctx
+        .banks_client
+        .get_account(identity_pk)
+        .await
+        .unwrap()
+        .expect("identity account");
+    acc.owner = Pubkey::new_unique();
+    ctx.set_account(&identity_pk, &acc.into());
+
+    // attach_parcel rejects.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: discriminator("global", "attach_parcel").to_vec(),
+        },
+    )
+    .await;
+    assert_custom_error(res, 6019, "attach: foreign identity rejected");
+
+    // grant_identity_right rejects; no IdentityRights record appears.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    let mut grant_data = discriminator("global", "grant_identity_right").to_vec();
+    grant_data.push(right_kind::OWNERSHIP);
+    grant_data.extend_from_slice(&borsh_ser(&0i64));
+    grant_data.extend_from_slice(&borsh_ser(&"forged".to_string()));
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: grant_data,
+        },
+    )
+    .await;
+    assert_custom_error(res, 6019, "grant: foreign identity rejected");
+    assert!(
+        ctx.banks_client.get_account(ir_pk).await.unwrap().is_none(),
+        "no IdentityRights from a forged identity slot"
+    );
+}
+
+// ===========================================================================
+// P0-ZK: root attestation (RFC-011 §6.2) verification
+// ===========================================================================
+
+#[tokio::test]
+async fn zk_generate_rejects_invalid_root_attestation() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new().pubkey();
+    let (zone_set, _) = zone_set_pda(&zone_id);
+    let (root, _) = ownership_root_pda(&zone_set);
+
+    // register_zone_set (payer becomes zone authority).
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(zone_id, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_zone_set").to_vec();
+                d.extend_from_slice(&borsh_ser(&"QmRoot".to_string()));
+                d.extend_from_slice(&[31u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    let merkle_root = [11u8; 32];
+    let mk_generate = |sig: Vec<u8>| {
+        let mut data = discriminator("global", "generate_ownership_root").to_vec();
+        data.extend_from_slice(&merkle_root);
+        data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
+        data.extend_from_slice(&[12u8; 32]);
+        data.extend_from_slice(&borsh_ser(&1u32));
+        data.extend_from_slice(&sig);
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        }
+    };
+
+    // 1. Garbage 64-byte signature (precompile attestation is valid; the
+    // argument must equal the precompile signature).
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &zk::root_attestation_message(&merkle_root, 1),
+        mk_generate(vec![7u8; 64]),
+    )
+    .await;
+    assert_custom_error(res, 6087, "garbage root attestation");
+
+    // 2. Correct message signed by a different key.
+    let rogue = Keypair::new();
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &rogue,
+        &zk::root_attestation_message(&merkle_root, 1),
+        mk_generate(root_attestation_sig(&rogue, &merkle_root, 1)),
+    )
+    .await;
+    assert_custom_error(res, 6087, "root attestation signed by wrong key");
+
+    // 3. Correct key but signed over the WRONG version (0 instead of 1).
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &zk::root_attestation_message(&merkle_root, 0),
+        mk_generate(root_attestation_sig(&payer, &merkle_root, 0)),
+    )
+    .await;
+    assert_custom_error(res, 6087, "root attestation over wrong version");
+
+    // No partial write: version still 0.
+    let zone: ZoneSet = read_account(&ctx, zone_set).await;
+    assert_eq!(zone.current_root_version, 0, "no root written on bad sigs");
+
+    // 4. Valid attestation accepted.
+    process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &zk::root_attestation_message(&merkle_root, 1),
+        mk_generate(root_attestation_sig(&payer, &merkle_root, 1)),
+    )
+    .await
+    .expect("valid root attestation must be accepted");
+    let zone: ZoneSet = read_account(&ctx, zone_set).await;
+    assert_eq!(zone.current_root_version, 1);
 }

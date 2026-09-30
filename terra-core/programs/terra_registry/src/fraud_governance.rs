@@ -274,7 +274,12 @@ pub fn draw_bps(seed: &[u8; 32], key: &Pubkey) -> u16 {
     (v % 10_000) as u16
 }
 
+/// Deserialize a remaining-account slot. Program-owned check (F1):
+/// a foreign program could otherwise forge pool/profile/reputation data.
+/// Soft-fail callers (`.ok()`) keep optional-account semantics; the
+/// committee-pool builders (`?`) reject foreign slots.
 fn deser<T: anchor_lang::AccountDeserialize>(ai: &AccountInfo) -> Result<T> {
+    require!(ai.owner == &crate::ID, TerraError::RouteAccountMismatch);
     let data = ai.try_borrow_data()?;
     let mut slice: &[u8] = data.as_ref();
     T::try_deserialize(&mut slice)

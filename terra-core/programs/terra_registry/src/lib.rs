@@ -65,8 +65,10 @@ pub struct Parcel {
     pub name: String,
     pub geometry_hash: [u8; 32],
     pub status: u8,
-    /// Monotonic nonce for the parcel's non-ownership Rights PDAs
-    /// (`["rights", parcel, nonce]`). Never decremented.
+    /// Count of the parcel's non-ownership Rights PDAs (`["rights", parcel,
+    /// nonce]`): `grant_right` requires `nonce == rights_count` and
+    /// increments it; `revoke_right` decrements it so a closed nonce can be
+    /// reused by a later grant.
     pub rights_count: u8,
     pub infrastructure_flags: u16,
     /// sha-256 canonical digest over the off-chain infra/access validation
@@ -968,10 +970,17 @@ pub mod terra_registry {
             ctx.accounts.granter.key(),
         )?;
 
-        // Verify the identity account is a valid Identity PDA.
-        // The identity's owner is not required to match the granter — a
-        // recognized holder may bind sub-rights to any valid identity.
+        // Verify the identity account is a valid Identity PDA: it must be
+        // owned by the terra_identity program (F8) — discriminator + body
+        // alone are forgeable by a foreign program. The identity's owner is
+        // not required to match the granter — a recognized holder may bind
+        // sub-rights to any valid identity.
         let identity_info = &ctx.accounts.identity;
+        require_keys_eq!(
+            *identity_info.owner,
+            terra_identity::ID,
+            TerraError::IdentityMismatch
+        );
         let identity_data = identity_info.try_borrow_data()?;
         let slice = if identity_data.len() >= 8 {
             &identity_data[8..]
@@ -1071,8 +1080,15 @@ pub mod terra_registry {
             ctx.remaining_accounts,
             ctx.accounts.owner.key(),
         )?;
-        // Read identity from UncheckedAccount — owned by terra_identity program.
+        // Read identity from UncheckedAccount — enforce that it really is a
+        // terra_identity account (F7): the `identity.owner` check below is
+        // only meaningful against unforgeable terra_identity data.
         let identity_info = &ctx.accounts.identity;
+        require_keys_eq!(
+            *identity_info.owner,
+            terra_identity::ID,
+            TerraError::IdentityMismatch
+        );
         let identity_data = identity_info.try_borrow_data()?;
         // Skip the 8-byte Anchor discriminator added by the terra_identity program.
         let slice = if identity_data.len() >= 8 {
@@ -1686,6 +1702,7 @@ pub mod terra_registry {
         new_snapshot_cid: String,
         new_snapshot_hash: [u8; 32],
         commitment_count: u32,
+        authority_signature: [u8; 64],
     ) -> Result<()> {
         zk::generate_ownership_root(
             ctx,
@@ -1693,6 +1710,7 @@ pub mod terra_registry {
             new_snapshot_cid,
             new_snapshot_hash,
             commitment_count,
+            authority_signature,
         )
     }
 
@@ -4160,6 +4178,10 @@ pub struct GenerateOwnershipRoot<'info> {
         constraint = authority.key() == registry.admin @ TerraError::NotAuthorized,
     )]
     pub authority: Signer<'info>,
+    /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
+    /// (must be the Instructions sysvar holding this transaction's
+    /// Ed25519 precompile attestation for the new root).
+    pub instructions: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -4186,9 +4208,16 @@ pub struct VerifyOwnershipProof<'info> {
     #[account(mut)]
     pub prover: Signer<'info>,
     /// Zone authority co-sign: every accepted proof is explicitly attested.
-    /// (Circuit-level verification is deferred to audit; see RFC-011.)
+    /// `proof_data` is separately verified as the prover's Ed25519 signature
+    /// over the canonical statement via the runtime precompile (P0-ZK
+    /// interim; Poseidon/Groth16 circuit verification remains deferred to
+    /// audit — see RFC-011 §6.3).
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
+    /// (must be the Instructions sysvar holding this transaction's
+    /// Ed25519 precompile attestation of the proof statement).
+    pub instructions: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -4315,6 +4344,10 @@ pub struct VerifyCredential<'info> {
     #[account(mut)]
     pub prover: Signer<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
+    /// (must be the Instructions sysvar holding this transaction's
+    /// Ed25519 precompile attestation of the credential statement).
+    pub instructions: UncheckedAccount<'info>,
 }
 
 // ---------------------------------------------------------------------------

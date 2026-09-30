@@ -2,8 +2,15 @@ use crate::Identity;
 use anchor_lang::prelude::*;
 
 /// Deserialize an Identity account from an UncheckedAccount.
-/// The identity account is owned by the terra_identity program.
+/// The identity account must be owned by the terra_identity program — the
+/// callers' `/// CHECK:` comments promise this; enforce it so a foreign
+/// program cannot forge `Identity { owner, recovery }` (F6).
 pub fn deserialize_identity(info: &UncheckedAccount<'_>) -> Result<Identity> {
+    require_keys_eq!(
+        *info.owner,
+        terra_identity::ID,
+        super::TerraError::IdentityMismatch
+    );
     let data = info.try_borrow_data()?;
     // The identity account is created by the terra_identity program which uses
     // the #[account] macro, adding an 8-byte Anchor discriminator prefix. Skip

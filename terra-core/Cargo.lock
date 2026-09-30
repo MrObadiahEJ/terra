@@ -9064,6 +9064,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "borsh",
+ "ed25519-dalek 2.2.0",
  "solana-program",
  "solana-program-test",
  "solana-sdk",

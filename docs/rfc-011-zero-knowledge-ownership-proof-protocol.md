@@ -4,7 +4,7 @@
 
 ## 1. Status
 
-- **Status:** Implemented (zk.rs structural; on-chain proof verification still opaque — external audit required)
+- **Status:** Implemented (zk.rs structural + P0-ZK Ed25519 presentation verification live — statement builders, precompile verification via the Solana Ed25519 program + Instructions sysvar, and all §6.2/§6.3 guards; the Groth16 circuit proof itself remains P2 / external-audit required)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 - **Target Phase:** 8 (Global platform) — earliest
