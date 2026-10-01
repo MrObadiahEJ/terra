@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::extract::{Query, State};
 use axum::routing::get;
 use axum::{Json, Router};
-use geo::{Coord, Distance, Haversine, Point};
+use geo::{Coord, Distance, Haversine, Intersects, Point, Polygon, Rect};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -106,21 +106,23 @@ async fn buildings(
         }
     };
     let limit = params.limit.clamp(1, 2000);
+    let bbox = bbox.map(|(minx, miny, maxx, maxy)| {
+        Rect::new(Coord { x: minx, y: miny }, Coord { x: maxx, y: maxy })
+    });
     let footprints = geo
         .data
         .buildings
         .iter()
-        .filter(|building| {
-            let Some((minx, miny, maxx, maxy)) = bbox else {
+        .zip(&geo.building_bounds)
+        .filter(|(building, bounds)| {
+            let Some(bbox) = bbox else {
                 return true;
             };
-            building.ring.iter().any(|point| {
-                point.x >= minx && point.x <= maxx && point.y >= miny && point.y <= maxy
-            })
+            footprint_intersects_bbox(building, **bounds, &bbox)
         })
         .skip(params.offset)
         .take(limit)
-        .map(|building| BuildingFootprintView {
+        .map(|(building, _)| BuildingFootprintView {
             osm_id: building.id,
             name: building.name.clone(),
             building: building.building.clone(),
@@ -131,6 +133,22 @@ async fn buildings(
         })
         .collect();
     Ok(Json(footprints))
+}
+
+fn footprint_intersects_bbox(
+    building: &terra_geo::BuildingFootprint,
+    bounds: Option<Rect<f64>>,
+    bbox: &Rect<f64>,
+) -> bool {
+    let Some(bounds) = bounds else {
+        return false;
+    };
+    if !bounds.intersects(bbox) {
+        return false;
+    }
+
+    let footprint = Polygon::new(building.ring.clone().into(), vec![]);
+    footprint.intersects(bbox)
 }
 
 async fn nearest_roads(
@@ -225,4 +243,57 @@ fn geo(state: &AppState) -> Result<&Arc<GeoData>, AppError> {
     state.geo.as_ref().ok_or_else(|| {
         AppError::bad_request("OSM data not loaded (set OSM_PBF_PATH on the server)")
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn footprint(coords: &[(f64, f64)]) -> terra_geo::BuildingFootprint {
+        terra_geo::BuildingFootprint {
+            id: 1,
+            name: None,
+            building: "yes".into(),
+            ring: coords.iter().map(|(x, y)| Coord { x: *x, y: *y }).collect(),
+        }
+    }
+
+    #[test]
+    fn bbox_intersection_includes_polygon_enclosing_bbox() {
+        let building = footprint(&[
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 10.0),
+            (0.0, 10.0),
+            (0.0, 0.0),
+        ]);
+        let bounds = Rect::new(Coord { x: 0.0, y: 0.0 }, Coord { x: 10.0, y: 10.0 });
+        let bbox = Rect::new(Coord { x: 4.0, y: 4.0 }, Coord { x: 6.0, y: 6.0 });
+
+        assert!(footprint_intersects_bbox(&building, Some(bounds), &bbox));
+    }
+
+    #[test]
+    fn bbox_intersection_rejects_disjoint_polygons() {
+        let building = footprint(&[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)]);
+        let bounds = Rect::new(Coord { x: 0.0, y: 0.0 }, Coord { x: 1.0, y: 1.0 });
+        let bbox = Rect::new(Coord { x: 2.0, y: 2.0 }, Coord { x: 3.0, y: 3.0 });
+
+        assert!(!footprint_intersects_bbox(&building, Some(bounds), &bbox));
+    }
+
+    #[test]
+    fn bbox_intersection_includes_crossing_polygon_without_inside_vertices() {
+        let building = footprint(&[
+            (-1.0, 0.4),
+            (2.0, 0.4),
+            (2.0, 0.6),
+            (-1.0, 0.6),
+            (-1.0, 0.4),
+        ]);
+        let bounds = Rect::new(Coord { x: -1.0, y: 0.4 }, Coord { x: 2.0, y: 0.6 });
+        let bbox = Rect::new(Coord { x: 0.0, y: 0.0 }, Coord { x: 1.0, y: 1.0 });
+
+        assert!(footprint_intersects_bbox(&building, Some(bounds), &bbox));
+    }
 }

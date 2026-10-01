@@ -8,13 +8,17 @@ import {
   Compass,
   Fingerprint,
   Layers3,
+  MapPin,
   Radio,
   ShieldCheck,
   Sparkles,
+  Wallet,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useActivityStore, type ActivityItem } from '../lib/activityStore'
 import { useLocale } from '../lib/locale'
+import { useWallet } from '../lib/wallet'
+import { useAppStore } from '../store/appStore'
 
 type FeedState = 'checking' | 'online' | 'offline'
 
@@ -24,6 +28,14 @@ function formatTime(at: number, locale: string) {
 
 export default function WelcomePage() {
   const { locale, t } = useLocale()
+  const { publicKey, walletName } = useWallet()
+  const parcels = useAppStore((state) => state.parcels)
+  const loadingParcels = useAppStore((state) => state.loadingParcels)
+  const parcelsError = useAppStore((state) => state.parcelsError)
+  const ownedParcels = useMemo(
+    () => publicKey ? parcels.filter((parcel) => parcel.holder === publicKey.toBase58()) : [],
+    [parcels, publicKey],
+  )
   const demoItems = useActivityStore((state) => state.items)
   const [apiItems, setApiItems] = useState<ActivityItem[]>([])
   const [feedState, setFeedState] = useState<FeedState>('checking')
@@ -77,46 +89,67 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          <div className="welcome-art" aria-label="Illustration of a parcel review workflow">
+          <div className="welcome-art" aria-label="Terra land asset preview">
             <div className="welcome-art-top">
-              <span><span className="welcome-live-dot" /> NETWORK PREVIEW</span>
-              <span className="welcome-art-tag">{t('simulation')}</span>
+              <span><span className="welcome-live-dot" /> {t('walletOverview')}</span>
+              <span className={`welcome-art-tag ${publicKey ? 'connected' : ''}`}>
+                {publicKey ? t('walletConnected') : t('walletNotConnected')}
+              </span>
             </div>
-            <svg className="welcome-map-art" viewBox="0 0 560 300" role="img" aria-label="Parcel boundaries connected to review nodes">
+            <div className="welcome-asset-card">
+              <div className="welcome-asset-meta">
+                <span>{t('registeredLand')}</span>
+                <span className="welcome-asset-network"><i /> SOLANA · DEVNET</span>
+              </div>
+              <div className="welcome-asset-main">
+                <div>
+                  <span className="welcome-asset-label">{t('ownedLandAssets')}</span>
+                  <strong>{publicKey && !loadingParcels && !parcelsError ? ownedParcels.length : '—'}</strong>
+                  <span className="welcome-asset-caption">
+                    {!publicKey ? t('connectToViewHoldings') : loadingParcels ? t('loadingHoldings') : parcelsError ? t('holdingsUnavailable') : t('verifiedOnChain')}
+                  </span>
+                </div>
+                <div className="welcome-land-mark" aria-hidden="true">
+                  <svg viewBox="0 0 120 120">
+                    <path d="m18 34 45-18 39 23-7 48-45 20-39-24 7-49Z" />
+                    <path d="m18 34 44 23 40-18M62 57l-12 50M41 25l-2 45 11 37M85 28l-6 45 16 14" />
+                    <circle cx="62" cy="57" r="3" />
+                    <circle cx="18" cy="34" r="2" />
+                    <circle cx="102" cy="39" r="2" />
+                  </svg>
+                </div>
+              </div>
+              <div className="welcome-wallet-row">
+                <span className="welcome-wallet-icon"><Wallet size={14} /></span>
+                <span>
+                  <strong>{publicKey ? walletName || t('walletConnected') : t('selfCustody')}</strong>
+                  <small>{publicKey ? `${publicKey.toBase58().slice(0, 6)}…${publicKey.toBase58().slice(-5)}` : t('walletControls')}</small>
+                </span>
+                <Link to="/portfolio" aria-label={t('openPortfolio')}><ArrowUpRight size={15} /></Link>
+              </div>
+            </div>
+            <div className="welcome-art-preview">
+              <span className="welcome-preview-kicker">{t('spatialPreview')}</span>
+              <svg className="welcome-map-art" viewBox="0 0 560 190" role="img" aria-label="Illustrative 3D land geometry preview">
               <defs>
                 <linearGradient id="land-fill" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0" stopColor="currentColor" stopOpacity=".28" />
                   <stop offset="1" stopColor="currentColor" stopOpacity=".03" />
                 </linearGradient>
-                <pattern id="map-grid" width="38" height="38" patternUnits="userSpaceOnUse">
-                  <path d="M38 0H0V38" fill="none" stroke="currentColor" strokeOpacity=".08" strokeWidth="1" />
-                </pattern>
               </defs>
-              <rect width="560" height="300" fill="url(#map-grid)" />
-              <path className="welcome-road" d="M-20 238 C72 194 106 257 187 209 S307 206 360 153 477 122 586 48" />
-              <path className="welcome-road secondary" d="M37 10 C112 82 146 94 239 101 S374 84 515 167" />
-              <path className="welcome-parcel" d="M137 110 234 75 296 124 279 205 182 221 121 172Z" />
-              <path className="welcome-parcel secondary" d="m296 124 92-26 59 47-23 81-145-21z" />
-              <path className="welcome-route" d="M168 163 C224 133 264 164 331 158 S402 147 458 116" />
-              <circle className="welcome-node pulse" cx="168" cy="163" r="7" />
-              <circle className="welcome-node" cx="331" cy="158" r="6" />
-              <circle className="welcome-node pulse delay" cx="458" cy="116" r="7" />
-              <g className="welcome-map-label" transform="translate(144 245)">
-                <rect width="130" height="31" rx="8" />
-                <text x="13" y="20">PARCEL · 0x8F2…</text>
-              </g>
-              <g className="welcome-map-label floating" transform="translate(347 43)">
-                <rect width="160" height="40" rx="9" />
-                <circle cx="16" cy="20" r="4" />
-                <text x="29" y="24">3 REVIEWERS ACTIVE</text>
-              </g>
+              <path className="welcome-land-shadow" d="m115 139 163-79 174 65-163 48-174-34Z" />
+              <path className="welcome-parcel-side" d="m176 84 101-42 111 41v52l-102 44-110-44V84Z" />
+              <path className="welcome-parcel" d="m176 84 110-43 102 42-102 48-110-47Z" />
+              <path className="welcome-parcel-grid" d="m176 84 110 47m0 0 102-48m-102 48v48m-61-74 105-45m-51 91V66m-51 41v-1" />
+              <path className="welcome-parcel-highlight" d="m176 84 110-43 102 42-102 48-110-47Z" />
+              <circle className="welcome-parcel-node" cx="286" cy="131" r="5" />
+              <circle className="welcome-parcel-node" cx="176" cy="84" r="4" />
+              <circle className="welcome-parcel-node" cx="388" cy="83" r="4" />
             </svg>
-            <div className="welcome-art-footer">
-              <span><Layers3 size={13} /> {t('spatialRecord')}</span>
-              <ArrowRight size={14} />
-              <span><Fingerprint size={13} /> {t('identityChecks')}</span>
-              <ArrowRight size={14} />
-              <span><ShieldCheck size={13} /> {t('reviewOutcome')}</span>
+              <div className="welcome-art-footer">
+                <span><Layers3 size={13} /> {t('spatialRecord')}</span>
+                <span className="welcome-preview-note">{t('illustrativeGeometry')}</span>
+              </div>
             </div>
           </div>
         </section>
@@ -128,18 +161,50 @@ export default function WelcomePage() {
             <small>{feedState === 'online' ? t('latestWindow') : feedState === 'offline' ? t('apiOffline') : t('connectingFeed')}</small>
           </article>
           <article className="welcome-stat">
+            <span className="welcome-stat-icon"><MapPin size={16} /></span>
+            <div><strong>{publicKey && !loadingParcels && !parcelsError ? ownedParcels.length : '—'}</strong><span>{t('ownedLandAssets')}</span></div>
+            <small>{!publicKey ? t('connectToViewHoldings') : loadingParcels ? t('loadingHoldings') : parcelsError ? t('holdingsUnavailable') : t('verifiedOnChain')}</small>
+          </article>
+          <article className="welcome-stat">
             <span className="welcome-stat-icon"><Compass size={16} /></span>
             <div><strong>2D <i>/</i> 3D</strong><span>{t('landContext')}</span></div>
             <small>{t('switchAtlas')}</small>
           </article>
-          <article className="welcome-stat">
-            <span className="welcome-stat-icon"><Fingerprint size={16} /></span>
-            <div><strong>{t('selfCustody')}</strong><span>{t('walletLinked')}</span></div>
-            <small>{t('walletControls')}</small>
-          </article>
         </section>
 
         <section className="welcome-lower">
+          <div className="welcome-holdings">
+            <div className="welcome-section-head">
+              <div><span className="welcome-section-kicker">{t('walletOverview')}</span><h2>{t('yourLandAssets')}</h2></div>
+              <Link to="/portfolio" className="welcome-section-action">{t('openPortfolio')} <ArrowUpRight size={13} /></Link>
+            </div>
+            {publicKey && !loadingParcels && !parcelsError && ownedParcels.length > 0 ? (
+              <div className="welcome-holdings-list">
+                {ownedParcels.slice(0, 3).map((parcel) => (
+                  <article className="welcome-holding-row" key={parcel.address}>
+                    <span className="welcome-holding-icon"><MapPin size={15} /></span>
+                    <span className="welcome-holding-copy">
+                      <strong>{parcel.account.name}</strong>
+                      <small>{t('onChainRecord')} · {parcel.id.slice(0, 8)}…</small>
+                    </span>
+                    <span className="welcome-holding-status"><ShieldCheck size={13} /> {t('verified')}</span>
+                    <ArrowRight size={14} className="welcome-holding-arrow" />
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="welcome-holdings-empty">
+                <span className="welcome-empty-icon"><Wallet size={17} /></span>
+                <div>
+                  <strong>{!publicKey ? t('walletNotConnected') : loadingParcels ? t('loadingHoldings') : parcelsError ? t('holdingsUnavailable') : t('noOwnedLandYet')}</strong>
+                  <p>{!publicKey ? t('connectToViewHoldings') : loadingParcels ? t('loadingHoldingsDescription') : parcelsError ? parcelsError : t('noOwnedLandDescription')}</p>
+                </div>
+                <Link to={publicKey ? '/atlas' : '/portfolio'} aria-label={publicKey ? t('openAtlas') : t('openPortfolio')}>
+                  <ArrowUpRight size={15} />
+                </Link>
+              </div>
+            )}
+          </div>
           <div className="welcome-activity">
             <div className="welcome-section-head">
               <div><span className="welcome-section-kicker">{t('networkPulse')}</span><h2>{t('recentActivity')}</h2></div>

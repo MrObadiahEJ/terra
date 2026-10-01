@@ -21,4 +21,8 @@ pub struct AppState {
 pub struct GeoData {
     pub data: OsmData,
     pub graph: RoadGraph,
+    /// Precomputed bounds aligned with `data.buildings`.
+    pub building_bounds: Vec<Option<geo::Rect<f64>>>,
+    /// Road-network topology used by reachability analysis.
+    pub network: terra_geo::NetworkGraph,
 }

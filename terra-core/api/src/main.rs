@@ -91,19 +91,44 @@ async fn load_geo(path: Option<&Path>) -> Result<Option<Arc<GeoData>>> {
 
     let path = path.to_path_buf();
     tracing::info!(path = %path.display(), "loading OSM road network");
-    let (data, graph) = tokio::task::spawn_blocking(move || {
+    let (data, graph, building_bounds, network) = tokio::task::spawn_blocking(move || {
         let data = terra_geo::read_osm_pbf(&path)
             .with_context(|| format!("failed to parse OSM data from {}", path.display()))?;
         let graph = terra_geo::build_graph(&data);
+        let network = terra_geo::NetworkGraph::build(&graph);
+        let building_bounds = data.buildings.iter().map(building_bounds).collect();
         tracing::info!(
             nodes = data.nodes.len(),
             roads = data.roads.len(),
             pois = data.pois.len(),
             "OSM data loaded"
         );
-        Ok::<_, anyhow::Error>((data, graph))
+        Ok::<_, anyhow::Error>((data, graph, building_bounds, network))
     })
     .await??;
 
-    Ok(Some(Arc::new(GeoData { data, graph })))
+    Ok(Some(Arc::new(GeoData {
+        data,
+        graph,
+        building_bounds,
+        network,
+    })))
+}
+
+fn building_bounds(building: &terra_geo::BuildingFootprint) -> Option<geo::Rect<f64>> {
+    let mut points = building.ring.iter();
+    let first = *points.next()?;
+    let (min, max) = points.fold((first, first), |(min, max), point| {
+        (
+            geo::Coord {
+                x: min.x.min(point.x),
+                y: min.y.min(point.y),
+            },
+            geo::Coord {
+                x: max.x.max(point.x),
+                y: max.y.max(point.y),
+            },
+        )
+    });
+    Some(geo::Rect::new(min, max))
 }

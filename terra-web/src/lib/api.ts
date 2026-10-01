@@ -714,11 +714,11 @@ export interface ZoneParcelCount {
 
 // ---- client ---------------------------------------------------------------
 
-async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
+async function requestUrl<T>(url: string, init?: RequestInit, retries = 1): Promise<T> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30_000)
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
       ...init,
       signal: controller.signal,
@@ -736,19 +736,24 @@ async function request<T>(path: string, init?: RequestInit, retries = 1): Promis
     if (res.status === 204) return undefined as T
     return (await res.json()) as T
   } catch (err) {
-    // Retry once on network-level failures (offline / flaky links); HTTP
-    // error statuses above already threw and are not retried.
+    // Retry only safe reads after network-level failures; writes may have
+    // succeeded remotely even when their response was lost.
     const networkFailure =
       err instanceof DOMException && err.name === 'AbortError'
       || err instanceof TypeError
-    if (retries > 0 && networkFailure) {
+    const method = init?.method?.toUpperCase() ?? 'GET'
+    if (retries > 0 && networkFailure && (method === 'GET' || method === 'HEAD')) {
       await new Promise((r) => setTimeout(r, 1000))
-      return request<T>(path, init, retries - 1)
+      return requestUrl<T>(url, init, retries - 1)
     }
     throw err
   } finally {
     clearTimeout(timeout)
   }
+}
+
+async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
+  return requestUrl<T>(`${API_BASE}${path}`, init, retries)
 }
 
 async function signedIdentityRequest<T>(
@@ -823,6 +828,23 @@ export interface ActivityResponse {
 }
 
 export const api = {
+  serviceHealth: () => requestUrl<{ status: string; database: string; osm_loaded: boolean }>('/health'),
+  consoleRequest: (
+    path: string,
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    body?: unknown,
+    query?: Record<string, string>,
+  ) => {
+    if (!path.startsWith('/') || path.startsWith('//') || path.split('/').includes('..')) {
+      return Promise.reject(new Error('Invalid backend route path'))
+    }
+    const params = new URLSearchParams(query)
+    const suffix = params.size > 0 ? `?${params.toString()}` : ''
+    return request<unknown>(`${path}${suffix}`, {
+      method,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }, 0)
+  },
   // parcels
   listParcels: (bbox?: { minx: number; miny: number; maxx: number; maxy: number }) => {
     const q = bbox

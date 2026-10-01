@@ -10,6 +10,7 @@ import NetworkPage from './pages/NetworkPage'
 import PortfolioPage from './pages/PortfolioPage'
 import StatusPage from './pages/StatusPage'
 import TransactionsPage from './pages/TransactionsPage'
+import ProtocolConsolePage from './pages/ProtocolConsolePage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
@@ -25,6 +26,7 @@ const TITLES: Record<string, string> = {
   '/status': 'Protocol status — Terra',
   '/network': 'Validator network — Terra',
   '/demo': 'Demo scenarios — Terra',
+  '/console': 'Protocol console — Terra',
 }
 
 function DocumentTitle() {
@@ -76,6 +78,7 @@ function App() {
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/status" element={<StatusPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/console" element={<ProtocolConsolePage />} />
             <Route path="*" element={<Navigate to="/welcome" replace />} />
           </Routes>
           <Toasts />

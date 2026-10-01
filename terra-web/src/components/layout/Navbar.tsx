@@ -13,6 +13,7 @@ import {
   BriefcaseBusiness,
   ShieldCheck,
   Sun,
+  Terminal,
 } from 'lucide-react'
 import TerraLogo from '../brand/TerraLogo'
 import { useWallet } from '../../lib/wallet'
@@ -33,6 +34,7 @@ const navigation: { to: string; label: TranslationKey; icon: typeof Compass; end
   { to: '/portfolio', label: 'portfolio', icon: BriefcaseBusiness },
   { to: '/lab', label: 'studio', icon: FlaskConical },
   { to: '/status', label: 'status', icon: ShieldCheck },
+  { to: '/console', label: 'console', icon: Terminal },
 ]
 
 export default function Navbar({ theme, onToggleTheme }: Props) {
