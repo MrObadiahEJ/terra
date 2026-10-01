@@ -4,7 +4,7 @@
 
 ## 1. Status
 
-- **Status:** Implemented (zk.rs structural + P0-ZK Ed25519 presentation verification live — statement builders, precompile verification via the Solana Ed25519 program + Instructions sysvar, and all §6.2/§6.3 guards; the Groth16 circuit proof itself remains P2 / external-audit required)
+- **Status:** Implemented (P0-ZK — statement builders + Ed25519 precompile verification + **framed `proof_data` v1 with on-chain Groth16/BN254 verification** live: hash-pinned VK, `alt_bn128` group/pairing syscalls, all §6.2/§6.3 guards. The production membership circuit and trusted setup remain external-audit gated — see §6.3.1 and the Handoff)
 - **Created:** 2026-09-03
 - **Supersedes:** None
 - **Target Phase:** 8 (Global platform) — earliest
@@ -255,15 +255,21 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 
 **Args:** `proof_data: Vec<u8>`, `nullifier_hash: [u8; 32]`, `root_version: u32`, `proof_purpose: String`, `disclosure_type: u8`
 
-**Guards:**
+**Guards (checked in this order — later checks must not change earlier error codes):**
 - `nullifier_hash != [0; 32]`
 - `nullifier_record` does NOT already exist (first-use check — prevents double-proving)
 - `root_version == ownership_root.version` (proof must reference the current root)
 - `proof_data.len() <= MAX_PROOF_SIZE (1024 bytes)`
 - `proof_purpose` is non-empty and <= 128 characters
 - `disclosure_type` is 0, 1, or 2
-- The ZK proof is valid against `ownership_root.merkle_root` (verified by the circuit)
-- The nullifier in the proof matches `nullifier_hash`
+- `proof_data` parses as a framed v1 payload (§6.3.1 — magic, version, lengths)
+- `zone_set.algorithm_id == 0` (Poseidon + Groth16)
+- `ownership_root.verification_key_hash != [0; 32]` and `SHA-256(frame.vk) == ownership_root.verification_key_hash` (VK pin)
+- Ed25519: `frame.signature` verifies the canonical statement over `prover`'s key (runtime precompile)
+- Groth16: pairing check against `frame.vk` for public input `SHA-256(statement) mod r` (§6.3.1)
+- `SHA-256(statement || proof_data)` recorded as `nullifier_record.proof_hash`; the nullifier in the statement matches `nullifier_hash`
+
+All proof-layer failures (malformed frame, VK pin mismatch, bad signature, invalid pairing) return `InvalidProofData (6087)`.
 
 **Effects:**
 - `nullifier_record.nullifier_hash = nullifier_hash`
@@ -274,6 +280,36 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
 - `nullifier_record.block_time = now`
 
 **Emits:** `OwnershipProofVerified { nullifier_hash, zone_set, root_version, proof_purpose, disclosure_type, prover, block_time }`
+
+#### 6.3.1 Framed `proof_data` v1 (Groth16/BN254)
+
+`proof_data` is a single opaque frame of exactly **901 bytes** (legacy 64-byte-signature payloads are rejected):
+
+| Offset | Len | Field |
+|--------|-----|-------|
+| 0 | 4 | Magic `TG16` (`0x54 0x47 0x31 0x36`) |
+| 4 | 1 | Version `1` |
+| 5 | 64 | Ed25519 signature over the canonical statement (§6.2) |
+| 69 | 576 | Groth16 verification key: `α (64) ‖ β (128) ‖ γ (128) ‖ δ (128) ‖ γ·abc[0] (64) ‖ γ·abc[1] (64)` — k = 1 public input |
+| 645 | 256 | Groth16 proof: `A (64) ‖ B (128) ‖ C (64)` |
+
+**Encodings.** G1 points: big-endian `x ‖ y` (64 bytes, EIP-196). G2 points: EIP-197 order `be(x₁) ‖ be(x₀) ‖ be(y₁) ‖ be(y₀)` (128 bytes) — i.e. the conjugate-tower components reversed relative to arkworks' internal `(c0, c1)` layout. Coordinates are canonical field elements; the pairing syscall rejects non-canonical / off-curve inputs.
+
+**Public input.** A single Fr: `SHA-256(canonical_statement)` reduced mod the BN254 scalar field `r` with a hand-rolled 256-bit subtraction reduction (no big-integer dependency on-chain). Binding the full statement (zone set, root, version, nullifier, prover key, purpose, disclosure) into the public input means a valid proof is worthless for any other statement — Ed25519 and Groth16 each independently bind the statement.
+
+**Pairing check** (mirrors ark-groth16's verifier; negation is `y → p − y` on G1):
+
+```
+e(A, B) · e(−α, β) · e(−(γ·abc[0] + x·γ·abc[1]), γ) · e(−C, δ) == 1
+```
+
+Implemented via `solana_bn254` (`alt_bn128_g1_multiplication_be` ×1, `alt_bn128_g1_addition_be` ×1, `alt_bn128_pairing_be` ×4 pairs). Measured cost of a full framed verify (Ed25519 precompile + Groth16): **≈ 99k compute units** of the 500k per-instruction limit.
+
+**VK pinning workflow (required).** `verification_key_hash` is zeroed at `register_zone_set`; the zone authority MUST call `update_verification_key_hash(SHA-256(vk))` (pinning the exact 576 VK bytes the provers will carry) BEFORE any proof can verify. Re-pinning rotates the accepted VK and immediately invalidates proofs framed with the old key. Provers MUST fetch the pinned VK bytes (or the VK they were pinned from) and embed them verbatim.
+
+**Caveats (audit-relevant):**
+- The agave `sol_alt_bn128_pairing_op` syscall performs curve arithmetic and field checks but does **not** re-check G2 subgroup membership — consensus-level behavior inherited from Agave; flag for auditors.
+- The test-suite circuit is a placeholder (`a·b = x`) proving only statement binding; the production membership circuit (Merkle membership + nullifier derivation), its trusted setup, and an external audit remain the release gate for production privacy claims.
 
 ### 6.4 `invalidate_proof`
 
@@ -321,7 +357,8 @@ The on-chain program never sees plaintext ownership data, parcel identifiers, or
    - **Range proof (disclosure_type=1):** "I know a leaf such that the committed value > threshold, without revealing the value."
    - **Count proof (disclosure_type=2):** "I know exactly N leaves in the tree that I can open." (Requires a different circuit or accumulator.)
 5. The prover computes `nullifier = Poseidon(owner_commitment, root_version)`.
-6. The prover calls `verify_ownership_proof` on-chain with the proof data, nullifier, root version, purpose, and disclosure type.
+6. The prover assembles the framed `proof_data` v1 (§6.3.1): magic + version + Ed25519 statement signature + the zone's pinned 576-byte Groth16 VK + the 256-byte proof for public input `SHA-256(statement) mod r`.
+7. The prover calls `verify_ownership_proof` on-chain with the frame, nullifier, root version, purpose, and disclosure type. The zone's `update_verification_key_hash` pin must already match `SHA-256(frame.vk)`.
 
 ### 7.3 Ownership Transfer & Revocation
 
@@ -637,11 +674,11 @@ When a post-quantum algorithm is standardized and ready for use:
 
 ---
 
-## Handoff — status & next steps (2026-09-23)
+## Handoff — status & next steps (2026-10-01)
 
-**Done:** Structural `zk.rs` — zone roots, nullifier first-use, admin on register/generate-root/invalidate/update-vk (SECURITY.md H-2). **Proof verification remains opaque** (no on-chain Groth16/PLONK yet).
+**Done:** Structural `zk` module (was `zk.rs`) — zone roots, nullifier first-use, admin on register/generate-root/invalidate/update-vk (SECURITY.md H-2). P0-ZK: statement builders + Ed25519 precompile verification, then **P0-ZK-01 — framed `proof_data` v1 with on-chain Groth16/BN254 verification** (§6.3.1): 901-byte frame, hash-pinned VK (`update_verification_key_hash` required before first proof), public input `SHA-256(statement) mod r`, pairing via `solana-bn254` + `alt_bn128` syscalls (≈99k CU), all failures mapped to `InvalidProofData (6087)`. Verified by 136 registry unit tests + 303 registry integration tests (framed happy path, corrupted proof / cross-statement splice / corrupted VK / wrong pin all rejected, guard error codes preserved).
 
 **Next for this RFC (blocking for production privacy claims):**
-1. Choose circuit (Groth16 vs PLONK), integrate real verifier, **external audit** — treat as multi-month; do not claim production ZK without it.
+1. Design and implement the real membership circuit (Merkle membership + nullifier derivation) with a proper trusted setup ceremony, regenerate frames against it, **external audit** — treat as multi-month; the in-repo placeholder circuit (`a·b = x`) only proves statement binding.
 2. Depends on RFC-006 credential path audited first (see WARNING in §1).
-3. After verifier integration: regenerate IDL, extend unit + BPF tests for verify/invalidate happy + replay paths.
+3. Audit flags to carry forward: agave pairing syscall skips G2 subgroup checks; VK rotation (re-pin) invalidates all in-flight proofs by design.

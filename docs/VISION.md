@@ -33,7 +33,7 @@ Related: [`../README.md`](../README.md) (repo status) ·
 | On-chain programs | `terra_registry` **161 instructions · 67 accounts · 148 events · 237 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
 | Protocol specs | **RFC-003 → RFC-013** — 003–012 delivered (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture), RFC-013 (spatial pipeline) Phase A delivered |
 | Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path + **Vision Stage 3 Phase A** (spatial assets, versioned geometry) |
-| Tests | Registry BPF integration **302/302**, identity BPF **23/23**, unit libs **131 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
+| Tests | Registry BPF integration **303/303**, identity BPF **23/23**, unit libs **136 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
 | Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
 | Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, `/lab` interactive experiments (incl. WebGL-free SVG 3D land skeleton), `/transactions` demo chain explorer, typed API client, wallet adapter |
@@ -450,14 +450,14 @@ tamper-evident **coordination and history layer**:
 
 | Stage | Name | Status | Anchored in |
 |-------|------|--------|-------------|
-| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-013, 302 on-chain tests |
+| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-013, 303 on-chain tests |
 | **1** | Protocol hardening | ✅ **Done** | RFC-012 Phases 0–8, Tier A1–A3, B6 boundary, P0-2 removal path — security, tasks, observations, provenance, routing, reputation, economics |
 | **2** | Physical Terra | ✅ **Done** | RFC-012 Phase 9 — device identity registry (`DeviceIdentity` PDAs: keys, capabilities, calibration, validator verification) covering smartphones, GNSS, cameras, drones, survey devices (reuses Phase 4 observation sources/provenance) |
 | **3** | Spatial intelligence | 🟡 **In progress** | Raw observation → AI/GIS → geometry → parcel → SpatialAsset → 3D model (computer vision, photogrammetry, remote sensing, LiDAR). Phase A delivered: on-chain `SpatialAsset` + `GeometryVersion` ([RFC-013](rfc-013-spatial-intelligence-pipeline.md)); pipeline phases B–E pending |
 | **4** | Digital twin | ⬜ Planned | Identity + geometry + elevation + structure + evidence + history + relationships per spatial entity (`SpatialAsset`, `GeometryVersion`, `ThreeDModel`, `SpatialSnapshot` already specified) |
 | **5** | 3D / vertical / subsurface | ⬜ Planned | Surface → buildings → floors → units → airspace → underground (product roadmap: legal 3D/air-rights layer) |
 | **6** | Jurisdiction integration | ⬜ Planned | Country configurations: tenure, legal categories, authorities, credentials, evidence rules (product roadmap: country config layer) |
-| **7** | Cross-border Terra | ✅ **Done** | RFC-012 Phase 10 — jurisdiction bindings (`CrossBorderBinding`), cross-border routing gate, spanning records (`CrossBorderSpanRecord`); ZK identity/ownership + selective disclosure live via RFC-011 `zk.rs` (circuit audit remains a mainnet gate) |
+| **7** | Cross-border Terra | ✅ **Done** | RFC-012 Phase 10 — jurisdiction bindings (`CrossBorderBinding`), cross-border routing gate, spanning records (`CrossBorderSpanRecord`); ZK identity/ownership + selective disclosure live via RFC-011 `zk/` (framed Groth16 verification since P0-ZK-01; circuit audit remains a mainnet gate) |
 | **8** | Transaction layer | 🟡 **Seeded** | RFC-004 escrow delivered; marketplaces, finance, insurance, leasing to build on verified spatial assets |
 | **9** | Terra infrastructure | ⬜ Future | Terra becomes the shared layer others build on (Anchor analogy): Terra-powered finance, insurance, government services, PropTech, agriculture |
 | **10** | Global physical-world network | ⬜ Future | Not a global land registry — **a global interoperable trust layer for physical reality**: land, buildings, infrastructure, agriculture, natural resources, environment, borders, physical assets |

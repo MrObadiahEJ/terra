@@ -15286,10 +15286,11 @@ export const terraRegistry: Idl = {
           "name": "authority",
           "docs": [
             "Zone authority co-sign: every accepted proof is explicitly attested.",
-            "`proof_data` is separately verified as the prover's Ed25519 signature",
-            "over the canonical statement via the runtime precompile (P0-ZK",
-            "interim; Poseidon/Groth16 circuit verification remains deferred to",
-            "audit \u2014 see RFC-011 \u00a76.3)."
+            "`proof_data` is a framed v1 payload (RFC-011 \u00a76.3): the prover's",
+            "Ed25519 statement signature, the hash-pinned Groth16 verification",
+            "key, and the Groth16 proof verified via the `alt_bn128` group",
+            "operations syscalls. The production membership circuit and trusted",
+            "setup remain gated on external audit."
           ],
           "signer": true
         },

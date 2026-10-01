@@ -237,12 +237,12 @@ exact pre-fix bypass.
 cd terra-core
 cargo fmt --check
 cargo clippy -- -D warnings              # CI-exact (libs only — CI does not lint test targets)
-cargo test -p terra-registry --lib       # 131 unit tests
-cargo test -p terra-registry --test integration   # 302 tests (make test: --test-threads=1; CI does not run this suite)
+cargo test -p terra-registry --lib       # 136 unit tests
+cargo test -p terra-registry --test integration   # 303 tests (make test: --test-threads=1; CI does not run this suite)
 anchor build --skip-lint                 # CI build path (fresh .so needed before running tests)
 ```
 
-Latest local run: 302/302 integration, 131/131 lib, fmt clean, clippy clean.
+Latest local run: 303/303 integration, 136/136 lib, fmt clean, clippy clean.
 TS smoke tests (`make test-ts`) require a local validator — `solana-test-validator`
 core-dumps on this machine (no AVX); CI/devnet only.
 
@@ -259,14 +259,14 @@ not just structurally parsed. Design (measured: ed25519-dalek verify costs
 >1.4M CU on SBF, so in-program verification is not viable at 500k CU):
 
 * **Verification path:** the transaction carries a Solana Ed25519
-  precompile instruction; `zk.rs::verify_precompiled_ed25519` finds it via
+  precompile instruction; `zk::verify_precompiled_ed25519` finds it via
   the `Instructions` sysvar (appended as `instructions: UncheckedAccount`
   to all three instruction account structs), checks it targets its own
   instruction (u16::MAX = "current"), and checks pubkey/message/signature
   against what the program expects. The runtime does the actual curve math
   natively (~0 program CU); tx atomicity covers failure. `ed25519-dalek`
   is now a `[dev-dependencies]`-only (test-side signing).
-* **Statement formats** (`zk.rs`, RFC-011 §6.2/§6.3 domain-separated,
+* **Statement formats** (`zk`, RFC-011 §6.2/§6.3 domain-separated,
   length-delimited): root attestation `merkle_root(32) || version(LE u32)`;
   ownership/credential statements are `b"TERRA_ZK_*_V1" || … || purpose(u8
   len) || purpose || disclosure(u8)`, signed by the prover.
@@ -281,3 +281,19 @@ not just structurally parsed. Design (measured: ed25519-dalek verify costs
 * **IDL regenerated** (`make idl` + build.sh copy step): new
   `authority_signature` arg, `instructions` account on the three structs —
   synced to `terra-web/src/idl/`.
+* **P0-ZK-01 (2026-10-01) — framed Groth16 layer** on top of the above:
+  ownership `proof_data` must now be the 901-byte frame of RFC-011 §6.3.1
+  (`TG16` magic + version + Ed25519 statement signature + 576-byte
+  verification key + 256-byte Groth16 proof), all in `zk/groth16.rs`.
+  The VK is hash-pinned on the root (`update_verification_key_hash`
+  before first proof); the pairing check runs through `solana-bn254`
+  `alt_bn128` syscalls with public input `SHA-256(statement) mod r`
+  (~99k CU full verify); every proof-layer failure maps to
+  `InvalidProofData` (6087) after the existing guards, so the codes
+  above are unchanged. Verified by the framed happy path plus
+  `zk_groth16_verification_rejections` (corrupted proof byte,
+  cross-statement proof splice, corrupted VK, wrong pinned hash — each
+  rejected). Test harness `send_tx` additionally guards against banks
+  signature-dedup phantom results (identical tx inside one ~6.4 ms
+  blockhash window would otherwise return the cached status without
+  executing).

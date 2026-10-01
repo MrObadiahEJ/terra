@@ -70,7 +70,7 @@ Verified tests on `dev` (2026-09-30):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 131 |
+| `terra-registry` lib unit tests | 136 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 23 |
@@ -79,23 +79,24 @@ Verified tests on `dev` (2026-09-30):
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and `tsc --noEmit` — mirrored locally by `make ci`
-(all four jobs). Identity BPF (23) and the long-form registry BPF suite (302)
-are run locally / on demand (full registry suite ≈ 3.5 min on the reference
-dev machine).
+(all four jobs). Identity BPF (23) and the long-form registry BPF suite (303)
+are run locally / on demand (full registry suite ≈ 7 min with
+`--test-threads=1`).
 
-Registry BPF integration suite (`tests/integration.rs`, 302 tests) is
+Registry BPF integration suite (`tests/integration.rs`, 303 tests) is
 maintained and run locally; it is the long-form regression suite for all
 instruction happy paths and guard rails. Both BPF suites refuse to run
 against a stale `target/deploy/*.so` — their `setup()` guards compare
 mtimes and fail with the rebuild command (`anchor build --skip-lint`).
 
 Known limits before `main`: no devnet deployment yet (see
-[Devnet checklist](#devnet-checklist)); ZK circuits are structural
-(proof bytes opaque, no on-chain Groth16 verification — needs audit);
-time-locked paths (7-day unbonding withdraw) are guard-verified, not
-time-executed, in the harness; checked-in IDL
+[Devnet checklist](#devnet-checklist)); ZK proof verification is
+framed `proof_data` v1 with on-chain Groth16/BN254 (RFC-011 §6.3.1,
+hash-pinned VK — the production membership circuit + trusted setup
+still need audit); time-locked paths (7-day unbonding withdraw) are
+guard-verified, not time-executed, in the harness; checked-in IDL
 (`terra-web/src/idl/terra_registry.json`) is synced to source at
-**161/67/148/237 (re-synced 2026-09-30, counts unchanged)** — re-run `make idl` / `./build.sh`
+**161/67/148/237 (re-synced 2026-10-01, counts unchanged)** — re-run `make idl` / `./build.sh`
 before shipping client changes after any program edit.
 
 ### How to continue (handoff)
@@ -140,7 +141,7 @@ records how to do it, and it never touches key material.**
 | RFC-008 | Parcel subdivision & amalgamation (lineage records) | `subdivision.rs` | subdivide/amalgamate/migrate-rights |
 | RFC-009 | Time-bound credentials (expiry, grace, renewal, sweep) | `time_bound.rs` | renew/sweep/conditional-grant |
 | RFC-010 | Guardian & Recovery Council (policy layer on Succession: ≥3 validators, ≥90-day grace, court `case_hash`, revocation) | `terra_identity` `guardianship.rs` + registry `guardian_claim` | request-court-guardianship/revoke-guardianship |
-| RFC-011 | Zero-knowledge ownership proofs (zone Merkle roots, nullifier first-use) | `zk.rs` | register-zone/generate-root/verify-proof/invalidate |
+| RFC-011 | Zero-knowledge ownership proofs (zone Merkle roots, nullifier first-use; framed Groth16 `proof_data` v1) | `zk/` (mod + groth16) | register-zone/generate-root/verify-proof/invalidate |
 | RFC-012 | Global physical-digital trust architecture (Phases 0–10) | design contract + Phase 1 hardening across modules | see `docs/rfc-012-…` |
 | RFC-013 | Spatial intelligence pipeline (Vision Stage 3) | `spatial_asset.rs` | init-spatial-asset/append-geometry-version/verify-geometry-version |
 
@@ -297,7 +298,7 @@ Build the BPF program (manifest parsing issue in Anchor requires direct
 cd terra-core
 cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
 cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
-# Long-form registry BPF suite (302 tests, ~3.5 min; needs built SBF):
+# Long-form registry BPF suite (303 tests, ~7 min; needs built SBF):
 cargo test -p terra-registry --test integration -- --test-threads=1
 # Identity BPF suite (23 tests):
 cargo test -p terra-identity --test integration
@@ -321,11 +322,11 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 131/131 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 136/136 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
-| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 302/302 (~3.5 min; run locally) |
+| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 303/303 (~7 min; run locally) |
 | Unit (API validation logic) | `cargo test -p terra-api` | 68/68 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 4/4 |
 | Migrations on real PostGIS 16 | CI service + local scratch instance | 26/26 apply |
@@ -343,8 +344,8 @@ pnpm dev
 - [ ] Restore the `terra_identity` deploy keypair for `68urV9nG…` — `deploy.sh` verifies each `target/deploy/*-keypair.json` against `declare_id!` and aborts on mismatch (registry keypair: `terra-core/deploy-backup/`)
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
-- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`
-- [ ] ZK circuit choice (Groth16/PLONK) + external audit (RFC-006/011)
+- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged)
+- [ ] ZK membership circuit design + trusted setup + external audit (RFC-006/011) — Groth16/BN254 verifier now live on-chain (P0-ZK-01), circuit choice made; placeholder test circuit is not production
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
 ---
@@ -386,6 +387,7 @@ The stage map (0–10) and long-term direction live in
 - [x] Frontend demo layer (2026-09-29): `/lab` interactive experiments (geometry vault with live `sha256` digits + borsh byte inspector mirroring the on-chain layout, verification pipeline lifecycle with authentic event log & error codes, cross-border gate), offline demo-data globe (wallet-less, API-less), local demo parcel registration, responsive/mobile layout fixes
 - [x] **P0 audit (2026-09-29/30)** — P0-TEST-01 RRR E2E TS tests (`make test-ts`); P0-INVARIANTS; P0-REMAINING remaining-accounts audit with findings **F1–F8 all fixed** (`docs/remaining-accounts-matrix.md`, incl. full UncheckedAccount census); P0-ZK real Ed25519 precompile verification (RFC-011 status updated); registry bindings F3/F4/F5; suites green: registry BPF 302, registry lib 131, identity 6+23, rfc012 21, api 68, geo 4; tooling: `make ci` (CI mirror), `make prune` (disk), stale-`.so` guards, `deploy.sh` keypair verification
 - [x] Frontend transactions explorer (2026-09-30): `/transactions` simulated chain feed (base58 signatures, accounts, Anchor-style logs, exact error codes), broadcast composer with failure injection, toasts, **land-version timeline** (anchored → verified states with per-version WebGL-free SVG isometric 3D skeletons), wallet-signed txs marked `LIVE` with devnet status + Solana Explorer link, realtime validator-API/devnet pills; **WebGL-free 3D land skeleton** added to `/lab` Geometry Vault; `/progress` page removed
+- [x] **P0-ZK-01 framed Groth16 verification (2026-10-01)** — `proof_data` is now the mandatory 901-byte frame of RFC-011 §6.3.1 (`TG16` magic + version + Ed25519 statement signature + 576-byte hash-pinned VK + 256-byte Groth16 proof); on-chain pairing via `solana-bn254`/`alt_bn128` syscalls (public input `SHA-256(statement) mod r`, ≈99k CU full verify); `update_verification_key_hash` pin required before any proof; all proof-layer failures → `InvalidProofData` (6087), guard error codes preserved; new test `zk_groth16_verification_rejections` + framed happy path; test harness `send_tx` kills banks signature-dedup phantom results (root cause of previously flaky double-vote/replay negatives); suites green: registry BPF 303, registry lib 136, identity 6+23, rfc012 21, api 68, geo 4; IDL re-synced **161/67/148/237** (doc-comment only)
 
 **Next (in order):**
 
