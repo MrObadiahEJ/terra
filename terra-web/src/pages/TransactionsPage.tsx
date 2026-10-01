@@ -339,7 +339,10 @@ export default function TransactionsPage() {
   const reseed = useTxStore((s) => s.reseed)
   const { publicKey } = useWallet()
 
-  const [view, setView] = useState<'feed' | 'versions'>('feed')
+  const [view, setView] = useState<'feed' | 'versions'>(() => {
+    const t = new URLSearchParams(window.location.search).get('view')
+    return t === 'versions' ? 'versions' : 'feed'
+  })
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
   const [openSig, setOpenSig] = useState<string | null>(null)

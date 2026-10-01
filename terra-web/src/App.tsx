@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
 import LabPage from './pages/LabPage'
+import LandDetailPage from './pages/LandDetailPage'
 import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
@@ -17,7 +18,9 @@ const TITLES: Record<string, string> = {
 function DocumentTitle() {
   const { pathname } = useLocation()
   useEffect(() => {
-    document.title = TITLES[pathname] ?? 'Terra'
+    document.title =
+      TITLES[pathname] ??
+      (pathname.startsWith('/lab/land') ? 'Land — Terra' : 'Terra')
   }, [pathname])
   return null
 }
@@ -40,6 +43,7 @@ function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<GlobePage />} />
+          <Route path="/lab/land" element={<LandDetailPage />} />
           <Route path="/lab" element={<LabPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

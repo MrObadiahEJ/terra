@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { PublicKey } from '@solana/web3.js'
 import {
   useLabVault,
@@ -296,9 +297,14 @@ export default function GeometryVault() {
               <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
                 <Boxes size={14} /> Current geometry claim
               </h3>
-              <button className="btn btn-secondary" onClick={v.nextShape}>
-                New shape
-              </button>
+              <div className="flex items-center gap-1">
+                <Link className="btn btn-secondary px-2 py-1" to="/lab/land?v=claim">
+                  Land view ↗
+                </Link>
+                <button className="btn btn-secondary" onClick={v.nextShape}>
+                  New shape
+                </button>
+              </div>
             </div>
             <ShapePreview ring={shape} />
             <p className="font-mono text-[10px] break-all mt-1">
@@ -604,6 +610,14 @@ export default function GeometryVault() {
                             {GEOMETRY_SOURCES[entry.source]?.label} · {SPATIAL_DIMENSIONS[entry.dimension]?.label}
                           </span>
                           <span className="flex-1" />
+                          <Link
+                            className="btn btn-ghost p-1"
+                            title="Open land details + 3D view"
+                            to={`/lab/land?v=${entry.version}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            ↗
+                          </Link>
                           {entry.verified ? (
                             <span className="lab-badge lab-badge-ok">verified</span>
                           ) : (
@@ -709,13 +723,21 @@ export default function GeometryVault() {
 
       {/* --- Phase B viz grid: all plain SVG, no WebGL --------------------- */}
       <div className="lab-grid-3 mt-3">
-        <div className="lab-card">
-          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-            <h3 className="text-[13px] font-semibold">Isometric terrain — SVG heightfield</h3>
-            <span className="lab-badge lab-badge-info">
-              {inspectedEntry ? `GeometryVersion v${inspectedEntry.version}` : 'next append'}
-            </span>
-          </div>
+          <div className="lab-card">
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <h3 className="text-[13px] font-semibold">Isometric terrain — SVG heightfield</h3>
+              <div className="flex items-center gap-1">
+                <span className="lab-badge lab-badge-info">
+                  {inspectedEntry ? `GeometryVersion v${inspectedEntry.version}` : 'next append'}
+                </span>
+                <Link
+                  className="btn btn-ghost px-2 py-1"
+                  to={inspectedEntry ? `/lab/land?v=${inspectedEntry.version}` : '/lab/land?v=claim'}
+                >
+                  Land view ↗
+                </Link>
+              </div>
+            </div>
           <IsoTerrain
             ring={isoRing}
             elevMinM={focusMinM}
