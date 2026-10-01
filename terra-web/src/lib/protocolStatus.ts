@@ -486,10 +486,15 @@ export const STATUS_MODULES: StatusModule[] = [
     id: 'demo-scenarios-ui',
     name: 'Demo scenario runner & protocol playground (B5–B7)',
     track: 'frontend',
-    status: 'planned',
-    evidence: 'Lab has 3 tabs (vault, pipeline, crossborder)',
-    verified: [],
-    gaps: ['Deterministic scenario runner + playground tabs: routing, escrow, disputes, fraud, staking, devices, recovery, ZK'],
+    status: 'partial',
+    evidence:
+      '/demo ships the deterministic scenario runner (8 scenarios, seeded, animated); Lab has 3 tabs (vault, pipeline, crossborder)',
+    verified: [
+      'Shipped /demo player: scenario picker, seeded runs, animated event timelines, determinism check, deep links',
+    ],
+    gaps: [
+      'Playground tabs in Lab: routing, escrow, disputes, fraud, staking, devices, recovery, ZK',
+    ],
   },
   {
     id: 'protocol-status',
