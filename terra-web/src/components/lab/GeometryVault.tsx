@@ -5,13 +5,29 @@ import {
   labShape,
   SPATIAL_DIMENSIONS,
   GEOMETRY_SOURCES,
+  ELEVATION_SOURCES,
+  DEMO_VALIDATORS,
   MAX_GEOMETRY_VERSIONS,
+  MAX_MANIFEST_ARTIFACTS,
+  DEFAULT_GEOMETRY_QUOROM,
   type LabResult,
 } from '../../lib/labStore'
 import { sha256Bytes, sha256Hex, type LonLat } from '../../lib/geo'
 import { reportTx } from '../../lib/txStore'
 import IsoLandSkeleton from './IsoLandSkeleton'
-import { Boxes, FilePlus2, BadgeCheck, RotateCcw } from 'lucide-react'
+import IsoTerrain from './IsoTerrain'
+import ElevationCrossSection from './ElevationCrossSection'
+import QuorumRing from './QuorumRing'
+import EvidenceChain from './EvidenceChain'
+import {
+  Boxes,
+  FilePlus2,
+  RotateCcw,
+  Link2,
+  ShieldCheck,
+  ScrollText,
+  Gauge,
+} from 'lucide-react'
 
 // --- borsh-style account serialization (Anchor layout, little-endian) -------
 
@@ -43,6 +59,7 @@ const i64 = (v: number) => {
 }
 const bool = (v: boolean) => [v ? 1 : 0]
 const utf8 = (s: string) => Array.from(new TextEncoder().encode(s))
+const ZERO32 = new Uint8Array(32)
 
 interface Serialized {
   bytes: Uint8Array
@@ -108,13 +125,20 @@ export default function GeometryVault() {
   const v = useLabVault()
   const [msg, setMsg] = useState<LabResult | null>(null)
 
-  // Form state
+  // Form state — asset (init)
   const [dim, setDim] = useState(1)
   const [elevMin, setElevMin] = useState(0) // metres
   const [elevMax, setElevMax] = useState(1200) // metres
+  // Form state — version (append, RFC-013 Phase B)
   const [source, setSource] = useState(3)
-  const [vDim, setVDim] = useState(0)
+  const [vDim, setVDim] = useState(1)
   const [storageRef, setStorageRef] = useState('')
+  const [vElevMin, setVElevMin] = useState(40) // metres
+  const [vElevMax, setVElevMax] = useState(860) // metres
+  const [vElevSource, setVElevSource] = useState(1) // SURVEY
+  const [fromEvidence, setFromEvidence] = useState(false)
+  const [artifactCount, setArtifactCount] = useState(1)
+  const [quorumInput, setQuorumInput] = useState(DEFAULT_GEOMETRY_QUOROM)
   const [inspected, setInspected] = useState<number | null>(null) // null → SpatialAsset
 
   // Deterministic demo keys (SHA-256 of labels → 32 bytes).
@@ -123,6 +147,7 @@ export default function GeometryVault() {
     asset: Uint8Array
     authority: Uint8Array
     validator: Uint8Array
+    manifest: Uint8Array
     authorityB58: string
     validatorB58: string
     discAsset: Uint8Array
@@ -132,11 +157,12 @@ export default function GeometryVault() {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [parcel, asset, authority, validator, dAsset, dVersion] = await Promise.all([
+      const [parcel, asset, authority, validator, manifest, dAsset, dVersion] = await Promise.all([
         sha256Bytes('terra-lab-parcel'),
         sha256Bytes('terra-lab-spatial-asset-pda'),
         sha256Bytes('terra-lab-registrar'),
         sha256Bytes('terra-lab-validator'),
+        sha256Bytes('terra-lab-evidence-manifest'),
         sha256Bytes('account:SpatialAsset'),
         sha256Bytes('account:GeometryVersion'),
       ])
@@ -146,6 +172,7 @@ export default function GeometryVault() {
         asset,
         authority,
         validator,
+        manifest,
         authorityB58: new PublicKey(authority).toBase58(),
         validatorB58: new PublicKey(validator).toBase58(),
         discAsset: dAsset.slice(0, 8),
@@ -158,14 +185,12 @@ export default function GeometryVault() {
   }, [])
 
   const shape = useMemo(() => labShape(v.shapeIndex), [v.shapeIndex])
-  // What the 3D skeleton shows: the inspected anchored version, else the next shape.
-  const isoRing = useMemo(() => {
-    if (inspected !== null) {
-      const e = v.versions.find((x) => x.version === inspected)
-      if (e) return e.ring
-    }
-    return shape
-  }, [inspected, v.versions, shape])
+  const inspectedEntry =
+    inspected !== null ? (v.versions.find((x) => x.version === inspected) ?? null) : null
+  // Quorum / evidence target: the inspected version, else the latest one.
+  const focusEntry = inspectedEntry ?? (v.versions.length > 0 ? v.versions[v.versions.length - 1] : null)
+  // What the 3D skeletons show: the inspected anchored version, else the next shape.
+  const isoRing = inspectedEntry ? inspectedEntry.ring : shape
   const [digest, setDigest] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -214,12 +239,52 @@ export default function GeometryVault() {
     b.add('submitted_by (Pubkey)', keys.validator, entry.submittedBy)
     b.add('submitted_at (i64)', i64(Date.parse(entry.submittedAt)), entry.submittedAt)
     b.add('verified (bool)', bool(entry.verified), String(entry.verified))
-    b.add('verified_by (Pubkey)', keys.validator, entry.verifiedBy ?? '111…111 (zero)')
+    b.add('verified_by (Pubkey)', entry.verifiedBy ? keys.validator : ZERO32, entry.verifiedBy ?? '111…111 (zero)')
     b.add('verified_at (i64)', i64(entry.verifiedAt ? Date.parse(entry.verifiedAt) : 0), entry.verifiedAt ?? '0')
+    // --- Phase B (RFC-013 §3) ---
+    b.add(
+      'evidence_manifest (Pubkey)',
+      entry.evidenceManifest ? keys.manifest : ZERO32,
+      entry.evidenceManifest
+        ? `${new PublicKey(keys.manifest).toBase58()} · ${entry.evidenceManifest}`
+        : '111…111 (zero = standalone)',
+    )
+    b.add('elevation_min_mm (i32)', i32(entry.elevationMinMm), `${entry.elevationMinMm} mm`)
+    b.add('elevation_max_mm (i32)', i32(entry.elevationMaxMm), `${entry.elevationMaxMm} mm`)
+    b.add(
+      'elevation_source (u8)',
+      u8(entry.elevationSource),
+      `${entry.elevationSource} (${ELEVATION_SOURCES[entry.elevationSource]?.id ?? '?'})`,
+    )
+    b.add('required (u8)', u8(entry.required), String(entry.required))
+    for (let i = 0; i < 8; i++) {
+      const label = entry.attestors[i]
+      b.add(
+        `attestors[${i}] (Pubkey)`,
+        label ? keys.validator : ZERO32,
+        label ?? '111…111 (zero)',
+      )
+    }
+    b.add('attest_count (u8)', u8(entry.attestors.length), String(entry.attestors.length))
     return { bytes: b.finish(), fields: b.fields }
   }, [keys, inspected, v])
 
   const disabled = !keys
+
+  // Live preview data for the viz grid.
+  const assetMinM = (v.initialized ? v.elevationMinMm : Math.round(elevMin * 1000)) / 1000
+  const assetMaxM = (v.initialized ? v.elevationMaxMm : Math.round(elevMax * 1000)) / 1000
+  const assetDim = v.initialized ? v.dimensionality : dim
+  const focusMinM = (inspectedEntry ? inspectedEntry.elevationMinMm : Math.round(vElevMin * 1000)) / 1000
+  const focusMaxM = (inspectedEntry ? inspectedEntry.elevationMaxMm : Math.round(vElevMax * 1000)) / 1000
+  const focusSource = inspectedEntry ? inspectedEntry.elevationSource : vElevSource
+  const focusDim = inspectedEntry ? inspectedEntry.dimension : vDim
+  const focusSeed = inspectedEntry ? inspectedEntry.geometryHash : digest ?? '0'.repeat(64)
+  const focusRequired = focusEntry
+    ? focusEntry.required
+    : v.quorumConfig > 0
+      ? v.quorumConfig
+      : DEFAULT_GEOMETRY_QUOROM
 
   return (
     <div className="lab-body">
@@ -298,6 +363,7 @@ export default function GeometryVault() {
             <div className="lab-card space-y-2">
               <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
                 <FilePlus2 size={14} /> append_geometry_version
+                {fromEvidence && <span className="lab-badge lab-badge-info">_from_evidence</span>}
               </h3>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                 <label className="text-[11px] text-muted">
@@ -330,6 +396,139 @@ export default function GeometryVault() {
                   onChange={(e) => setStorageRef(e.target.value)}
                 />
               </label>
+
+              {/* --- Phase B: elevation provenance envelope --- */}
+              <div className="vault-block">
+                <div className="vault-block-title">elevation provenance — RFC-013 Phase B</div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <label className="text-[11px] text-muted">
+                    Elevation min (m)
+                    <input
+                      className="text-input"
+                      type="number"
+                      value={vElevMin}
+                      onChange={(e) => setVElevMin(Number(e.target.value))}
+                    />
+                  </label>
+                  <label className="text-[11px] text-muted">
+                    Elevation max (m)
+                    <input
+                      className="text-input"
+                      type="number"
+                      value={vElevMax}
+                      onChange={(e) => setVElevMax(Number(e.target.value))}
+                    />
+                  </label>
+                </div>
+                <label className="text-[11px] text-muted">
+                  elevation_source (u8)
+                  <select
+                    className="select-input"
+                    value={vElevSource}
+                    onChange={(e) => setVElevSource(Number(e.target.value))}
+                  >
+                    {ELEVATION_SOURCES.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.code} = {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[10px] text-muted mt-1">
+                  Guards in order: source ≤ 5 → 6237 · min ≤ max → 6235 · NONE ⇒ (0,0) → 6237 · NONE ⇔ flat D2 →
+                  6237 · envelope ⊆ asset → 6235.
+                </p>
+              </div>
+
+              {/* --- Phase B: evidence-linked append --- */}
+              <div className="vault-block">
+                <div className="vault-block-title flex items-center gap-1">
+                  <Link2 size={11} /> evidence anchor
+                </div>
+                <label className="vault-toggle mb-1">
+                  <input
+                    type="checkbox"
+                    checked={fromEvidence}
+                    onChange={(e) => setFromEvidence(e.target.checked)}
+                  />
+                  append_geometry_version_from_evidence (task + manifest PDAs self-derived — no seed args)
+                </label>
+                <div className="vault-row">
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={0}
+                    max={MAX_MANIFEST_ARTIFACTS}
+                    value={artifactCount}
+                    onChange={(e) => setArtifactCount(Number(e.target.value))}
+                    title={`artifact index 0..=${MAX_MANIFEST_ARTIFACTS - 1}`}
+                  />
+                  <button
+                    className="btn btn-secondary px-2 py-1 gap-1"
+                    disabled={disabled}
+                    onClick={() => {
+                      const r = v.submitManifest(artifactCount)
+                      setMsg(r)
+                      reportTx('submit_evidence_manifest', r.ok, r.msg)
+                    }}
+                  >
+                    <ScrollText size={12} /> submit_evidence_manifest
+                  </button>
+                  <span
+                    className={`lab-badge ${
+                      v.manifestNonce === null
+                        ? 'lab-badge-warn'
+                        : v.manifestArtifacts >= 1
+                          ? 'lab-badge-ok'
+                          : 'lab-badge-err'
+                    }`}
+                  >
+                    {v.manifestNonce === null
+                      ? 'no manifest'
+                      : `#${v.manifestNonce} · ${v.manifestArtifacts} artifacts`}
+                  </span>
+                </div>
+                <label className="vault-toggle">
+                  <input
+                    type="checkbox"
+                    checked={v.taskCancelled}
+                    onChange={(e) => v.setTaskCancelled(e.target.checked)}
+                  />
+                  cancel verification task → terminal (anchored append fails 6174)
+                </label>
+              </div>
+
+              {/* --- Phase B: global quorum config --- */}
+              <div className="vault-block">
+                <div className="vault-block-title flex items-center gap-1">
+                  <Gauge size={11} /> set_quorum_config
+                </div>
+                <div className="vault-row">
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={quorumInput}
+                    onChange={(e) => setQuorumInput(Number(e.target.value))}
+                  />
+                  <button
+                    className="btn btn-secondary px-2 py-1"
+                    disabled={disabled}
+                    onClick={() => {
+                      const r = v.setQuorumConfig(quorumInput)
+                      setMsg(r)
+                      reportTx('set_quorum_config', r.ok, r.msg)
+                    }}
+                  >
+                    Set global required
+                  </button>
+                  <span className={`lab-badge ${v.quorumConfig > 0 ? 'lab-badge-info' : 'lab-badge-warn'}`}>
+                    {v.quorumConfig > 0 ? `(0,[0,0]) → ${v.quorumConfig}` : 'unset → fallback 2'}
+                  </span>
+                </div>
+              </div>
+
               <p className="text-[11px] text-muted">
                 Cursor: <b className="font-mono">{v.versions.length}</b> / {MAX_GEOMETRY_VERSIONS}
                 {v.versions.length >= MAX_GEOMETRY_VERSIONS && (
@@ -346,12 +545,21 @@ export default function GeometryVault() {
                     vDim,
                     activeStorageRef,
                     keys?.validatorB58 ?? 'payer',
+                    Math.round(vElevMin * 1000),
+                    Math.round(vElevMax * 1000),
+                    vElevSource,
+                    fromEvidence,
                   )
                   setMsg(r)
-                  reportTx('append_geometry_version', r.ok, r.msg)
+                  reportTx(
+                    fromEvidence ? 'append_geometry_version_from_evidence' : 'append_geometry_version',
+                    r.ok,
+                    r.msg,
+                  )
                 }}
               >
                 Anchor version {nextIndex}
+                {fromEvidence ? ' from evidence' : ''}
               </button>
             </div>
           )}
@@ -379,49 +587,69 @@ export default function GeometryVault() {
               <p className="text-[12px] text-muted">No versions anchored yet.</p>
             ) : (
               <ul className="space-y-1">
-                {v.versions.map((entry) => (
-                  <li key={entry.version}>
-                    <div
-                      className={`lab-version ${inspected === entry.version ? 'active' : ''}`}
-                      onClick={() => setInspected(entry.version)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && setInspected(entry.version)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-mono text-[11px] shrink-0">v{entry.version}</span>
-                        <span className="text-[11px] text-muted truncate">
-                          {GEOMETRY_SOURCES[entry.source]?.label} · {SPATIAL_DIMENSIONS[entry.dimension]?.label}
-                        </span>
-                        <span className="flex-1" />
-                        {entry.verified ? (
-                          <span className="lab-badge lab-badge-ok">verified</span>
-                        ) : (
-                          <button
-                            className="btn btn-secondary px-2 py-0.5 gap-1"
-                            disabled={!keys}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              const r = v.verifyVersion(entry.version, keys?.validatorB58 ?? 'validator')
-                              setMsg(r)
-                              reportTx('verify_geometry_version', r.ok, r.msg)
-                            }}
-                          >
-                            <BadgeCheck size={12} /> Verify
-                          </button>
+                {v.versions.map((entry) => {
+                  const nextValidator = DEMO_VALIDATORS.find((d) => !entry.attestors.includes(d))
+                  return (
+                    <li key={entry.version}>
+                      <div
+                        className={`lab-version ${inspected === entry.version ? 'active' : ''}`}
+                        onClick={() => setInspected(entry.version)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === 'Enter' && setInspected(entry.version)}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[11px] shrink-0">v{entry.version}</span>
+                          <span className="text-[11px] text-muted truncate">
+                            {GEOMETRY_SOURCES[entry.source]?.label} · {SPATIAL_DIMENSIONS[entry.dimension]?.label}
+                          </span>
+                          <span className="flex-1" />
+                          {entry.verified ? (
+                            <span className="lab-badge lab-badge-ok">verified</span>
+                          ) : (
+                            <button
+                              className="btn btn-secondary px-2 py-0.5 gap-1"
+                              disabled={!keys || !nextValidator}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (!nextValidator) return
+                                const r = v.attestVersion(entry.version, nextValidator)
+                                setMsg(r)
+                                reportTx('verify_geometry_version', r.ok, r.msg)
+                              }}
+                            >
+                              <ShieldCheck size={12} /> Attest
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-mono text-[10px] text-muted break-all">
+                          {shortHex(entry.geometryHash)} · {entry.storageReference}
+                        </div>
+                        <div className="font-mono text-[10px] text-muted">
+                          elev {entry.elevationMinMm}…{entry.elevationMaxMm}mm ·{' '}
+                          {ELEVATION_SOURCES[entry.elevationSource]?.id} · quorum{' '}
+                          <span className={entry.verified ? 'text-emerald-700' : ''}>
+                            {entry.attestors.length}/{entry.required}
+                          </span>
+                          {entry.evidenceManifest && <span> · {entry.evidenceManifest}</span>}
+                        </div>
+                        <div className="lab-quorum mt-1">
+                          {Array.from({ length: entry.required }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`lab-quorum-cell ${i < entry.attestors.length ? 'on' : ''}`}
+                            />
+                          ))}
+                        </div>
+                        {entry.verified && entry.verifiedBy && (
+                          <div className="font-mono text-[10px] text-emerald-700 break-all">
+                            ✓ {entry.verifiedBy.slice(0, 16)}… at {entry.verifiedAt?.slice(0, 19).replace('T', ' ')}
+                          </div>
                         )}
                       </div>
-                      <div className="font-mono text-[10px] text-muted break-all">
-                        {shortHex(entry.geometryHash)} · {entry.storageReference}
-                      </div>
-                      {entry.verified && entry.verifiedBy && (
-                        <div className="font-mono text-[10px] text-emerald-700 break-all">
-                          ✓ {entry.verifiedBy.slice(0, 16)}… at {entry.verifiedAt?.slice(0, 19).replace('T', ' ')}
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             )}
             {v.initialized && (
@@ -477,6 +705,99 @@ export default function GeometryVault() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* --- Phase B viz grid: all plain SVG, no WebGL --------------------- */}
+      <div className="lab-grid-3 mt-3">
+        <div className="lab-card">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <h3 className="text-[13px] font-semibold">Isometric terrain — SVG heightfield</h3>
+            <span className="lab-badge lab-badge-info">
+              {inspectedEntry ? `GeometryVersion v${inspectedEntry.version}` : 'next append'}
+            </span>
+          </div>
+          <IsoTerrain
+            ring={isoRing}
+            elevMinM={focusMinM}
+            elevMaxM={focusMaxM}
+            elevationSource={focusSource}
+            dimension={focusDim}
+            seedHex={focusSeed}
+            verified={inspectedEntry?.verified ?? false}
+            attestCount={inspectedEntry?.attestors.length ?? 0}
+            required={focusRequired}
+          />
+          <p className="text-[10px] text-muted mt-1">
+            Deterministic heightfield from sha256(ring) — per-column extrusion with provenance tint,
+            painter-sorted. Works without WebGL (Cesium is optional here).
+          </p>
+        </div>
+
+        <div className="lab-card">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <h3 className="text-[13px] font-semibold">Elevation cross-section</h3>
+            <span className={`lab-badge ${focusSource === 0 ? 'lab-badge-warn' : 'lab-badge-ok'}`}>
+              {ELEVATION_SOURCES[focusSource]?.id ?? 'NONE'}
+            </span>
+          </div>
+          <ElevationCrossSection
+            assetMinM={assetMinM}
+            assetMaxM={assetMaxM}
+            versionMinM={focusMinM}
+            versionMaxM={focusMaxM}
+            elevSource={focusSource}
+            dimension={focusDim}
+            assetDimension={assetDim}
+          />
+          <p className="text-[10px] text-muted mt-1">
+            Version envelope vs asset bounding envelope — the five Phase B invariants evaluated live
+            (6235/6237 guards shown as chips before you anchor).
+          </p>
+        </div>
+
+        <div className="lab-card">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <h3 className="text-[13px] font-semibold">Validator quorum ring</h3>
+            <span className={`lab-badge ${focusEntry?.verified ? 'lab-badge-ok' : 'lab-badge-warn'}`}>
+              {focusEntry ? `v${focusEntry.version}` : 'no version'}
+            </span>
+          </div>
+          <QuorumRing
+            attestors={focusEntry?.attestors ?? []}
+            required={focusRequired}
+            verified={focusEntry?.verified ?? false}
+            quorumConfig={v.quorumConfig}
+            validators={DEMO_VALIDATORS}
+            disabled={!focusEntry}
+            onAttest={(validator) => {
+              if (!focusEntry) return
+              const r = v.attestVersion(focusEntry.version, validator)
+              setMsg(r)
+              reportTx('verify_geometry_version', r.ok, r.msg)
+            }}
+          />
+          <p className="text-[10px] text-muted mt-1">
+            Each attestation is a <span className="font-mono">verify_geometry_version</span> call;{' '}
+            <span className="font-mono">verified</span> flips only when count ≥ required
+            (6238 duplicate, 6240 array full).
+          </p>
+        </div>
+      </div>
+
+      <div className="lab-card mt-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+          <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
+            <Link2 size={14} /> Evidence → geometry chain (from_evidence)
+          </h3>
+          <span className="lab-badge lab-badge-info">manifest PDA self-derived</span>
+        </div>
+        <EvidenceChain
+          taskCancelled={v.taskCancelled}
+          manifestNonce={v.manifestNonce}
+          manifestArtifacts={v.manifestArtifacts}
+          linkedManifest={focusEntry?.evidenceManifest ?? null}
+          linkedVersion={focusEntry?.version ?? null}
+        />
       </div>
 
       {/* WebGL-free 3D representation: plain SVG isometric wireframe. */}

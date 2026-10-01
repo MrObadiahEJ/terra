@@ -94,7 +94,7 @@ export default function TerraGlobe({
       // — otherwise the dead widget DOM overlays the 2D map.
       containerRef.current?.replaceChildren()
       const msg = err instanceof Error ? err.message : String(err)
-      setWebglError(msg)
+      queueMicrotask(() => setWebglError(msg))
       onWebGLStatusRef.current?.(msg)
       return
     }

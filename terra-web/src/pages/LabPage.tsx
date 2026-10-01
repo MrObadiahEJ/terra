@@ -7,7 +7,7 @@ import { useTxStore } from '../lib/txStore'
 import { FlaskConical } from 'lucide-react'
 
 const TABS = [
-  { id: 'vault', label: 'Geometry Vault', hint: 'RFC-013' },
+  { id: 'vault', label: 'Geometry Vault', hint: 'RFC-013 A+B' },
   { id: 'pipeline', label: 'Verification pipeline', hint: 'claim → quorum → fact' },
   { id: 'crossborder', label: 'Cross-border gate', hint: 'RFC-012 Phase 10' },
 ] as const
@@ -83,7 +83,7 @@ export default function LabPage() {
         <span className="font-mono">verification/*</span>, <span className="font-mono">routing.rs</span> +
         <span className="font-mono">cross_border.rs</span> (RFC-012 Phase 10). Error codes are the exact{' '}
         <span className="font-mono">6000 + variant index</span> values from{' '}
-        <span className="font-mono">TerraError</span> (237 variants).
+        <span className="font-mono">TerraError</span> (241 variants).
       </footer>
     </div>
   )

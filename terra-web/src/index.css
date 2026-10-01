@@ -1035,3 +1035,234 @@ header .wallet-adapter-button {
   .txv-body { grid-template-columns: 1fr; }
   .txv-iso { max-width: 220px; }
 }
+
+/* ---- missing micro-utilities (used by lab components) --------------------- */
+.gap-1\.5 { gap: 6px; }
+.mt-2 { margin-top: 8px; }
+.mb-1 { margin-bottom: 4px; }
+.space-y-2 > * + * { margin-top: 8px; }
+
+/* ---- Vision Stage 3 Phase B lab viz (RFC-013) — all SVG, no WebGL ------- */
+.lab-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .lab-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* Isometric terrain */
+.isoterrain {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.isoterrain-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.isoterrain svg { display: block; border-radius: 8px; }
+.isoterrain-scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.isoterrain-segs { display: flex; gap: 3px; flex: 1 1 0%; }
+.isoterrain-seg {
+  flex: 1;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--border);
+  transition: background 0.3s ease;
+}
+.isoterrain-seg.on { background: #6366f1; }
+.isoterrain-seg.on.done { background: #10b981; }
+.isot-col {
+  animation: isot-rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes isot-rise {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
+}
+.isot-pip.on { animation: lab-pulse 1.6s ease-in-out infinite; }
+.isot-halo { animation: lab-pulse 2.2s ease-in-out infinite; }
+@keyframes lab-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Elevation cross-section */
+.xsec {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.xsec svg { display: block; }
+.xsec-tick {
+  font-size: 9px;
+  fill: #6b7280;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.xsec-label-em {
+  font-size: 9.5px;
+  fill: #047857;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.xsec-label-v {
+  font-size: 9.5px;
+  font-weight: 600;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.xsec-label-sea {
+  font-size: 9px;
+  fill: #3b82f6;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.xsec-spill { animation: lab-pulse 1.2s ease-in-out infinite; }
+.xsec-scan { animation: xsec-scan 3.4s linear infinite; }
+@keyframes xsec-scan {
+  from { transform: translateX(0); }
+  to { transform: translateX(312px); }
+}
+.xsec-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.xsec-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  background: #d1fae5;
+  color: #065f46;
+}
+.xsec-chip.bad { background: #fee2e2; color: #991b1b; }
+.xsec-chip.mini {
+  font-weight: 500;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+/* Quorum ring */
+.qring {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.qring svg { display: block; }
+.qring-arc { transition: stroke-dasharray 0.5s cubic-bezier(0.3, 0.8, 0.4, 1); }
+.qring-big {
+  font-size: 24px;
+  font-weight: 700;
+  fill: #111827;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.qring-sub {
+  font-size: 10px;
+  font-weight: 600;
+  fill: #6b7280;
+  letter-spacing: 0.06em;
+}
+.qring-check { color: #10b981; }
+.qring-node.on {
+  fill: #10b981;
+  animation: lab-pulse 1.6s ease-in-out infinite;
+}
+.qring-node.slot { fill: #ffffff; stroke: #6366f1; }
+.qring-node.spare { fill: #f1f5f9; stroke: #e2e8f0; }
+.qring-legend-h {
+  font-size: 9.5px;
+  font-weight: 700;
+  fill: #6b7280;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.qring-legend-v {
+  font-size: 10.5px;
+  fill: #111827;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.qring-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* Evidence chain */
+.echain {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.echain svg { display: block; }
+.echain-h {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.echain-v {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #111827;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.echain-s {
+  font-size: 9.5px;
+  fill: #6b7280;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.echain-cap {
+  font-size: 9.5px;
+  fill: #6b7280;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.echain-lock {
+  font-size: 11px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+.echain-flow { animation: echain-dash 0.9s linear infinite; }
+@keyframes echain-dash {
+  to { stroke-dashoffset: -24; }
+}
+.echain-dim { opacity: 0.5; }
+.echain-node.ok .echain-dot { animation: lab-pulse 1.8s ease-in-out infinite; }
+
+/* Vault: elevation / evidence / quorum form blocks */
+.vault-block {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 7px 8px;
+}
+.vault-block-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.vault-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+.vault-toggle input { accent-color: var(--accent); }
+.vault-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vault-row .text-input { flex: 1 1 70px; min-width: 0; }
+.vault-row .select-input { flex: 1 1 auto; min-width: 0; }
