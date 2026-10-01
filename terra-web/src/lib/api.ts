@@ -39,12 +39,20 @@ export interface Poi {
   lat: number
 }
 
+export interface OsmBuildingFootprint {
+  osm_id: number
+  name: string | null
+  building: string
+  geometry: { type: 'Polygon'; coordinates: number[][][] }
+}
+
 export interface GeoStats {
   nodes?: number
   roads?: number
   road_segments?: number
   road_length_km?: number
   pois?: number
+  building_footprints?: number
   bbox?: { min_lon: number; min_lat: number; max_lon: number; max_lat: number }
   loaded?: boolean
 }
@@ -836,6 +844,8 @@ export const api = {
         (category ? `&category=${encodeURIComponent(category)}` : ''),
     ),
   geoStats: () => request<GeoStats>(`/geo/stats`),
+  osmBuildingFootprints: (limit = 500, offset = 0) =>
+    request<OsmBuildingFootprint[]>(`/geo/buildings?limit=${limit}&offset=${offset}`),
 
   // fusion (PostGIS — requires ingestion)
   fusionStats: () => request<FusionStats>(`/fusion/stats`),

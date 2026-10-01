@@ -25,81 +25,35 @@ function parcel(
   }
 }
 
-export const DEMO_PARCELS: OffChainParcel[] = [
-  parcel(
-    'a11e0001d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60',
-    'Soa Demo Block A',
-    'registered',
-    [
-      [11.498, 3.845],
-      [11.506, 3.845],
-      [11.506, 3.851],
-      [11.498, 3.851],
-      [11.498, 3.845],
-    ],
-  ),
-  parcel(
-    'a11e0002d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f61',
-    'Ekoa Farm Plot',
-    'registered',
-    [
-      [11.509, 3.838],
-      [11.515, 3.837],
-      [11.517, 3.841],
-      [11.514, 3.845],
-      [11.509, 3.844],
-      [11.509, 3.838],
-    ],
-  ),
-  parcel(
-    'a11e0003d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f62',
-    'Mbankomo Test Parcel',
-    'verified',
-    [
-      [11.484, 3.854],
-      [11.491, 3.853],
-      [11.493, 3.858],
-      [11.487, 3.861],
-      [11.484, 3.854],
-    ],
-  ),
-  parcel(
-    'a11e0004d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f63',
-    'Nkolbisson Ridge',
-    'disputed',
-    [
-      [11.492, 3.863],
-      [11.499, 3.862],
-      [11.501, 3.867],
-      [11.494, 3.869],
-      [11.492, 3.863],
-    ],
-  ),
-  parcel(
-    'a11e0005d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f64',
-    'Obili Small Lot',
-    'pending',
-    [
-      [11.4875, 3.8455],
-      [11.4905, 3.8455],
-      [11.4905, 3.8475],
-      [11.4875, 3.8475],
-      [11.4875, 3.8455],
-    ],
-  ),
-  parcel(
-    'a11e0006d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f65',
-    'Biyem-Sud Corner',
-    'registered',
-    [
-      [11.491, 3.837],
-      [11.496, 3.837],
-      [11.497, 3.842],
-      [11.491, 3.843],
-      [11.491, 3.837],
-    ],
-  ),
+// Compact illustrative lot envelopes for offline UI. Not OSM features or
+// cadastral boundaries; the live demo prefers actual mapped OSM footprints.
+const DEMO_LOT_SEEDS: { id: string; name: string; dx: number; dy: number; w: number; h: number }[] = [
+  { id: 'a11e0001d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f60', name: 'Soa Sample Lot 01', dx: 0, dy: 0, w: 0.00026, h: 0.00031 },
+  { id: 'a11e0002d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f61', name: 'Soa Sample Lot 02', dx: 0.00034, dy: 0.00003, w: 0.00021, h: 0.00029 },
+  { id: 'a11e0003d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f62', name: 'Soa Sample Lot 03', dx: -0.00031, dy: 0.00015, w: 0.00022, h: 0.00025 },
+  { id: 'a11e0004d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f63', name: 'Soa Sample Lot 04', dx: 0.00018, dy: 0.00038, w: 0.00029, h: 0.00024 },
+  { id: 'a11e0005d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f64', name: 'Soa Sample Lot 05', dx: -0.00016, dy: -0.00034, w: 0.0002, h: 0.00026 },
+  { id: 'a11e0006d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f65', name: 'Soa Sample Lot 06', dx: 0.00043, dy: -0.00028, w: 0.00024, h: 0.00023 },
+  { id: 'a11e0007d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f66', name: 'Soa Sample Lot 07', dx: -0.00048, dy: -0.00023, w: 0.0002, h: 0.00028 },
+  { id: 'a11e0008d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f67', name: 'Soa Sample Lot 08', dx: 0.00061, dy: 0.00012, w: 0.0002, h: 0.00025 },
+  { id: 'a11e0009d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f68', name: 'Soa Sample Lot 09', dx: -0.00055, dy: 0.00038, w: 0.00023, h: 0.00022 },
+  { id: 'a11e0010d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f69', name: 'Soa Sample Lot 10', dx: 0.00075, dy: -0.00016, w: 0.00018, h: 0.00027 },
+  { id: 'a11e0011d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a', name: 'Soa Sample Lot 11', dx: -0.00075, dy: -0.00008, w: 0.00024, h: 0.0002 },
+  { id: 'a11e0012d50c0a9f6b2e4c7d8f3a5b1c0d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6b', name: 'Soa Sample Lot 12', dx: 0.00002, dy: 0.00069, w: 0.0002, h: 0.00026 },
 ]
+
+export const DEMO_PARCELS: OffChainParcel[] = DEMO_LOT_SEEDS.map((lot, index) => {
+  const west = 11.501 + lot.dx
+  const south = 3.847 + lot.dy
+  const ring: LonLat[] = [
+    [west, south],
+    [west + lot.w, south + lot.h * 0.08],
+    [west + lot.w * 0.92, south + lot.h],
+    [west + lot.w * 0.08, south + lot.h * 0.94],
+    [west, south],
+  ]
+  return parcel(lot.id, lot.name, ['registered', 'verified', 'pending'][index % 3], ring)
+})
 
 function road(
   id: number,

@@ -19,7 +19,7 @@ import {
 } from '../lib/geo'
 import LandViewer, { type VolumeLayer } from '../components/lab/LandViewer'
 import ElevationCrossSection from '../components/lab/ElevationCrossSection'
-import { ArrowLeft, MapPin, ShieldCheck, ScrollText, Box } from 'lucide-react'
+import { ArrowLeft, MapPin, ShieldCheck, ScrollText, Box, Pause, Play } from 'lucide-react'
 
 // Land detail view (/lab/land) — click-through from the Geometry Vault.
 // Shows every prop of the selected land (SpatialAsset + GeometryVersion) and
@@ -43,6 +43,7 @@ function Row({ k, v, title }: { k: string; v: string; title?: string }) {
 export default function LandDetailPage() {
   const v = useLabVault()
   const [params, setParams] = useSearchParams()
+  const [timelinePlaying, setTimelinePlaying] = useState(false)
   const vRaw = params.get('v')
 
   // Resolve which land state to show: ?v=N → that version, ?v=claim → the
@@ -130,7 +131,21 @@ export default function LandDetailPage() {
     ]
   }, [v.initialized, v.elevationMinMm, v.elevationMaxMm, volumes])
 
-  const openStratum = (id: string) => setParams({ v: id })
+  const openStratum = (id: string) => {
+    setTimelinePlaying(false)
+    setParams({ v: id })
+  }
+  const timelineIndex = entry ? v.versions.findIndex((version) => version.version === entry.version) + 1 : 0
+  const timelineLength = v.versions.length + 1
+
+  useEffect(() => {
+    if (!timelinePlaying || timelineLength <= 1) return
+    const timer = window.setInterval(() => {
+      const next = (timelineIndex + 1) % timelineLength
+      setParams({ v: next === 0 ? 'claim' : String(v.versions[next - 1].version) })
+    }, 1600)
+    return () => window.clearInterval(timer)
+  }, [timelinePlaying, timelineIndex, timelineLength, v.versions, setParams])
 
   const title = entry ? `Land — GeometryVersion v${entry.version}` : 'Land — current claim'
   const required = entry?.required ?? (v.quorumConfig > 0 ? v.quorumConfig : DEFAULT_GEOMETRY_QUOROM)
@@ -334,12 +349,45 @@ export default function LandDetailPage() {
 
       {/* version timeline */}
       <div className="lab-card mt-3">
-        <h3 className="text-[13px] font-semibold mb-2">Land through time</h3>
+        <div className="land-time-head">
+          <div>
+            <h3 className="text-[13px] font-semibold">Land through time</h3>
+            <p className="text-[10px] text-muted">4D history · scrub geometry states and replay the record</p>
+          </div>
+          <button
+            className="btn btn-secondary px-2 py-1 gap-1"
+            type="button"
+            onClick={() => setTimelinePlaying((playing) => !playing)}
+            disabled={timelineLength < 2}
+            aria-label={timelinePlaying ? 'Pause timeline playback' : 'Play timeline playback'}
+          >
+            {timelinePlaying ? <Pause size={13} /> : <Play size={13} />}
+            {timelinePlaying ? 'Pause' : 'Play'}
+          </button>
+        </div>
+        <label className="land-time-scrubber">
+          <span>Claim</span>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0, timelineLength - 1)}
+            step={1}
+            value={timelineIndex}
+            aria-label="Scrub land geometry through time"
+            onChange={(event) => {
+              const index = Number(event.target.value)
+              setTimelinePlaying(false)
+              setParams({ v: index === 0 ? 'claim' : String(v.versions[index - 1].version) })
+            }}
+          />
+          <span>{v.versions.length ? `v${v.versions[v.versions.length - 1].version}` : 'Current'}</span>
+        </label>
         <div className="land-timeline">
           <Link
             className={`land-tl-chip ${!entry && !notFound ? 'active' : ''}`}
             to="/lab/land?v=claim"
             title="Current unanchored claim"
+            onClick={() => setTimelinePlaying(false)}
           >
             <span className="land-tl-v">claim</span>
             <span className="land-tl-s">{SPATIAL_DIMENSIONS[v.dimensionality]?.id ?? 'D2'} · next append</span>
@@ -349,6 +397,7 @@ export default function LandDetailPage() {
               key={x.version}
               className={`land-tl-chip ${entry?.version === x.version ? 'active' : ''} ${x.verified ? 'verified' : ''}`}
               to={`/lab/land?v=${x.version}`}
+              onClick={() => setTimelinePlaying(false)}
             >
               <span className="land-tl-v">v{x.version}</span>
               <span className="land-tl-s">

@@ -1,5 +1,7 @@
 // Auto-generated from terra_registry.json — DO NOT EDIT
-import type { Idl } from "@coral-xyz/oxn";
+import type { Idl } from '@coral-xyz/anchor'
+
+export type TerraRegistry = Idl
 
 export const terraRegistry: Idl = {
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",

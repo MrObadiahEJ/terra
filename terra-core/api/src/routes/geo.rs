@@ -56,11 +56,81 @@ pub struct Poi {
     pub lat: f64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct BuildingsParams {
+    pub minx: Option<f64>,
+    pub miny: Option<f64>,
+    pub maxx: Option<f64>,
+    pub maxy: Option<f64>,
+    #[serde(default = "default_building_limit")]
+    pub limit: usize,
+    #[serde(default)]
+    pub offset: usize,
+}
+
+fn default_building_limit() -> usize {
+    500
+}
+
+#[derive(Debug, Serialize)]
+pub struct BuildingFootprintView {
+    pub osm_id: i64,
+    pub name: Option<String>,
+    pub building: String,
+    /// OSM-mapped building footprint; not a legal parcel outline.
+    pub geometry: Value,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/nearest-roads", get(nearest_roads))
         .route("/pois", get(pois))
+        .route("/buildings", get(buildings))
         .route("/stats", get(stats))
+}
+
+async fn buildings(
+    State(state): State<AppState>,
+    Query(params): Query<BuildingsParams>,
+) -> Result<Json<Vec<BuildingFootprintView>>, AppError> {
+    let geo = geo(&state)?;
+    let bbox = match (params.minx, params.miny, params.maxx, params.maxy) {
+        (Some(minx), Some(miny), Some(maxx), Some(maxy)) if minx <= maxx && miny <= maxy => {
+            Some((minx, miny, maxx, maxy))
+        }
+        (None, None, None, None) => None,
+        _ => {
+            return Err(AppError::bad_request(
+                "provide a complete, ordered building bbox",
+            ))
+        }
+    };
+    let limit = params.limit.clamp(1, 2000);
+    let footprints = geo
+        .data
+        .buildings
+        .iter()
+        .filter(|building| {
+            let Some((minx, miny, maxx, maxy)) = bbox else {
+                return true;
+            };
+            building.ring.iter().any(|point| {
+                point.x >= minx && point.x <= maxx && point.y >= miny && point.y <= maxy
+            })
+        })
+        .skip(params.offset)
+        .take(limit)
+        .map(|building| BuildingFootprintView {
+            osm_id: building.id,
+            name: building.name.clone(),
+            building: building.building.clone(),
+            geometry: json!({
+                "type": "Polygon",
+                "coordinates": [building.ring.iter().map(|point| [point.x, point.y]).collect::<Vec<_>>()]
+            }),
+        })
+        .collect();
+    Ok(Json(footprints))
 }
 
 async fn nearest_roads(
@@ -143,6 +213,7 @@ async fn stats(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
                 "road_segments": geo.graph.segment_count(),
                 "road_length_km": geo.graph.total_length_m() / 1000.0,
                 "pois": geo.data.pois.len(),
+                "building_footprints": geo.data.buildings.len(),
                 "bbox": bbox,
             })))
         }

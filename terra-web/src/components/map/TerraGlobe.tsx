@@ -33,8 +33,6 @@ interface TerraGlobeProps {
 
 export default function TerraGlobe({
   offChainParcels,
-  roads,
-  pois,
   drawing,
   drawVertices,
   onDrawVertexAdd,
@@ -223,7 +221,7 @@ export default function TerraGlobe({
     }
   }, [])
 
-  // ---- render all entities (parcels + draw + roads + pois) -----------------
+  // ---- render parcel boundaries and the active drawing ---------------------
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
@@ -268,9 +266,9 @@ export default function TerraGlobe({
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(hierarchy),
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          material: Cesium.Color.ORANGE.withAlpha(0.45),
+          material: Cesium.Color.LIME.withAlpha(0.16),
           outline: true,
-          outlineColor: Cesium.Color.ORANGE,
+          outlineColor: Cesium.Color.YELLOW,
           classificationType: Cesium.ClassificationType.TERRAIN,
         },
         properties: {
@@ -290,49 +288,7 @@ export default function TerraGlobe({
       })
     }
 
-    // roads
-    for (const road of roads) {
-      const line = parseGeoJSON<{ type: string; coordinates: number[][] }>(road.geometry)
-      if (!line || line.type !== 'LineString') continue
-      const positions = line.coordinates.map(([lon, lat]) =>
-        Cesium.Cartesian3.fromDegrees(lon, lat),
-      )
-      viewer.entities.add({
-        id: `road-${road.id}`,
-        polyline: {
-          positions,
-          width: 3,
-          material: Cesium.Color.ROYALBLUE.withAlpha(0.8),
-          clampToGround: true,
-        },
-        properties: { terRoad: road.name ?? road.highway },
-        label: {
-          text: road.name ?? road.highway,
-          font: '10px sans-serif',
-          fillColor: Cesium.Color.PALEGOLDENROD,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      })
-    }
-
-    // POIs
-    for (const poi of pois) {
-      const g = parseGeoJSON<{ type: string; coordinates: number[] }>(poi.geometry)
-      if (!g) continue
-      const [lon, lat] = g.coordinates
-      viewer.entities.add({
-        id: `poi-${poi.id}`,
-        position: Cesium.Cartesian3.fromDegrees(lon, lat),
-        point: { pixelSize: 9, color: Cesium.Color.RED },
-        label: {
-          text: poi.name ?? poi.category,
-          font: '10px sans-serif',
-          fillColor: Cesium.Color.WHITE,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        },
-      })
-    }
-  }, [offChainParcels, roads, pois, drawVertices])
+  }, [offChainParcels, drawVertices])
 
   // ---- focus camera ---------------------------------------------------------
   useEffect(() => {
@@ -382,8 +338,8 @@ export default function TerraGlobe({
         <div className="globe-map">
           <LeafletMap
             offChainParcels={offChainParcels}
-            roads={roads}
-            pois={pois}
+            roads={[]}
+            pois={[]}
             drawing={drawing}
             drawVertices={drawVertices}
             onDrawVertexAdd={onDrawVertexAdd}

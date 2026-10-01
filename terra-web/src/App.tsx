@@ -13,6 +13,7 @@ import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
+import { LocaleProvider } from './lib/locale'
 
 const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
@@ -56,29 +57,31 @@ function App() {
   }, [theme])
 
   return (
-    <BrowserRouter>
-      <div className="flex flex-col h-screen bg-bg text-ink">
-        <DocumentTitle />
-        <Navbar
-          theme={theme}
-          onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
-        />
-        <Routes>
-          <Route path="/" element={<Navigate to="/welcome" replace />} />
-          <Route path="/welcome" element={<WelcomePage />} />
-          <Route path="/atlas" element={<GlobePage />} />
-          <Route path="/lab/land" element={<LandDetailPage />} />
-          <Route path="/lab" element={<LabPage />} />
-          <Route path="/demo" element={<DemoPage />} />
-          <Route path="/network" element={<NetworkPage />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/status" element={<StatusPage />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="*" element={<Navigate to="/welcome" replace />} />
-        </Routes>
-        <Toasts />
-      </div>
-    </BrowserRouter>
+    <LocaleProvider>
+      <BrowserRouter>
+        <div className="flex flex-col h-screen bg-bg text-ink">
+          <DocumentTitle />
+          <Navbar
+            theme={theme}
+            onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+          />
+          <Routes>
+            <Route path="/" element={<Navigate to="/welcome" replace />} />
+            <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/atlas" element={<GlobePage />} />
+            <Route path="/lab/land" element={<LandDetailPage />} />
+            <Route path="/lab" element={<LabPage />} />
+            <Route path="/demo" element={<DemoPage />} />
+            <Route path="/network" element={<NetworkPage />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/status" element={<StatusPage />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="*" element={<Navigate to="/welcome" replace />} />
+          </Routes>
+          <Toasts />
+        </div>
+      </BrowserRouter>
+    </LocaleProvider>
   )
 }
 

@@ -28,6 +28,16 @@ pub struct Poi {
     pub coord: Coord<f64>,
 }
 
+/// A closed building outline extracted from an OSM building way.
+#[derive(Debug, Clone)]
+pub struct BuildingFootprint {
+    pub id: i64,
+    pub name: Option<String>,
+    pub building: String,
+    /// Closed polygon ring in [longitude, latitude] order.
+    pub ring: Vec<Coord<f64>>,
+}
+
 /// Everything we care about from a PBF extract.
 #[derive(Debug, Default)]
 pub struct OsmData {
@@ -37,6 +47,8 @@ pub struct OsmData {
     pub roads: Vec<RoadWay>,
     /// points of interest
     pub pois: Vec<Poi>,
+    /// mapped building outlines (not cadastral parcel boundaries)
+    pub buildings: Vec<BuildingFootprint>,
 }
 
 /// Parse an OSM PBF file, keeping roads and POIs.
@@ -45,6 +57,7 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
         .with_context(|| format!("failed to open {}", path.display()))?;
 
     let mut data = OsmData::default();
+    let mut building_ways = Vec::new();
     reader.for_each(|element| match element {
         osmpbf::Element::Node(node) => {
             let coord = Coord {
@@ -71,6 +84,15 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                 .tags()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect();
+            let refs: Vec<i64> = way.refs().collect();
+            if let Some(kind) = tags.get("building").filter(|kind| kind.as_str() != "no") {
+                building_ways.push((
+                    way.id(),
+                    tags.get("name").cloned(),
+                    kind.clone(),
+                    refs.clone(),
+                ));
+            }
             if let Some(highway) = tags.get("highway") {
                 if is_road_highway(highway) {
                     let oneway = matches!(
@@ -82,13 +104,32 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                         name: tags.get("name").cloned(),
                         highway: highway.clone(),
                         oneway,
-                        nodes: way.refs().collect(),
+                        nodes: refs,
                     });
                 }
             }
         }
         _ => {}
     })?;
+
+    data.buildings = building_ways
+        .into_iter()
+        .filter_map(|(id, name, building, refs)| {
+            if refs.len() < 4 || refs.first() != refs.last() {
+                return None;
+            }
+            let ring: Option<Vec<Coord<f64>>> = refs
+                .iter()
+                .map(|node| data.nodes.get(node).copied())
+                .collect();
+            ring.map(|ring| BuildingFootprint {
+                id,
+                name,
+                building,
+                ring,
+            })
+        })
+        .collect();
 
     Ok(data)
 }

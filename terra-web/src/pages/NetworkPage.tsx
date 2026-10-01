@@ -25,6 +25,7 @@ import {
   type DemoValidator,
 } from '../lib/validatorDemo'
 import { Activity, Building2, Globe2, MapPin, RotateCw } from 'lucide-react'
+import { useLocale } from '../lib/locale'
 
 // Validator network (B3) — demo dataset + a faithful JS mirror of routing.rs.
 // Every ✓/✗ below runs the same predicates as route_task (availability →
@@ -89,6 +90,7 @@ interface Row {
 }
 
 export default function NetworkPage() {
+  const { t } = useLocale()
   const [taskId, setTaskId] = useState(DEMO_TASKS[0].id)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [slot, setSlot] = useState(DEMO_INITIAL_SLOT)
@@ -216,7 +218,7 @@ export default function NetworkPage() {
       <header className="land-head">
         <div className="min-w-0">
           <h1 className="land-title">
-            <Activity size={18} /> Terra — Validator network
+            <Activity size={18} /> Terra — {t('networkTitle')}
           </h1>
           <p className="text-[11px] text-muted max-w-3xl">
             Deterministic demo network (no <span className="font-mono">/validators</span> API yet — see{' '}
@@ -237,25 +239,23 @@ export default function NetworkPage() {
       <section className="net-directory" aria-labelledby="net-directory-title">
         <div className="net-directory-head">
           <div>
-            <span className="welcome-section-kicker">COUNTRY & ORGANIZATION PROFILES</span>
-            <h2 id="net-directory-title">Network directory</h2>
-            <p>Registered jurisdictions and authority registries come from Terra’s backend. The validator showcase is an illustrative demo dataset.</p>
+            <span className="welcome-section-kicker">{t('networkDirectory')}</span>
+            <h2 id="net-directory-title">{t('networkDirectory')}</h2>
+            <p>{t('demoNetworkIntro')}</p>
           </div>
           <button className="btn btn-secondary px-2 py-1" onClick={() => void loadProfiles()} disabled={profilesLoading}>
-            <RotateCw size={13} className={profilesLoading ? 'spin' : ''} /> {profilesLoading ? 'Refreshing…' : 'Refresh profiles'}
+            <RotateCw size={13} className={profilesLoading ? 'spin' : ''} /> {profilesLoading ? t('connecting') : t('refreshProfiles')}
           </button>
         </div>
 
         {profilesError && (
-          <div className="net-directory-error">
-            Some profile data could not be loaded: {profilesError}
-          </div>
+          <div className="net-directory-error">{t('profilesUnavailable')} {profilesError}</div>
         )}
 
         <div className="net-directory-grid">
           <article className="net-directory-panel">
             <div className="net-directory-panel-head">
-              <span><Globe2 size={14} /> Registered jurisdictions</span>
+              <span><Globe2 size={14} /> {t('registeredJurisdictions')}</span>
               <span className="net-directory-count">{jurisdictions.length}</span>
             </div>
             {jurisdictions.length ? jurisdictions.map((profile) => (
@@ -265,13 +265,13 @@ export default function NetworkPage() {
                 <span className={`net-profile-status ${profile.status.toLowerCase()}`}>{profile.status}</span>
               </div>
             )) : (
-              <div className="net-directory-empty">{profilesLoading ? 'Loading jurisdiction profiles…' : profilesError ? 'Jurisdiction service unavailable.' : 'No jurisdiction profiles have been registered in the backend yet.'}</div>
+              <div className="net-directory-empty">{profilesLoading ? t('loadingJurisdictions') : profilesError ? t('jurisdictionUnavailable') : t('noJurisdictions')}</div>
             )}
           </article>
 
           <article className="net-directory-panel">
             <div className="net-directory-panel-head">
-              <span><Building2 size={14} /> Authority registries</span>
+              <span><Building2 size={14} /> {t('authorityRegistries')}</span>
               <span className="net-directory-count">{registries.length}</span>
             </div>
             {registries.length ? registries.map((registry) => (
@@ -281,15 +281,15 @@ export default function NetworkPage() {
                 <span className="net-profile-status active">registered</span>
               </div>
             )) : (
-              <div className="net-directory-empty">{profilesLoading ? 'Loading authority registries…' : profilesError ? 'Registry service unavailable.' : 'No authority registries have been registered in the backend yet.'}</div>
+              <div className="net-directory-empty">{profilesLoading ? t('loadingRegistries') : profilesError ? t('registryUnavailable') : t('noRegistries')}</div>
             )}
           </article>
         </div>
 
         <div className="net-demo-directory">
           <div className="net-directory-panel-head">
-            <span><Activity size={14} /> Illustrative validator organizations</span>
-            <span className="net-demo-tag">DEMO DATA — NOT REGISTERED PROFILES</span>
+            <span><Activity size={14} /> {t('illustrativeOrgs')}</span>
+            <span className="net-demo-tag">{t('demoProfiles')}</span>
           </div>
           <div className="net-demo-country-list">
             {demoOrganizations.map((country) => (

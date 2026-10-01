@@ -14,14 +14,16 @@ import {
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useActivityStore, type ActivityItem } from '../lib/activityStore'
+import { useLocale } from '../lib/locale'
 
 type FeedState = 'checking' | 'online' | 'offline'
 
-function formatTime(at: number) {
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(at)
+function formatTime(at: number, locale: string) {
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(at)
 }
 
 export default function WelcomePage() {
+  const { locale, t } = useLocale()
   const demoItems = useActivityStore((state) => state.items)
   const [apiItems, setApiItems] = useState<ActivityItem[]>([])
   const [feedState, setFeedState] = useState<FeedState>('checking')
@@ -63,25 +65,22 @@ export default function WelcomePage() {
       <div className="welcome-shell">
         <section className="welcome-hero">
           <div className="welcome-copy">
-            <span className="welcome-eyebrow"><Sparkles size={13} /> LAND • IDENTITY • TRUST</span>
-            <h1>Land ownership,<br /><span>made visible.</span></h1>
-            <p>
-              Explore mapped parcels, connect an identity, and follow how land records move
-              through independent review.
-            </p>
+            <span className="welcome-eyebrow"><Sparkles size={13} /> {t('welcomeEyebrow')}</span>
+            <h1>{t('welcomeTitleA')}<br /><span>{t('welcomeTitleB')}</span></h1>
+            <p>{t('welcomeIntro')}</p>
             <div className="welcome-actions">
-              <Link className="welcome-primary" to="/atlas"><Compass size={16} /> Open the atlas <ArrowUpRight size={14} /></Link>
-              <Link className="welcome-secondary" to="/demo"><Activity size={15} /> Watch the demo</Link>
+              <Link className="welcome-primary" to="/atlas"><Compass size={16} /> {t('openAtlas')} <ArrowUpRight size={14} /></Link>
+              <Link className="welcome-secondary" to="/demo"><Activity size={15} /> {t('watchDemo')}</Link>
             </div>
             <div className="welcome-assurance">
-              <ShieldCheck size={14} /> Wallet-first identity <span /> Reviewable activity <span /> 2D + 3D
+              <ShieldCheck size={14} /> {t('walletFirst')} <span /> {t('reviewableActivity')} <span /> 2D + 3D
             </div>
           </div>
 
           <div className="welcome-art" aria-label="Illustration of a parcel review workflow">
             <div className="welcome-art-top">
               <span><span className="welcome-live-dot" /> NETWORK PREVIEW</span>
-              <span className="welcome-art-tag">SIMULATION</span>
+              <span className="welcome-art-tag">{t('simulation')}</span>
             </div>
             <svg className="welcome-map-art" viewBox="0 0 560 300" role="img" aria-label="Parcel boundaries connected to review nodes">
               <defs>
@@ -113,11 +112,11 @@ export default function WelcomePage() {
               </g>
             </svg>
             <div className="welcome-art-footer">
-              <span><Layers3 size={13} /> Spatial record</span>
+              <span><Layers3 size={13} /> {t('spatialRecord')}</span>
               <ArrowRight size={14} />
-              <span><Fingerprint size={13} /> Identity checks</span>
+              <span><Fingerprint size={13} /> {t('identityChecks')}</span>
               <ArrowRight size={14} />
-              <span><ShieldCheck size={13} /> Review outcome</span>
+              <span><ShieldCheck size={13} /> {t('reviewOutcome')}</span>
             </div>
           </div>
         </section>
@@ -125,26 +124,26 @@ export default function WelcomePage() {
         <section className="welcome-summary" aria-label="Platform overview">
           <article className="welcome-stat">
             <span className="welcome-stat-icon"><Radio size={16} /></span>
-            <div><strong>{feedState === 'checking' ? '…' : apiItems.length}</strong><span>Recent API records</span></div>
-            <small>{feedState === 'online' ? 'latest activity window' : feedState === 'offline' ? 'API currently offline' : 'connecting to activity API'}</small>
+            <div><strong>{feedState === 'checking' ? '…' : apiItems.length}</strong><span>{t('recentApiRecords')}</span></div>
+            <small>{feedState === 'online' ? t('latestWindow') : feedState === 'offline' ? t('apiOffline') : t('connectingFeed')}</small>
           </article>
           <article className="welcome-stat">
             <span className="welcome-stat-icon"><Compass size={16} /></span>
-            <div><strong>2D <i>/</i> 3D</strong><span>Explore land in context</span></div>
-            <small>Switch views in the atlas</small>
+            <div><strong>2D <i>/</i> 3D</strong><span>{t('landContext')}</span></div>
+            <small>{t('switchAtlas')}</small>
           </article>
           <article className="welcome-stat">
             <span className="welcome-stat-icon"><Fingerprint size={16} /></span>
-            <div><strong>Self-custody</strong><span>Wallet-linked identity</span></div>
-            <small>Your wallet controls signatures</small>
+            <div><strong>{t('selfCustody')}</strong><span>{t('walletLinked')}</span></div>
+            <small>{t('walletControls')}</small>
           </article>
         </section>
 
         <section className="welcome-lower">
           <div className="welcome-activity">
             <div className="welcome-section-head">
-              <div><span className="welcome-section-kicker">NETWORK PULSE</span><h2>Recent activity</h2></div>
-              <span className={`welcome-status ${feedState}`}><i />{feedState === 'online' ? 'API connected' : feedState === 'offline' ? 'API offline' : 'Connecting'}</span>
+              <div><span className="welcome-section-kicker">{t('networkPulse')}</span><h2>{t('recentActivity')}</h2></div>
+              <span className={`welcome-status ${feedState}`}><i />{feedState === 'online' ? t('apiConnected') : feedState === 'offline' ? t('apiOffline') : t('connecting')}</span>
             </div>
             {recent.length ? (
               <div className="welcome-feed">
@@ -155,7 +154,7 @@ export default function WelcomePage() {
                       <div><strong>{item.kind.replaceAll('_', ' ')}</strong><span className={`welcome-source ${item.source}`}>{item.source === 'api' ? 'API record' : 'DEMO'}</span></div>
                       <p>{item.summary}</p>
                     </div>
-                    <time>{formatTime(item.at)}</time>
+                    <time>{formatTime(item.at, locale === 'zh' ? 'zh-CN' : locale)}</time>
                     {index < recent.length - 1 && <span className="welcome-feed-line" />}
                   </article>
                 ))}
@@ -163,20 +162,20 @@ export default function WelcomePage() {
             ) : (
               <div className="welcome-empty">
                 <Activity size={18} />
-                <p>{feedState === 'offline' ? 'The activity API is unreachable. Demo playback is still available.' : 'No activity has been recorded in this window yet.'}</p>
-                <Link to="/demo">Play a clearly labelled demo <ArrowRight size={13} /></Link>
+                <p>{feedState === 'offline' ? t('offlineActivity') : t('noActivity')}</p>
+                <Link to="/demo">{t('playDemo')} <ArrowRight size={13} /></Link>
               </div>
             )}
-            <Link className="welcome-all-activity" to="/transactions">Open activity explorer <ArrowRight size={14} /></Link>
+            <Link className="welcome-all-activity" to="/transactions">{t('activityExplorer')} <ArrowRight size={14} /></Link>
           </div>
 
           <aside className="welcome-next">
-            <span className="welcome-section-kicker">START HERE</span>
-            <h2>Your land, in context.</h2>
-            <p>Move from a mapped boundary to an identity-backed portfolio, with a review trail you can inspect.</p>
-            <Link to="/portfolio" className="welcome-next-link"><span className="welcome-next-icon"><Fingerprint size={17} /></span><span><strong>Set up your portfolio</strong><small>Identity, wallet and owned land</small></span><ArrowUpRight size={15} /></Link>
-            <Link to="/network" className="welcome-next-link"><span className="welcome-next-icon"><ShieldCheck size={17} /></span><span><strong>Browse the network</strong><small>Authorities and validator replay</small></span><ArrowUpRight size={15} /></Link>
-            <div className="welcome-note"><ArrowDownRight size={14} /> Simulated events are labelled. No demo action writes to the chain.</div>
+            <span className="welcome-section-kicker">{t('startHere')}</span>
+            <h2>{t('yourLand')}</h2>
+            <p>{t('welcomeNext')}</p>
+            <Link to="/portfolio" className="welcome-next-link"><span className="welcome-next-icon"><Fingerprint size={17} /></span><span><strong>{t('setupPortfolio')}</strong><small>{t('portfolioDesc')}</small></span><ArrowUpRight size={15} /></Link>
+            <Link to="/network" className="welcome-next-link"><span className="welcome-next-icon"><ShieldCheck size={17} /></span><span><strong>{t('browseNetwork')}</strong><small>{t('networkDesc')}</small></span><ArrowUpRight size={15} /></Link>
+            <div className="welcome-note"><ArrowDownRight size={14} /> {t('demoNotice')}</div>
           </aside>
         </section>
       </div>

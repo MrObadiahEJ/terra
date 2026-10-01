@@ -71,7 +71,7 @@ export const useAppStore = create<AppState>()(
           // Dynamic import keeps the Anchor client out of the initial bundle and
           // avoids a hard crash when the wallet is not yet connected.
           const { getProgram } = await import('../lib/program')
-          const program = getProgram()
+          const program = getProgram() as any
           const [accounts, rights] = await Promise.all([
             program.account.parcel.all(),
             program.account.rights.all(),
@@ -79,12 +79,12 @@ export const useAppStore = create<AppState>()(
           // Ownership is the Rights PDA with rightsKind === 0 (OWNERSHIP); it is
           // the single source of truth for who holds a parcel.
           const holders = new Map<string, string>()
-          for (const r of rights) {
+          for (const r of rights as any[]) {
             if (r.account.rightsKind === 0) {
               holders.set(r.account.parcel.toBase58(), r.account.holder.toBase58())
             }
           }
-          const items: OnChainParcelItem[] = accounts.map((a) => ({
+          const items: OnChainParcelItem[] = (accounts as any[]).map((a: any) => ({
             address: a.publicKey.toBase58(),
             id: bytesToHex(a.account.id),
             account: a.account,

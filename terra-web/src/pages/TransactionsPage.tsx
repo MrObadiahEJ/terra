@@ -10,7 +10,7 @@ import { api } from '../lib/api'
 import { useWallet } from '../lib/wallet'
 import IsoLandSkeleton from '../components/lab/IsoLandSkeleton'
 
-const COMPOSE: Array<{ id: string; label: string; fail: { code: string; name: string } | null }> = [
+const COMPOSE: Array<{ id: string; label: string; fail: { code: string | null; name: string } | null }> = [
   { id: 'init_spatial_asset', label: 'init_spatial_asset', fail: { code: '6231', name: 'InvalidSpatialDimension' } },
   { id: 'append_geometry_version', label: 'append_geometry_version', fail: { code: '6002', name: 'EmptyGeometryHash' } },
   { id: 'verify_geometry_version', label: 'verify_geometry_version', fail: { code: '6236', name: 'GeometryAlreadyVerified' } },

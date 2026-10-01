@@ -5,17 +5,14 @@ import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
 import OffChainParcelPanel from '../components/panels/OffChainParcelPanel'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
-import { api, parseGeoJSON, type OffChainParcel, type RoadRow, type PoiRow } from '../lib/api'
+import { parseGeoJSON, type OffChainParcel } from '../lib/api'
 import { polygonCentroid, snapPoint, type LonLat } from '../lib/geo'
-import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
 import {
   Box,
   ChevronDown,
   ChevronUp,
   LocateFixed,
   Map as MapIcon,
-  Route,
-  MapPin,
   Square,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
@@ -47,11 +44,8 @@ export default function GlobePage() {
   const [drawing, setDrawing] = useState(false)
   const [webglStatus, setWebglStatus] = useState<string | null>(null)
   const [drawVertices, setDrawVertices] = useState<DrawVertex[]>([])
-  const [roads, setRoads] = useState<RoadRow[]>([])
-  const [pois, setPois] = useState<PoiRow[]>([])
-  const [layersDemo, setLayersDemo] = useState(false)
   const [tab, setTab] = useState<'register' | 'browse'>('browse')
-  const [showLayers, setShowLayers] = useState({ parcels: true, roads: true, pois: true })
+  const [showParcels, setShowParcels] = useState(true)
   const [snapGeom, setSnapGeom] = useState(true)
   const [snapGrid, setSnapGrid] = useState(false)
   const [viewMode, setViewMode] = useState<'3d' | '2d'>(() =>
@@ -68,55 +62,11 @@ export default function GlobePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Roads/POIs with bundled demo fallback (API down or empty database).
-  useEffect(() => {
-    let cancelled = false
-    let demo = false
-    api
-      .roads()
-      .then((r) => {
-        if (cancelled) return
-        if (r.length === 0) {
-          demo = true
-          setRoads(DEMO_ROADS)
-        } else {
-          setRoads(r)
-        }
-      })
-      .catch(() => {
-        if (cancelled) return
-        demo = true
-        setRoads(DEMO_ROADS)
-      })
-    api
-      .poisFusion()
-      .then((p) => {
-        if (cancelled) return
-        if (p.length === 0) {
-          demo = true
-          setPois(DEMO_POIS)
-        } else {
-          setPois(p)
-        }
-        if (demo) setLayersDemo(true)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setPois(DEMO_POIS)
-        setLayersDemo(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   const shownParcels = useMemo(
-    () => (showLayers.parcels ? offChainParcels : []),
-    [showLayers.parcels, offChainParcels],
+    () => (showParcels ? offChainParcels : []),
+    [showParcels, offChainParcels],
   )
-  const shownRoads = showLayers.roads ? roads : []
-  const shownPois = showLayers.pois ? pois : []
-  const usingDemo = demoMode || layersDemo
+  const usingDemo = demoMode
 
   useEffect(() => {
     localStorage.setItem('terra-map-view', viewMode)
@@ -221,8 +171,8 @@ export default function GlobePage() {
         <div className="globe-stage">
         <TerraGlobe
           offChainParcels={shownParcels}
-          roads={shownRoads}
-          pois={shownPois}
+          roads={[]}
+          pois={[]}
           viewMode={viewMode}
           focus={focus}
           drawing={drawing}
@@ -247,12 +197,8 @@ export default function GlobePage() {
           <span>
             <b>{offChainParcels.length}</b> parcels
           </span>
-          <span>
-            <b>{fusionStats?.roads ?? geoStats?.roads ?? roads.length}</b> roads
-          </span>
-          <span>
-            <b>{fusionStats?.pois ?? geoStats?.pois ?? pois.length}</b> places
-          </span>
+          <span><b>{fusionStats?.roads ?? geoStats?.roads ?? 0}</b> mapped roads in dataset</span>
+          <span><b>{fusionStats?.pois ?? geoStats?.pois ?? 0}</b> mapped places in dataset</span>
           <span>
             {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km mapped` : 'Spatial data'}
           </span>
@@ -265,24 +211,14 @@ export default function GlobePage() {
 
         {/* layer toggles */}
         <div className="globe-chips absolute top-3 right-3 bg-surface/90 rounded-lg shadow px-2 py-1.5 flex gap-1 text-[11px]">
-          {(
-            [
-              ['parcels', 'Parcels', Square],
-              ['roads', 'Roads', Route],
-              ['pois', 'POIs', MapPin],
-            ] as const
-          ).map(([key, label, Icon]) => (
-            <button
-              key={key}
-              className={`btn btn-ghost px-2 py-1 gap-1 ${showLayers[key] ? 'text-emerald-700' : 'text-muted'}`}
-              onClick={() => setShowLayers((s) => ({ ...s, [key]: !s[key] }))}
-              aria-pressed={showLayers[key]}
-              title={`Toggle ${label}`}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          ))}
+          <button
+            className={`btn btn-ghost px-2 py-1 gap-1 ${showParcels ? 'text-emerald-700' : 'text-muted'}`}
+            onClick={() => setShowParcels((visible) => !visible)}
+            aria-pressed={showParcels}
+            title="Toggle parcel outlines"
+          >
+            <Square size={12} /> Parcels
+          </button>
         </div>
 
         <div className="map-controls">

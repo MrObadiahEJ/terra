@@ -208,11 +208,15 @@ export default function GeometryVault() {
   // Serialized accounts for the byte-level inspector.
   const serialized = useMemo<Serialized | null>(() => {
     if (!keys) return null
-    const ts = (iso: string | null) => (iso ? Date.parse(iso) : 0)
+    const toMsec = (value: string | number | null | undefined): number => {
+      if (value == null || value === '') return 0
+      const numeric = typeof value === 'number' ? value : Date.parse(value)
+      return Number.isFinite(numeric) ? numeric : 0
+    }
     if (inspected === null) {
       if (!v.initialized) return null
       const b = builder()
-      b.add('discriminator', keys.discAsset, keys.discAsset.map((x) => x.toString(16).padStart(2, '0')).join(''))
+      b.add('discriminator', Array.from(keys.discAsset), Array.from(keys.discAsset).map((x) => x.toString(16).padStart(2, '0')).join(''))
       b.add('parcel (Pubkey)', keys.parcel, new PublicKey(keys.parcel).toBase58())
       b.add('authority (Pubkey)', keys.authority, new PublicKey(keys.authority).toBase58())
       b.add('dimensionality (u8)', u8(v.dimensionality), String(v.dimensionality))
@@ -221,14 +225,14 @@ export default function GeometryVault() {
       b.add('geometry_version_count (u32)', u32(v.versions.length), String(v.versions.length))
       const latest = v.versions.length > 0 ? v.versions[v.versions.length - 1].geometryHash : '0'.repeat(64)
       b.add('latest_geometry ([u8;32])', hexToBytes(latest), shortHex(latest))
-      b.add('created_at (i64)', i64(ts(v.createdAt)), v.createdAt ?? '0')
-      b.add('updated_at (i64)', i64(ts(v.updatedAt)), v.updatedAt ?? '0')
+      b.add('created_at (i64)', i64(toMsec(v.createdAt)), String(v.createdAt ?? '0'))
+      b.add('updated_at (i64)', i64(toMsec(v.updatedAt)), String(v.updatedAt ?? '0'))
       return { bytes: b.finish(), fields: b.fields }
     }
     const entry = v.versions.find((x) => x.version === inspected)
     if (!entry) return null
     const b = builder()
-    b.add('discriminator', keys.discVersion, keys.discVersion.map((x) => x.toString(16).padStart(2, '0')).join(''))
+    b.add('discriminator', Array.from(keys.discVersion), Array.from(keys.discVersion).map((x) => x.toString(16).padStart(2, '0')).join(''))
     b.add('asset (Pubkey)', keys.asset, new PublicKey(keys.asset).toBase58())
     b.add('parcel (Pubkey)', keys.parcel, new PublicKey(keys.parcel).toBase58())
     b.add('version (u32)', u32(entry.version), String(entry.version))
@@ -238,10 +242,10 @@ export default function GeometryVault() {
     b.add('storage_reference.len (u32)', u32(new TextEncoder().encode(entry.storageReference).length), '')
     b.add('storage_reference (utf8)', utf8(entry.storageReference), entry.storageReference)
     b.add('submitted_by (Pubkey)', keys.validator, entry.submittedBy)
-    b.add('submitted_at (i64)', i64(Date.parse(entry.submittedAt)), entry.submittedAt)
+    b.add('submitted_at (i64)', i64(Date.parse(entry.submittedAt)), String(entry.submittedAt))
     b.add('verified (bool)', bool(entry.verified), String(entry.verified))
     b.add('verified_by (Pubkey)', entry.verifiedBy ? keys.validator : ZERO32, entry.verifiedBy ?? '111…111 (zero)')
-    b.add('verified_at (i64)', i64(entry.verifiedAt ? Date.parse(entry.verifiedAt) : 0), entry.verifiedAt ?? '0')
+    b.add('verified_at (i64)', i64(entry.verifiedAt ? Date.parse(entry.verifiedAt) : 0), String(entry.verifiedAt ?? '0'))
     // --- Phase B (RFC-013 §3) ---
     b.add(
       'evidence_manifest (Pubkey)',

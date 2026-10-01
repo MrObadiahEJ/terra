@@ -18,17 +18,17 @@ import {
   type DemoScenarioInfo,
   type DemoScenarioResult,
   type OffChainParcel,
-  type RoadRow,
-  type PoiRow,
+  type OsmBuildingFootprint,
   parseGeoJSON,
 } from '../lib/api'
 import { useActivityStore } from '../lib/activityStore'
 import ActivityFeed from '../components/ActivityFeed'
 import { buildLocalDemoScenario } from '../lib/localDemo'
 import TerraGlobe from '../components/map/TerraGlobe'
-import { DEMO_PARCELS, DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
-import { polygonCentroid, type LonLat } from '../lib/geo'
+import { DEMO_PARCELS } from '../lib/demoData'
+import { polygonAreaM2, polygonCentroid, type LonLat } from '../lib/geo'
 import { DEFAULT_FOCUS } from '../lib/constants'
+import { useLocale } from '../lib/locale'
 
 // Demo scenario player (B5/B6 frontend) — renders a deterministic scenario
 // from POST /api/v1/demo/scenarios/* as an animated event timeline.
@@ -72,21 +72,30 @@ function parcelFocus(parcel: OffChainParcel | null) {
   const ring = parcelRing(parcel)
   if (ring.length < 3) return null
   const [longitude, latitude] = polygonCentroid(ring)
-  return { longitude, latitude, height: 1800 }
+  const footprintHeight = Math.sqrt(Math.max(1, parcel?.area_m2 ?? 400)) * 4
+  return { longitude, latitude, height: Math.max(55, Math.min(180, footprintHeight)) }
 }
 
-function parcelBounds(parcel: OffChainParcel | null) {
-  const ring = parcelRing(parcel)
-  if (!ring.length) return null
-  const longitudes = ring.map(([lon]) => lon)
-  const latitudes = ring.map(([, lat]) => lat)
-  const padding = 0.015
-  return {
-    minx: Math.min(...longitudes) - padding,
-    miny: Math.min(...latitudes) - padding,
-    maxx: Math.max(...longitudes) + padding,
-    maxy: Math.max(...latitudes) + padding,
+function footprintsAsParcels(footprints: OsmBuildingFootprint[]): OffChainParcel[] {
+  return footprints.map((footprint) => ({
+    id: `osm-building-${footprint.osm_id}`,
+    name: footprint.name ?? `OSM ${footprint.building} · ${footprint.osm_id}`,
+    holder: 'openstreetmap-contributor-data',
+    status: 'mapped building footprint',
+    geometry: JSON.stringify(footprint.geometry),
+    area_m2: polygonAreaM2(footprint.geometry.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat)),
+    created_at: '',
+    updated_at: '',
+  }))
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items]
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
   }
+  return result
 }
 
 async function executeScenario(name: string, seed: string) {
@@ -103,6 +112,7 @@ async function executeScenario(name: string, seed: string) {
 }
 
 export default function DemoPage() {
+  const { t } = useLocale()
   const [catalogue, setCatalogue] = useState<DemoScenarioInfo[]>(FALLBACK)
   const [catalogueSource, setCatalogueSource] = useState<'checking' | 'api' | 'local'>('checking')
   const [sel, setSel] = useState(
@@ -123,10 +133,7 @@ export default function DemoPage() {
   const [runId, setRunId] = useState(0)
   const [sceneParcels, setSceneParcels] = useState<OffChainParcel[]>(DEMO_PARCELS)
   const [selectedSceneParcelId, setSelectedSceneParcelId] = useState(DEMO_PARCELS[0].id)
-  const [sceneSource, setSceneSource] = useState<'loading' | 'api' | 'sample'>('loading')
-  const [sceneRoads, setSceneRoads] = useState<RoadRow[]>([])
-  const [scenePois, setScenePois] = useState<PoiRow[]>([])
-  const [sceneContextSource, setSceneContextSource] = useState<'loading' | 'fusion' | 'empty' | 'sample'>('loading')
+  const [sceneSource, setSceneSource] = useState<'loading' | 'osm' | 'api' | 'sample'>('loading')
   const [sceneView, setSceneView] = useState<'2d' | '3d'>('3d')
   const [sceneWebglError, setSceneWebglError] = useState<string | null>(null)
   const tlRef = useRef<HTMLDivElement | null>(null)
@@ -155,56 +162,51 @@ export default function DemoPage() {
 
   useEffect(() => {
     let live = true
-    api.listParcels().then((parcels) => {
-      if (!live) return
-      const usable = parcels.filter((parcel) => parcelRing(parcel).length >= 3)
-      if (usable.length) {
-        setSceneParcels(usable)
-        setSelectedSceneParcelId(usable[0].id)
-        setSceneSource('api')
-      } else {
+    const loadFallbackParcels = async () => {
+      try {
+        const parcels = await api.listParcels()
+        if (!live) return
+        const usable = parcels.filter((parcel) => parcelRing(parcel).length >= 3)
+        if (usable.length) {
+          setSceneParcels(usable)
+          setSelectedSceneParcelId(usable[0].id)
+          setSceneSource('api')
+          return
+        }
+      } catch {
+        if (!live) return
+      }
+      if (live) {
         setSceneParcels(DEMO_PARCELS)
         setSelectedSceneParcelId(DEMO_PARCELS[0].id)
         setSceneSource('sample')
       }
-    }).catch(() => {
-      if (!live) return
-      setSceneParcels(DEMO_PARCELS)
-      setSelectedSceneParcelId(DEMO_PARCELS[0].id)
-      setSceneSource('sample')
-    })
+    }
+    const loadFootprints = async () => {
+      try {
+        const stats = await api.geoStats()
+        const total = stats.building_footprints ?? 0
+        const offset = total > 500 ? Math.floor(Math.random() * (total - 500)) : 0
+        const footprints = await api.osmBuildingFootprints(500, offset)
+        if (!live) return
+        const usable = shuffle(footprints).slice(0, 36)
+        if (usable.length) {
+          const mapped = footprintsAsParcels(usable)
+          setSceneParcels(mapped)
+          setSelectedSceneParcelId(mapped[0].id)
+          setSceneSource('osm')
+          return
+        }
+      } catch {
+        if (!live) return
+      }
+      await loadFallbackParcels()
+    }
+    void loadFootprints()
     return () => {
       live = false
     }
   }, [])
-
-  useEffect(() => {
-    if (sceneSource === 'loading' || !selectedSceneParcel) return
-    let live = true
-    const bounds = parcelBounds(selectedSceneParcel)
-    if (!bounds) return
-    Promise.allSettled([api.roads(bounds), api.poisFusion(bounds)]).then(([roads, pois]) => {
-      if (!live) return
-      const loadedRoads = roads.status === 'fulfilled' ? roads.value : []
-      const loadedPois = pois.status === 'fulfilled' ? pois.value : []
-      if (loadedRoads.length || loadedPois.length) {
-        setSceneRoads(loadedRoads)
-        setScenePois(loadedPois)
-        setSceneContextSource('fusion')
-      } else if (sceneSource === 'sample') {
-        setSceneRoads(DEMO_ROADS)
-        setScenePois(DEMO_POIS)
-        setSceneContextSource('sample')
-      } else {
-        setSceneRoads([])
-        setScenePois([])
-        setSceneContextSource('empty')
-      }
-    })
-    return () => {
-      live = false
-    }
-  }, [sceneSource, selectedSceneParcel])
 
   const events = data?.events ?? []
   const last = events.length - 1
@@ -333,19 +335,14 @@ export default function DemoPage() {
       <header className="land-head">
         <div className="min-w-0">
           <h1 className="land-title">
-            <Activity size={18} /> Terra — Demo scenario player
+            <Activity size={18} /> Terra — {t('scenarioPlayer')}
           </h1>
-          <p className="text-xs text-muted max-w-3xl">
-            Seeded protocol scenarios use{' '}
-            <span className="font-mono">POST /api/v1/demo/scenarios/*</span> when the API is
-            available. Offline, a deterministic browser preview keeps the timeline and controls
-            working. Both are clearly labelled and never write chain state.
-          </p>
+          <p className="text-xs text-muted max-w-3xl">{t('demoIntro')}</p>
         </div>
         <div className="land-badges">
-          <span className="lab-badge lab-badge-warn">demo state — not chain state</span>
+          <span className="lab-badge lab-badge-warn">{t('demoState')}</span>
           <Link className="btn btn-secondary px-2 py-1" to="/status">
-            Engine status ↗
+            {t('engineStatus')} ↗
           </Link>
         </div>
       </header>
@@ -493,8 +490,8 @@ export default function DemoPage() {
                 ) : (
                   <TerraGlobe
                     offChainParcels={sceneParcels}
-                    roads={sceneRoads}
-                    pois={scenePois}
+                    roads={[]}
+                    pois={[]}
                     drawing={false}
                     drawVertices={[]}
                     onDrawVertexAdd={() => undefined}
@@ -502,35 +499,36 @@ export default function DemoPage() {
                     onParcelClick={setSelectedSceneParcelId}
                     viewMode={sceneView}
                     focus={sceneFocus}
-                    basemap="osm"
+                    basemap="imagery"
                     onWebGLStatus={(error) => {
                       setSceneWebglError(error)
                       if (error) setSceneView('2d')
                     }}
                   />
                 )}
-                <span className={`dm-scene-source ${sceneSource === 'sample' || sceneContextSource === 'sample' ? 'sample' : ''}`}>
+                <span className={`dm-scene-source ${sceneSource === 'sample' ? 'sample' : ''}`}>
                   {sceneSource === 'loading'
-                    ? 'LOADING MAP DATA'
-                    : sceneSource === 'sample'
-                      ? 'SAMPLE PARCEL · NOT CADASTRAL'
-                      : 'PARCEL GEOMETRY · TERRA API'}
-                  {sceneContextSource === 'fusion' && ' · OSM FUSION LAYERS'}
+                    ? t('loadingMap')
+                    : sceneSource === 'osm'
+                      ? t('osmBuilding')
+                      : sceneSource === 'sample'
+                        ? t('sampleLot')
+                        : t('registeredGeometry')}
                 </span>
                 {sceneWebglError && <span className="dm-scene-fallback">3D unavailable — showing 2D map</span>}
               </div>
               <div className="dm-scene-foot">
-                <strong>{selectedSceneParcel?.name ?? 'Parcel preview'}</strong>
+                <strong>{selectedSceneParcel?.name ?? t('parcelContext')}</strong>
                 <span>{selectedSceneParcel?.area_m2 ? `${(selectedSceneParcel.area_m2 / 10_000).toFixed(2)} ha` : 'Area not recorded'}</span>
-                <span>{sceneContextSource === 'fusion' ? `${sceneRoads.length} roads · ${scenePois.length} places` : sceneContextSource === 'empty' ? 'No nearby OSM context ingested' : sceneContextSource === 'sample' ? 'Illustrative map context' : 'Loading map context…'}</span>
+                <span>{sceneSource === 'osm' ? t('imageryContext') : sceneSource === 'sample' ? t('sampleLot') : t('noMapOverlays')}</span>
               </div>
             </div>
 
             <aside className="dm-review-panel">
-              <div className="dm-panel-h"><span><ShieldCheck size={14} /> {includesValidatorReview ? 'Validator decision replay' : 'Protocol event replay'}</span><span className="dm-sim-badge">SIMULATED</span></div>
+              <div className="dm-panel-h"><span><ShieldCheck size={14} /> {includesValidatorReview ? t('validatorReplay') : t('protocolReplay')}</span><span className="dm-sim-badge">{t('simulated')}</span></div>
               <div className="dm-review-summary">
                 <span className={`dm-review-indicator ${phase >= 0 ? 'running' : ''}`} />
-                <div><strong>{phase < 0 ? 'Awaiting scenario' : events[phase]?.kind.replaceAll('_', ' ')}</strong><small>{phase < 0 ? 'Start playback to follow each review step.' : events[phase]?.detail}</small></div>
+                <div><strong>{phase < 0 ? t('awaitingScenario') : events[phase]?.kind.replaceAll('_', ' ')}</strong><small>{phase < 0 ? t('startPlayback') : events[phase]?.detail}</small></div>
               </div>
               {includesValidatorReview ? (
                 <>
@@ -545,16 +543,16 @@ export default function DemoPage() {
                       return (
                         <div className="dm-reviewer" key={reviewer}>
                           <span className={`dm-review-avatar ${settled ? 'approved' : hasReviewStarted ? 'checking' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
-                          <span><strong>{reviewer}</strong><small>{decisionReady ? 'Vote included in replay quorum' : selectedWinner && index === 0 ? 'Seeded task winner' : isNotSelected ? 'Not selected for this task' : hasReviewStarted ? 'Checking review gates' : 'In queue'}</small></span>
+                          <span><strong>{t((['reviewerOne', 'reviewerTwo', 'reviewerThree'] as const)[index])}</strong><small>{decisionReady ? t('reviewRecorded') : selectedWinner && index === 0 ? t('seededWinner') : isNotSelected ? t('notSelected') : hasReviewStarted ? t('checkingGates') : t('inQueue')}</small></span>
                           <i className={settled ? 'approved' : hasReviewStarted ? 'checking' : ''} />
                         </div>
                       )
                     })}
                   </div>
-                  <div className="dm-review-foot"><Fingerprint size={13} /> Seeded reviewer replay · no chain writes</div>
+                  <div className="dm-review-foot"><Fingerprint size={13} /> {t('seededReplay')}</div>
                 </>
               ) : (
-                <div className="dm-review-no-votes">This scenario records protocol events but does not model validator votes.</div>
+                <div className="dm-review-no-votes">{t('noVotes')}</div>
               )}
               <ActivityFeed pollMs={5000} />
             </aside>

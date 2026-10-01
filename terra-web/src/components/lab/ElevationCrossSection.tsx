@@ -92,6 +92,9 @@ export default function ElevationCrossSection({
           <pattern id="xsec-hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
             <line x1="0" y1="0" x2="0" y2="6" stroke="#ef4444" strokeWidth="2.4" opacity="0.55" />
           </pattern>
+          <clipPath id="xsec-plot-clip">
+            <rect x={LEFT} y={TOP} width={RIGHT - LEFT} height={BOTTOM - TOP} />
+          </clipPath>
         </defs>
 
         {/* axis */}
@@ -190,7 +193,9 @@ export default function ElevationCrossSection({
         )}
 
         {/* scan sweep */}
-        <rect className="xsec-scan" x={LEFT} y={TOP} width="26" height={BOTTOM - TOP} fill="#10b981" opacity="0.06" />
+        <g clipPath="url(#xsec-plot-clip)">
+          <rect className="xsec-scan" x={LEFT} y={TOP} width="26" height={BOTTOM - TOP} fill="#10b981" opacity="0.06" />
+        </g>
       </svg>
 
       <div className="xsec-chips">

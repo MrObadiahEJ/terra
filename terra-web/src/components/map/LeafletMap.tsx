@@ -55,7 +55,7 @@ function ClickHandler({
   }, [zoomLock, map])
 
   useMapEvents({
-    click(e) {
+    click(e: any) {
       if (!drawing) return
       const now = performance.now()
       const prev = lastClickRef.current
@@ -93,7 +93,8 @@ function FocusController({ focus }: { focus: LeafletMapProps['focus'] }) {
   const map = useMap()
   useEffect(() => {
     if (!focus) return
-    map.flyTo([focus.latitude, focus.longitude], DEFAULT_ZOOM, { duration: 1.2 })
+    const zoom = Math.max(12, Math.min(20, Math.round(20 - Math.log2(focus.height / 60))))
+    map.flyTo([focus.latitude, focus.longitude], zoom, { duration: 1.2 })
   }, [focus, map])
   return null
 }
@@ -106,23 +107,14 @@ function parcelRing(parcel: OffChainParcel): Ring | null {
   return poly.coordinates[0].map(([lon, lat]) => [lat, lon] as [number, number])
 }
 
-function roadLine(road: RoadRow): Ring | null {
-  const line = parseGeoJSON<{ type: string; coordinates: number[][] }>(road.geometry)
-  if (!line || line.type !== 'LineString') return null
-  return line.coordinates.map(([lon, lat]) => [lat, lon] as [number, number])
-}
-
 export default function LeafletMap({
   offChainParcels,
-  roads,
-  pois,
   drawing,
   drawVertices,
   onDrawVertexAdd,
   onDrawFinish,
   onParcelClick,
   focus,
-  basemap = 'imagery',
 }: LeafletMapProps) {
   const suppressUntilRef = useRef(0)
 
@@ -130,29 +122,27 @@ export default function LeafletMap({
     .map((p) => ({ parcel: p, ring: parcelRing(p) }))
     .filter((x): x is { parcel: OffChainParcel; ring: Ring } => x.ring !== null)
 
-  const lines = roads
-    .map((r) => ({ road: r, line: roadLine(r) }))
-    .filter((x): x is { road: RoadRow; line: Ring } => x.line !== null)
-
   const drawPath: Ring = drawVertices.map((v) => [v.lat, v.lon])
   if (drawVertices.length >= 3) drawPath.push(drawPath[0])
 
   return (
     <MapContainer
-      center={CENTER}
-      zoom={DEFAULT_ZOOM}
-      zoomControl={false}
-      className="leaflet-container"
-      style={{ width: '100%', height: '100%' }}
+      {...({
+        center: CENTER,
+        zoom: DEFAULT_ZOOM,
+        zoomControl: false,
+        className: 'leaflet-container',
+        style: { width: '100%', height: '100%' },
+      } as any)}
     >
       <ZoomBottomLeft />
       <TileLayer
-        url={basemap === 'osm'
-          ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-          : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'}
-        maxNativeZoom={basemap === 'osm' ? 19 : 20}
-        maxZoom={22}
-        attribution={basemap === 'osm' ? '© OpenStreetMap contributors' : 'Esri, Maxar, Earthstar Geographics and the GIS User Community'}
+        {...({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maxNativeZoom: 20,
+          maxZoom: 22,
+          attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+        } as any)}
       />
       <ClickHandler
         drawing={drawing}
@@ -168,10 +158,10 @@ export default function LeafletMap({
           key={parcel.id}
           positions={ring}
           pathOptions={{
-            color: '#f97316',
-            fillColor: '#f97316',
-            fillOpacity: 0.45,
-            weight: 1,
+            color: '#e7c86e',
+            fillColor: '#8dcc98',
+            fillOpacity: 0.12,
+            weight: 2,
           }}
           eventHandlers={{
             click: () => {
@@ -185,36 +175,14 @@ export default function LeafletMap({
         </Polygon>
       ))}
 
-      {lines.map(({ road, line }) => (
-        <Polyline
-          key={road.id}
-          positions={line}
-          pathOptions={{ color: '#4169e1', weight: 3, opacity: 0.8 }}
-        />
-      ))}
-
-      {pois.map((poi) => {
-        const g = parseGeoJSON<{ type: string; coordinates: number[] }>(poi.geometry)
-        if (!g) return null
-        const [lon, lat] = g.coordinates
-        return (
-          <CircleMarker
-            key={poi.id}
-            center={[lat, lon]}
-            radius={5}
-            pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 1 }}
-          >
-            <Tooltip>{poi.name ?? poi.category}</Tooltip>
-          </CircleMarker>
-        )
-      })}
-
       {drawVertices.map((v, i) => (
         <CircleMarker
           key={`draw-${i + 1}`}
-          center={[v.lat, v.lon]}
-          radius={4}
-          pathOptions={{ color: '#000000', fillColor: '#7fff00', fillOpacity: 1, weight: 1 }}
+          {...({
+            center: [v.lat, v.lon],
+            radius: 4,
+            pathOptions: { color: '#000000', fillColor: '#7fff00', fillOpacity: 1, weight: 1 },
+          } as any)}
         />
       ))}
       {drawVertices.length > 1 && (
