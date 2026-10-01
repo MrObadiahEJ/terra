@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
 import LabPage from './pages/LabPage'
 import LandDetailPage from './pages/LandDetailPage'
+import StatusPage from './pages/StatusPage'
 import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
@@ -13,6 +14,7 @@ const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
   '/lab': 'Terra Lab — Interactive demos',
   '/transactions': 'Terra — Transactions',
+  '/status': 'Protocol status — Terra',
 }
 
 function DocumentTitle() {
@@ -45,6 +47,7 @@ function App() {
           <Route path="/" element={<GlobePage />} />
           <Route path="/lab/land" element={<LandDetailPage />} />
           <Route path="/lab" element={<LabPage />} />
+          <Route path="/status" element={<StatusPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
