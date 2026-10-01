@@ -1927,3 +1927,88 @@ header .wallet-adapter-button {
   color: var(--muted);
 }
 .af-meta a { color: var(--accent); }
+
+/* ---------------- Lab / Protocol playground (B7) ---------------- */
+.pg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  padding-bottom: 6px;
+}
+.pg-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pg-tab:hover { color: var(--ink); background: #f8fafc; }
+.pg-tab.active {
+  color: var(--ink);
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+.pg-tab-hint { font-size: 9.5px; color: var(--muted); font-weight: 400; }
+.pg-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+.pg-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+.pg-fields .select-input { display: block; width: 100%; margin-top: 2px; }
+.pg-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.pg-steps { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.pg-step {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.pg-step::after { content: '→'; margin-left: 6px; color: #cbd5e1; }
+.pg-step:last-child::after { content: ''; margin: 0; }
+.pg-step-done { background: #d1fae5; color: #065f46; }
+.pg-step-active { background: #e0e7ff; color: #3730a3; }
+.pg-step-failed { background: #fee2e2; color: #991b1b; }
+.pg-table { width: 100%; border-collapse: collapse; }
+.pg-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.pg-table td { padding: 5px 8px 5px 0; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.pg-row-mine td { background: #eef2ff; }
+.pg-clock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}

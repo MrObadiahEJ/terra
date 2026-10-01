@@ -493,15 +493,14 @@ export const STATUS_MODULES: StatusModule[] = [
     id: 'demo-scenarios-ui',
     name: 'Demo scenario runner & protocol playground (B5–B7)',
     track: 'frontend',
-    status: 'partial',
+    status: 'implemented',
     evidence:
-      '/demo ships the deterministic scenario runner (8 scenarios, seeded, animated); Lab has 3 tabs (vault, pipeline, crossborder)',
+      '/demo deterministic scenario runner (8 scenarios, seeded, animated) + Lab playground: 4 tabs (vault, pipeline, crossborder, playground) with 8 protocol state machines',
     verified: [
       'Shipped /demo player: scenario picker, seeded runs, animated event timelines, determinism check, deep links',
+      'Shipped Lab playground (B7): routing, escrow, disputes, fraud, staking, devices, recovery, ZK — guard order + exact TerraError names/codes read live from the IDL (59 names verified against the 241-variant catalogue), per-panel simulated clocks for time-locked guards, demo tx emission to /transactions, deep links ?tab=playground&pt=<sub>',
     ],
-    gaps: [
-      'Playground tabs in Lab: routing, escrow, disputes, fraud, staking, devices, recovery, ZK',
-    ],
+    gaps: [],
   },
   {
     id: 'protocol-status',
