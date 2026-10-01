@@ -24,6 +24,7 @@ interface TerraGlobeProps {
   /** Called when the user double-clicks (or clicks the first corner) to close the ring. */
   onDrawFinish: () => void
   onParcelClick: (id: string) => void
+  viewMode: '2d' | '3d'
   focus?: { longitude: number; latitude: number; height: number } | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
   onWebGLStatus?: (msg: string | null) => void
@@ -38,6 +39,7 @@ export default function TerraGlobe({
   onDrawVertexAdd,
   onDrawFinish,
   onParcelClick,
+  viewMode,
   focus,
   onWebGLStatus,
 }: TerraGlobeProps) {
@@ -338,6 +340,16 @@ export default function TerraGlobe({
       duration: 1.2,
     })
   }, [focus])
+
+  useEffect(() => {
+    const scene = viewerRef.current?.scene
+    if (!scene) return
+    if (viewMode === '2d' && scene.mode !== Cesium.SceneMode.SCENE2D) {
+      scene.morphTo2D(0.7)
+    } else if (viewMode === '3d' && scene.mode !== Cesium.SceneMode.SCENE3D) {
+      scene.morphTo3D(0.7)
+    }
+  }, [viewMode])
 
   // Cesium may append its error panel asynchronously after the constructor
   // throws; keep purging leftover widget DOM so it can't overlay the 2D map.

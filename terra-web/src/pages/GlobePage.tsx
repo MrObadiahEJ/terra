@@ -5,10 +5,20 @@ import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
 import OffChainParcelPanel from '../components/panels/OffChainParcelPanel'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
-import { api, parseGeoJSON, type RoadRow, type PoiRow } from '../lib/api'
-import { snapPoint, type LonLat } from '../lib/geo'
+import { api, parseGeoJSON, type OffChainParcel, type RoadRow, type PoiRow } from '../lib/api'
+import { polygonCentroid, snapPoint, type LonLat } from '../lib/geo'
 import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
-import { ChevronDown, ChevronUp, Route, MapPin, Square } from 'lucide-react'
+import {
+  Box,
+  ChevronDown,
+  ChevronUp,
+  LocateFixed,
+  Map as MapIcon,
+  Route,
+  MapPin,
+  Square,
+} from 'lucide-react'
+import { DEFAULT_FOCUS } from '../lib/constants'
 
 export default function GlobePage() {
   const {
@@ -34,6 +44,8 @@ export default function GlobePage() {
   const [showLayers, setShowLayers] = useState({ parcels: true, roads: true, pois: true })
   const [snapGeom, setSnapGeom] = useState(true)
   const [snapGrid, setSnapGrid] = useState(false)
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d')
+  const [focus, setFocus] = useState(DEFAULT_FOCUS)
 
   // Initial load of off-chain data + stats.
   useEffect(() => {
@@ -146,7 +158,27 @@ export default function GlobePage() {
     return { onchain: selectedParcel, off }
   }, [selectedParcel, offChainParcels])
 
-  const onSelectParcel = (p: OnChainParcelItem) => selectParcel(p)
+  const focusParcel = useCallback((parcel: OffChainParcel) => {
+    const polygon = parseGeoJSON<{ type: string; coordinates: number[][][] }>(parcel.geometry)
+    if (!polygon || polygon.type !== 'Polygon' || polygon.coordinates[0].length < 3) return
+    const [longitude, latitude] = polygonCentroid(
+      polygon.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat),
+    )
+    setFocus({ longitude, latitude, height: 1800 })
+  }, [])
+
+  const onSelectParcel = useCallback((p: OnChainParcelItem) => {
+    selectParcel(p)
+    const offChain = offChainParcels.find(
+      (parcel) => parcel.holder === p.holder && parcel.name === p.account.name,
+    )
+    if (offChain) focusParcel(offChain)
+  }, [focusParcel, offChainParcels, selectParcel])
+
+  const onSelectOffChain = useCallback((parcel: OffChainParcel) => {
+    selectOffChain(parcel)
+    focusParcel(parcel)
+  }, [focusParcel, selectOffChain])
 
   const onParcelClick = useCallback(
     (id: string) => {
@@ -177,27 +209,38 @@ export default function GlobePage() {
           offChainParcels={shownParcels}
           roads={shownRoads}
           pois={shownPois}
+          viewMode={viewMode}
+          focus={focus}
           drawing={drawing}
           drawVertices={drawVertices}
           onDrawVertexAdd={onVertexAdd}
           onDrawFinish={finishDrawing}
           onParcelClick={onParcelClick}
-          onWebGLStatus={setWebglStatus}
+          onWebGLStatus={(status) => {
+            setWebglStatus(status)
+            if (status) setViewMode('2d')
+          }}
         />
+
+        <div className="explore-heading">
+          <span className="explore-kicker"><span className="live-dot" /> LAND INTELLIGENCE</span>
+          <h1>Explore the atlas</h1>
+          <p>Discover, verify and manage land from one place.</p>
+        </div>
 
         {/* stats overlay */}
         <div className="globe-stats absolute top-3 left-3 bg-surface/90 rounded-lg shadow px-3 py-2 text-[11px] pointer-events-none flex flex-wrap gap-3 items-center">
           <span>
-            🗺️ Parcels: <b>{offChainParcels.length}</b>
+            <b>{offChainParcels.length}</b> parcels
           </span>
           <span>
-            🛣️ Roads: <b>{fusionStats?.roads ?? geoStats?.roads ?? roads.length}</b>
+            <b>{fusionStats?.roads ?? geoStats?.roads ?? roads.length}</b> roads
           </span>
           <span>
-            📍 POIs: <b>{fusionStats?.pois ?? geoStats?.pois ?? pois.length}</b>
+            <b>{fusionStats?.pois ?? geoStats?.pois ?? pois.length}</b> places
           </span>
           <span>
-            📏 {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km` : 'OSM off'}
+            {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km mapped` : 'Spatial data'}
           </span>
           {usingDemo && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
@@ -219,6 +262,7 @@ export default function GlobePage() {
               key={key}
               className={`btn btn-ghost px-2 py-1 gap-1 ${showLayers[key] ? 'text-emerald-700' : 'text-muted'}`}
               onClick={() => setShowLayers((s) => ({ ...s, [key]: !s[key] }))}
+              aria-pressed={showLayers[key]}
               title={`Toggle ${label}`}
             >
               <Icon size={12} />
@@ -226,12 +270,52 @@ export default function GlobePage() {
             </button>
           ))}
         </div>
+
+        <div className="map-controls">
+          <div className="map-mode-switch" role="group" aria-label="Map view">
+            <button
+              className={viewMode === '2d' ? 'active' : ''}
+              onClick={() => setViewMode('2d')}
+              aria-pressed={viewMode === '2d'}
+            >
+              <MapIcon size={14} /> 2D
+            </button>
+            <button
+              className={viewMode === '3d' ? 'active' : ''}
+              onClick={() => setViewMode('3d')}
+              aria-pressed={viewMode === '3d'}
+              disabled={Boolean(webglStatus)}
+              title={webglStatus ? '3D view requires WebGL' : '3D globe view'}
+            >
+              <Box size={14} /> 3D
+            </button>
+          </div>
+          <button
+            className="map-icon-button"
+            onClick={() => setFocus({ ...DEFAULT_FOCUS })}
+            title="Return to pilot area"
+            aria-label="Return to pilot area"
+          >
+            <LocateFixed size={16} />
+          </button>
+        </div>
         </div>
       </main>
 
       {/* Sidebar */}
       <aside className="globe-side bg-surface flex flex-col">
-        <div className="flex border-b">
+        <div className="land-panel-heading">
+          <div>
+            <span className="panel-eyebrow">YOUR PORTFOLIO</span>
+            <h2>Land assets</h2>
+          </div>
+          <span className="asset-count">{offChainParcels.length}</span>
+        </div>
+        <div className="portfolio-summary">
+          <div><span>Registered parcels</span><strong>{offChainParcels.length}</strong></div>
+          <div><span>Mapped area</span><strong>{formatArea(offChainParcels.reduce((total, parcel) => total + (parcel.area_m2 ?? 0), 0))}</strong></div>
+        </div>
+        <div className="flex border-b panel-tabs">
           {(['register', 'browse'] as const).map((t) => (
             <button
               key={t}
@@ -239,6 +323,7 @@ export default function GlobePage() {
                 tab === t ? 'border-b-2 border-emerald-500' : 'text-muted'
               }`}
               onClick={() => setTab(t)}
+              aria-pressed={tab === t}
             >
               {t === 'register' ? 'Register' : 'Browse'}
             </button>
@@ -299,7 +384,7 @@ export default function GlobePage() {
               <OffChainParcelPanel parcel={selectedOffChain} />
             </>
           ) : (
-            <ParcelListPanel onSelect={onSelectParcel} onSelectOffChain={selectOffChain} />
+            <ParcelListPanel onSelect={onSelectParcel} onSelectOffChain={onSelectOffChain} />
           )}
         </div>
 
@@ -308,6 +393,12 @@ export default function GlobePage() {
       </aside>
     </div>
   )
+}
+
+function formatArea(areaM2: number): string {
+  if (areaM2 >= 1_000_000) return `${(areaM2 / 1_000_000).toFixed(2)} km²`
+  if (areaM2 >= 10_000) return `${(areaM2 / 10_000).toFixed(2)} ha`
+  return `${Math.round(areaM2).toLocaleString()} m²`
 }
 
 function DetailsFooter({

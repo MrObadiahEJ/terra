@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useAppStore, type OnChainParcelItem } from '../../store/appStore'
 import type { OffChainParcel } from '../../lib/api'
 import { PARCEL_STATUS } from '../../lib/constants'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Search, X } from 'lucide-react'
 
 interface Props {
   onSelect: (p: OnChainParcelItem) => void
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
+  const [query, setQuery] = useState('')
   const parcels = useAppStore((s) => s.parcels)
   const loading = useAppStore((s) => s.loadingParcels)
   const error = useAppStore((s) => s.parcelsError)
@@ -17,6 +19,13 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
   const offChainParcels = useAppStore((s) => s.offChainParcels)
   const demoMode = useAppStore((s) => s.demoMode)
   const selectedOff = useAppStore((s) => s.selectedOffChain)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredParcels = parcels.filter((p) =>
+    `${p.account.name} ${p.holder}`.toLocaleLowerCase().includes(normalizedQuery),
+  )
+  const filteredOffChainParcels = offChainParcels.filter((p) =>
+    `${p.name} ${p.holder} ${p.status}`.toLocaleLowerCase().includes(normalizedQuery),
+  )
 
   if (loading) {
     return (
@@ -40,17 +49,34 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
   }
 
   return (
-    <div className="py-1">
-      {parcels.length > 0 && (
+    <div className="parcel-list">
+      <label className="parcel-search">
+        <Search size={15} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search parcels or owners"
+          aria-label="Search parcels or owners"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery('')} aria-label="Clear parcel search">
+            <X size={14} />
+          </button>
+        )}
+      </label>
+
+      {filteredParcels.length > 0 && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5">
-            <span className="text-[12px] font-semibold flex-1">On-chain parcels</span>
+            <span className="text-[12px] font-semibold flex-1">
+              On-chain parcels <span className="text-muted">({filteredParcels.length})</span>
+            </span>
             <button className="btn btn-ghost p-1" onClick={refresh} title="Refresh">
               <RefreshCw size={13} />
             </button>
           </div>
           <ul className="max-h-[300px] overflow-y-auto">
-            {parcels.map((p) => {
+            {filteredParcels.map((p) => {
               const active = selected?.address === p.address
               return (
                 <li key={p.address}>
@@ -77,11 +103,11 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
         </>
       )}
 
-      {offChainParcels.length > 0 && (
+      {filteredOffChainParcels.length > 0 && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 mt-1">
             <span className="text-[12px] font-semibold flex-1">
-              Map parcels{parcels.length === 0 ? '' : ' (off-chain geometry)'}
+              Map parcels <span className="text-muted">({filteredOffChainParcels.length})</span>
             </span>
             {demoMode && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
@@ -90,7 +116,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
             )}
           </div>
           <ul className="max-h-[300px] overflow-y-auto">
-            {offChainParcels.map((p) => {
+            {filteredOffChainParcels.map((p) => {
               const active = selectedOff?.id === p.id
               return (
                 <li key={p.id}>
@@ -116,6 +142,11 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
             })}
           </ul>
         </>
+      )}
+      {filteredParcels.length === 0 && filteredOffChainParcels.length === 0 && (
+        <p className="parcel-search-empty">
+          {normalizedQuery ? `No parcels match “${query.trim()}”.` : 'No parcels to display.'}
+        </p>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
 import DemoPage from './pages/DemoPage'
@@ -41,12 +41,23 @@ function useSyncParcels() {
 }
 function App() {
   useSyncParcels()
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    localStorage.getItem('terra-theme') === 'dark' ? 'dark' : 'light',
+  )
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('terra-theme', theme)
+  }, [theme])
 
   return (
     <BrowserRouter>
       <div className="flex flex-col h-screen bg-bg text-ink">
         <DocumentTitle />
-        <Navbar />
+        <Navbar
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+        />
         <Routes>
           <Route path="/" element={<GlobePage />} />
           <Route path="/lab/land" element={<LandDetailPage />} />
