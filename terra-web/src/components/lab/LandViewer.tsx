@@ -118,7 +118,7 @@ export default function LandViewer({
   const zoomAt = useCallback(
     (k: number, cx = W / 2, cy = H / 2) => {
       const v = view.current
-      const s = clamp(v.s * k, 0.4, 10)
+      const s = clamp(v.s * k, 0.2, 200)
       const kk = s / v.s
       view.current = { s, tx: cx - kk * (cx - v.tx), ty: cy - kk * (cy - v.ty) }
       applyView()

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import TerraGlobe, { type DrawVertex } from '../components/map/TerraGlobe'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
 import OffChainParcelPanel from '../components/panels/OffChainParcelPanel'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
-import { api, type RoadRow, type PoiRow } from '../lib/api'
+import { api, parseGeoJSON, type RoadRow, type PoiRow } from '../lib/api'
+import { snapPoint, type LonLat } from '../lib/geo'
 import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
 import { ChevronDown, ChevronUp, Route, MapPin, Square } from 'lucide-react'
 
@@ -31,6 +32,8 @@ export default function GlobePage() {
   const [layersDemo, setLayersDemo] = useState(false)
   const [tab, setTab] = useState<'register' | 'browse'>('browse')
   const [showLayers, setShowLayers] = useState({ parcels: true, roads: true, pois: true })
+  const [snapGeom, setSnapGeom] = useState(true)
+  const [snapGrid, setSnapGrid] = useState(false)
 
   // Initial load of off-chain data + stats.
   useEffect(() => {
@@ -81,10 +84,61 @@ export default function GlobePage() {
     }
   }, [])
 
-  const shownParcels = showLayers.parcels ? offChainParcels : []
+  const shownParcels = useMemo(
+    () => (showLayers.parcels ? offChainParcels : []),
+    [showLayers.parcels, offChainParcels],
+  )
   const shownRoads = showLayers.roads ? roads : []
   const shownPois = showLayers.pois ? pois : []
   const usingDemo = demoMode || layersDemo
+
+  // Parcel boundaries as snap candidates while drawing.
+  const snapRings = useMemo(() => {
+    const rings: LonLat[] = []
+    for (const p of shownParcels) {
+      const poly = parseGeoJSON<{ type: string; coordinates: number[][][] }>(p.geometry)
+      if (!poly || poly.type !== 'Polygon') continue
+      rings.push(poly.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat))
+    }
+    return rings
+  }, [shownParcels])
+
+  const finishDrawing = useCallback(() => {
+    if (drawVertices.length >= 3) setDrawing(false)
+  }, [drawVertices])
+
+  const onVertexAdd = useCallback(
+    (raw: DrawVertex) => {
+      const current = drawVertices
+      const snapped = snapPoint([raw.lon, raw.lat], {
+        own: current.map((v) => [v.lon, v.lat] as LonLat),
+        rings: snapGeom ? snapRings : undefined,
+        grid: snapGrid,
+      })
+      const [lon, lat] = snapped
+      const dup = current.findIndex((v) => v.lon === lon && v.lat === lat)
+      // Clicking the first corner closes the ring; other repeats are dropped.
+      if (dup === 0 && current.length >= 3) {
+        finishDrawing()
+        return
+      }
+      if (dup >= 0) return
+      setDrawVertices([...current, { lon, lat }])
+    },
+    [drawVertices, finishDrawing, snapGeom, snapGrid, snapRings],
+  )
+
+  const onVertexUndo = useCallback(() => setDrawVertices((vs) => vs.slice(0, -1)), [])
+
+  const onVertexRemove = useCallback(
+    (index: number) => setDrawVertices((vs) => vs.filter((_, i) => i !== index)),
+    [],
+  )
+
+  const onToggleSnap = useCallback((key: 'geom' | 'grid') => {
+    if (key === 'geom') setSnapGeom((v) => !v)
+    else setSnapGrid((v) => !v)
+  }, [])
 
   const selectedSummary = useMemo(() => {
     if (!selectedParcel) return null
@@ -93,6 +147,21 @@ export default function GlobePage() {
   }, [selectedParcel, offChainParcels])
 
   const onSelectParcel = (p: OnChainParcelItem) => selectParcel(p)
+
+  const onParcelClick = useCallback(
+    (id: string) => {
+      const off = offChainParcels.find((p) => p.id === id)
+      if (!off) return
+      // Link the off-chain geometry record to its on-chain ownership by
+      // matching on holder + name (both are written at registration time).
+      const onchain = useAppStore
+        .getState()
+        .parcels.find((p) => p.holder === off.holder && p.account.name === off.name)
+      if (onchain) selectParcel(onchain)
+      else selectOffChain(off)
+    },
+    [offChainParcels, selectParcel, selectOffChain],
+  )
 
   return (
     <div className="globe-layout">
@@ -110,18 +179,9 @@ export default function GlobePage() {
           pois={shownPois}
           drawing={drawing}
           drawVertices={drawVertices}
-          onDrawVertexAdd={(v) => setDrawVertices((vs) => [...vs, v])}
-          onParcelClick={(id) => {
-            const off = offChainParcels.find((p) => p.id === id)
-            if (!off) return
-            // Link the off-chain geometry record to its on-chain ownership by
-            // matching on holder + name (both are written at registration time).
-            const onchain = useAppStore
-              .getState()
-              .parcels.find((p) => p.holder === off.holder && p.account.name === off.name)
-            if (onchain) selectParcel(onchain)
-            else selectOffChain(off)
-          }}
+          onDrawVertexAdd={onVertexAdd}
+          onDrawFinish={finishDrawing}
+          onParcelClick={onParcelClick}
           onWebGLStatus={setWebglStatus}
         />
 
@@ -192,6 +252,12 @@ export default function GlobePage() {
               drawVertices={drawVertices}
               onToggleDrawing={() => setDrawing((d) => !d)}
               onClearDrawing={() => setDrawVertices([])}
+              onUndoVertex={onVertexUndo}
+              onRemoveVertex={onVertexRemove}
+              onFinishDrawing={finishDrawing}
+              snapGeom={snapGeom}
+              snapGrid={snapGrid}
+              onToggleSnap={onToggleSnap}
             />
           ) : selectedParcel ? (
             <>

@@ -1,20 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Transaction } from '@solana/web3.js'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
 import { getProgram, parcelPda } from '../../lib/program'
 import { api, type OffChainParcel, type ReachabilityResult } from '../../lib/api'
 import { bytesToHex } from '../../lib/codec'
-import { sha256Hex, polygonAreaM2, polygonCentroid, type LonLat } from '../../lib/geo'
+import {
+  sha256Hex,
+  polygonAreaM2,
+  polygonCentroid,
+  polygonPerimeterM,
+  lineLengthM,
+  validateRing,
+  type LonLat,
+} from '../../lib/geo'
 import { reportTx } from '../../lib/txStore'
 import type { DrawVertex } from '../map/TerraGlobe'
-import { PencilRuler, Square, Loader2 } from 'lucide-react'
+import { PencilRuler, Square, Loader2, Undo2, Check, Magnet, Grid3x3 } from 'lucide-react'
 
 interface Props {
   drawing: boolean
   drawVertices: DrawVertex[]
   onToggleDrawing: () => void
   onClearDrawing: () => void
+  onUndoVertex: () => void
+  onRemoveVertex: (index: number) => void
+  onFinishDrawing: () => void
+  snapGeom: boolean
+  snapGrid: boolean
+  onToggleSnap: (key: 'geom' | 'grid') => void
+}
+
+function fmtDist(m: number): string {
+  return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(1)} m`
+}
+
+function fmtArea(m2: number): string {
+  return m2 >= 10000 ? `${(m2 / 10000).toFixed(2)} ha` : `${m2.toFixed(1)} m²`
 }
 
 export default function RegisterParcelPanel({
@@ -22,6 +44,12 @@ export default function RegisterParcelPanel({
   drawVertices,
   onToggleDrawing,
   onClearDrawing,
+  onUndoVertex,
+  onRemoveVertex,
+  onFinishDrawing,
+  snapGeom,
+  snapGrid,
+  onToggleSnap,
 }: Props) {
   const { publicKey, send } = useWallet()
   const refreshParcels = useAppStore((s) => s.refreshParcels)
@@ -36,7 +64,25 @@ export default function RegisterParcelPanel({
 
   const addLocalParcel = useAppStore((s) => s.addLocalParcel)
 
-  const canSubmit = name.trim() !== '' && drawVertices.length >= 3
+  const n = drawVertices.length
+  const pts = drawVertices.map((v) => [v.lon, v.lat] as LonLat)
+  const perimeter = n >= 3 ? polygonPerimeterM(pts) : n === 2 ? lineLengthM(pts) : 0
+  const area = n >= 3 ? polygonAreaM2(pts) : 0
+  const validation = n >= 3 ? validateRing(pts) : null
+  const canSubmit = name.trim() !== '' && validation?.ok === true
+
+  // Backspace undoes the last vertex while drawing (but not while typing).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Backspace' || !drawing) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      e.preventDefault()
+      onUndoVertex()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawing, onUndoVertex])
 
   /** Closed ring [lon, lat] from the drawn vertices. */
   const buildRing = (): LonLat[] => {
@@ -96,7 +142,7 @@ export default function RegisterParcelPanel({
 
       const demoMsg =
         `Demo parcel stored ${savedToApi ? 'locally + API' : 'on this device'} · ` +
-        `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(4)}, ${centroid[0].toFixed(4)} · ` +
+        `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(6)}, ${centroid[0].toFixed(6)} · ` +
         `sha256 ${geometryHash.slice(0, 16)}…`
       setMsg(demoMsg)
       reportTx('register_parcel', true, demoMsg)
@@ -210,8 +256,86 @@ export default function RegisterParcelPanel({
 
       {drawing && (
         <p className="text-[12px] text-muted">
-          Click on the globe to add polygon corners, then register.
+          Click the map to add corners · double-click (or click the first corner) to close ·
+          Backspace undoes the last corner.
         </p>
+      )}
+
+      {n >= 2 && (
+        <div className="text-[12px] text-muted flex gap-3">
+          <span>
+            Perimeter <b>{fmtDist(perimeter)}</b>
+          </span>
+          {n >= 3 && (
+            <span>
+              Area <b>{fmtArea(area)}</b>
+            </span>
+          )}
+        </div>
+      )}
+
+      {n > 0 && (
+        <div className="border rounded max-h-36 overflow-y-auto text-[11px] font-mono">
+          {drawVertices.map((v, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-2 px-2 py-0.5 border-b last:border-b-0"
+            >
+              <span className="truncate">
+                #{i + 1} {v.lat.toFixed(7)}, {v.lon.toFixed(7)}
+              </span>
+              <button
+                className="btn btn-ghost p-0.5 shrink-0"
+                onClick={() => onRemoveVertex(i)}
+                title="Remove vertex"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {n > 0 && (
+        <div className="flex gap-2">
+          <button className="btn btn-secondary flex-1 justify-center" onClick={onUndoVertex}>
+            <Undo2 size={14} />
+            Undo
+          </button>
+          <button
+            className="btn btn-secondary flex-1 justify-center"
+            onClick={onFinishDrawing}
+            disabled={!drawing || n < 3}
+          >
+            <Check size={14} />
+            Close ring
+          </button>
+        </div>
+      )}
+
+      {drawing && (
+        <div className="flex gap-2 text-[11px]">
+          <button
+            className={`btn btn-ghost px-2 py-1 gap-1 ${snapGeom ? 'text-emerald-700' : 'text-muted'}`}
+            onClick={() => onToggleSnap('geom')}
+            title="Snap corners and edges to parcel boundaries"
+          >
+            <Magnet size={12} />
+            Snap
+          </button>
+          <button
+            className={`btn btn-ghost px-2 py-1 gap-1 ${snapGrid ? 'text-emerald-700' : 'text-muted'}`}
+            onClick={() => onToggleSnap('grid')}
+            title="Round free picks to a 1e-6° grid"
+          >
+            <Grid3x3 size={12} />
+            Grid
+          </button>
+        </div>
+      )}
+
+      {validation && !validation.ok && (
+        <p className="text-red-700 text-[12px]">{validation.error}</p>
       )}
 
       <input

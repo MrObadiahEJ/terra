@@ -21,6 +21,8 @@ interface TerraGlobeProps {
   drawing: boolean
   drawVertices: DrawVertex[]
   onDrawVertexAdd: (v: DrawVertex) => void
+  /** Called when the user double-clicks (or clicks the first corner) to close the ring. */
+  onDrawFinish: () => void
   onParcelClick: (id: string) => void
   focus?: { longitude: number; latitude: number; height: number } | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
@@ -34,6 +36,7 @@ export default function TerraGlobe({
   drawing,
   drawVertices,
   onDrawVertexAdd,
+  onDrawFinish,
   onParcelClick,
   focus,
   onWebGLStatus,
@@ -46,6 +49,16 @@ export default function TerraGlobe({
   useEffect(() => {
     onWebGLStatusRef.current = onWebGLStatus
   })
+  const onDrawFinishRef = useRef(onDrawFinish)
+  useEffect(() => {
+    onDrawFinishRef.current = onDrawFinish
+  })
+  const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null)
+  const suppressPickRef = useRef(0)
+  // The dblclick DOM event can be delayed past suppressPickRef by render
+  // jank; remember that the *next* double-click belongs to the drawing
+  // gesture that just finished and must not reach Cesium's zoomTo.
+  const pendingDblSwallowRef = useRef(false)
 
   // ---- init viewer ---------------------------------------------------------
   useEffect(() => {
@@ -66,8 +79,11 @@ export default function TerraGlobe({
         infoBox: false,
         selectionIndicator: false,
         baseLayer: new Cesium.ImageryLayer(
-          new Cesium.OpenStreetMapImageryProvider({
-            url: 'https://tile.openstreetmap.org/',
+          // Esri World Imagery serves up to z20 (OSM raster stops at z19).
+          new Cesium.UrlTemplateImageryProvider({
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            maximumLevel: 20,
+            credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
           }),
         ),
         // World Terrain requires a Cesium Ion token. If none is configured we
@@ -79,6 +95,7 @@ export default function TerraGlobe({
       })
 
       viewer.scene.globe.enableLighting = true
+      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1
       viewer.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(
           DEFAULT_FOCUS.longitude,
@@ -120,11 +137,33 @@ export default function TerraGlobe({
 
     const handler = viewer.screenSpaceEventHandler
     const action = (movement: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+      const now = performance.now()
+      pendingDblSwallowRef.current = false
       if (drawingRef.current) {
-        const cartesian = viewer.camera.pickEllipsoid(
+        // Second physical click of a double click: close the ring instead of
+        // adding a near-duplicate vertex (pixel tolerance, not metres — picks
+        // are only ~cm apart up close but metres apart when zoomed out).
+        const prev = lastClickRef.current
+        lastClickRef.current = { t: now, x: movement.position.x, y: movement.position.y }
+        if (
+          prev &&
+          now - prev.t < 300 &&
+          Math.hypot(movement.position.x - prev.x, movement.position.y - prev.y) < 6
+        ) {
+          suppressPickRef.current = now + 400
+          pendingDblSwallowRef.current = true
+          onDrawFinishRef.current?.()
+          return
+        }
+        // Terrain is off (Ion token cleared above), so the analytic ellipsoid
+        // pick is ground truth; globe.pick occasionally returns a far-side hit
+        // tens of km along the ray, so only trust it if the ellipsoid misses.
+        const ray = viewer.camera.getPickRay(movement.position)
+        let cartesian = viewer.camera.pickEllipsoid(
           movement.position,
           viewer.scene.globe.ellipsoid,
         )
+        if (!cartesian && ray) cartesian = viewer.scene.globe.pick(ray, viewer.scene)
         if (!cartesian) return
         const carto = Cesium.Cartographic.fromCartesian(cartesian)
         onDrawVertexAdd({
@@ -132,6 +171,7 @@ export default function TerraGlobe({
           lat: Cesium.Math.toDegrees(carto.latitude),
         })
       } else {
+        if (now < suppressPickRef.current) return
         const picked = viewer.scene.pick(movement.position)
         const id: string | undefined =
           picked && Cesium.defined(picked.id)
@@ -147,13 +187,40 @@ export default function TerraGlobe({
     }
   }, [onDrawVertexAdd, onParcelClick])
 
+  // ---- double-click: finish the ring while drawing (keep Cesium default) ---
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    const handler = viewer.screenSpaceEventHandler
+    const prev =
+      handler.getInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK) as
+        | Cesium.ScreenSpaceEventHandler.PositionedEventCallback
+        | undefined
+    handler.setInputAction((movement) => {
+      if (drawingRef.current) {
+        pendingDblSwallowRef.current = false
+        onDrawFinishRef.current?.()
+        return
+      }
+      if (pendingDblSwallowRef.current || performance.now() < suppressPickRef.current) {
+        pendingDblSwallowRef.current = false
+        return
+      }
+      prev?.(movement)
+    }, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
+    return () => {
+      if (prev) handler.setInputAction(prev, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
+      else handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
+    }
+  }, [])
+
   // ---- render all entities (parcels + draw + roads + pois) -----------------
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
     viewer.entities.removeAll()
 
-    // pending draw vertices
+    // pending draw vertices + ring outline (closing edge once we have 3+)
     drawVertices.forEach((v, i) => {
       viewer.entities.add({
         id: `draw-${i + 1}`,
@@ -166,6 +233,19 @@ export default function TerraGlobe({
         },
       })
     })
+    if (drawVertices.length >= 2) {
+      const path = drawVertices.map((v) => Cesium.Cartesian3.fromDegrees(v.lon, v.lat))
+      if (drawVertices.length >= 3) path.push(path[0])
+      viewer.entities.add({
+        id: 'draw-line',
+        polyline: {
+          positions: path,
+          width: 2,
+          material: Cesium.Color.LIME.withAlpha(0.9),
+          clampToGround: true,
+        },
+      })
+    }
 
     // off-chain parcels -> extruded polygons
     for (const parcel of offChainParcels) {
@@ -288,6 +368,7 @@ export default function TerraGlobe({
             drawing={drawing}
             drawVertices={drawVertices}
             onDrawVertexAdd={onDrawVertexAdd}
+            onDrawFinish={onDrawFinish}
             onParcelClick={onParcelClick}
             focus={focus}
           />
