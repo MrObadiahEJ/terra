@@ -33,7 +33,7 @@ Related: [`../README.md`](../README.md) (repo status) ·
 | On-chain programs | `terra_registry` **161 instructions · 67 accounts · 148 events · 237 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
 | Protocol specs | **RFC-003 → RFC-013** — 003–012 delivered (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture), RFC-013 (spatial pipeline) Phase A delivered |
 | Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path + **Vision Stage 3 Phase A** (spatial assets, versioned geometry) |
-| Tests | Registry BPF integration **288/288**, identity BPF **23/23**, unit libs **128 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
+| Tests | Registry BPF integration **302/302**, identity BPF **23/23**, unit libs **131 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
 | Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
 | Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, `/lab` interactive experiments (incl. WebGL-free SVG 3D land skeleton), `/transactions` demo chain explorer, typed API client, wallet adapter |
@@ -450,7 +450,7 @@ tamper-evident **coordination and history layer**:
 
 | Stage | Name | Status | Anchored in |
 |-------|------|--------|-------------|
-| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-013, 288 on-chain tests |
+| **0** | Architecture | ✅ **Done** | LADM research, country-agnostic model, RFC-003 → RFC-013, 302 on-chain tests |
 | **1** | Protocol hardening | ✅ **Done** | RFC-012 Phases 0–8, Tier A1–A3, B6 boundary, P0-2 removal path — security, tasks, observations, provenance, routing, reputation, economics |
 | **2** | Physical Terra | ✅ **Done** | RFC-012 Phase 9 — device identity registry (`DeviceIdentity` PDAs: keys, capabilities, calibration, validator verification) covering smartphones, GNSS, cameras, drones, survey devices (reuses Phase 4 observation sources/provenance) |
 | **3** | Spatial intelligence | 🟡 **In progress** | Raw observation → AI/GIS → geometry → parcel → SpatialAsset → 3D model (computer vision, photogrammetry, remote sensing, LiDAR). Phase A delivered: on-chain `SpatialAsset` + `GeometryVersion` ([RFC-013](rfc-013-spatial-intelligence-pipeline.md)); pipeline phases B–E pending |

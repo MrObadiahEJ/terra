@@ -101,7 +101,8 @@ cargo test -p terra-registry --test rfc012_structure
 # Identity BPF integration tests (requires SBF build)
 cargo test -p terra-identity --test integration
 
-# Registry BPF integration tests (long-running)
+# Registry BPF integration tests (302 tests, ~3.5 min; requires a fresh
+# `anchor build --skip-lint` — setup() refuses stale target/deploy/*.so)
 cargo test -p terra-registry --test integration -- --test-threads=1
 
 # API unit tests (needs DATABASE_URL for PostGIS-backed cases)
@@ -112,12 +113,19 @@ cargo test -p terra-geo
 
 # Via Make (integration only)
 make test
+
+# Full CI mirror — run before pushing to dev/main
+make ci
+
+# Reclaim several GB of regenerable debug artifacts (stale test
+# binaries, incremental caches); keeps target/deploy and target/idl
+make prune
 ```
 
 ### Lint
 
 ```bash
-# Check formatting and clippy
+# Check formatting and clippy -D warnings across all targets (incl. tests)
 make lint
 
 # Auto-fix
@@ -126,7 +134,12 @@ make fix
 
 ## Deployment
 
-See [deploy.sh](deploy.sh) for deployment scripts.
+See [deploy.sh](deploy.sh) for deployment scripts. Before building,
+`deploy.sh` verifies that each `target/deploy/*-keypair.json` matches its
+program's `declare_id!` (and that `Anchor.toml` agrees) — a regenerated or
+stale keypair aborts instead of installing the program at a wrong address.
+The registry keypair is in `deploy-backup/`; the identity keypair for
+`68urV9nG…` must be supplied by the operator.
 
 ```bash
 # Deploy to devnet
@@ -165,7 +178,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 288 BPF integration tests
+│   │       ├── integration.rs  # 302 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -223,21 +236,22 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 123 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, … |
+| terra-registry lib | 131 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 23 | BPF happy paths + guard rails |
-| terra-registry integration | 288 | Full instruction matrix (long-running) |
+| terra-registry integration | 302 | Full instruction matrix (~3.5 min) |
 | terra-api | 68 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-09-28): registry lib 128/128, identity lib 6/6, rfc012
-21/21, API 68/68, geo 4/4, registry BPF suite 288/288, identity BPF 23/23,
-`cargo fmt` + `clippy -D warnings` clean, `cargo build-sbf` OK, checked-in IDL
-matches source at **161/67/148/237**, `tsc --noEmit` clean, CI 4/4 green on
-`dev` and `main`. Fast baseline: `make test-fast`.
+Verified on `dev` (2026-09-30): registry lib 131/131, identity lib 6/6, rfc012
+21/21, API 68/68, geo 4/4, registry BPF suite 302/302, identity BPF 23/23,
+`cargo fmt` + `clippy -D warnings` clean (all targets incl. tests), checked-in
+IDL matches source at **161/67/148/237**, `tsc --noEmit` clean, CI 4/4 green on
+`dev` and `main`. Pre-push gate: `make ci` (exact CI mirror); fast baseline:
+`make test-fast`; disk reclaim: `make prune`.
 
-## Current Status (as of 2026-09-28)
+## Current Status (as of 2026-09-30)
 
 **Done:**
 - All RFC-003…011 protocol modules implemented on-chain (see [architecture.md](docs/architecture.md)).

@@ -125,12 +125,12 @@ accounts are Phase E (see below).
 ## 8. Testing (Phase A)
 
 - Unit (`spatial_asset.rs`, 5): dimension/source enums, elevation range,
-  dimension-within-asset, cap arithmetic — registry lib **128/128**
+  dimension-within-asset, cap arithmetic — registry lib **131/131**
 - BPF (`tests/integration.rs`): `stage3_spatial_asset_lifecycle` (init happy
   + duplicate PDA + guards 6231/6235/6232/6002/6134 + appends + cap 6234 via
   cursor poke), `stage3_geometry_version_verification` (non-validator reject,
   verify happy, double-verify 6236, cross-asset 6233) — integration
-  **288/288**
+  **302/302**
 - IDL synced: **161 / 67 / 148 / 237** (`terra-web/src/idl/`)
 
 ## 9. Open questions (Phase B+)
