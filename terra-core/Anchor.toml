@@ -6,15 +6,15 @@ skip-lint = false
 
 [programs.devnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
-terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
+terra_identity = "HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p"
 
 [programs.mainnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
-terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
+terra_identity = "HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p"
 
 [programs.localnet]
 terra_registry = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
-terra_identity = "68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
+terra_identity = "HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p"
 
 [provider]
 cluster = "devnet"

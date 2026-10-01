@@ -113,6 +113,6 @@ echo ""
 
 echo "==> Deployment complete!"
 echo "    terra_registry: GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
-echo "    terra_identity: 68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4"
+echo "    terra_identity: HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p"
 echo ""
 echo "==> Verify with: solana program show <PROGRAM_ID> --url $CLUSTER"

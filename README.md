@@ -341,7 +341,7 @@ pnpm dev
 - [x] Phase 1 — security hardening (unique validator sets, endorsement action binding, ownership checks, admin constraints)
 - [ ] `solana-test-validator` run with program deployed (requires AVX-capable CPU — not available on current dev machine)
 - [ ] Fund the deploy wallet (`CCng7…`): ~17.1 devnet SOL of rent — registry 15.70 + identity 1.38 (refundable)
-- [ ] Restore the `terra_identity` deploy keypair for `68urV9nG…` — `deploy.sh` verifies each `target/deploy/*-keypair.json` against `declare_id!` and aborts on mismatch (registry keypair: `terra-core/deploy-backup/`)
+- [x] `terra_identity` deploy keypair — original `68urV9nG…` keypair lost before first deploy; program ID rotated to `HyjpaHY9…` (2026-10-01, `declare_id!` + `Anchor.toml` synced, keypair backed up in `terra-core/deploy-backup/`); `deploy.sh` verifies each `target/deploy/*-keypair.json` against `declare_id!` and aborts on mismatch
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
 - [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged)
@@ -391,7 +391,7 @@ The stage map (0–10) and long-term direction live in
 
 **Next (in order):**
 
-- [ ] **Devnet deployment** (see checklist above) — deploy-wallet funding + identity keypair restore + `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates
+- [ ] **Devnet deployment** (see checklist above) — deploy-wallet funding (~17.1 SOL) + `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates
 - [ ] Product layers — Vision Stage 3 Phases B–E (RFC-013: evidence-linked geometry, ThreeDModel/SpatialSnapshot, AI/GIS loop, API mirror), Phase 5 (legal 3D/air-rights = vision Stage 5), Phase 6 (country config = vision Stage 6), regional expansion → global platform (vision Stages 9–10)
 
 ---

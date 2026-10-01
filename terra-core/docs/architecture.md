@@ -14,7 +14,7 @@ Terra is a decentralized land claim & verification network on Solana built with 
 | Program | ID | Crate | Purpose |
 |---------|-----|-------|---------|
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
-| `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | `terra-identity` | Identity management, succession, guardianship |
+| `terra_identity` | `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p` | `terra-identity` | Identity management, succession, guardianship |
 
 **Source counts** (as of 2026-09-28, Vision Stage 3 Phase A spatial assets after RFC-012 Phase 10 cross-border + legacy sweep + B6 boundary split + P0-2 removal-endorsement path): `terra_registry` — 161 instructions, 67 `#[account]` types, 148 events, 237 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.
 

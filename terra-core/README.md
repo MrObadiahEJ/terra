@@ -15,7 +15,7 @@ Terra is a multi-program Solana system for managing land parcels, rights, escrow
 | Program | ID | Purpose |
 |---------|-----|---------|
 | `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | Core land registry, escrow, staking, verification |
-| `terra_identity` | `68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4` | Identity management, succession, guardianship |
+| `terra_identity` | `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p` | Identity management, succession, guardianship |
 
 ### Architecture
 
@@ -138,8 +138,10 @@ See [deploy.sh](deploy.sh) for deployment scripts. Before building,
 `deploy.sh` verifies that each `target/deploy/*-keypair.json` matches its
 program's `declare_id!` (and that `Anchor.toml` agrees) — a regenerated or
 stale keypair aborts instead of installing the program at a wrong address.
-The registry keypair is in `deploy-backup/`; the identity keypair for
-`68urV9nG…` must be supplied by the operator.
+Both program keypairs are kept in `deploy-backup/`. (2026-10-01: the
+`terra_identity` program ID was rotated from `68urV9nG…` to
+`HyjpaHY9…` after the original keypair was lost — the program had
+never been deployed, so nothing was broken.)
 
 ```bash
 # Deploy to devnet

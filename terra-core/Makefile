@@ -107,4 +107,4 @@ verify-devnet:
 	solana program show GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage --url devnet 2>&1
 	@echo ""
 	@echo "terra_identity:"
-	solana program show 68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4 --url devnet 2>&1
+	solana program show HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p --url devnet 2>&1

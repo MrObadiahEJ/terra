@@ -5,7 +5,7 @@
 > repo status: [`../../README.md`](../../README.md).
 
 **Date:** 2026-09-14 (original audit); **updated:** 2026-09-25  
-**Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (68urV9nGcRcoWT1QjzZfXuCnTS9921x2se1SybKJr1U4)  
+**Programs:** `terra_registry` (GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage), `terra_identity` (HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p — ID rotated 2026-10-01; original `68urV9nG…` keypair lost before first deploy)  
 **Auditor:** Automated review (opencode); Phase 1 + A1 remediation + A2 IDL regen + A3 test/CI baseline applied on `dev`
 
 ---
