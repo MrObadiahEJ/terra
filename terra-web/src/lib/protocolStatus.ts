@@ -462,10 +462,13 @@ export const STATUS_MODULES: StatusModule[] = [
     id: 'network-page',
     name: 'Validator network page (B3)',
     track: 'frontend',
-    status: 'planned',
-    evidence: 'no /network route',
-    verified: [],
-    gaps: ['Validator map/cards + "why selected" breakdown mirroring routing.rs gates'],
+    status: 'partial',
+    evidence: 'pages/NetworkPage.tsx · lib/routingSim.ts (mirror of routing.rs)',
+    verified: [
+      '/network: eligibility matrix running all 6 route_task gates + random gate + winner pick, "why selected" details',
+      'Deterministic demo network (9 validators, 4 tasks) with equirectangular presence plot and profile cards',
+    ],
+    gaps: ['Demo dataset only — live validator data awaits the /validators API (planned)'],
   },
   {
     id: 'activity-feed',

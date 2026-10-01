@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar'
 import GlobePage from './pages/GlobePage'
 import LabPage from './pages/LabPage'
 import LandDetailPage from './pages/LandDetailPage'
+import NetworkPage from './pages/NetworkPage'
 import StatusPage from './pages/StatusPage'
 import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
@@ -15,6 +16,7 @@ const TITLES: Record<string, string> = {
   '/lab': 'Terra Lab — Interactive demos',
   '/transactions': 'Terra — Transactions',
   '/status': 'Protocol status — Terra',
+  '/network': 'Validator network — Terra',
 }
 
 function DocumentTitle() {
@@ -47,6 +49,7 @@ function App() {
           <Route path="/" element={<GlobePage />} />
           <Route path="/lab/land" element={<LandDetailPage />} />
           <Route path="/lab" element={<LabPage />} />
+          <Route path="/network" element={<NetworkPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

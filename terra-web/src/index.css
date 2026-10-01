@@ -1554,3 +1554,180 @@ header .wallet-adapter-button {
 .st-list.gap li::marker { color: #f59e0b; }
 .st-list.gap { color: var(--muted); }
 .st-foot { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* ---------------------------------------------------------------- */
+/* validator network page (B3)                                       */
+/* ---------------------------------------------------------------- */
+.net-page { max-width: 1240px; margin: 0 auto; padding: 20px 20px 48px; }
+.net-tasks { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.net-task {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  min-width: 180px;
+  flex: 1;
+}
+.net-task:hover { background: var(--bg); }
+.net-task.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.net-task-label { font-size: 12px; font-weight: 700; color: var(--ink); }
+.net-task.on .net-task-label { color: var(--accent); }
+.net-task-sub {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.net-row { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.net-row .lab-card { flex: 1; min-width: 300px; }
+
+.net-flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.net-flow-step {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.net-flow-step.mono { font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace; font-weight: 500; }
+.net-flow-step.win { background: #d1fae5; border-color: #10b981; color: #065f46; }
+.net-flow-step.warn { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+.net-flow-arrow { color: var(--muted); font-size: 12px; }
+.net-seed {
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.net-gatebox {
+  font-size: 11px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  padding: 5px 9px;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+.net-gatebox.ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.net-gatebox.no { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+.net-tablewrap { overflow-x: auto; }
+.net-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.net-table th {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.net-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+.net-table tbody tr { cursor: pointer; }
+.net-table tbody tr:hover { background: var(--bg); }
+.net-table tbody tr.sel { background: #eef2ff; }
+.net-table tbody tr.winner { background: #ecfdf5; }
+.net-table tbody tr.winner td:first-child { box-shadow: inset 3px 0 0 #10b981; }
+.net-gate { font-weight: 800; }
+.net-gate.ok { color: #10b981; }
+.net-gate.no { color: #ef4444; }
+
+.net-detail {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+}
+.net-why { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.net-why li { display: flex; gap: 8px; align-items: baseline; font-size: 11px; }
+.net-why li.ok .net-why-m { color: #10b981; }
+.net-why li.no .net-why-m { color: #ef4444; }
+.net-why li.no > span:nth-child(2) { color: var(--muted); }
+.net-why-k {
+  flex: none;
+  width: 74px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+.net-why-m { margin-left: auto; font-weight: 800; font-size: 10px; }
+
+.net-plot { display: block; border: 1px solid var(--border); border-radius: 8px; touch-action: none; }
+.net-plot-t {
+  font-size: 8px;
+  fill: #475569;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  paint-order: stroke;
+  stroke: #f8fafc;
+  stroke-width: 2px;
+}
+.net-mk { cursor: pointer; }
+.net-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+.net-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.net-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+.net-card:hover { background: var(--bg); }
+.net-card.eligible { border-color: #a7f3d0; }
+.net-card.win { border-color: #10b981; box-shadow: 0 0 0 1px #10b981 inset; }
+.net-card.sel { outline: 2px solid #6366f1; outline-offset: 1px; }
+.net-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.net-card-name { font-size: 12px; font-weight: 700; min-width: 0; }
+.net-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.net-chip {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.net-chip.tier { border-color: #c7d2fe; color: #4338ca; background: #eef2ff; }
+.net-rep { display: flex; align-items: center; gap: 8px; }
+.net-rep-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.net-rep-fill { height: 100%; background: #10b981; }
+.net-caps { display: flex; gap: 4px; flex-wrap: wrap; }
+.net-cap {
+  font-size: 9px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #ecfdf5;
+  color: #065f46;
+}
+.net-cap.weak { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
+.net-stats { display: flex; justify-content: space-between; color: var(--muted); }
