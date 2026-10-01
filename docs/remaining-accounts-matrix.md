@@ -302,3 +302,48 @@ not just structurally parsed. Design (measured: ed25519-dalek verify costs
   signature-dedup phantom results (identical tx inside one ~6.4 ms
   blockhash window would otherwise return the cached status without
   executing).
+
+## 8. Re-audit pass — 2026-10-01 (A2 broader re-audit)
+
+Independent verification of this matrix against the tree at `1e9a9f3`
+(RFC-013 Phase B IDL sync; no program edits after that commit):
+
+* **Census re-count — exact match:** 62 non-comment `remaining_accounts`
+  references in `programs/terra_registry/src`, per-file: `lib.rs` 12,
+  `routing.rs` 8, `subdivision.rs` 6, `spatial_asset.rs` 6 (the six
+  RFC-013 Phase B quorum-loader plumbs), `verification/quorum_voting.rs` 4,
+  `verification/challenge.rs` 4, `dispute.rs` 4, `verification/session.rs` 3,
+  `verification/attestation.rs` 3, `time_bound.rs` 3, `escrow.rs` 3,
+  `fraud_governance.rs` 2, and 1 each in `observation.rs`, `claim.rs`,
+  `vault.rs`, `validator_registry.rs`. `terra_identity`: 0 references.
+* **Guard re-check — all 17 raw data-read sites clean:** every
+  `try_borrow_data` / `try_from_slice` / `try_deserialize` site is preceded
+  by its owner/PDA guard — Pattern 1 `is_authorized_holder`
+  (`terra_identity::ID` before deser), Pattern 5 (`claim_succession`:
+  identity + succession owner checks before both desers), Pattern 6
+  (`verify_rights_account` → `NotOwner` + parcel match; `migrate_rights`
+  new-target → canonical PDA + zero lamports), the H-1 helpers
+  (`quorum_voting` / `session` / `attestation` / `challenge` → `crate::ID`;
+  `observation` → `continue`-skip on foreign owner), the F1 `deser()`s
+  (routing + fraud → `RouteAccountMismatch`), F6 (vault →
+  `terra_identity::ID`), F7/F8 identity slots, and
+  `task_economics::deser_policy` (owner + non-empty).
+* **UncheckedAccount census re-count — exact match:** `terra_registry` 50,
+  `terra_identity` 1 (never data-read: that program has zero
+  `try_borrow_data`/`try_from_slice`/`try_deserialize` sites).
+* **Adversarial suite intact:** all 8 §4 tests still present in
+  `tests/integration.rs`.
+* **Result: no new findings.** Line numbers in §2 drift ±few lines with
+  future edits; guards above were re-verified by symbol and semantics, not
+  by line number. The still-open item in SECURITY.md §Recommendations 5 is
+  the *broader* security re-audit (classes outside this document) — this
+  audit class is closed.
+
+Re-count commands:
+
+```bash
+grep -rn "remaining_accounts" terra-core/programs/terra_registry/src --include=*.rs \
+  | grep -vE ":\s*(//|\*)" | wc -l              # 62
+grep -rn "UncheckedAccount" \
+  terra-core/programs/terra_registry/src/lib.rs | wc -l   # 50
+```
