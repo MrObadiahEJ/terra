@@ -438,22 +438,75 @@ async fn setup() -> (ProgramTestContext, Keypair) {
     (ctx, payer)
 }
 
+/// Build, sign and send one transaction on a fresh blockhash.
+///
+/// Two hazards are handled here so negative tests are deterministic:
+///
+/// 1. *Stale blockhash*: always fetch the latest one before signing
+///    (banks advance under load; an old hash surfaces as client errors
+///    unrelated to the program under test).
+/// 2. *Signature dedup*: the banks status cache answers a byte-identical
+///    transaction (same message ⇒ same signature ⇒ same blockhash) with the
+///    CACHED result instead of executing it — a phantom `Ok`/`Err` that makes
+///    double-vote / replay / re-bind tests flaky. The simulated PohService
+///    only rotates the blockhash every target_tick_duration × ticks_per_slot
+///    (100µs × 64 ≈ 6.4 ms), so identical transactions sent inside one
+///    window would dedup. Every submitted signature is remembered; on a hit
+///    we wait for a rotation (bounded) and re-sign so the signature changes.
+async fn send_tx(
+    ctx: &mut ProgramTestContext,
+    fee_payer: &Pubkey,
+    signers: &[&Keypair],
+    ixs: &[Instruction],
+) -> Result<(), solana_program_test::BanksClientError> {
+    use solana_sdk::signature::Signature;
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+
+    static SEEN: Mutex<Option<HashSet<Signature>>> = Mutex::new(None);
+
+    let mut blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+    let mut tx = Transaction::new_signed_with_payer(ixs, Some(fee_payer), signers, blockhash);
+
+    let duplicate = {
+        let mut guard = SEEN.lock().unwrap();
+        let set = guard.get_or_insert_with(HashSet::new);
+        if set.len() > 16_384 {
+            set.clear();
+        }
+        let dup = set.contains(&tx.signatures[0]);
+        set.insert(tx.signatures[0]);
+        dup
+    };
+    if duplicate {
+        // Wait (≤ ~128 ms) for the PohService to register a new blockhash,
+        // then re-sign. If the ticker never fires we proceed with the
+        // original hash — no worse than the previous behaviour.
+        for _ in 0..64 {
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            let next = ctx.banks_client.get_latest_blockhash().await.unwrap();
+            if next != blockhash {
+                blockhash = next;
+                break;
+            }
+        }
+        tx = Transaction::new_signed_with_payer(ixs, Some(fee_payer), signers, blockhash);
+        SEEN.lock()
+            .unwrap()
+            .get_or_insert_with(HashSet::new)
+            .insert(tx.signatures[0]);
+    }
+
+    ctx.last_blockhash = blockhash;
+    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+}
+
 async fn process(
     ctx: &mut ProgramTestContext,
     payer: &Keypair,
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
-    // Always use a fresh blockhash: banks advance under parallel load and a
-    // stale hash surfaces as flaky client/bank errors unrelated to the
-    // program under test.
-    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&payer.pubkey()),
-        &[payer],
-        ctx.last_blockhash,
-    );
-    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+    send_tx(ctx, &payer.pubkey(), &[payer], &[ix]).await
 }
 
 async fn process_with(
@@ -462,14 +515,7 @@ async fn process_with(
     signers: &[&Keypair],
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
-    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fee_payer.pubkey()),
-        signers,
-        ctx.last_blockhash,
-    );
-    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+    send_tx(ctx, &fee_payer.pubkey(), signers, &[ix]).await
 }
 
 async fn process_multi(
@@ -477,14 +523,7 @@ async fn process_multi(
     payer: &Keypair,
     ixs: &[Instruction],
 ) -> Result<(), solana_program_test::BanksClientError> {
-    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        ixs,
-        Some(&payer.pubkey()),
-        &[payer],
-        ctx.last_blockhash,
-    );
-    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+    send_tx(ctx, &payer.pubkey(), &[payer], ixs).await
 }
 
 fn instructions_meta() -> AccountMeta {
@@ -1113,7 +1152,143 @@ fn root_attestation_sig(kp: &Keypair, merkle_root: &[u8; 32], version: u32) -> V
     keypair_signing_key(kp).sign(&msg).to_bytes().to_vec()
 }
 
-/// Prover signature over the canonical ownership-proof statement.
+// --- P0-ZK-01: Groth16 test prover ------------------------------------------
+//
+// The on-chain verifier consumes framed `proof_data` v1 (RFC-011 §6.3):
+// Ed25519 statement signature + hash-pinned VK + Groth16 proof for public
+// input SHA-256(statement) mod r. Tests prove at runtime with a placeholder
+// circuit so every (random) statement can be proven on the fly; the
+// production membership circuit remains an external audit gate.
+
+use ark_groth16::{Groth16, Proof, ProvingKey, VerifyingKey};
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use std::sync::OnceLock;
+
+type Bn = ark_bn254::Bn254;
+
+/// Placeholder circuit: public input `x`, witness `(a, b)` with `a * b = x`
+/// (satisfied by `a = x, b = 1` for every statement-derived input).
+#[derive(Clone)]
+struct StatementProductCircuit {
+    x: ark_bn254::Fr,
+}
+
+impl ConstraintSynthesizer<ark_bn254::Fr> for StatementProductCircuit {
+    fn generate_constraints(
+        self,
+        cs: ConstraintSystemRef<ark_bn254::Fr>,
+    ) -> Result<(), SynthesisError> {
+        let x_var = cs.new_input_variable(|| Ok(self.x))?;
+        let a = cs.new_witness_variable(|| Ok(self.x))?;
+        let b = cs.new_witness_variable(|| Ok(ark_bn254::Fr::from(1u64)))?;
+        cs.enforce_constraint(
+            ark_relations::lc!() + a,
+            ark_relations::lc!() + b,
+            ark_relations::lc!() + x_var,
+        )?;
+        Ok(())
+    }
+}
+
+fn fq_be(x: &ark_bn254::Fq) -> [u8; 32] {
+    use ark_ff::{BigInteger, PrimeField};
+    let b = x.into_bigint().to_bytes_be();
+    let mut out = [0u8; 32];
+    assert!(b.len() <= 32);
+    out[32 - b.len()..].copy_from_slice(&b);
+    out
+}
+
+/// EIP-196 big-endian G1 encoding: `be(x) | be(y)`.
+fn g1_be(p: &ark_bn254::G1Affine) -> [u8; 64] {
+    let mut out = [0u8; 64];
+    out[..32].copy_from_slice(&fq_be(&p.x));
+    out[32..].copy_from_slice(&fq_be(&p.y));
+    out
+}
+
+/// EIP-197 big-endian G2 encoding: `be(x1) | be(x0) | be(y1) | be(y0)`.
+fn g2_be(p: &ark_bn254::G2Affine) -> [u8; 128] {
+    let mut out = [0u8; 128];
+    out[..32].copy_from_slice(&fq_be(&p.x.c1));
+    out[32..64].copy_from_slice(&fq_be(&p.x.c0));
+    out[64..96].copy_from_slice(&fq_be(&p.y.c1));
+    out[96..].copy_from_slice(&fq_be(&p.y.c0));
+    out
+}
+
+/// VK frame bytes: α | β | γ | δ | γ·abc[0] | γ·abc[1] (k = 1).
+fn serialize_vk(vk: &VerifyingKey<Bn>) -> [u8; zk::groth16::ZK_VK_LEN] {
+    assert_eq!(vk.gamma_abc_g1.len(), 2, "circuit must have k=1");
+    let mut out = [0u8; zk::groth16::ZK_VK_LEN];
+    out[0..64].copy_from_slice(&g1_be(&vk.alpha_g1));
+    out[64..192].copy_from_slice(&g2_be(&vk.beta_g2));
+    out[192..320].copy_from_slice(&g2_be(&vk.gamma_g2));
+    out[320..448].copy_from_slice(&g2_be(&vk.delta_g2));
+    out[448..512].copy_from_slice(&g1_be(&vk.gamma_abc_g1[0]));
+    out[512..576].copy_from_slice(&g1_be(&vk.gamma_abc_g1[1]));
+    out
+}
+
+/// Proof frame bytes: A | B | C.
+fn serialize_proof(proof: &Proof<Bn>) -> [u8; zk::groth16::ZK_PROOF_LEN] {
+    let mut out = [0u8; zk::groth16::ZK_PROOF_LEN];
+    out[0..64].copy_from_slice(&g1_be(&proof.a));
+    out[64..192].copy_from_slice(&g2_be(&proof.b));
+    out[192..256].copy_from_slice(&g1_be(&proof.c));
+    out
+}
+
+/// One Groth16 setup per test process: proving key, serialized VK, VK hash.
+fn groth16_setup() -> &'static (ProvingKey<Bn>, [u8; zk::groth16::ZK_VK_LEN], [u8; 32]) {
+    static SETUP: OnceLock<(ProvingKey<Bn>, [u8; zk::groth16::ZK_VK_LEN], [u8; 32])> =
+        OnceLock::new();
+    SETUP.get_or_init(|| {
+        let mut rng = ark_std::test_rng();
+        let circuit = StatementProductCircuit {
+            x: ark_bn254::Fr::from(1u64),
+        };
+        let pk = Groth16::<Bn>::generate_random_parameters_with_reduction(circuit, &mut rng)
+            .expect("groth16 setup");
+        let vk_bytes = serialize_vk(&pk.vk);
+        let vk_hash = hash(&vk_bytes).to_bytes();
+        (pk, vk_bytes, vk_hash)
+    })
+}
+
+/// Hash of the test verification key — what `update_verification_key_hash`
+/// must pin before any ownership proof can verify.
+fn groth16_vk_hash() -> [u8; 32] {
+    groth16_setup().2
+}
+
+/// Build framed `proof_data` v1 for an already-constructed statement.
+fn framed_proof_data(kp: &Keypair, statement: &[u8]) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    let (pk, vk_bytes, _) = groth16_setup();
+    let x = zk::groth16::public_input(statement);
+    let fr = <ark_bn254::Fr as ark_ff::PrimeField>::from_be_bytes_mod_order(&x);
+    let mut rng = ark_std::test_rng();
+    let proof = Groth16::<Bn>::create_random_proof_with_reduction(
+        StatementProductCircuit { x: fr },
+        pk,
+        &mut rng,
+    )
+    .expect("groth16 prove");
+    let sig = keypair_signing_key(kp).sign(statement).to_bytes();
+    let mut frame = Vec::with_capacity(zk::groth16::ZK_FRAME_LEN);
+    frame.extend_from_slice(&zk::groth16::ZK_FRAME_MAGIC);
+    frame.push(zk::groth16::ZK_FRAME_VERSION);
+    frame.extend_from_slice(&sig);
+    frame.extend_from_slice(vk_bytes);
+    frame.extend_from_slice(&serialize_proof(&proof));
+    assert_eq!(frame.len(), zk::groth16::ZK_FRAME_LEN);
+    frame
+}
+
+/// Framed v1 proof_data: Ed25519 signature over the canonical ownership
+/// statement + hash-pinned Groth16 VK + Groth16 proof for
+/// SHA-256(statement) mod r.
 #[allow(clippy::too_many_arguments)]
 fn ownership_proof_data(
     kp: &Keypair,
@@ -1124,7 +1299,6 @@ fn ownership_proof_data(
     purpose: &str,
     disclosure_type: u8,
 ) -> Vec<u8> {
-    use ed25519_dalek::Signer;
     let stmt = zk::ownership_proof_statement(
         zone_set,
         merkle_root,
@@ -1134,7 +1308,7 @@ fn ownership_proof_data(
         purpose,
         disclosure_type,
     );
-    keypair_signing_key(kp).sign(&stmt).to_bytes().to_vec()
+    framed_proof_data(kp, &stmt)
 }
 
 /// Prover signature over the canonical credential-proof statement.
@@ -1186,6 +1360,29 @@ async fn zk_register_generate_verify_double_use() {
     let zone: ZoneSet = read_account(&ctx, zone_set).await;
     assert_eq!(zone.authority, payer.pubkey());
     assert_eq!(zone.current_root_version, 0);
+
+    // RFC-011 §6.3: pin the Groth16 verification key before any ownership
+    // proof can verify (verification_key_hash starts zeroed on register).
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&groth16_vk_hash());
+                d
+            },
+        },
+    )
+    .await
+    .expect("pin groth16 verification key hash failed");
 
     // generate_ownership_root(root, cid, hash, count = 5)
     let merkle_root = [11u8; 32];
@@ -1454,6 +1651,201 @@ async fn zk_register_generate_verify_double_use() {
         .process_transaction(tx)
         .await
         .expect_err("non-authority root rotation should fail");
+}
+
+#[tokio::test]
+async fn zk_groth16_verification_rejections() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new().pubkey();
+    let (zone_set, _) = zone_set_pda(&zone_id);
+    let (root, _) = ownership_root_pda(&zone_set);
+
+    // register_zone_set
+    let mut data = discriminator("global", "register_zone_set").to_vec();
+    data.extend_from_slice(&borsh_ser(&"QmG16".to_string()));
+    data.extend_from_slice(&[37u8; 32]);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(zone_id, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_zone_set failed");
+
+    // Pin the (correct) Groth16 verification key hash.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&groth16_vk_hash());
+                d
+            },
+        },
+    )
+    .await
+    .expect("pin groth16 verification key hash failed");
+
+    // generate_ownership_root -> version 1
+    let merkle_root = [21u8; 32];
+    let mut data = discriminator("global", "generate_ownership_root").to_vec();
+    data.extend_from_slice(&merkle_root);
+    data.extend_from_slice(&borsh_ser(&"QmG16R".to_string()));
+    data.extend_from_slice(&[22u8; 32]);
+    data.extend_from_slice(&borsh_ser(&3u32));
+    data.extend_from_slice(&root_attestation_sig(&payer, &merkle_root, 1));
+    process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &zk::root_attestation_message(&merkle_root, 1),
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("generate_ownership_root failed");
+
+    let stmt = |nullifier: &[u8; 32]| {
+        zk::ownership_proof_statement(
+            &zone_set,
+            &merkle_root,
+            1,
+            nullifier,
+            &payer.pubkey(),
+            "subsidy",
+            zk::disclosure_type::MEMBERSHIP,
+        )
+    };
+    let mk_verify = |nullifier: [u8; 32], proof: Vec<u8>| {
+        let (nullifier_rec, _) = nullifier_pda(&nullifier);
+        let mut data = discriminator("global", "verify_ownership_proof").to_vec();
+        data.extend_from_slice(&borsh_ser(&proof));
+        data.extend_from_slice(&nullifier);
+        data.extend_from_slice(&borsh_ser(&1u32));
+        data.extend_from_slice(&borsh_ser(&"subsidy".to_string()));
+        data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(zone_set, false),
+                AccountMeta::new_readonly(root, false),
+                AccountMeta::new(nullifier_rec, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        }
+    };
+    let prove = |nullifier: &[u8; 32]| {
+        ownership_proof_data(
+            &payer,
+            &zone_set,
+            &merkle_root,
+            1,
+            nullifier,
+            "subsidy",
+            zk::disclosure_type::MEMBERSHIP,
+        )
+    };
+
+    // Positive control: an untouched framed proof verifies.
+    let n0 = [60u8; 32];
+    process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &stmt(&n0),
+        mk_verify(n0, prove(&n0)),
+    )
+    .await
+    .expect("valid framed proof should verify");
+
+    // Corrupted proof byte: signature and VK still match, so the failure
+    // isolates the pairing check.
+    let n1 = [61u8; 32];
+    let mut p1 = prove(&n1);
+    p1[zk::groth16::ZK_FRAME_OFFSET_PROOF + 5] ^= 0x01;
+    let res = process_attested(&mut ctx, &payer, &payer, &stmt(&n1), mk_verify(n1, p1)).await;
+    assert_custom_error(res, 6087, "corrupted groth16 proof byte");
+
+    // Proof spliced from another statement: Ed25519 + VK hash pass, only
+    // the Groth16 public-input binding can reject.
+    let na = [62u8; 32];
+    let nb = [63u8; 32];
+    let fa = prove(&na);
+    let mut fb = prove(&nb);
+    fb[zk::groth16::ZK_FRAME_OFFSET_PROOF..]
+        .copy_from_slice(&fa[zk::groth16::ZK_FRAME_OFFSET_PROOF..]);
+    let res = process_attested(&mut ctx, &payer, &payer, &stmt(&nb), mk_verify(nb, fb)).await;
+    assert_custom_error(res, 6087, "proof bound to a different statement");
+
+    // Corrupted VK bytes inside the frame: pinned-hash check rejects.
+    let n3 = [64u8; 32];
+    let mut p3 = prove(&n3);
+    p3[zk::groth16::ZK_FRAME_OFFSET_VK + 7] ^= 0x01;
+    let res = process_attested(&mut ctx, &payer, &payer, &stmt(&n3), mk_verify(n3, p3)).await;
+    assert_custom_error(res, 6087, "corrupted verification key in frame");
+
+    // Re-pinned (wrong) VK hash: a freshly valid proof no longer verifies.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&[7u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("re-pin verification key hash failed");
+    let n4 = [65u8; 32];
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &stmt(&n4),
+        mk_verify(n4, prove(&n4)),
+    )
+    .await;
+    assert_custom_error(res, 6087, "wrong pinned verification key hash");
 }
 
 #[tokio::test]

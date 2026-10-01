@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 use crate::TerraError;
 
+pub mod groth16;
+
 // ===========================================================================
 // Threshold credential system + legacy ZK ownership proofs.
 //
@@ -470,13 +472,27 @@ pub fn verify_ownership_proof(
     );
     require!(root.commitment_count > 0, TerraError::EmptyZoneSet);
 
-    // P0-ZK: proof_data must be the prover's Ed25519 signature over the
-    // canonical statement (zone, root, version, nullifier, prover, purpose,
-    // disclosure) — not an opaque blob. Verified via the runtime Ed25519
-    // precompile (locate in the Instructions sysvar, match signer/statement/
-    // signature). Checked after the size/version guards so existing error
-    // semantics (ProofTooLarge / RootVersionMismatch / InvalidProofPurpose /
-    // InvalidDisclosureType) are preserved.
+    // P0-ZK-01: proof_data is a framed v1 payload (RFC-011 §6.3) — the
+    // prover's Ed25519 signature over the canonical statement (zone, root,
+    // version, nullifier, prover, purpose, disclosure), the hash-pinned
+    // Groth16 verification key, and the Groth16 proof. Framing is parsed
+    // only after the guards above so existing error semantics
+    // (ProofTooLarge / RootVersionMismatch / InvalidProofPurpose /
+    // InvalidDisclosureType / EmptyZoneSet) are preserved; every
+    // proof-layer failure below reports InvalidProofData (6087).
+    let frame = groth16::parse_ownership_frame(&proof_data)?;
+    require!(
+        root.algorithm_id == zk_algorithm_id::POSEIDON_GROTH16,
+        TerraError::InvalidProofData
+    );
+    require!(
+        !root.verification_key_hash.iter().all(|b| *b == 0),
+        TerraError::InvalidProofData
+    );
+    require!(
+        solana_program::hash::hash(frame.verification_key).to_bytes() == root.verification_key_hash,
+        TerraError::InvalidProofData
+    );
     let statement = ownership_proof_statement(
         &ctx.accounts.zone_set.key(),
         &root.merkle_root,
@@ -490,8 +506,19 @@ pub fn verify_ownership_proof(
         &ctx.accounts.instructions,
         &ctx.accounts.prover.key(),
         &statement,
-        &proof_data,
+        frame.signature,
     )?;
+    // Groth16 pairing equation over public input SHA-256(statement) mod r
+    // (statement-bound: zone, root, version, nullifier, prover, purpose and
+    // disclosure are all covered by the circuit's public input).
+    require!(
+        groth16::verify_groth16(
+            frame.verification_key,
+            frame.proof,
+            &groth16::public_input(&statement),
+        ),
+        TerraError::InvalidProofData
+    );
 
     let now = Clock::get()?.unix_timestamp;
     let proof_hash =
