@@ -1134,6 +1134,214 @@ export const terraRegistry: Idl = {
         {
           "name": "storage_reference",
           "type": "string"
+        },
+        {
+          "name": "elevation_min_mm",
+          "type": "i32"
+        },
+        {
+          "name": "elevation_max_mm",
+          "type": "i32"
+        },
+        {
+          "name": "elevation_source",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "append_geometry_version_from_evidence",
+      "docs": [
+        "Anchor a geometry version from an evidence manifest (RFC-013 Phase B)."
+      ],
+      "discriminator": [
+        181,
+        10,
+        220,
+        112,
+        151,
+        247,
+        247,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset.parcel",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "geometry_version",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  101,
+                  111,
+                  109,
+                  101,
+                  116,
+                  114,
+                  121,
+                  95,
+                  118,
+                  101,
+                  114,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "path": "asset.geometry_version_count",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "manifest",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  105,
+                  100,
+                  101,
+                  110,
+                  99,
+                  101,
+                  95,
+                  109,
+                  97,
+                  110,
+                  105,
+                  102,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.submitter",
+                "account": "EvidenceManifest"
+              },
+              {
+                "kind": "account",
+                "path": "manifest.nonce",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "geometry_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "source",
+          "type": "u8"
+        },
+        {
+          "name": "dimension",
+          "type": "u8"
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
+        },
+        {
+          "name": "elevation_min_mm",
+          "type": "i32"
+        },
+        {
+          "name": "elevation_max_mm",
+          "type": "i32"
+        },
+        {
+          "name": "elevation_source",
+          "type": "u8"
         }
       ]
     },
@@ -14988,6 +15196,10 @@ export const terraRegistry: Idl = {
     },
     {
       "name": "verify_geometry_version",
+      "docs": [
+        "A registered validator attests the version; `verified` flips when",
+        "the append-time quorum threshold is reached (RFC-013 Phase B)."
+      ],
       "discriminator": [
         71,
         36,
@@ -17181,6 +17393,19 @@ export const terraRegistry: Idl = {
         110,
         6,
         57
+      ]
+    },
+    {
+      "name": "GeometryVersionAttested",
+      "discriminator": [
+        200,
+        92,
+        5,
+        221,
+        66,
+        252,
+        209,
+        72
       ]
     },
     {
@@ -19552,6 +19777,26 @@ export const terraRegistry: Idl = {
       "code": 6236,
       "name": "GeometryAlreadyVerified",
       "msg": "Geometry version is already verified"
+    },
+    {
+      "code": 6237,
+      "name": "InvalidElevationSource",
+      "msg": "Unknown elevation source, or provenance does not match the layer dimension"
+    },
+    {
+      "code": 6238,
+      "name": "GeometryAlreadyAttested",
+      "msg": "Validator has already attested this geometry version"
+    },
+    {
+      "code": 6239,
+      "name": "EmptyEvidenceManifest",
+      "msg": "Evidence manifest has no artifacts to anchor a version from"
+    },
+    {
+      "code": 6240,
+      "name": "GeometryQuorumFull",
+      "msg": "Geometry version quorum list has no free attestation slot"
     }
   ],
   "types": [
@@ -22876,20 +23121,75 @@ export const terraRegistry: Idl = {
           {
             "name": "verified",
             "docs": [
-              "Claim \u2192 fact: true once a registered validator verified it."
+              "Claim \u2192 fact: true once `attest_count >= required` validators attested."
             ],
             "type": "bool"
           },
           {
             "name": "verified_by",
             "docs": [
-              "Verifying validator wallet (zero until verified)."
+              "Validator whose attestation completed the quorum (zero until verified)."
             ],
             "type": "pubkey"
           },
           {
             "name": "verified_at",
             "type": "i64"
+          },
+          {
+            "name": "evidence_manifest",
+            "docs": [
+              "EvidenceManifest this version was anchored from",
+              "(`Pubkey::default()` = standalone permissionless append)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "elevation_min_mm",
+            "docs": [
+              "This version's elevation envelope, millimetres (both 0 when",
+              "`elevation_source == elevation_source::NONE`)."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "elevation_max_mm",
+            "type": "i32"
+          },
+          {
+            "name": "elevation_source",
+            "docs": [
+              "`elevation_source` provenance code for the Z values above."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "docs": [
+              "Quorum threshold resolved at append (global `QuorumConfig`, else 2;",
+              "1..=MAX_VALIDATORS)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "attestors",
+            "docs": [
+              "Unique validator attestors so far (zero-filled padding after",
+              "`attest_count`; append-only \u2014 slots are never reused)."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "attest_count",
+            "docs": [
+              "Confirmed attestations so far (0..=required until verified)."
+            ],
+            "type": "u8"
           }
         ]
       }
@@ -22935,6 +23235,54 @@ export const terraRegistry: Idl = {
           {
             "name": "submitted_at",
             "type": "i64"
+          },
+          {
+            "name": "evidence_manifest",
+            "type": "pubkey"
+          },
+          {
+            "name": "elevation_min_mm",
+            "type": "i32"
+          },
+          {
+            "name": "elevation_max_mm",
+            "type": "i32"
+          },
+          {
+            "name": "elevation_source",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GeometryVersionAttested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "geometry_version",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "attest_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
           }
         ]
       }
@@ -22959,6 +23307,14 @@ export const terraRegistry: Idl = {
           {
             "name": "verified_at",
             "type": "i64"
+          },
+          {
+            "name": "attest_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
           }
         ]
       }

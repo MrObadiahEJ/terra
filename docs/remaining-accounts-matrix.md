@@ -6,8 +6,9 @@ Scope: every place `terra_registry` reads data out of `ctx.remaining_accounts`
 slot is, whether it is enforced, and what was fixed vs. left open.
 
 **Rules honored:** no architecture redesign, no RRR rework, no `Parcel.owner`
-reintroduction, no new `TerraError` variants (code = 6000 + variant index,
-237 variants, append-only). All fixes reuse existing variants (`6190
+reintroduction, no new `TerraError` variants beyond the RFC-gated appends
+(code = 6000 + variant index, 241 variants, append-only). All fixes reuse
+existing variants (`6190
 RouteAccountMismatch`, `6019 IdentityMismatch`, `6028 NotValidator`).
 F1/F2/F6/F7/F8 are behaviour-only (no IDL change); F4 (`judicial_forfeiture`)
 and F3 (`open_fraud_review`/`open_appeal_review`) add a `registry` account —
@@ -40,8 +41,12 @@ Minor notes (no action needed):
 
 ## 2. The six patterns (and the identity slots)
 
-56 textual `remaining_accounts` references in `programs/terra_registry/src`
-distill into 6 read patterns + the identity-slot readers:
+62 textual `remaining_accounts` references in `programs/terra_registry/src`
+(56 before RFC-013 Phase B, which added 6: the geometry append/verify paths
+plumb `ctx.remaining_accounts` into the **existing** `try_load_quorum_config`
+global-`(0,[0,0])` PDA loader — owner-checked, bounded 1..=8, same contract
+as `create_claim`, so no new pattern class) distill into 6 read patterns +
+the identity-slot readers:
 
 ### Pattern 1 — `is_authorized_holder` (lib.rs:170) — 19 call sites — SOLID
 
@@ -237,12 +242,12 @@ exact pre-fix bypass.
 cd terra-core
 cargo fmt --check
 cargo clippy -- -D warnings              # CI-exact (libs only — CI does not lint test targets)
-cargo test -p terra-registry --lib       # 136 unit tests
-cargo test -p terra-registry --test integration   # 303 tests (make test: --test-threads=1; CI does not run this suite)
+cargo test -p terra-registry --lib       # 142 unit tests
+cargo test -p terra-registry --test integration   # 305 tests (make test: --test-threads=1; CI does not run this suite)
 anchor build --skip-lint                 # CI build path (fresh .so needed before running tests)
 ```
 
-Latest local run: 303/303 integration, 136/136 lib, fmt clean, clippy clean.
+Latest local run: 305/305 integration, 142/142 lib, fmt clean, clippy clean.
 TS smoke tests (`make test-ts`) require a local validator — `solana-test-validator`
 core-dumps on this machine (no AVX); CI/devnet only.
 

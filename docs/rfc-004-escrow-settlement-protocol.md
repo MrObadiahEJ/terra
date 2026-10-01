@@ -687,5 +687,5 @@ When Solana introduces post-quantum signature support:
 
 **Next for this RFC:**
 1. L-2 (escrow vault lamports / rent-exempt edge) is **accepted** — only revisit if changing settle/transfer math.
-2. Run `cargo test -p terra-registry --test integration -- --test-threads=1` (escrow happy paths live there; 303 tests, ~7 min locally).
+2. Run `cargo test -p terra-registry --test integration -- --test-threads=1` (escrow happy paths live there; 305 tests, ~7 min locally).
 3. After program edits: `make idl`.

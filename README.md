@@ -55,7 +55,7 @@ matrix: findings **F1–F8 all fixed**), P0-ZK real Ed25519 precompile
 verification — unique validator sets, endorsement
 action binding, account-ownership checks on `remaining_accounts` loaders,
 admin/authority constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL
-synced to source (161/67/148/237), and CI covers registry/identity lib + rfc012 +
+synced to source (162/67/149/241), and CI covers registry/identity lib + rfc012 +
 geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 **Frontend:** interactive `/lab` experiments
@@ -70,7 +70,7 @@ Verified tests on `dev` (2026-09-30):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 136 |
+| `terra-registry` lib unit tests | 142 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 23 |
@@ -79,11 +79,11 @@ Verified tests on `dev` (2026-09-30):
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and `tsc --noEmit` — mirrored locally by `make ci`
-(all four jobs). Identity BPF (23) and the long-form registry BPF suite (303)
+(all four jobs). Identity BPF (23) and the long-form registry BPF suite (305)
 are run locally / on demand (full registry suite ≈ 7 min with
 `--test-threads=1`).
 
-Registry BPF integration suite (`tests/integration.rs`, 303 tests) is
+Registry BPF integration suite (`tests/integration.rs`, 305 tests) is
 maintained and run locally; it is the long-form regression suite for all
 instruction happy paths and guard rails. Both BPF suites refuse to run
 against a stale `target/deploy/*.so` — their `setup()` guards compare
@@ -96,7 +96,7 @@ hash-pinned VK — the production membership circuit + trusted setup
 still need audit); time-locked paths (7-day unbonding withdraw) are
 guard-verified, not time-executed, in the harness; checked-in IDL
 (`terra-web/src/idl/terra_registry.json`) is synced to source at
-**161/67/148/237 (re-synced 2026-10-01, counts unchanged)** — re-run `make idl` / `./build.sh`
+**162/67/149/241 (re-synced 2026-10-01, RFC-013 Phase B)** — re-run `make idl` / `./build.sh`
 before shipping client changes after any program edit.
 
 ### How to continue (handoff)
@@ -105,7 +105,7 @@ This repo is self-describing for a new contributor or agent — read in order:
 
 1. **[`docs/VISION.md`](docs/VISION.md)** — the north star: what Terra is, the 10 domains, stages 0–10, where we are today. Never work against this document.
 2. **This file** — Status, Protocol Catalog, Verification table, Devnet checklist, Roadmap.
-3. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); B6 program-boundary split re-synced (147/62/135/220); P0-2 removal-endorsement path re-synced (148/62/135/220); Phase 9 device identity re-synced (154/63/141/225, 2026-09-26); Phase 10 cross-border re-synced (158/65/145/231, 2026-09-28); Stage 3A spatial re-synced (161/67/148/237, 2026-09-28); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
+3. [`terra-core/SECURITY.md`](terra-core/SECURITY.md) — Phase 1 + A1 closed Critical/High/Medium and L-1; A2 refreshed IDL (119/44/108/160); Phase 2 re-synced (128/49/115/169); Phase 3 re-synced (134/52/120/182); Phase 4 re-synced (135/53/121/184); Phase 5 re-synced (137/55/123/187); Phase 6 re-synced (138/55/124/191); Phase 7 re-synced (147/59/133/206); Phase 8 re-synced (153/64/139/220); RFC-012 legacy sweep re-synced (146/62/134/220); B6 program-boundary split re-synced (147/62/135/220); P0-2 removal-endorsement path re-synced (148/62/135/220); Phase 9 device identity re-synced (154/63/141/225, 2026-09-26); Phase 10 cross-border re-synced (158/65/145/231, 2026-09-28); Stage 3A spatial re-synced (161/67/148/237, 2026-09-28); RFC-013 Phase B re-synced (162/67/149/241, 2026-10-01); A3 fixed API test baseline + CI coverage. Open mainnet items: RFC-005 reconfirm, ZK audit (L-3 cosmetic).
 4. [`terra-core/README.md`](terra-core/README.md) — Current Status + numbered next steps; workspace build/test commands.
 5. [`terra-core/docs/architecture.md`](terra-core/docs/architecture.md) — module map, PDAs, constants, source counts.
 6. [`docs/rfc-012-global-physical-digital-trust-architecture.md`](docs/rfc-012-global-physical-digital-trust-architecture.md) — Phases 0–10 done; start at §8.1 Handoff (next steps: devnet deployment), then §9 Migration Map and §10 PDA sketch.
@@ -150,13 +150,12 @@ peer-consensus), `quorum.rs` (unique-validator + signer dedup), `verification/*`
 (claims, sessions, challenges, reputation).
 Full specs live in [`docs/`](docs/) as `rfc-003…rfc-013`.
 
-Source counts (regenerate IDL after changes): **161 instructions · 67 account
-types · 148 events · 237 `TerraError` codes** in `terra_registry`; **8
+Source counts (regenerate IDL after changes): **162 instructions · 67 account
+types · 149 events · 241 `TerraError` codes** in `terra_registry`; **8
 instructions · 2 accounts · 8 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
-matches source (Stage 3 Phase A 2026-09-28; re-synced 2026-09-30 after the
-F3/F4/F5 registry-binding audit — counts unchanged); re-run `make idl` after
+matches source (Stage 3 Phase B 2026-10-01 — 162/67/149/241); re-run `make idl` after
 program edits.
 
 ---
@@ -298,7 +297,7 @@ Build the BPF program (manifest parsing issue in Anchor requires direct
 cd terra-core
 cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
 cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
-# Long-form registry BPF suite (303 tests, ~7 min; needs built SBF):
+# Long-form registry BPF suite (305 tests, ~7 min; needs built SBF):
 cargo test -p terra-registry --test integration -- --test-threads=1
 # Identity BPF suite (23 tests):
 cargo test -p terra-identity --test integration
@@ -322,11 +321,11 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 136/136 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 142/142 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
-| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 303/303 (~7 min; run locally) |
+| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 305/305 (~7 min; run locally) |
 | Unit (API validation logic) | `cargo test -p terra-api` | 68/68 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 4/4 |
 | Migrations on real PostGIS 16 | CI service + local scratch instance | 26/26 apply |
@@ -344,7 +343,7 @@ pnpm dev
 - [x] `terra_identity` deploy keypair — original `68urV9nG…` keypair lost before first deploy; program ID rotated to `HyjpaHY9…` (2026-10-01, `declare_id!` + `Anchor.toml` synced, keypair backed up in `terra-core/deploy-backup/`); `deploy.sh` verifies each `target/deploy/*-keypair.json` against `declare_id!` and aborts on mismatch
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
-- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged)
+- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged); RFC-013 Phase B (2026-10-01): **162/67/149/241** synced to `terra-web/src/idl/`
 - [ ] ZK membership circuit design + trusted setup + external audit (RFC-006/011) — Groth16/BN254 verifier now live on-chain (P0-ZK-01), circuit choice made; placeholder test circuit is not production
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
@@ -388,11 +387,12 @@ The stage map (0–10) and long-term direction live in
 - [x] **P0 audit (2026-09-29/30)** — P0-TEST-01 RRR E2E TS tests (`make test-ts`); P0-INVARIANTS; P0-REMAINING remaining-accounts audit with findings **F1–F8 all fixed** (`docs/remaining-accounts-matrix.md`, incl. full UncheckedAccount census); P0-ZK real Ed25519 precompile verification (RFC-011 status updated); registry bindings F3/F4/F5; suites green: registry BPF 302, registry lib 131, identity 6+23, rfc012 21, api 68, geo 4; tooling: `make ci` (CI mirror), `make prune` (disk), stale-`.so` guards, `deploy.sh` keypair verification
 - [x] Frontend transactions explorer (2026-09-30): `/transactions` simulated chain feed (base58 signatures, accounts, Anchor-style logs, exact error codes), broadcast composer with failure injection, toasts, **land-version timeline** (anchored → verified states with per-version WebGL-free SVG isometric 3D skeletons), wallet-signed txs marked `LIVE` with devnet status + Solana Explorer link, realtime validator-API/devnet pills; **WebGL-free 3D land skeleton** added to `/lab` Geometry Vault; `/progress` page removed
 - [x] **P0-ZK-01 framed Groth16 verification (2026-10-01)** — `proof_data` is now the mandatory 901-byte frame of RFC-011 §6.3.1 (`TG16` magic + version + Ed25519 statement signature + 576-byte hash-pinned VK + 256-byte Groth16 proof); on-chain pairing via `solana-bn254`/`alt_bn128` syscalls (public input `SHA-256(statement) mod r`, ≈99k CU full verify); `update_verification_key_hash` pin required before any proof; all proof-layer failures → `InvalidProofData` (6087), guard error codes preserved; new test `zk_groth16_verification_rejections` + framed happy path; test harness `send_tx` kills banks signature-dedup phantom results (root cause of previously flaky double-vote/replay negatives); suites green: registry BPF 303, registry lib 136, identity 6+23, rfc012 21, api 68, geo 4; IDL re-synced **161/67/148/237** (doc-comment only)
+- [x] **Vision Stage 3 Phase B — evidence-linked geometry (2026-10-01)** — RFC-013 §7 row B: `append_geometry_version_from_evidence` (version anchored to an `EvidenceManifest`, task open + non-empty guards, self-derived PDA seeds), `elevation_source` enum with 5 provenance invariants (NONE ⇔ flat D2, NONE ⇒ zero envelope, envelope ⊆ asset box), validator-quorum verification (`attestors`[8] / `attest_count` / `required` snapshotted from global `QuorumConfig (0,[0,0])`, fallback 2; `GeometryVersionAttested` event per attest), errors 6237–6240; +1 ix, +1 event; tests: spatial_asset 11 unit, `stage3_evidence_linked_geometry` + `stage3_geometry_quorum_config` new, quorum flow in verification test, 4 elevation guard cases in lifecycle — suites green: registry BPF **305**, registry lib **142**, identity 6+23, rfc012 21, api 68, geo 4; IDL re-synced **162/67/149/241**; identity test harness `process`/`process_with` adopted the `send_tx` signature-dedup fix (killed a latent duplicate-endorsement flake)
 
 **Next (in order):**
 
 - [ ] **Devnet deployment** (see checklist above) — deploy-wallet funding (~17.1 SOL) + `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates
-- [ ] Product layers — Vision Stage 3 Phases B–E (RFC-013: evidence-linked geometry, ThreeDModel/SpatialSnapshot, AI/GIS loop, API mirror), Phase 5 (legal 3D/air-rights = vision Stage 5), Phase 6 (country config = vision Stage 6), regional expansion → global platform (vision Stages 9–10)
+- [ ] Product layers — Vision Stage 3 Phases C–E (RFC-013: ThreeDModel/SpatialSnapshot, AI/GIS loop, API mirror), Phase 5 (legal 3D/air-rights = vision Stage 5), Phase 6 (country config = vision Stage 6), regional expansion → global platform (vision Stages 9–10)
 
 ---
 

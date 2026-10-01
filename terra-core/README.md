@@ -101,7 +101,7 @@ cargo test -p terra-registry --test rfc012_structure
 # Identity BPF integration tests (requires SBF build)
 cargo test -p terra-identity --test integration
 
-# Registry BPF integration tests (303 tests, ~7 min; requires a fresh
+# Registry BPF integration tests (305 tests, ~7 min; requires a fresh
 # `anchor build --skip-lint` — setup() refuses stale target/deploy/*.so)
 cargo test -p terra-registry --test integration -- --test-threads=1
 
@@ -180,7 +180,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 303 BPF integration tests
+│   │       ├── integration.rs  # 305 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -238,18 +238,18 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 136 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, … |
+| terra-registry lib | 142 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, spatial/elevation quorum, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 23 | BPF happy paths + guard rails |
-| terra-registry integration | 303 | Full instruction matrix (~7 min) |
+| terra-registry integration | 305 | Full instruction matrix (~7 min) |
 | terra-api | 68 | Route validation + storage helpers |
 | terra-geo | 4 | Graph reachability |
 
-Verified on `dev` (2026-10-01): registry lib 136/136, identity lib 6/6, rfc012
-21/21, API 68/68, geo 4/4, registry BPF suite 303/303, identity BPF 23/23,
+Verified on `dev` (2026-10-01): registry lib 142/142, identity lib 6/6, rfc012
+21/21, API 68/68, geo 4/4, registry BPF suite 305/305, identity BPF 23/23,
 `cargo fmt` + `clippy -D warnings` clean (all targets incl. tests), checked-in
-IDL matches source at **161/67/148/237**, `tsc --noEmit` clean, CI 4/4 green on
+IDL matches source at **162/67/149/241**, `tsc --noEmit` clean, CI 4/4 green on
 `dev` and `main`. Pre-push gate: `make ci` (exact CI mirror); fast baseline:
 `make test-fast`; disk reclaim: `make prune`.
 
@@ -272,23 +272,24 @@ IDL matches source at **161/67/148/237**, `tsc --noEmit` clean, CI 4/4 green on
 - **P0-2 removal-endorsement path** (2026-09-25): `endorse_validator_removal` shipped, IDL **148/62/135/220**.
 - RFC-012 **Phase 9** (physical infrastructure, 2026-09-26): `device_identity.rs` with `DeviceIdentity` PDA (seeds `["device_identity", owner, device_nonce(u16)]`); 6 instructions (`register_device`, `update_device`, `rotate_device_key`, `set_device_status`, `set_device_calibration`, `verify_device` — validator-profile-gated); capability bitfield GNSS/PHOTO/VIDEO/LIDAR/IMU/RTK/SCANNER_3D/THERMAL; status ACTIVE/SUSPENDED/REVOKED (terminal); errors 6220–6224 (reuses 6182/6014); 6 unit tests + 2 BPF tests (`phase9_*`); IDL **154/63/141/225**.
 - RFC-012 **Phase 10** (cross-border + privacy, 2026-09-28): `ValidatorProfile.jurisdiction` (self-declared, `[0,0]`=undeclared) + `set_validator_jurisdiction`; `CrossBorderBinding` PDA (dual-authority treaty sign, ACTIVE/SUSPENDED/REVOKED terminal, optional expiry) + `set_cross_border_binding_status`; `CrossBorderSpanRecord` PDA (`["cross_border_verification", task_id, validator]`) + permissionless `record_cross_border_verification`; `route_task` jurisdiction gate (trailing binding slot, stride `3 + need_geo + 2*need_cap + need_juris`, soft-fail); errors 6225–6230 (reuses 6010/6088/6089/6091/6180/6214); 5 unit tests + 3 BPF tests (`phase10_*`); IDL 158/65/145/231 at delivery.
-- **Vision Stage 3 Phase A** (spatial intelligence foundations, 2026-09-28): `spatial_asset.rs` — `SpatialAsset` PDA (`["spatial_asset", parcel]`, dimensionality + elevation envelope + version cursor) and append-only `GeometryVersion` PDA (`["geometry_version", asset, version]`, max 64); instructions `init_spatial_asset` (permissionless), `append_geometry_version` (permissionless claim), `verify_geometry_version` (validator fact, claim → fact); guards: dimension ≤ asset dimensionality, source/hash/storage validation, non-inverted elevation, cursor-derived seeds; errors 6231–6236 (reuses 6002/6010/6134); 5 unit + 2 BPF tests (`stage3_*`); spec [`docs/rfc-013-…`](../../docs/rfc-013-spatial-intelligence-pipeline.md); IDL **161/67/148/237** — current synced state.
+- **Vision Stage 3 Phase A** (spatial intelligence foundations, 2026-09-28): `spatial_asset.rs` — `SpatialAsset` PDA (`["spatial_asset", parcel]`, dimensionality + elevation envelope + version cursor) and append-only `GeometryVersion` PDA (`["geometry_version", asset, version]`, max 64); instructions `init_spatial_asset` (permissionless), `append_geometry_version` (permissionless claim), `verify_geometry_version` (validator fact, claim → fact); guards: dimension ≤ asset dimensionality, source/hash/storage validation, non-inverted elevation, cursor-derived seeds; errors 6231–6236 (reuses 6002/6010/6134); 5 unit + 2 BPF tests (`stage3_*`); spec [`docs/rfc-013-…`](../../docs/rfc-013-spatial-intelligence-pipeline.md); IDL **161/67/148/237** at delivery.
 - **P0-ZK-01 framed Groth16 verification** (2026-10-01): `zk/groth16.rs` — `proof_data` is now a mandatory 901-byte frame `TG16 | v1 | Ed25519 sig (64) | VK (576) | Groth16 proof (256)` (RFC-011 §6.3.1): public input `SHA-256(statement) mod r`, EIP-196/197 point encodings, pairing via `solana-bn254` + `alt_bn128` group/pairing syscalls (≈99k CU for a full verify), VK hash-pin enforced before any proof (`update_verification_key_hash`), all proof-layer failures → `InvalidProofData` (6087); legacy 64-byte signature payloads rejected. Runtime dep `solana-bn254` (no new lock crates); ark-groth16 0.5 test prover (dev-deps). +5 unit tests (136 lib), +1 BPF test `zk_groth16_verification_rejections` — 303 registry integration green; test harness `send_tx` now guards against banks signature-dedup phantom results (root-caused flaky double-vote/replay negatives). IDL re-synced **161/67/148/237** (doc-comment only).
+- **Vision Stage 3 Phase B — evidence-linked geometry (2026-10-01)**: `append_geometry_version_from_evidence` anchors a `GeometryVersion` to an `EvidenceManifest` (task open + non-empty guards → 6174/6239; manifest/task PDAs self-derived from the manifest's own fields — no seed instruction args, AddEvidenceArtifact precedent; linked manifest stored in `GeometryVersion.evidence_manifest`); `elevation_source` enum (NONE/SURVEY/DEM/LIDAR/PHOTOGRAMMETRY/MANUAL) with 5 invariants — NONE ⇒ zero envelope, provenance ⇔ Z-dimension biconditional (NONE iff flat D2), envelope ⊆ asset bounding box; validator-quorum verification — `attestors`[8] + `attest_count`, `required` snapshotted at append from the global `QuorumConfig (0,[0,0])` in `remaining_accounts` (fallback `DEFAULT_GEOMETRY_QUOROM = 2`, bounds 1..=8), each attest emits `GeometryVersionAttested`, flip at `count >= required` (dedup → 6238, full → 6240); errors 6237–6240; +1 ix, +1 event; tests: 6 new unit (11 in `spatial_asset.rs`, 142 lib), BPF `stage3_evidence_linked_geometry` + `stage3_geometry_quorum_config` new, quorum flow in `stage3_geometry_version_verification`, 4 elevation guard cases in `stage3_spatial_asset_lifecycle` — **305/305**; identity harness `process`/`process_with` adopted the `send_tx` signature-dedup fix (kills latent duplicate-endorsement flake); IDL re-synced **162/67/149/241**.
 - PostGIS mirror API (21 route modules, migrations `0001`…`0026`) + geo-engine + workspace CI green on `dev` and `main`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK membership circuit + trusted setup + external audit (RFC-006/011; Groth16 verifier live since P0-ZK-01). L-3 is cosmetic only. IDL regen chain through P0-ZK-01 is current (**161/67/148/237**, re-synced 2026-10-01, counts unchanged).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of P0-ZK-01 (161/67/148/237, 2026-10-01).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK membership circuit + trusted setup + external audit (RFC-006/011; Groth16 verifier live since P0-ZK-01). L-3 is cosmetic only. IDL regen chain through RFC-013 Phase B is current (**162/67/149/241**, re-synced 2026-10-01).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of RFC-013 Phase B (162/67/149/241, 2026-10-01).
 3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
 4. ZK membership circuit design + trusted setup + external audit (RFC-006/011) — on-chain Groth16/BN254 verifier is live (P0-ZK-01, 2026-10-01); the in-repo placeholder circuit only proves statement binding.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
-6. **Vision Stage 3 Phases B–E** — evidence-linked geometry, `SpatialSnapshot`/`ThreeDModel`, AI/GIS loop, API mirror (see [RFC-013](../../docs/rfc-013-spatial-intelligence-pipeline.md) §7); then Stage 5 (legal 3D/air-rights), Stage 6 (country config) — stage map in [`docs/VISION.md`](../../docs/VISION.md). RFC-012 Phases 0–10 complete ([§8.1](../../docs/rfc-012-global-physical-digital-trust-architecture.md)); Stage 3 Phase A shipped 2026-09-28.
+6. **Vision Stage 3 Phases C–E** — `SpatialSnapshot`/`ThreeDModel`, AI/GIS loop, API mirror (see [RFC-013](../../docs/rfc-013-spatial-intelligence-pipeline.md) §7); then Stage 5 (legal 3D/air-rights), Stage 6 (country config) — stage map in [`docs/VISION.md`](../../docs/VISION.md). RFC-012 Phases 0–10 complete ([§8.1](../../docs/rfc-012-global-physical-digital-trust-architecture.md)); Stage 3 Phases A (2026-09-28) + B (2026-10-01) shipped.
 
 Anyone picking this up: start from [`docs/VISION.md`](../../docs/VISION.md) (north star), then root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 
 ## Error Codes
 
-- **terra_registry:** 237 custom error codes (`TerraError` in `lib.rs`).
+- **terra_registry:** 241 custom error codes (`TerraError` in `lib.rs`).
 - **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License
