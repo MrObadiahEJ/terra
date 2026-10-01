@@ -361,19 +361,16 @@ export const STATUS_MODULES: StatusModule[] = [
     id: 'demo-engine',
     name: 'Demo scenario engine',
     track: 'infra',
-    status: 'partial',
+    status: 'implemented',
     evidence:
-      'api/src/routes/demo_scenarios.rs — GET/POST /api/v1/demo/scenarios/*, 7 unit tests (cargo test -p terra-api: 75 passed)',
+      'api/src/routes/demo_scenarios.rs (GET/POST /api/v1/demo/scenarios/*, 7 unit tests — cargo test -p terra-api: 75 passed) + shipped /demo player; live chain-event streaming tracked under activity-feed (B4)',
     verified: [
       '8 scenario builders (verification, land-registration, cross-border, dispute, validator-routing, spatial-update, fraud-review, recovery)',
-      'Deterministic seeded output (FNV-1a + xorshift64*, byte-identical per seed — unit-tested)',
+      'Deterministic seeded output (FNV-1a + xorshift64*, byte-identical per seed — unit-tested + in-page "Verify determinism")',
       'Every payload carries demo:true + demo-prefixed accounts (never presented as chain state)',
-      'API client helpers api.listDemoScenarios / api.runDemoScenario',
+      'Shipped /demo player: scenario picker, seeded runs, animated event timeline (play/pause/step), entity inspector',
     ],
-    gaps: [
-      'Frontend scenario player/animation consuming the endpoints',
-      'Live event stream (ties into B4 activity feed)',
-    ],
+    gaps: [],
   },
   {
     id: 'devnet-e2e',

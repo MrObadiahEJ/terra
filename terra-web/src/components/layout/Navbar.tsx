@@ -33,6 +33,12 @@ export default function Navbar() {
           Lab
         </NavLink>
         <NavLink
+          to="/demo"
+          className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+        >
+          Demo
+        </NavLink>
+        <NavLink
           to="/network"
           className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
         >

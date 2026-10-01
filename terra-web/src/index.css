@@ -213,6 +213,8 @@ a {
 .text-\[12px\] { font-size: 12px; }
 .text-\[13px\] { font-size: 13px; }
 .text-sm { font-size: 13px; }
+.text-xs { font-size: 11px; }
+.text-\[11px\] { font-size: 11px; }
 .text-base { font-size: 14px; }
 .text-center { text-align: center; }
 .text-left { text-align: left; }
@@ -1731,3 +1733,140 @@ header .wallet-adapter-button {
 }
 .net-cap.weak { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
 .net-stats { display: flex; justify-content: space-between; color: var(--muted); }
+
+/* ---- demo scenario player (B5/B6 frontend) -------------------------------- */
+.dm-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.dm-banner-err { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.dm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dm-chip {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.dm-chip:hover { border-color: var(--accent); color: var(--accent); }
+.dm-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.dm-input {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  width: 170px;
+}
+.dm-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dm-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  margin-bottom: 12px;
+}
+.dm-ctrls { margin-left: auto; display: flex; gap: 4px; }
+.dm-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 14px;
+}
+@media (max-width: 900px) { .dm-grid { grid-template-columns: 1fr; } }
+.dm-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 12px;
+  min-width: 0;
+}
+.dm-panel-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.dm-progress {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+  min-width: 40px;
+}
+.dm-progress-bar { display: block; height: 100%; background: var(--accent); transition: width 140ms linear; }
+.dm-tl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.dm-ev {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid transparent;
+  opacity: 0.35;
+  animation: dm-fade 240ms ease;
+}
+.dm-ev.cur { opacity: 1; border-color: var(--accent); background: #ecfdf5; }
+@keyframes dm-fade { from { transform: translateY(4px); opacity: 0; } to { transform: translateY(0); } }
+.dm-ev-seq {
+  font-size: 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--muted);
+  text-align: right;
+  padding-top: 2px;
+}
+.dm-kind {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #047857;
+}
+.dm-meta { font-size: 10px; color: var(--muted); }
+.dm-ents { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dm-ent {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 12px;
+}
+.dm-ent-k { color: var(--muted); font-weight: 600; }
+.dm-ent-v { font-size: 11px; word-break: break-all; }
+.dm-pre {
+  margin: 0;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  max-height: 180px;
+}
+.dm-inline { vertical-align: -2px; }

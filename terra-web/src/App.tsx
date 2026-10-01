@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
+import DemoPage from './pages/DemoPage'
 import GlobePage from './pages/GlobePage'
 import LabPage from './pages/LabPage'
 import LandDetailPage from './pages/LandDetailPage'
@@ -17,6 +18,7 @@ const TITLES: Record<string, string> = {
   '/transactions': 'Terra — Transactions',
   '/status': 'Protocol status — Terra',
   '/network': 'Validator network — Terra',
+  '/demo': 'Demo scenarios — Terra',
 }
 
 function DocumentTitle() {
@@ -49,6 +51,7 @@ function App() {
           <Route path="/" element={<GlobePage />} />
           <Route path="/lab/land" element={<LandDetailPage />} />
           <Route path="/lab" element={<LabPage />} />
+          <Route path="/demo" element={<DemoPage />} />
           <Route path="/network" element={<NetworkPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
