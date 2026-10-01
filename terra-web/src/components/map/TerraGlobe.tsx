@@ -28,6 +28,7 @@ interface TerraGlobeProps {
   focus?: { longitude: number; latitude: number; height: number } | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
   onWebGLStatus?: (msg: string | null) => void
+  basemap?: 'imagery' | 'osm'
 }
 
 export default function TerraGlobe({
@@ -42,6 +43,7 @@ export default function TerraGlobe({
   viewMode,
   focus,
   onWebGLStatus,
+  basemap = 'imagery',
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
@@ -81,12 +83,17 @@ export default function TerraGlobe({
         infoBox: false,
         selectionIndicator: false,
         baseLayer: new Cesium.ImageryLayer(
-          // Esri World Imagery serves up to z20 (OSM raster stops at z19).
-          new Cesium.UrlTemplateImageryProvider({
-            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            maximumLevel: 20,
-            credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
-          }),
+          basemap === 'osm'
+            ? new Cesium.UrlTemplateImageryProvider({
+                url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                maximumLevel: 19,
+                credit: '© OpenStreetMap contributors',
+              })
+            : new Cesium.UrlTemplateImageryProvider({
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                maximumLevel: 20,
+                credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+              }),
         ),
         // World Terrain requires a Cesium Ion token. If none is configured we
         // fall back to the bare ellipsoid so the globe works out of the box.
@@ -125,7 +132,7 @@ export default function TerraGlobe({
       viewer.destroy()
       viewerRef.current = null
     }
-  }, [])
+  }, [basemap])
 
   // ---- keep drawing flag in sync -------------------------------------------
   useEffect(() => {
@@ -383,6 +390,7 @@ export default function TerraGlobe({
             onDrawFinish={onDrawFinish}
             onParcelClick={onParcelClick}
             focus={focus}
+            basemap={basemap}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapte
 import {
   Activity,
   ArrowUpRight,
+  Compass,
   FlaskConical,
   Globe2,
   Moon,
@@ -21,7 +22,8 @@ interface Props {
 }
 
 const navigation = [
-  { to: '/', label: 'Explore', icon: Globe2, end: true },
+  { to: '/welcome', label: 'Home', icon: Globe2, end: true },
+  { to: '/atlas', label: 'Explore', icon: Compass },
   { to: '/transactions', label: 'Activity', icon: Activity },
   { to: '/demo', label: 'Demo', icon: ShieldCheck },
   { to: '/network', label: 'Network', icon: Network },
@@ -40,7 +42,7 @@ export default function Navbar({ theme, onToggleTheme }: Props) {
 
   return (
     <header className="app-header">
-      <NavLink to="/" className="brand-lockup" aria-label="Terra home">
+      <NavLink to="/welcome" className="brand-lockup" aria-label="Terra home">
         <span className="brand-mark"><Globe2 size={19} strokeWidth={1.8} /></span>
         <span className="brand-name">terra<span className="brand-period">.</span></span>
       </NavLink>

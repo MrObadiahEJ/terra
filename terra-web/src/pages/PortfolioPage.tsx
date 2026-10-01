@@ -219,11 +219,11 @@ export default function PortfolioPage() {
 
   const openMapParcel = (parcel: OffChainParcel) => {
     selectOffChain(parcel)
-    navigate('/')
+    navigate('/atlas')
   }
   const openChainParcel = (parcel: OnChainParcelItem) => {
     selectParcel(parcel)
-    navigate('/')
+    navigate('/atlas')
   }
 
   const ownedAssetCount = myChainParcels.length + standaloneMapParcels.length
@@ -406,19 +406,19 @@ export default function PortfolioPage() {
             <MapPin size={15} />
             <input value={assetQuery} onChange={(event) => setAssetQuery(event.target.value)} placeholder="Search land assets" aria-label="Search land assets" />
           </label>
-          <Link className="btn btn-primary" to="/"><MapPin size={14} /> Open land atlas</Link>
+          <Link className="btn btn-primary" to="/atlas"><MapPin size={14} /> Open land atlas</Link>
         </div>
         {!address && assetFilter === 'owned' ? (
           <div className="portfolio-empty asset-empty">
             <p>Connect a wallet to see verified holdings.</p>
             <span>Explore the pilot area to preview sample land parcels.</span>
-            <Link to="/">Explore demo parcels <ArrowRight size={13} /></Link>
+            <Link to="/atlas">Explore demo parcels <ArrowRight size={13} /></Link>
           </div>
         ) : assetFilter === 'owned' && myChainParcels.length === 0 && mapRecords.length === 0 ? (
           <div className="portfolio-empty asset-empty">
             <p>No parcels are linked to this wallet yet.</p>
             <span>Draw a boundary and register a parcel, or browse map records.</span>
-            <Link to="/">Register or explore land <ArrowRight size={13} /></Link>
+            <Link to="/atlas">Register or explore land <ArrowRight size={13} /></Link>
           </div>
         ) : (
           <div className="portfolio-asset-list">

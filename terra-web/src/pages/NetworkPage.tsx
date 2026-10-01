@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   admitBps,
@@ -15,6 +15,7 @@ import {
   type Eligibility,
   type GateResult,
 } from '../lib/routingSim'
+import { api, type AuthorityRegistry, type Jurisdiction } from '../lib/api'
 import {
   DEMO_BLOCKHASH,
   DEMO_INITIAL_SLOT,
@@ -23,7 +24,7 @@ import {
   bindingActive,
   type DemoValidator,
 } from '../lib/validatorDemo'
-import { Activity, MapPin, RotateCw } from 'lucide-react'
+import { Activity, Building2, Globe2, MapPin, RotateCw } from 'lucide-react'
 
 // Validator network (B3) — demo dataset + a faithful JS mirror of routing.rs.
 // Every ✓/✗ below runs the same predicates as route_task (availability →
@@ -32,6 +33,14 @@ import { Activity, MapPin, RotateCw } from 'lucide-react'
 
 const GATE_KEYS = ['availability', 'tier', 'reputation', 'capability', 'jurisdiction', 'geo'] as const
 type GateKey = (typeof GATE_KEYS)[number]
+type ProfileResults = [
+  PromiseSettledResult<Jurisdiction[]>,
+  PromiseSettledResult<AuthorityRegistry[]>,
+]
+
+function fetchNetworkProfiles(): Promise<ProfileResults> {
+  return Promise.allSettled([api.listJurisdictions(), api.listRegistries()])
+}
 const GATE_LABELS: Record<GateKey, string> = {
   availability: 'avail',
   tier: 'tier',
@@ -83,6 +92,49 @@ export default function NetworkPage() {
   const [taskId, setTaskId] = useState(DEMO_TASKS[0].id)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [slot, setSlot] = useState(DEMO_INITIAL_SLOT)
+  const [jurisdictions, setJurisdictions] = useState<Jurisdiction[]>([])
+  const [registries, setRegistries] = useState<AuthorityRegistry[]>([])
+  const [profilesLoading, setProfilesLoading] = useState(true)
+  const [profilesError, setProfilesError] = useState<string | null>(null)
+
+  const applyProfiles = useCallback(([jurisdictionResult, registryResult]: ProfileResults) => {
+    setJurisdictions(jurisdictionResult.status === 'fulfilled' ? jurisdictionResult.value : [])
+    setRegistries(registryResult.status === 'fulfilled' ? registryResult.value : [])
+    const errors = [jurisdictionResult, registryResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason instanceof Error ? result.reason.message : String(result.reason))
+    setProfilesError(errors.length ? errors.join(' · ') : null)
+    setProfilesLoading(false)
+  }, [])
+
+  const loadProfiles = useCallback(async () => {
+    setProfilesLoading(true)
+    setProfilesError(null)
+    applyProfiles(await fetchNetworkProfiles())
+  }, [applyProfiles])
+
+  useEffect(() => {
+    let live = true
+    fetchNetworkProfiles().then((results) => {
+      if (live) applyProfiles(results)
+    })
+    return () => {
+      live = false
+    }
+  }, [applyProfiles])
+
+  const demoOrganizations = useMemo(() => {
+    const countries = new Map<string, { countryName: string; organizations: string[] }>()
+    for (const validator of DEMO_VALIDATORS) {
+      const country = countries.get(validator.country) ?? {
+        countryName: validator.countryName,
+        organizations: [],
+      }
+      country.organizations.push(validator.name)
+      countries.set(validator.country, country)
+    }
+    return [...countries.entries()].map(([countryCode, value]) => ({ countryCode, ...value }))
+  }, [])
 
   const now = NOW_S
   const task = useMemo(() => DEMO_TASKS.find((t) => t.id === taskId) ?? DEMO_TASKS[0], [taskId])
@@ -181,6 +233,74 @@ export default function NetworkPage() {
           </Link>
         </div>
       </header>
+
+      <section className="net-directory" aria-labelledby="net-directory-title">
+        <div className="net-directory-head">
+          <div>
+            <span className="welcome-section-kicker">COUNTRY & ORGANIZATION PROFILES</span>
+            <h2 id="net-directory-title">Network directory</h2>
+            <p>Registered jurisdictions and authority registries come from Terra’s backend. The validator showcase is an illustrative demo dataset.</p>
+          </div>
+          <button className="btn btn-secondary px-2 py-1" onClick={() => void loadProfiles()} disabled={profilesLoading}>
+            <RotateCw size={13} className={profilesLoading ? 'spin' : ''} /> {profilesLoading ? 'Refreshing…' : 'Refresh profiles'}
+          </button>
+        </div>
+
+        {profilesError && (
+          <div className="net-directory-error">
+            Some profile data could not be loaded: {profilesError}
+          </div>
+        )}
+
+        <div className="net-directory-grid">
+          <article className="net-directory-panel">
+            <div className="net-directory-panel-head">
+              <span><Globe2 size={14} /> Registered jurisdictions</span>
+              <span className="net-directory-count">{jurisdictions.length}</span>
+            </div>
+            {jurisdictions.length ? jurisdictions.map((profile) => (
+              <div className="net-profile-row" key={profile.id}>
+                <span className="net-profile-mark">{profile.country_code.slice(0, 2).toUpperCase()}</span>
+                <div><strong>{profile.jurisdiction_name}</strong><small>{profile.country_code.toUpperCase()} · {profile.authority || 'Authority not named'}</small></div>
+                <span className={`net-profile-status ${profile.status.toLowerCase()}`}>{profile.status}</span>
+              </div>
+            )) : (
+              <div className="net-directory-empty">{profilesLoading ? 'Loading jurisdiction profiles…' : profilesError ? 'Jurisdiction service unavailable.' : 'No jurisdiction profiles have been registered in the backend yet.'}</div>
+            )}
+          </article>
+
+          <article className="net-directory-panel">
+            <div className="net-directory-panel-head">
+              <span><Building2 size={14} /> Authority registries</span>
+              <span className="net-directory-count">{registries.length}</span>
+            </div>
+            {registries.length ? registries.map((registry) => (
+              <div className="net-profile-row" key={registry.pubkey}>
+                <span className="net-profile-mark authority"><Building2 size={15} /></span>
+                <div><strong>Authority registry</strong><small>{registry.validators.length} validators · {registry.mode === 1 ? 'peer consensus' : 'bootstrap'} · {registry.pubkey.slice(0, 8)}…</small></div>
+                <span className="net-profile-status active">registered</span>
+              </div>
+            )) : (
+              <div className="net-directory-empty">{profilesLoading ? 'Loading authority registries…' : profilesError ? 'Registry service unavailable.' : 'No authority registries have been registered in the backend yet.'}</div>
+            )}
+          </article>
+        </div>
+
+        <div className="net-demo-directory">
+          <div className="net-directory-panel-head">
+            <span><Activity size={14} /> Illustrative validator organizations</span>
+            <span className="net-demo-tag">DEMO DATA — NOT REGISTERED PROFILES</span>
+          </div>
+          <div className="net-demo-country-list">
+            {demoOrganizations.map((country) => (
+              <div key={country.countryCode}>
+                <strong>{country.countryName} <span>{country.countryCode}</span></strong>
+                <small>{country.organizations.join(' · ')}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* task selector */}
       <div className="net-tasks">

@@ -25,6 +25,7 @@ export interface LeafletMapProps {
   onDrawFinish: () => void
   onParcelClick: (id: string) => void
   focus?: { longitude: number; latitude: number; height: number } | null
+  basemap?: 'imagery' | 'osm'
 }
 
 const CENTER: [number, number] = [DEFAULT_FOCUS.latitude, DEFAULT_FOCUS.longitude]
@@ -121,6 +122,7 @@ export default function LeafletMap({
   onDrawFinish,
   onParcelClick,
   focus,
+  basemap = 'imagery',
 }: LeafletMapProps) {
   const suppressUntilRef = useRef(0)
 
@@ -145,10 +147,12 @@ export default function LeafletMap({
     >
       <ZoomBottomLeft />
       <TileLayer
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        maxNativeZoom={20}
+        url={basemap === 'osm'
+          ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+          : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'}
+        maxNativeZoom={basemap === 'osm' ? 19 : 20}
         maxZoom={22}
-        attribution="Esri, Maxar, Earthstar Geographics and the GIS User Community"
+        attribution={basemap === 'osm' ? '© OpenStreetMap contributors' : 'Esri, Maxar, Earthstar Geographics and the GIS User Community'}
       />
       <ClickHandler
         drawing={drawing}

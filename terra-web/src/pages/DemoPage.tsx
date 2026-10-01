@@ -3,21 +3,32 @@ import { Link } from 'react-router-dom'
 import {
   Activity,
   AlertTriangle,
+  Box,
   ChevronRight,
   Fingerprint,
   ListChecks,
+  Map as MapIcon,
   Pause,
   Play,
   RotateCcw,
+  ShieldCheck,
 } from 'lucide-react'
 import {
   api,
   type DemoScenarioInfo,
   type DemoScenarioResult,
+  type OffChainParcel,
+  type RoadRow,
+  type PoiRow,
+  parseGeoJSON,
 } from '../lib/api'
 import { useActivityStore } from '../lib/activityStore'
 import ActivityFeed from '../components/ActivityFeed'
 import { buildLocalDemoScenario } from '../lib/localDemo'
+import TerraGlobe from '../components/map/TerraGlobe'
+import { DEMO_PARCELS, DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
+import { polygonCentroid, type LonLat } from '../lib/geo'
+import { DEFAULT_FOCUS } from '../lib/constants'
 
 // Demo scenario player (B5/B6 frontend) — renders a deterministic scenario
 // from POST /api/v1/demo/scenarios/* as an animated event timeline.
@@ -49,6 +60,34 @@ const ENVELOPE_KEYS = new Set([
 
 type DetState = 'idle' | 'checking' | 'same' | 'diff' | 'error'
 type ScenarioSource = 'api' | 'local'
+type PolygonGeometry = { type: string; coordinates: number[][][] }
+
+function parcelRing(parcel: OffChainParcel | null): LonLat[] {
+  const geometry = parseGeoJSON<PolygonGeometry>(parcel?.geometry)
+  if (!geometry || geometry.type !== 'Polygon' || !geometry.coordinates[0]) return []
+  return geometry.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat)
+}
+
+function parcelFocus(parcel: OffChainParcel | null) {
+  const ring = parcelRing(parcel)
+  if (ring.length < 3) return null
+  const [longitude, latitude] = polygonCentroid(ring)
+  return { longitude, latitude, height: 1800 }
+}
+
+function parcelBounds(parcel: OffChainParcel | null) {
+  const ring = parcelRing(parcel)
+  if (!ring.length) return null
+  const longitudes = ring.map(([lon]) => lon)
+  const latitudes = ring.map(([, lat]) => lat)
+  const padding = 0.015
+  return {
+    minx: Math.min(...longitudes) - padding,
+    miny: Math.min(...latitudes) - padding,
+    maxx: Math.max(...longitudes) + padding,
+    maxy: Math.max(...latitudes) + padding,
+  }
+}
 
 async function executeScenario(name: string, seed: string) {
   try {
@@ -82,6 +121,14 @@ export default function DemoPage() {
   const [offlineReason, setOfflineReason] = useState<string | null>(null)
   const [speed, setSpeed] = useState(2)
   const [runId, setRunId] = useState(0)
+  const [sceneParcels, setSceneParcels] = useState<OffChainParcel[]>(DEMO_PARCELS)
+  const [selectedSceneParcelId, setSelectedSceneParcelId] = useState(DEMO_PARCELS[0].id)
+  const [sceneSource, setSceneSource] = useState<'loading' | 'api' | 'sample'>('loading')
+  const [sceneRoads, setSceneRoads] = useState<RoadRow[]>([])
+  const [scenePois, setScenePois] = useState<PoiRow[]>([])
+  const [sceneContextSource, setSceneContextSource] = useState<'loading' | 'fusion' | 'empty' | 'sample'>('loading')
+  const [sceneView, setSceneView] = useState<'2d' | '3d'>('3d')
+  const [sceneWebglError, setSceneWebglError] = useState<string | null>(null)
   const tlRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -100,6 +147,64 @@ export default function DemoPage() {
       live = false
     }
   }, [])
+
+  const selectedSceneParcel = sceneParcels.find((parcel) => parcel.id === selectedSceneParcelId) ?? sceneParcels[0] ?? null
+  const sceneFocus = parcelFocus(selectedSceneParcel) ?? DEFAULT_FOCUS
+  const includesValidatorReview = ['verification', 'validator-routing', 'spatial-update', 'fraud-review', 'recovery']
+    .includes(data?.scenario ?? '')
+
+  useEffect(() => {
+    let live = true
+    api.listParcels().then((parcels) => {
+      if (!live) return
+      const usable = parcels.filter((parcel) => parcelRing(parcel).length >= 3)
+      if (usable.length) {
+        setSceneParcels(usable)
+        setSelectedSceneParcelId(usable[0].id)
+        setSceneSource('api')
+      } else {
+        setSceneParcels(DEMO_PARCELS)
+        setSelectedSceneParcelId(DEMO_PARCELS[0].id)
+        setSceneSource('sample')
+      }
+    }).catch(() => {
+      if (!live) return
+      setSceneParcels(DEMO_PARCELS)
+      setSelectedSceneParcelId(DEMO_PARCELS[0].id)
+      setSceneSource('sample')
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (sceneSource === 'loading' || !selectedSceneParcel) return
+    let live = true
+    const bounds = parcelBounds(selectedSceneParcel)
+    if (!bounds) return
+    Promise.allSettled([api.roads(bounds), api.poisFusion(bounds)]).then(([roads, pois]) => {
+      if (!live) return
+      const loadedRoads = roads.status === 'fulfilled' ? roads.value : []
+      const loadedPois = pois.status === 'fulfilled' ? pois.value : []
+      if (loadedRoads.length || loadedPois.length) {
+        setSceneRoads(loadedRoads)
+        setScenePois(loadedPois)
+        setSceneContextSource('fusion')
+      } else if (sceneSource === 'sample') {
+        setSceneRoads(DEMO_ROADS)
+        setScenePois(DEMO_POIS)
+        setSceneContextSource('sample')
+      } else {
+        setSceneRoads([])
+        setScenePois([])
+        setSceneContextSource('empty')
+      }
+    })
+    return () => {
+      live = false
+    }
+  }, [sceneSource, selectedSceneParcel])
 
   const events = data?.events ?? []
   const last = events.length - 1
@@ -164,14 +269,13 @@ export default function DemoPage() {
     }
   }, [sel, seed])
 
-  // Deep link: /demo?scenario=verification&seed=… auto-runs once on mount.
+  // Start the walkthrough on arrival; query parameters select a specific replay.
   const autoRan = useRef(false)
   useEffect(() => {
     if (autoRan.current) return
     autoRan.current = true
     const q = new URLSearchParams(window.location.search)
-    const name = q.get('scenario')
-    if (!name) return
+    const name = q.get('scenario') ?? 'verification'
     const sd = q.get('seed') ?? undefined
     // Deliberately no cleanup: StrictMode runs setup→cleanup→setup, and the
     // autoRan guard means only the first setup schedules this timeout — a
@@ -225,7 +329,7 @@ export default function DemoPage() {
   }[det]
 
   return (
-    <div className="st-page">
+    <div className="st-page dm-page">
       <header className="land-head">
         <div className="min-w-0">
           <h1 className="land-title">
@@ -362,6 +466,100 @@ export default function DemoPage() {
             </div>
           )}
 
+          <section className="dm-spatial-grid" aria-label="Spatial parcel and validator replay">
+            <div className="dm-scene-panel">
+              <div className="dm-panel-h">
+                <span><MapIcon size={14} /> Parcel in context</span>
+                <div className="dm-scene-actions">
+                  {sceneParcels.length > 1 && (
+                    <select
+                      className="dm-scene-select"
+                      value={selectedSceneParcel?.id ?? ''}
+                      onChange={(event) => setSelectedSceneParcelId(event.target.value)}
+                      aria-label="Choose a parcel for the demo scene"
+                    >
+                      {sceneParcels.map((parcel) => <option key={parcel.id} value={parcel.id}>{parcel.name}</option>)}
+                    </select>
+                  )}
+                  <div className="land-viewer-seg" role="group" aria-label="Parcel map view">
+                    <button className={`land-viewer-segbtn ${sceneView === '2d' ? 'on' : ''}`} onClick={() => setSceneView('2d')} aria-pressed={sceneView === '2d'}><MapIcon size={12} /> 2D</button>
+                    <button className={`land-viewer-segbtn ${sceneView === '3d' ? 'on' : ''}`} onClick={() => setSceneView('3d')} aria-pressed={sceneView === '3d'} disabled={Boolean(sceneWebglError)} title={sceneWebglError ? '3D view requires WebGL' : '3D globe view'}><Box size={12} /> 3D</button>
+                  </div>
+                </div>
+              </div>
+              <div className="dm-scene-map">
+                {sceneSource === 'loading' ? (
+                  <div className="dm-scene-placeholder">Loading parcel geometry…</div>
+                ) : (
+                  <TerraGlobe
+                    offChainParcels={sceneParcels}
+                    roads={sceneRoads}
+                    pois={scenePois}
+                    drawing={false}
+                    drawVertices={[]}
+                    onDrawVertexAdd={() => undefined}
+                    onDrawFinish={() => undefined}
+                    onParcelClick={setSelectedSceneParcelId}
+                    viewMode={sceneView}
+                    focus={sceneFocus}
+                    basemap="osm"
+                    onWebGLStatus={(error) => {
+                      setSceneWebglError(error)
+                      if (error) setSceneView('2d')
+                    }}
+                  />
+                )}
+                <span className={`dm-scene-source ${sceneSource === 'sample' || sceneContextSource === 'sample' ? 'sample' : ''}`}>
+                  {sceneSource === 'loading'
+                    ? 'LOADING MAP DATA'
+                    : sceneSource === 'sample'
+                      ? 'SAMPLE PARCEL · NOT CADASTRAL'
+                      : 'PARCEL GEOMETRY · TERRA API'}
+                  {sceneContextSource === 'fusion' && ' · OSM FUSION LAYERS'}
+                </span>
+                {sceneWebglError && <span className="dm-scene-fallback">3D unavailable — showing 2D map</span>}
+              </div>
+              <div className="dm-scene-foot">
+                <strong>{selectedSceneParcel?.name ?? 'Parcel preview'}</strong>
+                <span>{selectedSceneParcel?.area_m2 ? `${(selectedSceneParcel.area_m2 / 10_000).toFixed(2)} ha` : 'Area not recorded'}</span>
+                <span>{sceneContextSource === 'fusion' ? `${sceneRoads.length} roads · ${scenePois.length} places` : sceneContextSource === 'empty' ? 'No nearby OSM context ingested' : sceneContextSource === 'sample' ? 'Illustrative map context' : 'Loading map context…'}</span>
+              </div>
+            </div>
+
+            <aside className="dm-review-panel">
+              <div className="dm-panel-h"><span><ShieldCheck size={14} /> {includesValidatorReview ? 'Validator decision replay' : 'Protocol event replay'}</span><span className="dm-sim-badge">SIMULATED</span></div>
+              <div className="dm-review-summary">
+                <span className={`dm-review-indicator ${phase >= 0 ? 'running' : ''}`} />
+                <div><strong>{phase < 0 ? 'Awaiting scenario' : events[phase]?.kind.replaceAll('_', ' ')}</strong><small>{phase < 0 ? 'Start playback to follow each review step.' : events[phase]?.detail}</small></div>
+              </div>
+              {includesValidatorReview ? (
+                <>
+                  <div className="dm-reviewers">
+                    {['Reviewer 01', 'Reviewer 02', 'Reviewer 03'].map((reviewer, index) => {
+                      const kind = phase >= 0 ? events[phase]?.kind ?? '' : ''
+                      const hasReviewStarted = phase >= 0 && phase >= index + 1
+                      const decisionReady = kind.includes('QUORUM') || kind.includes('VERIFIED') || kind.includes('FINALIZED')
+                      const selectedWinner = data.scenario === 'validator-routing' && kind === 'WINNER_SELECTED'
+                      const isNotSelected = selectedWinner && index > 0
+                      const settled = decisionReady || (selectedWinner && index === 0)
+                      return (
+                        <div className="dm-reviewer" key={reviewer}>
+                          <span className={`dm-review-avatar ${settled ? 'approved' : hasReviewStarted ? 'checking' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
+                          <span><strong>{reviewer}</strong><small>{decisionReady ? 'Vote included in replay quorum' : selectedWinner && index === 0 ? 'Seeded task winner' : isNotSelected ? 'Not selected for this task' : hasReviewStarted ? 'Checking review gates' : 'In queue'}</small></span>
+                          <i className={settled ? 'approved' : hasReviewStarted ? 'checking' : ''} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="dm-review-foot"><Fingerprint size={13} /> Seeded reviewer replay · no chain writes</div>
+                </>
+              ) : (
+                <div className="dm-review-no-votes">This scenario records protocol events but does not model validator votes.</div>
+              )}
+              <ActivityFeed pollMs={5000} />
+            </aside>
+          </section>
+
           <div className="dm-grid">
             {/* event timeline */}
             <div className="dm-panel">
@@ -417,14 +615,12 @@ export default function DemoPage() {
         </>
       )}
 
-      <ActivityFeed />
-
       {!data && !err && (
         <div className="dm-panel text-xs text-muted">
-          Pick a scenario, optionally change the seed, then <strong>Run scenario</strong>.
-          The API or deterministic local preview will return entities, ordered events and a
-          result. Use <strong>Verify determinism</strong> to confirm the same seed replays
-          identically. No wallet, chain writes or unrepeatable randomness.
+        The verification walkthrough starts automatically. Choose another scenario or seed
+        above, then use <strong>Run scenario</strong> to replay it. The API or deterministic
+        local preview returns entities, ordered events and a result. No wallet, chain writes
+        or unrepeatable randomness.
         </div>
       )}
     </div>

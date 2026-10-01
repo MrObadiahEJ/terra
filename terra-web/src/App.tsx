@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import Navbar from './components/layout/Navbar'
 import DemoPage from './pages/DemoPage'
 import GlobePage from './pages/GlobePage'
+import WelcomePage from './pages/WelcomePage'
 import LabPage from './pages/LabPage'
 import LandDetailPage from './pages/LandDetailPage'
 import NetworkPage from './pages/NetworkPage'
@@ -15,6 +16,8 @@ import { useAppStore } from './store/appStore'
 
 const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
+  '/welcome': 'Terra — Land, identity & activity',
+  '/atlas': 'Terra — Land atlas',
   '/lab': 'Terra Lab — Interactive demos',
   '/transactions': 'Terra — Transactions',
   '/portfolio': 'Identity & portfolio — Terra',
@@ -61,7 +64,9 @@ function App() {
           onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
         />
         <Routes>
-          <Route path="/" element={<GlobePage />} />
+          <Route path="/" element={<Navigate to="/welcome" replace />} />
+          <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="/atlas" element={<GlobePage />} />
           <Route path="/lab/land" element={<LandDetailPage />} />
           <Route path="/lab" element={<LabPage />} />
           <Route path="/demo" element={<DemoPage />} />
@@ -69,7 +74,7 @@ function App() {
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/welcome" replace />} />
         </Routes>
         <Toasts />
       </div>
