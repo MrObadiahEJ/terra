@@ -20,6 +20,16 @@ import {
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
 
+function parcelFocus(parcel: OffChainParcel | null): typeof DEFAULT_FOCUS | null {
+  if (!parcel) return null
+  const polygon = parseGeoJSON<{ type: string; coordinates: number[][][] }>(parcel.geometry)
+  if (!polygon || polygon.type !== 'Polygon' || polygon.coordinates[0].length < 3) return null
+  const [longitude, latitude] = polygonCentroid(
+    polygon.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat),
+  )
+  return { longitude, latitude, height: 1800 }
+}
+
 export default function GlobePage() {
   const {
     offChainParcels,
@@ -44,8 +54,12 @@ export default function GlobePage() {
   const [showLayers, setShowLayers] = useState({ parcels: true, roads: true, pois: true })
   const [snapGeom, setSnapGeom] = useState(true)
   const [snapGrid, setSnapGrid] = useState(false)
-  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d')
-  const [focus, setFocus] = useState(DEFAULT_FOCUS)
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>(() =>
+    localStorage.getItem('terra-map-view') === '2d' ? '2d' : '3d',
+  )
+  const [focus, setFocus] = useState(
+    () => parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS,
+  )
 
   // Initial load of off-chain data + stats.
   useEffect(() => {
@@ -104,9 +118,13 @@ export default function GlobePage() {
   const shownPois = showLayers.pois ? pois : []
   const usingDemo = demoMode || layersDemo
 
+  useEffect(() => {
+    localStorage.setItem('terra-map-view', viewMode)
+  }, [viewMode])
+
   // Parcel boundaries as snap candidates while drawing.
   const snapRings = useMemo(() => {
-    const rings: LonLat[] = []
+    const rings: LonLat[][] = []
     for (const p of shownParcels) {
       const poly = parseGeoJSON<{ type: string; coordinates: number[][][] }>(p.geometry)
       if (!poly || poly.type !== 'Polygon') continue
@@ -159,12 +177,8 @@ export default function GlobePage() {
   }, [selectedParcel, offChainParcels])
 
   const focusParcel = useCallback((parcel: OffChainParcel) => {
-    const polygon = parseGeoJSON<{ type: string; coordinates: number[][][] }>(parcel.geometry)
-    if (!polygon || polygon.type !== 'Polygon' || polygon.coordinates[0].length < 3) return
-    const [longitude, latitude] = polygonCentroid(
-      polygon.coordinates[0].map(([lon, lat]) => [lon, lat] as LonLat),
-    )
-    setFocus({ longitude, latitude, height: 1800 })
+    const nextFocus = parcelFocus(parcel)
+    if (nextFocus) setFocus(nextFocus)
   }, [])
 
   const onSelectParcel = useCallback((p: OnChainParcelItem) => {

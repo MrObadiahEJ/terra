@@ -17,6 +17,7 @@ import {
 } from '../lib/api'
 import { useActivityStore } from '../lib/activityStore'
 import ActivityFeed from '../components/ActivityFeed'
+import { buildLocalDemoScenario } from '../lib/localDemo'
 
 // Demo scenario player (B5/B6 frontend) — renders a deterministic scenario
 // from POST /api/v1/demo/scenarios/* as an animated event timeline.
@@ -43,12 +44,28 @@ const ENVELOPE_KEYS = new Set([
   'program',
   'events',
   'result',
+  'source',
 ])
 
 type DetState = 'idle' | 'checking' | 'same' | 'diff' | 'error'
+type ScenarioSource = 'api' | 'local'
+
+async function executeScenario(name: string, seed: string) {
+  try {
+    return { data: await api.runDemoScenario(name, seed), source: 'api' as const, reason: null }
+  } catch (error) {
+    const data = buildLocalDemoScenario(name, seed)
+    return {
+      data,
+      source: 'local' as const,
+      reason: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
 
 export default function DemoPage() {
   const [catalogue, setCatalogue] = useState<DemoScenarioInfo[]>(FALLBACK)
+  const [catalogueSource, setCatalogueSource] = useState<'checking' | 'api' | 'local'>('checking')
   const [sel, setSel] = useState(
     () => new URLSearchParams(window.location.search).get('scenario') ?? 'verification',
   )
@@ -61,6 +78,8 @@ export default function DemoPage() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [det, setDet] = useState<DetState>('idle')
+  const [scenarioSource, setScenarioSource] = useState<ScenarioSource | null>(null)
+  const [offlineReason, setOfflineReason] = useState<string | null>(null)
   const [speed, setSpeed] = useState(2)
   const [runId, setRunId] = useState(0)
   const tlRef = useRef<HTMLDivElement | null>(null)
@@ -70,10 +89,12 @@ export default function DemoPage() {
     api
       .listDemoScenarios()
       .then((r) => {
-        if (live && r.scenarios?.length) setCatalogue(r.scenarios)
+        if (!live) return
+        if (r.scenarios?.length) setCatalogue(r.scenarios)
+        setCatalogueSource('api')
       })
       .catch(() => {
-        /* API down — keep the fallback catalogue so the page stays usable */
+        if (live) setCatalogueSource('local')
       })
     return () => {
       live = false
@@ -125,14 +146,18 @@ export default function DemoPage() {
     setErr(null)
     setDet('idle')
     try {
-      const r = await api.runDemoScenario(scenario, seedVal)
-      setData(r)
+      const result = await executeScenario(scenario, seedVal ?? 'default')
+      setData(result.data)
+      setScenarioSource(result.source)
+      setOfflineReason(result.reason)
       setPhase(0)
       setRunId((n) => n + 1)
-      setPlaying(r.events.length > 1)
+      setPlaying(result.data.events.length > 1)
     } catch (e) {
       setData(null)
       setPlaying(false)
+      setScenarioSource(null)
+      setOfflineReason(null)
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
@@ -159,9 +184,13 @@ export default function DemoPage() {
   const checkDeterminism = async () => {
     setDet('checking')
     try {
-      const a = await api.runDemoScenario(sel, seed || undefined)
-      const b = await api.runDemoScenario(sel, seed || undefined)
-      setDet(JSON.stringify(a) === JSON.stringify(b) ? 'same' : 'diff')
+      const [a, b] = await Promise.all([
+        executeScenario(sel, seed || 'default'),
+        executeScenario(sel, seed || 'default'),
+      ])
+      setDet(a.source === b.source && JSON.stringify(a.data) === JSON.stringify(b.data) ? 'same' : 'diff')
+      setScenarioSource(a.source)
+      setOfflineReason(a.reason)
     } catch {
       setDet('error')
     }
@@ -203,11 +232,10 @@ export default function DemoPage() {
             <Activity size={18} /> Terra — Demo scenario player
           </h1>
           <p className="text-xs text-muted max-w-3xl">
-            Deterministic, seeded previews served by{' '}
-            <span className="font-mono">POST /api/v1/demo/scenarios/*</span>. The same
-            scenario + seed always produces a byte-identical payload — hit{' '}
-            <strong>Verify determinism</strong> to prove it. Event kinds mirror
-            on-chain instruction names 1:1.
+            Seeded protocol scenarios use{' '}
+            <span className="font-mono">POST /api/v1/demo/scenarios/*</span> when the API is
+            available. Offline, a deterministic browser preview keeps the timeline and controls
+            working. Both are clearly labelled and never write chain state.
           </p>
         </div>
         <div className="land-badges">
@@ -230,6 +258,14 @@ export default function DemoPage() {
             {s.name}
           </button>
         ))}
+      </div>
+      <div className="dm-catalogue-status">
+        <span className={`lab-badge ${catalogueSource === 'local' ? 'lab-badge-warn' : 'lab-badge-info'}`}>
+          {catalogueSource === 'checking' ? 'CHECKING SCENARIO API' : catalogueSource === 'api' ? 'API CATALOGUE' : 'BUILT-IN CATALOGUE'}
+        </span>
+        <span className="text-xs text-muted">
+          {catalogueSource === 'local' ? 'The scenario API is unavailable; previews still run in this browser.' : 'Seeded demos are reproducible. No wallet approval or chain write is required.'}
+        </span>
       </div>
       <p className="text-xs text-muted mb-2">
         {catalogue.find((s) => s.name === sel)?.description}
@@ -285,6 +321,9 @@ export default function DemoPage() {
           {/* result strip */}
           <div className="dm-result">
             <span className="lab-badge lab-badge-ok">{data.result}</span>
+            <span className={`lab-badge ${scenarioSource === 'local' ? 'lab-badge-warn' : 'lab-badge-info'}`}>
+              {scenarioSource === 'local' ? 'LOCAL PREVIEW' : 'API ENGINE'}
+            </span>
             <span className="text-xs text-muted">
               <ListChecks size={12} className="dm-inline" /> {data.scenario} · seed{' '}
               <span className="font-mono">{data.seed}</span> · {events.length} events ·{' '}
@@ -315,6 +354,13 @@ export default function DemoPage() {
               </button>
             </span>
           </div>
+
+          {offlineReason && (
+            <div className="dm-banner dm-banner-offline">
+              <AlertTriangle size={14} />
+              <span>Scenario API unavailable ({offlineReason}). This repeatable browser-only preview keeps the demo interactive; it does not write chain state.</span>
+            </div>
+          )}
 
           <div className="dm-grid">
             {/* event timeline */}
@@ -375,10 +421,10 @@ export default function DemoPage() {
 
       {!data && !err && (
         <div className="dm-panel text-xs text-muted">
-          Pick a scenario, optionally change the seed, then <strong>Run scenario</strong> —
-          the endpoint returns a full deterministic story (entities + ordered events +
-          result) in one round-trip. No wallet, no chain, no randomness you cannot
-          reproduce.
+          Pick a scenario, optionally change the seed, then <strong>Run scenario</strong>.
+          The API or deterministic local preview will return entities, ordered events and a
+          result. Use <strong>Verify determinism</strong> to confirm the same seed replays
+          identically. No wallet, chain writes or unrepeatable randomness.
         </div>
       )}
     </div>

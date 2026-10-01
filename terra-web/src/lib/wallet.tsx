@@ -70,6 +70,7 @@ export interface WalletView {
   error: string | null
   walletName: string | null
   anchorWallet: AnchorWallet | undefined
+  signMessage: ((message: Uint8Array) => Promise<Uint8Array>) | null
   send: (tx: Transaction) => Promise<string>
 }
 
@@ -81,6 +82,7 @@ function useWalletView(): WalletView {
     wallet,
     signTransaction,
     signAllTransactions,
+    signMessage,
   } = useAdapterWallet()
 
   const anchorWallet = useMemo<AnchorWallet | undefined>(() => {
@@ -105,6 +107,7 @@ function useWalletView(): WalletView {
     error: null,
     walletName: wallet?.adapter.name ?? null,
     anchorWallet,
+    signMessage: signMessage ?? null,
     send,
   }
 }

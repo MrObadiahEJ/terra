@@ -8,6 +8,7 @@ import {
   Globe2,
   Moon,
   Network,
+  BriefcaseBusiness,
   ShieldCheck,
   Sun,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ const navigation = [
   { to: '/transactions', label: 'Activity', icon: Activity },
   { to: '/demo', label: 'Demo', icon: ShieldCheck },
   { to: '/network', label: 'Network', icon: Network },
+  { to: '/portfolio', label: 'Portfolio', icon: BriefcaseBusiness },
   { to: '/lab', label: 'Studio', icon: FlaskConical },
   { to: '/status', label: 'Status', icon: ShieldCheck },
 ]

@@ -188,6 +188,11 @@ pub async fn bind_identity(
     // Owner must be a valid base58 32-byte address.
     let _ = decode_wallet(&req.owner)?;
     let _ = decode_wallet(&req.recovery)?;
+    // Authenticate every new binding as well as updates; a caller-supplied
+    // public wallet address alone must never authorize creating an identity.
+    signed
+        .verify_wallet(&req.owner, "POST", "/api/v1/identities")
+        .map_err(|_| AppError::unauthorized("caller must sign with the owner wallet"))?;
 
     let mut tx = state.pool.begin().await?;
 
@@ -205,16 +210,6 @@ pub async fn bind_identity(
                 "identity already exists with a different owner; transfer ownership on-chain first",
             ));
         }
-        // Cryptographic proof: caller must sign with the current owner wallet's
-        // private key. The plaintext match above is not sufficient — the owner
-        // address is public data readable by anyone.
-        signed
-            .verify_wallet(&current_owner, "POST", "/api/v1/identities")
-            .map_err(|_| {
-                AppError::unauthorized(
-                    "identity exists: caller must sign with the current owner wallet's private key",
-                )
-            })?;
     }
 
     let row = sqlx::query_as::<_, IdentityRow>(
@@ -655,6 +650,29 @@ pub fn decode_wallet(s: &str) -> Result<[u8; 32], AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    #[test]
+    fn identity_binding_signature_must_belong_to_owner_wallet() {
+        let owner = SigningKey::from_bytes(&[7u8; 32]);
+        let owner_wallet = bs58::encode(owner.verifying_key().as_bytes()).into_string();
+        let digest = hex::encode([9u8; 32]);
+        let timestamp = 1_800_000_000;
+        let payload = format!("POST\n/api/v1/identities\n{digest}\n{timestamp}");
+        let signed = SignedRequest {
+            signature: owner.sign(payload.as_bytes()),
+            timestamp,
+            body_hash_hex: digest,
+        };
+
+        assert!(signed
+            .verify_wallet(&owner_wallet, "POST", "/api/v1/identities")
+            .is_ok());
+        let other_wallet = bs58::encode([8u8; 32]).into_string();
+        assert!(signed
+            .verify_wallet(&other_wallet, "POST", "/api/v1/identities")
+            .is_err());
+    }
 
     /// A passation is only valid if the required threshold does not exceed the
     /// set of known validators, so the endorsing set can always reach quorum.

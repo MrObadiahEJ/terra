@@ -198,7 +198,7 @@ export default function TerraGlobe({
       handler.getInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK) as
         | Cesium.ScreenSpaceEventHandler.PositionedEventCallback
         | undefined
-    handler.setInputAction((movement) => {
+    handler.setInputAction((movement: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
       if (drawingRef.current) {
         pendingDblSwallowRef.current = false
         onDrawFinishRef.current?.()

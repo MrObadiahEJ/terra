@@ -426,7 +426,7 @@ export interface CrossBorderBinding {
   country_code: string
 }
 
-export interface BindIdentityInput {
+export interface BindCrossBorderIdentityInput {
   jurisdiction_id: string
   identity_hash: string
   credential_commitment: string
@@ -743,6 +743,32 @@ async function request<T>(path: string, init?: RequestInit, retries = 1): Promis
   }
 }
 
+async function signedIdentityRequest<T>(
+  input: BindIdentityInput,
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
+): Promise<T> {
+  const body = JSON.stringify(input)
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body))
+  const bodyHash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  const timestamp = Math.floor(Date.now() / 1000)
+  const payload = `POST\n${API_BASE}/identities\n${bodyHash}\n${timestamp}`
+  const signature = await signMessage(new TextEncoder().encode(payload))
+  const signatureBase64 = btoa(String.fromCharCode(...signature))
+
+  return request<T>('/identities', {
+    method: 'POST',
+    body,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Signature ${signatureBase64}`,
+      'x-timestamp': String(timestamp),
+      'x-body-hash': bodyHash,
+    },
+  })
+}
+
 // ---- Demo scenario engine (B5/B6): deterministic, seeded, demo-labelled ----
 
 export interface DemoScenarioInfo {
@@ -848,8 +874,8 @@ export const api = {
     }),
 
   // identities + wallet passation (person->wallet binding, recovery, succession)
-  bindIdentity: (input: BindIdentityInput) =>
-    request<IdentityView>(`/identities`, { method: 'POST', body: JSON.stringify(input) }),
+  bindIdentity: (input: BindIdentityInput, signMessage: (message: Uint8Array) => Promise<Uint8Array>) =>
+    signedIdentityRequest<IdentityView>(input, signMessage),
   getIdentityByWallet: (wallet: string) =>
     request<IdentityView>(`/identities/${wallet}`),
   requestSuccession: (identityHash: string, input: RequestSuccessionInput) =>
@@ -1022,7 +1048,7 @@ export const api = {
     }),
   listBindings: () => request<CrossBorderBinding[]>('/cross-border/bindings'),
   getBinding: (id: string) => request<CrossBorderBinding>(`/cross-border/bindings/${id}`),
-  bindIdentity: (input: BindIdentityInput) =>
+  bindCrossBorderIdentity: (input: BindCrossBorderIdentityInput) =>
     request<CrossBorderBinding>('/cross-border/bindings', {
       method: 'POST', body: JSON.stringify(input),
     }),

@@ -6,6 +6,7 @@ import GlobePage from './pages/GlobePage'
 import LabPage from './pages/LabPage'
 import LandDetailPage from './pages/LandDetailPage'
 import NetworkPage from './pages/NetworkPage'
+import PortfolioPage from './pages/PortfolioPage'
 import StatusPage from './pages/StatusPage'
 import TransactionsPage from './pages/TransactionsPage'
 import Toasts from './components/Toasts'
@@ -16,6 +17,7 @@ const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
   '/lab': 'Terra Lab — Interactive demos',
   '/transactions': 'Terra — Transactions',
+  '/portfolio': 'Identity & portfolio — Terra',
   '/status': 'Protocol status — Terra',
   '/network': 'Validator network — Terra',
   '/demo': 'Demo scenarios — Terra',
@@ -64,6 +66,7 @@ function App() {
           <Route path="/lab" element={<LabPage />} />
           <Route path="/demo" element={<DemoPage />} />
           <Route path="/network" element={<NetworkPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
