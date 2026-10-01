@@ -238,7 +238,7 @@ cd terra-core
 cargo fmt --check
 cargo clippy -- -D warnings              # CI-exact (libs only — CI does not lint test targets)
 cargo test -p terra-registry --lib       # 131 unit tests
-cargo test -p terra-registry --test integration   # 302 tests, --test-threads=1 in CI
+cargo test -p terra-registry --test integration   # 302 tests (make test: --test-threads=1; CI does not run this suite)
 anchor build --skip-lint                 # CI build path (fresh .so needed before running tests)
 ```
 

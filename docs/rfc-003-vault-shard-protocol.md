@@ -582,5 +582,5 @@ If the reconstruction device is seized:
 
 **Next for this RFC:**
 1. No known open Critical/High for vault — re-audit after any seed/layout change.
-2. Cover long-form BPF cases in `terra-registry/tests/integration.rs` when a full run is possible (302-test suite, ~3.5 min locally).
+2. Cover long-form BPF cases in `terra-registry/tests/integration.rs` (302-test suite, ~3.5 min locally).
 3. After program edits: `make idl` so `terra-web` types stay in sync.
