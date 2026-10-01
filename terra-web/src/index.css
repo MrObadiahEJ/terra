@@ -1393,3 +1393,50 @@ header .wallet-adapter-button {
   border-radius: 4px;
   min-width: 60px;
 }
+
+/* CadaSPACE-style rights volumes (strata) */
+.lv-vol { transition: opacity 120ms ease; }
+.lv-vol.clickable { cursor: pointer; }
+.lv-vol.clickable:hover polygon { fill-opacity: 0.55; }
+.lv-vol-t {
+  font-size: 9px;
+  font-weight: 700;
+  fill: #475569;
+  paint-order: stroke;
+  stroke: rgba(244, 245, 247, 0.85);
+  stroke-width: 2.5px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  pointer-events: none;
+}
+.lv-vol-t.current { fill: var(--accent); }
+.land-viewer-strata {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.land-stratum-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.land-stratum-chip.box { cursor: default; border-style: dashed; }
+.land-stratum-chip:hover { background: var(--bg); }
+.land-stratum-chip.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.land-stratum-chip.verified { color: var(--accent); }
+.land-stratum-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1.5px solid transparent;
+  flex: none;
+}

@@ -17,7 +17,7 @@ import {
   polygonPerimeterM,
   ringDigest,
 } from '../lib/geo'
-import LandViewer from '../components/lab/LandViewer'
+import LandViewer, { type VolumeLayer } from '../components/lab/LandViewer'
 import ElevationCrossSection from '../components/lab/ElevationCrossSection'
 import { ArrowLeft, MapPin, ShieldCheck, ScrollText, Box } from 'lucide-react'
 
@@ -42,7 +42,7 @@ function Row({ k, v, title }: { k: string; v: string; title?: string }) {
 
 export default function LandDetailPage() {
   const v = useLabVault()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const vRaw = params.get('v')
 
   // Resolve which land state to show: ?v=N → that version, ?v=claim → the
@@ -91,6 +91,46 @@ export default function LandDetailPage() {
   const elevSource = entry ? entry.elevationSource : 0
   const dimension = entry ? entry.dimension : 0
   const seedHex = entry ? entry.geometryHash : digest ?? '0'.repeat(64)
+
+  // CadaSPACE-style rights volumes: every anchored version is a translucent
+  // stratum at its elevation envelope; the asset envelope is the bounding box.
+  const volumes = useMemo<VolumeLayer[]>(() => {
+    const out: VolumeLayer[] = []
+    if (v.initialized) {
+      out.push({
+        id: 'asset',
+        label: 'asset envelope',
+        minM: v.elevationMinMm / 1000,
+        maxM: v.elevationMaxMm / 1000,
+        color: '#10b981',
+        box: true,
+      })
+    }
+    for (const x of v.versions) {
+      out.push({
+        id: String(x.version),
+        label: `v${x.version}`,
+        minM: x.elevationMinMm / 1000,
+        maxM: x.elevationMaxMm / 1000,
+        color: ELEVATION_SOURCES[x.elevationSource]?.color ?? '#9ca3af',
+        verified: x.verified,
+        current: entry?.version === x.version,
+      })
+    }
+    return out
+  }, [v.initialized, v.elevationMinMm, v.elevationMaxMm, v.versions, entry])
+
+  const volumeDomain = useMemo<[number, number]>(() => {
+    if (v.initialized) return [v.elevationMinMm / 1000, v.elevationMaxMm / 1000]
+    const strata = volumes.filter((l) => !l.box)
+    if (strata.length === 0) return [0, 1000]
+    return [
+      Math.min(0, ...strata.map((l) => l.minM)),
+      Math.max(1, ...strata.map((l) => l.maxM)),
+    ]
+  }, [v.initialized, v.elevationMinMm, v.elevationMaxMm, volumes])
+
+  const openStratum = (id: string) => setParams({ v: id })
 
   const title = entry ? `Land — GeometryVersion v${entry.version}` : 'Land — current claim'
   const required = entry?.required ?? (v.quorumConfig > 0 ? v.quorumConfig : DEFAULT_GEOMETRY_QUOROM)
@@ -257,10 +297,18 @@ export default function LandDetailPage() {
               dimension={dimension}
               seedHex={seedHex}
               verified={entry?.verified ?? false}
+              volumes={volumes}
+              volumeDomain={volumeDomain}
+              onVolumeClick={openStratum}
             />
             <p className="text-[10px] text-muted mt-1">
               Drag to pan · wheel to zoom · switch 2D (top-down relief) ↔ 3D (isometric extrusion) ·
               90° rotate. Pure SVG — works on machines without WebGL.
+            </p>
+            <p className="text-[10px] text-muted mt-1">
+              <strong>Rights volumes</strong> — CadaSPACE-style strata: each anchored version is drawn at its
+              elevation envelope (subsurface → surface → air rights); click a stratum (or a chip below) to open
+              that version's land details. Dashed box = the asset's full envelope.
             </p>
           </div>
 

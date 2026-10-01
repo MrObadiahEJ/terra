@@ -9,14 +9,16 @@ import {
   projectIso,
   shade,
 } from '../../lib/terrain'
-import { RotateCcw, RotateCw, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { RotateCcw, RotateCw, ZoomIn, ZoomOut, Maximize2, Layers } from 'lucide-react'
 
 // Interactive land viewer for the /lab/land detail page — WebGL-free SVG.
-// Two navigation modes:
+// Navigation modes:
 //   3D → isometric extruded columns (painter-sorted)
 //   2D → top-down heightfield (hypsometric tint, like a relief map)
-// Pan with drag, zoom with wheel/buttons, rotate 90° steps, reset view.
-// Pan/zoom mutate a <g> transform directly (no React re-render per frame).
+// Plus CadaSPACE-style *rights volumes*: every anchored version becomes a
+// translucent prism at its elevation envelope — subsurface/surface/air strata
+// stacked over the parcel. Pan (drag), zoom (wheel/buttons), rotate 90°,
+// click a stratum to open that version's land view.
 
 interface Props {
   ring: LonLat[]
@@ -26,6 +28,24 @@ interface Props {
   dimension: number
   seedHex: string
   verified?: boolean
+  /** Volumetric rights strata (one per anchored GeometryVersion). */
+  volumes?: VolumeLayer[]
+  /** [minM, maxM] used to map metres → world Z (usually the asset envelope). */
+  volumeDomain?: [number, number]
+  /** Fired when a stratum prism is clicked (not the bounding box). */
+  onVolumeClick?: (id: string) => void
+}
+
+export interface VolumeLayer {
+  id: string
+  label: string
+  minM: number
+  maxM: number
+  color: string
+  verified?: boolean
+  current?: boolean
+  /** Dashed wireframe bounding box instead of a filled prism. */
+  box?: boolean
 }
 
 const W = 680
@@ -40,16 +60,18 @@ type Pt = { x: number; y: number }
 interface Scene {
   outline: string
   grid: { a: string; b: string }[]
-  cols: {
+  cols: { top: string; south: string; east: string; flat: string; h: number }[]
+  overlays: {
+    layer: VolumeLayer
+    kind: 'prism' | 'box'
+    sides: string[]
     top: string
-    south: string
-    east: string
-    flat: string
-    h: number
+    bottom: string
+    edges: { a: Pt; b: Pt }[]
+    label: Pt
   }[]
   cellCount: number
   color: string
-  centroid: Pt
   flat: boolean
 }
 
@@ -65,14 +87,19 @@ export default function LandViewer({
   dimension,
   seedHex,
   verified = false,
+  volumes = [],
+  volumeDomain,
+  onVolumeClick,
 }: Props) {
   const [mode, setMode] = useState<Mode>('3d')
   const [rot, setRot] = useState(0)
+  const [showVolumes, setShowVolumes] = useState(true)
   const svgRef = useRef<SVGSVGElement>(null)
   const gRef = useRef<SVGGElement>(null)
   const zoomRef = useRef<HTMLSpanElement>(null)
   const view = useRef({ tx: 0, ty: 0, s: 1 })
   const drag = useRef<{ x0: number; y0: number; tx: number; ty: number; w: number } | null>(null)
+  const moved = useRef(0)
 
   const applyView = useCallback(() => {
     const v = view.current
@@ -113,6 +140,8 @@ export default function LandViewer({
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [zoomAt])
+
+  const volumesActive = mode === '3d' && showVolumes && volumes.length > 0
 
   // scene geometry (recomputed on rot/mode/data change; view transform persists)
   const scene = useMemo<Scene | null>(() => {
@@ -160,12 +189,96 @@ export default function LandViewer({
       grid.push({ a: lineH, b: lineV })
     }
 
+    // --- rights volumes (CadaSPACE-style strata) -------------------------
+    const world = unit.map(([x, y]): [number, number] => [(x - 0.5) * S, (y - 0.5) * S])
+    const wEdges: [number, number][][] = []
+    for (let i = 0; i < world.length; i++) {
+      const j = (i + 1) % world.length
+      wEdges.push([world[i], world[j]])
+    }
+    let dMin: number
+    let dMax: number
+    if (volumeDomain) {
+      ;[dMin, dMax] = volumeDomain
+    } else if (volumes.length > 0) {
+      dMin = Math.min(...volumes.map((l) => l.minM))
+      dMax = Math.max(...volumes.map((l) => l.maxM))
+    } else {
+      dMin = 0
+      dMax = 1
+    }
+    const zSpan = Math.max(1e-6, dMax - dMin)
+    const zV = (m: number) => ((m - dMin) / zSpan) * 0.9
+
+    type Overlay = {
+      layer: VolumeLayer
+      kind: 'prism' | 'box'
+      sides: Pt[][]
+      top: Pt[]
+      bottom: Pt[]
+      edges: [Pt, Pt][]
+      labelCenter: Pt
+      zB: number
+      zT: number
+    }
+    const overlaysRaw: Overlay[] = []
+    if (volumesActive) {
+      const cxw = world.reduce((s, p) => s + p[0], 0) / world.length
+      const cyw = world.reduce((s, p) => s + p[1], 0) / world.length
+      for (const layer of [...volumes].sort((a, b) => a.minM - b.minM)) {
+        const zB = zV(layer.minM)
+        const zT = Math.max(zB + 0.03, zV(layer.maxM))
+        const top = world.map(([x, y]) => projectIso(x, y, zT))
+        if (layer.box) {
+          const bottom = world.map(([x, y]) => projectIso(x, y, zB))
+          overlaysRaw.push({
+            layer,
+            kind: 'box',
+            sides: [],
+            top,
+            bottom,
+            edges: world.map(([x, y]) => [
+              projectIso(x, y, zT),
+              projectIso(x, y, zB),
+            ]),
+            labelCenter: projectIso(cxw, cyw, zT),
+            zB,
+            zT,
+          })
+        } else {
+          const sides = wEdges.map(([a, b]) => [
+            projectIso(a[0], a[1], zT),
+            projectIso(b[0], b[1], zT),
+            projectIso(b[0], b[1], zB),
+            projectIso(a[0], a[1], zB),
+          ])
+          // painter: farther edges first (by mid-point x+y)
+          sides.sort((s1, s2) => {
+            const m1 = (s1[0].x + s1[1].x) / 2 + (s1[0].y + s1[1].y) / 2
+            const m2 = (s2[0].x + s2[1].x) / 2 + (s2[0].y + s2[1].y) / 2
+            return m1 - m2
+          })
+          overlaysRaw.push({
+            layer,
+            kind: 'prism',
+            sides,
+            top,
+            bottom: [],
+            edges: [],
+            labelCenter: projectIso(cxw, cyw, zT),
+            zB,
+            zT,
+          })
+        }
+      }
+    }
+
     const all = [
       ...base,
       ...ordered.flatMap((c) => (mode === '3d' ? [...c.top, ...c.south, ...c.east] : c.flat)),
+      ...overlaysRaw.flatMap((o) => [...o.top, ...o.bottom, ...o.sides.flat()]),
     ]
     const fit = fitProjector(all, W, H, 24)
-    const cp = p2(0, 0)
     return {
       outline: poly(base.map(fit)),
       grid,
@@ -176,12 +289,21 @@ export default function LandViewer({
         flat: poly(c.flat.map(fit)),
         h: c.h,
       })),
+      overlays: overlaysRaw.map((o) => ({
+        layer: o.layer,
+        kind: o.kind,
+        sides: o.sides.map((s) => poly(s.map(fit))),
+        top: poly(o.top.map(fit)),
+        bottom: o.bottom.length ? poly(o.bottom.map(fit)) : '',
+        edges: o.edges.map(([a, b]) => ({ a: fit(a), b: fit(b) })),
+        label: fit(o.labelCenter),
+      })),
       cellCount: ordered.length,
       color,
-      centroid: fit({ x: cp.x, y: cp.y }),
       flat,
     }
-  }, [ring, rot, mode, seedHex, elevationSource, dimension, elevMinM, elevMaxM])
+  }, [ring, rot, mode, seedHex, elevationSource, dimension, elevMinM, elevMaxM,
+      volumesActive, volumes, volumeDomain])
 
   // re-apply transform after scene re-render (same <g> node persists)
   useEffect(() => {
@@ -195,11 +317,13 @@ export default function LandViewer({
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
     e.currentTarget.setPointerCapture(e.pointerId)
+    moved.current = 0
     drag.current = { x0: e.clientX, y0: e.clientY, tx: view.current.tx, ty: view.current.ty, w: rect.width }
   }
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current
     if (!d) return
+    moved.current = Math.hypot(e.clientX - d.x0, e.clientY - d.y0)
     const k = W / d.w
     view.current.tx = d.tx + (e.clientX - d.x0) * k
     view.current.ty = d.ty + (e.clientY - d.y0) * k
@@ -208,10 +332,15 @@ export default function LandViewer({
   const onPointerUp = () => {
     drag.current = null
   }
+  const handleStratumClick = (id: string) => {
+    if (moved.current < 5) onVolumeClick?.(id)
+  }
 
   if (!scene) {
     return <div className="iso-empty">No geometry yet — anchor a shape first.</div>
   }
+
+  const boxLayer = volumes.find((l) => l.box)
 
   return (
     <div className="land-viewer">
@@ -232,6 +361,14 @@ export default function LandViewer({
             3D
           </button>
         </div>
+        <button
+          className={`btn px-2 py-1 gap-1 ${showVolumes && mode === '3d' ? 'btn-primary' : 'btn-secondary'}`}
+          disabled={mode !== '3d' || volumes.length === 0}
+          onClick={() => setShowVolumes((s) => !s)}
+          title="Toggle CadaSPACE-style rights volumes (elevation strata)"
+        >
+          <Layers size={12} /> Rights volumes
+        </button>
         <span className="flex-1" />
         <button className="btn btn-ghost p-1" title="Rotate left 90°" onClick={() => setRot((r) => (r + 3) % 4)}>
           <RotateCcw size={14} />
@@ -280,9 +417,7 @@ export default function LandViewer({
           {scene.grid.map((l, i) => (
             <g key={`g${i}`}>
               <polyline points={l.a} fill="none" stroke="#cbd5e1" strokeWidth="0.6" strokeDasharray="3 4" />
-              {l.b && (
-                <polyline points={l.b} fill="none" stroke="#cbd5e1" strokeWidth="0.6" strokeDasharray="3 4" />
-              )}
+              <polyline points={l.b} fill="none" stroke="#cbd5e1" strokeWidth="0.6" strokeDasharray="3 4" />
             </g>
           ))}
 
@@ -295,6 +430,7 @@ export default function LandViewer({
             strokeDasharray="5 3"
           />
 
+          {/* terrain / relief */}
           {mode === '3d'
             ? scene.cols.map((c, i) => (
                 <g key={i} className="isot-col" style={{ animationDelay: `${(i % 28) * 12}ms` }}>
@@ -319,6 +455,86 @@ export default function LandViewer({
                   strokeWidth="0.5"
                 />
               ))}
+
+          {/* rights volumes (translucent strata) */}
+          {mode === '3d' &&
+            showVolumes &&
+            scene.overlays.map((o) => {
+              const isCurrent = o.layer.current
+              const stroke = o.layer.box
+                ? '#10b981'
+                : isCurrent
+                  ? shade(o.layer.color, 0.55)
+                  : shade(o.layer.color, 0.7)
+              const clickable = o.kind === 'prism'
+              return (
+                <g
+                  key={`vol-${o.layer.id}`}
+                  className={`lv-vol ${clickable ? 'clickable' : ''}`}
+                  onClick={clickable ? () => handleStratumClick(o.layer.id) : undefined}
+                >
+                  <title>
+                    {o.layer.label} · {Math.round(o.layer.minM)}…{Math.round(o.layer.maxM)} m
+                    {clickable ? ' — click for land details' : ' — asset bounding envelope'}
+                  </title>
+                  {o.kind === 'prism' && (
+                    <>
+                      {o.sides.map((s, i) => (
+                        <polygon
+                          key={i}
+                          points={s}
+                          fill={o.layer.color}
+                          fillOpacity={isCurrent ? 0.3 : 0.18}
+                          stroke={stroke}
+                          strokeWidth="0.6"
+                          strokeOpacity="0.7"
+                        />
+                      ))}
+                      <polygon
+                        points={o.top}
+                        fill={o.layer.color}
+                        fillOpacity={isCurrent ? 0.55 : 0.35}
+                        stroke={stroke}
+                        strokeWidth={isCurrent ? 1.8 : 1}
+                      />
+                    </>
+                  )}
+                  {o.kind === 'box' && (
+                    <>
+                      <polygon points={o.bottom} fill="none" stroke="#10b981" strokeWidth="1" strokeDasharray="4 3" />
+                      <polygon points={o.top} fill="rgba(16,185,129,0.05)" stroke="#10b981" strokeWidth="1.2" strokeDasharray="5 3" />
+                      {o.edges.map((e, i) => (
+                        <line
+                          key={i}
+                          x1={e.a.x}
+                          y1={e.a.y}
+                          x2={e.b.x}
+                          y2={e.b.y}
+                          stroke="#10b981"
+                          strokeWidth="0.9"
+                          strokeDasharray="3 3"
+                        />
+                      ))}
+                    </>
+                  )}
+                </g>
+              )
+            })}
+
+          {/* stratum labels */}
+          {mode === '3d' &&
+            showVolumes &&
+            scene.overlays.map((o, i) => (
+              <text
+                key={`lbl-${o.layer.id}`}
+                x={o.label.x + (i - (scene.overlays.length - 1) / 2) * 6}
+                y={o.label.y - 6}
+                textAnchor="middle"
+                className={`lv-vol-t ${o.layer.current ? 'current' : ''}`}
+              >
+                {o.layer.label} {Math.round(o.layer.minM)}–{Math.round(o.layer.maxM)}m
+              </text>
+            ))}
         </g>
 
         {/* static overlays */}
@@ -330,6 +546,7 @@ export default function LandViewer({
         </g>
         <text x={14} y={H - 14} className="land-viewer-hint">
           drag to pan · wheel to zoom · {rot * 90}° · {scene.cellCount} cells
+          {mode === '3d' && showVolumes && ` · ${scene.overlays.length} strata`}
         </text>
       </svg>
 
@@ -347,10 +564,35 @@ export default function LandViewer({
         </span>
         <span className="lab-badge lab-badge-info">SVG · no WebGL</span>
       </div>
+
+      {mode === '3d' && showVolumes && volumes.length > 0 && (
+        <div className="land-viewer-strata">
+          {boxLayer && (
+            <span className="land-stratum-chip box">
+              <span className="land-stratum-swatch" style={{ borderColor: '#10b981' }} />
+              {boxLayer.label}
+            </span>
+          )}
+          {volumes
+            .filter((l) => !l.box)
+            .map((l) => (
+              <button
+                key={l.id}
+                className={`land-stratum-chip ${l.current ? 'current' : ''} ${l.verified ? 'verified' : ''}`}
+                onClick={() => onVolumeClick?.(l.id)}
+                title={`Open land view for ${l.label}`}
+              >
+                <span className="land-stratum-swatch" style={{ background: l.color }} />
+                {l.label} · {Math.round(l.minM)}–{Math.round(l.maxM)}m
+                {l.verified ? ' ✓' : ''}
+              </button>
+            ))}
+        </div>
+      )}
       {scene.flat && (
         <p className="text-[10px] text-muted mt-1">
-          Flat plate — D2 / elevation_source NONE carries a zero envelope (6237). Anchor a D2.5 version with
-          provenance for relief.
+          Flat plate — D2 / elevation_source NONE carries a zero envelope (6237). Anchor a D2.5/D3 version with
+          provenance for relief and strata.
         </p>
       )}
     </div>
