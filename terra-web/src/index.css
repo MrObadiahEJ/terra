@@ -1870,3 +1870,60 @@ header .wallet-adapter-button {
   max-height: 180px;
 }
 .dm-inline { vertical-align: -2px; }
+
+/* ---- live activity feed (B4) ---------------------------------------------- */
+.af {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.af-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.af-title { display: flex; align-items: center; gap: 6px; }
+.af-src { font-weight: 400; font-size: 11px; color: var(--muted); }
+.af-offline { color: #b45309; }
+.af-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.af-empty { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+.af-empty a { color: var(--accent); text-decoration: underline; }
+.af-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.af-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+.af-dot.af-demo { background: #f59e0b; }
+.af-dot.af-api { background: #10b981; }
+.af-body { min-width: 0; }
+.af-kind {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: #047857;
+  overflow-wrap: anywhere;
+}
+.af-sum { margin-left: 6px; font-weight: 400; font-family: system-ui, sans-serif; color: var(--ink); }
+.af-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.af-meta a { color: var(--accent); }

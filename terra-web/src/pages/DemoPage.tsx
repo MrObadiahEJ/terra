@@ -15,6 +15,8 @@ import {
   type DemoScenarioInfo,
   type DemoScenarioResult,
 } from '../lib/api'
+import { useActivityStore } from '../lib/activityStore'
+import ActivityFeed from '../components/ActivityFeed'
 
 // Demo scenario player (B5/B6 frontend) — renders a deterministic scenario
 // from POST /api/v1/demo/scenarios/* as an animated event timeline.
@@ -60,6 +62,7 @@ export default function DemoPage() {
   const [err, setErr] = useState<string | null>(null)
   const [det, setDet] = useState<DetState>('idle')
   const [speed, setSpeed] = useState(2)
+  const [runId, setRunId] = useState(0)
   const tlRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -100,6 +103,21 @@ export default function DemoPage() {
     if (el) el.scrollTop = el.scrollHeight
   }, [phase])
 
+  // Feed (B4): stream each revealed event into the global activity feed.
+  // Ids are run-scoped, so StrictMode double-effects and replays dedupe.
+  useEffect(() => {
+    if (!data || phase < 0) return
+    const e = data.events[phase]
+    useActivityStore.getState().push({
+      id: `${data.scenario}:${data.seed}:${runId}:${e.seq}`,
+      at: Date.now(),
+      kind: e.kind.toLowerCase(),
+      summary: e.detail,
+      source: 'demo',
+      link: `/demo?scenario=${data.scenario}&seed=${encodeURIComponent(data.seed)}`,
+    })
+  }, [phase, data, runId])
+
   const run = useCallback(async (name?: string, sd?: string) => {
     const scenario = name ?? sel
     const seedVal = (sd ?? seed) || undefined
@@ -110,6 +128,7 @@ export default function DemoPage() {
       const r = await api.runDemoScenario(scenario, seedVal)
       setData(r)
       setPhase(0)
+      setRunId((n) => n + 1)
       setPlaying(r.events.length > 1)
     } catch (e) {
       setData(null)
@@ -351,6 +370,8 @@ export default function DemoPage() {
           </div>
         </>
       )}
+
+      <ActivityFeed />
 
       {!data && !err && (
         <div className="dm-panel text-xs text-muted">

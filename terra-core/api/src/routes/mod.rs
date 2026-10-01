@@ -1,5 +1,6 @@
 use axum::Router;
 
+pub mod activity;
 pub mod authority_registry;
 pub mod cross_border;
 pub mod demo_scenarios;
@@ -48,4 +49,5 @@ pub fn router() -> Router<AppState> {
         .nest("/evidence", evidence::router())
         .nest("/tx", tx_prep::router())
         .nest("/demo", demo_scenarios::router())
+        .nest("/activity", activity::router())
 }

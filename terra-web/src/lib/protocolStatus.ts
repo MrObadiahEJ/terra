@@ -477,10 +477,17 @@ export const STATUS_MODULES: StatusModule[] = [
     id: 'activity-feed',
     name: 'Live network activity (B4)',
     track: 'frontend',
-    status: 'planned',
-    evidence: 'no feed component',
-    verified: [],
-    gaps: ['Observation/task/routing/attestation/quorum event feed (needs event stream or demo engine)'],
+    status: 'partial',
+    evidence:
+      'GET /api/v1/activity (6-table union, api/src/routes/activity.rs, 3 unit tests) + ActivityFeed component (5s poll, paused on hidden tabs) merging demo-engine events',
+    verified: [
+      'Demo events stream into the feed while /demo scenarios play (run-scoped ids, StrictMode-safe dedupe)',
+      'API channel verified live: create parcel → GET /activity row → delete → feed empty again (78 cargo tests pass)',
+      'Sources visually distinguished (demo amber / api green) + graceful API-offline fallback',
+    ],
+    gaps: [
+      'On-chain Solana event indexing/streaming — feed covers off-chain API rows + demo engine only',
+    ],
   },
   {
     id: 'demo-scenarios-ui',

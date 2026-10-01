@@ -12,6 +12,7 @@ import {
   type StatusTrack,
 } from '../lib/protocolStatus'
 import { Activity, CheckCircle2, CircleDashed, GitBranch, Info, XCircle } from 'lucide-react'
+import ActivityFeed from '../components/ActivityFeed'
 
 // Protocol status (B10) — honest public progress dashboard.
 // Every row cites real source locations; nothing is green because a fn exists.
@@ -87,6 +88,8 @@ export default function StatusPage() {
         <StatChip n={counts.experimental} label="experimental" cls="st-n-info" />
         <StatChip n={counts.planned} label="planned" cls="st-n-mut" />
       </div>
+
+      <ActivityFeed />
 
       {/* filters */}
       <div className="st-filters">

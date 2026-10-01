@@ -771,6 +771,23 @@ export interface DemoScenarioResult {
   [key: string]: unknown
 }
 
+// ---- Activity feed (B4): real off-chain API rows, newest first ----
+
+export interface ActivityItemDto {
+  id: string
+  kind: string
+  summary: string
+  /** epoch ms */
+  at: number
+  source: string
+}
+
+export interface ActivityResponse {
+  items: ActivityItemDto[]
+  source: string
+  note: string
+}
+
 export const api = {
   // parcels
   listParcels: (bbox?: { minx: number; miny: number; maxx: number; maxy: number }) => {
@@ -1111,6 +1128,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(seed ? { seed } : {}),
     }),
+
+  // ---- Activity feed (B4) --------------------------------------------------
+
+  listActivity: (limit = 50) => request<ActivityResponse>(`/activity?limit=${limit}`),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {
