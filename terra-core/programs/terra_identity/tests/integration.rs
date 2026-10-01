@@ -105,19 +105,75 @@ async fn setup() -> (ProgramTestContext, Keypair) {
     (ctx, payer)
 }
 
+/// Build, sign and send one transaction on a fresh blockhash.
+///
+/// Two hazards are handled here so negative tests are deterministic:
+///
+/// 1. *Stale blockhash*: always fetch the latest one before signing
+///    (banks advance under load; an old hash surfaces as client errors
+///    unrelated to the program under test).
+/// 2. *Signature dedup*: the banks status cache answers a byte-identical
+///    transaction (same message ⇒ same signature ⇒ same blockhash) with the
+///    CACHED result instead of executing it — a phantom `Ok`/`Err` that makes
+///    double-vote / replay / re-bind tests flaky. The simulated PohService
+///    only rotates the blockhash every target_tick_duration × ticks_per_slot
+///    (100µs × 64 ≈ 6.4 ms), so identical transactions sent inside one
+///    window would dedup. Every submitted signature is remembered; on a hit
+///    we wait for a rotation (bounded) and re-sign so the signature changes.
+async fn send_tx(
+    ctx: &mut ProgramTestContext,
+    fee_payer: &Pubkey,
+    signers: &[&Keypair],
+    ixs: &[Instruction],
+) -> Result<(), solana_program_test::BanksClientError> {
+    use solana_sdk::signature::Signature;
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+
+    static SEEN: Mutex<Option<HashSet<Signature>>> = Mutex::new(None);
+
+    let mut blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+    let mut tx = Transaction::new_signed_with_payer(ixs, Some(fee_payer), signers, blockhash);
+
+    let duplicate = {
+        let mut guard = SEEN.lock().unwrap();
+        let set = guard.get_or_insert_with(HashSet::new);
+        if set.len() > 16_384 {
+            set.clear();
+        }
+        let dup = set.contains(&tx.signatures[0]);
+        set.insert(tx.signatures[0]);
+        dup
+    };
+    if duplicate {
+        // Wait (≤ ~128 ms) for the PohService to register a new blockhash,
+        // then re-sign. If the ticker never fires we proceed with the
+        // original hash — no worse than the previous behaviour.
+        for _ in 0..64 {
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            let next = ctx.banks_client.get_latest_blockhash().await.unwrap();
+            if next != blockhash {
+                blockhash = next;
+                break;
+            }
+        }
+        tx = Transaction::new_signed_with_payer(ixs, Some(fee_payer), signers, blockhash);
+        SEEN.lock()
+            .unwrap()
+            .get_or_insert_with(HashSet::new)
+            .insert(tx.signatures[0]);
+    }
+
+    ctx.last_blockhash = blockhash;
+    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+}
+
 async fn process(
     ctx: &mut ProgramTestContext,
     payer: &Keypair,
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
-    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&payer.pubkey()),
-        &[payer],
-        ctx.last_blockhash,
-    );
-    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+    send_tx(ctx, &payer.pubkey(), &[payer], &[ix]).await
 }
 
 async fn process_with(
@@ -126,16 +182,14 @@ async fn process_with(
     signers: &[&Keypair],
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
-    ctx.last_blockhash = ctx.banks_client.get_latest_blockhash().await.unwrap();
+    // Identity call sites pass extra signers only; the fee payer always signs.
     let mut all = vec![fee_payer];
-    all.extend(signers);
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fee_payer.pubkey()),
-        &all,
-        ctx.last_blockhash,
-    );
-    ctx.banks_client.process_transaction(tx).await.map(|_| ())
+    for s in signers {
+        if s.pubkey() != fee_payer.pubkey() {
+            all.push(s);
+        }
+    }
+    send_tx(ctx, &fee_payer.pubkey(), &all, &[ix]).await
 }
 
 fn fund_ix(from: &Pubkey, to: &Pubkey, lamports: u64) -> Instruction {

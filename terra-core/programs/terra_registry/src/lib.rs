@@ -1913,12 +1913,16 @@ pub mod terra_registry {
         spatial_asset::init_spatial_asset(ctx, dimensionality, elevation_min_mm, elevation_max_mm)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn append_geometry_version(
         ctx: Context<AppendGeometryVersion>,
         geometry_hash: [u8; 32],
         source: u8,
         dimension: u8,
         storage_reference: String,
+        elevation_min_mm: i32,
+        elevation_max_mm: i32,
+        elevation_source: u8,
     ) -> Result<()> {
         spatial_asset::append_geometry_version(
             ctx,
@@ -1926,9 +1930,38 @@ pub mod terra_registry {
             source,
             dimension,
             storage_reference,
+            elevation_min_mm,
+            elevation_max_mm,
+            elevation_source,
         )
     }
 
+    /// Anchor a geometry version from an evidence manifest (RFC-013 Phase B).
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_geometry_version_from_evidence(
+        ctx: Context<AppendGeometryVersionFromEvidence>,
+        geometry_hash: [u8; 32],
+        source: u8,
+        dimension: u8,
+        storage_reference: String,
+        elevation_min_mm: i32,
+        elevation_max_mm: i32,
+        elevation_source: u8,
+    ) -> Result<()> {
+        spatial_asset::append_geometry_version_from_evidence(
+            ctx,
+            geometry_hash,
+            source,
+            dimension,
+            storage_reference,
+            elevation_min_mm,
+            elevation_max_mm,
+            elevation_source,
+        )
+    }
+
+    /// A registered validator attests the version; `verified` flips when
+    /// the append-time quorum threshold is reached (RFC-013 Phase B).
     pub fn verify_geometry_version(ctx: Context<VerifyGeometryVersion>) -> Result<()> {
         spatial_asset::verify_geometry_version(ctx)
     }
@@ -3609,7 +3642,52 @@ pub struct AppendGeometryVersion<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Registered validator verifies an anchored geometry version (claim → fact).
+/// Evidence-linked append (RFC-013 Phase B): same as `AppendGeometryVersion`
+/// plus the manifest + parent task the version grows out of. Manifest/task
+/// are read-only — appending never mutates the evidence stack.
+#[derive(Accounts)]
+pub struct AppendGeometryVersionFromEvidence<'info> {
+    #[account(
+        mut,
+        seeds = [b"spatial_asset", asset.parcel.as_ref()],
+        bump,
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + spatial_asset::GeometryVersion::INIT_SPACE,
+        seeds = [
+            b"geometry_version",
+            asset.key().as_ref(),
+            &asset.geometry_version_count.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub geometry_version: Account<'info, spatial_asset::GeometryVersion>,
+    #[account(
+        seeds = [
+            b"evidence_manifest",
+            manifest.task_id.as_ref(),
+            manifest.submitter.as_ref(),
+            &manifest.nonce.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub manifest: Account<'info, evidence_manifest::EvidenceManifest>,
+    #[account(
+        seeds = [b"task", manifest.task_id.as_ref()],
+        bump,
+        constraint = task.task_id == manifest.task_id @ TerraError::InvalidTaskRequirement,
+    )]
+    pub task: Account<'info, verification_task::VerificationTask>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Registered validator attests an anchored geometry version; `verified`
+/// flips once the version's quorum threshold is reached (RFC-013 Phase B).
 #[derive(Accounts)]
 pub struct VerifyGeometryVersion<'info> {
     #[account(
@@ -6905,6 +6983,20 @@ pub struct GeometryVersionAppended {
     pub dimension: u8,
     pub submitted_by: Pubkey,
     pub submitted_at: i64,
+    pub evidence_manifest: Pubkey,
+    pub elevation_min_mm: i32,
+    pub elevation_max_mm: i32,
+    pub elevation_source: u8,
+    pub required: u8,
+}
+
+#[event]
+pub struct GeometryVersionAttested {
+    pub geometry_version: Pubkey,
+    pub asset: Pubkey,
+    pub validator: Pubkey,
+    pub attest_count: u8,
+    pub required: u8,
 }
 
 #[event]
@@ -6913,6 +7005,8 @@ pub struct GeometryVersionVerified {
     pub asset: Pubkey,
     pub verified_by: Pubkey,
     pub verified_at: i64,
+    pub attest_count: u8,
+    pub required: u8,
 }
 
 // ---------------------------------------------------------------------------
@@ -7626,6 +7720,14 @@ pub enum TerraError {
     InvalidElevationRange,
     #[msg("Geometry version is already verified")]
     GeometryAlreadyVerified,
+    #[msg("Unknown elevation source, or provenance does not match the layer dimension")]
+    InvalidElevationSource,
+    #[msg("Validator has already attested this geometry version")]
+    GeometryAlreadyAttested,
+    #[msg("Evidence manifest has no artifacts to anchor a version from")]
+    EmptyEvidenceManifest,
+    #[msg("Geometry version quorum list has no free attestation slot")]
+    GeometryQuorumFull,
 }
 
 #[cfg(test)]

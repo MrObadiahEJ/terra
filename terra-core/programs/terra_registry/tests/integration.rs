@@ -29065,6 +29065,9 @@ fn stage3_append_ix(
     source: u8,
     dimension: u8,
     storage_reference: &str,
+    elevation_min_mm: i32,
+    elevation_max_mm: i32,
+    elevation_source: u8,
 ) -> Instruction {
     let (entry_pk, _) = geometry_version_pda(asset_pk, version);
     let mut data = discriminator("global", "append_geometry_version").to_vec();
@@ -29072,6 +29075,9 @@ fn stage3_append_ix(
     data.push(source);
     data.push(dimension);
     data.extend_from_slice(&borsh_ser(&storage_reference.to_string()));
+    data.extend_from_slice(&elevation_min_mm.to_le_bytes());
+    data.extend_from_slice(&elevation_max_mm.to_le_bytes());
+    data.push(elevation_source);
     Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
@@ -29101,7 +29107,7 @@ fn stage3_verify_ix(asset_pk: &Pubkey, entry_pk: &Pubkey, validator: &Pubkey) ->
 #[tokio::test]
 async fn stage3_spatial_asset_lifecycle() {
     use terra_registry::spatial_asset::{
-        geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -29174,6 +29180,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::SURVEY,
             spatial_dimension::D2,
             "ipfs://geo0",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await
@@ -29191,6 +29200,12 @@ async fn stage3_spatial_asset_lifecycle() {
     assert!(e0.submitted_at > 0);
     assert!(!e0.verified);
     assert_eq!(e0.verified_by, Pubkey::default());
+    assert_eq!(e0.evidence_manifest, Pubkey::default());
+    assert_eq!(e0.elevation_min_mm, 0);
+    assert_eq!(e0.elevation_max_mm, 0);
+    assert_eq!(e0.elevation_source, elevation_source::NONE);
+    assert_eq!(e0.required, 2);
+    assert_eq!(e0.attest_count, 0);
     let a: SpatialAsset = read_account(&ctx, asset_pk).await;
     assert_eq!(a.geometry_version_count, 1);
     assert_eq!(a.latest_geometry, h0);
@@ -29207,6 +29222,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::SURVEY,
             spatial_dimension::D2,
             "ipfs://stale",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
@@ -29224,6 +29242,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::LIDAR,
             spatial_dimension::D3,
             "ipfs://too-tall",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
@@ -29241,6 +29262,9 @@ async fn stage3_spatial_asset_lifecycle() {
             9,
             spatial_dimension::D2,
             "ipfs://bad-src",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
@@ -29258,6 +29282,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::SURVEY,
             spatial_dimension::D2,
             "ipfs://zero",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
@@ -29275,10 +29302,114 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::SURVEY,
             spatial_dimension::D2,
             "",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
     assert_custom_error(res, 6134, "empty storage reference must fail");
+
+    // --- Phase B elevation provenance guards ------------------------------
+    // unknown elevation source → 6237.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://bad-es",
+            0,
+            0,
+            9,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6237, "unknown elevation source must fail");
+
+    // NONE provenance with a nonzero envelope → 6237.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://none-nz",
+            10,
+            20,
+            elevation_source::NONE,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6237, "NONE provenance with nonzero envelope must fail");
+
+    // elevation provenance on a flat D2 layer → 6237.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://z2d",
+            0,
+            10,
+            elevation_source::SURVEY,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6237, "provenance on a flat D2 layer must fail");
+
+    // NONE provenance on a 2.5D layer → 6237.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::LIDAR,
+            spatial_dimension::D2_5,
+            "ipfs://n25",
+            0,
+            0,
+            elevation_source::NONE,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6237, "NONE provenance on a 2.5D layer must fail");
+
+    // envelope outside the asset bounding box → 6235.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h0,
+            geometry_source::LIDAR,
+            spatial_dimension::D2_5,
+            "ipfs://oob",
+            -60,
+            1_200_000,
+            elevation_source::LIDAR,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6235, "envelope outside asset bounds must fail");
 
     // --- append v1 (2.5D lidar layer) -------------------------------------
     let h1 = [4u8; 32];
@@ -29293,6 +29424,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::LIDAR,
             spatial_dimension::D2_5,
             "s3://terra/geo1.laz",
+            -50,
+            1_200_000,
+            elevation_source::LIDAR,
         ),
     )
     .await
@@ -29300,6 +29434,15 @@ async fn stage3_spatial_asset_lifecycle() {
     let a: SpatialAsset = read_account(&ctx, asset_pk).await;
     assert_eq!(a.geometry_version_count, 2);
     assert_eq!(a.latest_geometry, h1);
+    let (entry1_pk, _) = geometry_version_pda(&asset_pk, 1);
+    let e1: GeometryVersion = read_account(&ctx, entry1_pk).await;
+    assert_eq!(e1.elevation_min_mm, -50);
+    assert_eq!(e1.elevation_max_mm, 1_200_000);
+    assert_eq!(e1.elevation_source, elevation_source::LIDAR);
+    assert_eq!(e1.required, 2);
+    assert_eq!(e1.attest_count, 0);
+    assert_eq!(e1.evidence_manifest, Pubkey::default());
+    assert!(!e1.verified);
 
     // --- cap: cursor at MAX_GEOMETRY_VERSIONS → 6234 -----------------------
     let mut acc = ctx
@@ -29322,6 +29465,9 @@ async fn stage3_spatial_asset_lifecycle() {
             geometry_source::SURVEY,
             spatial_dimension::D2,
             "ipfs://full",
+            0,
+            0,
+            elevation_source::NONE,
         ),
     )
     .await;
@@ -29331,7 +29477,7 @@ async fn stage3_spatial_asset_lifecycle() {
 #[tokio::test]
 async fn stage3_geometry_version_verification() {
     use terra_registry::spatial_asset::{
-        geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -29363,11 +29509,18 @@ async fn stage3_geometry_version_verification() {
             geometry_source::PHOTOGRAMMETRY,
             spatial_dimension::D3,
             "s3://terra/model0.geojson",
+            -1_000,
+            900_000,
+            elevation_source::PHOTOGRAMMETRY,
         ),
     )
     .await
     .expect("append v0");
     let (entry_pk, _) = geometry_version_pda(&asset_pk, 0);
+    let e0: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(!e0.verified);
+    assert_eq!(e0.attest_count, 0);
+    assert_eq!(e0.required, 2);
 
     // Unregistered signer cannot verify (no validator profile PDA).
     let res = process(
@@ -29378,28 +29531,54 @@ async fn stage3_geometry_version_verification() {
     .await;
     assert!(res.is_err(), "non-validator verify must fail");
 
-    // Registered validator verifies (claim → fact).
-    let v = Keypair::new();
-    phase7_init_validator(&mut ctx, &payer, &v).await;
+    // First validator attests: recorded, but a quorum of 2 is not met yet.
+    let v1 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v1).await;
     process(
         &mut ctx,
-        &v,
-        stage3_verify_ix(&asset_pk, &entry_pk, &v.pubkey()),
+        &v1,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v1.pubkey()),
     )
     .await
-    .expect("verify geometry version");
+    .expect("attest 1");
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(!e.verified, "one attest must not flip a quorum-2 entry");
+    assert_eq!(e.attest_count, 1);
+    assert_eq!(e.verified_by, Pubkey::default());
+    assert_eq!(e.verified_at, 0);
+
+    // The same validator cannot attest twice → 6238.
+    let res = process(
+        &mut ctx,
+        &v1,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v1.pubkey()),
+    )
+    .await;
+    assert_custom_error(res, 6238, "duplicate attestation must fail");
+
+    // Second validator completes the quorum (claim → fact).
+    let v2 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v2).await;
+    process(
+        &mut ctx,
+        &v2,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v2.pubkey()),
+    )
+    .await
+    .expect("attest 2");
     let e: GeometryVersion = read_account(&ctx, entry_pk).await;
     assert!(e.verified);
-    assert_eq!(e.verified_by, v.pubkey());
+    assert_eq!(e.verified_by, v2.pubkey());
     assert!(e.verified_at > 0);
+    assert_eq!(e.attest_count, 2);
     let a: SpatialAsset = read_account(&ctx, asset_pk).await;
     assert!(a.updated_at > 0);
 
-    // Double-verify is rejected.
+    // Double-verify after the fact is rejected.
     let res = process(
         &mut ctx,
-        &v,
-        stage3_verify_ix(&asset_pk, &entry_pk, &v.pubkey()),
+        &v2,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v2.pubkey()),
     )
     .await;
     assert_custom_error(res, 6236, "double verify must fail");
@@ -29416,11 +29595,379 @@ async fn stage3_geometry_version_verification() {
     .expect("init asset B");
     let res = process(
         &mut ctx,
-        &v,
-        stage3_verify_ix(&asset_b_pk, &entry_pk, &v.pubkey()),
+        &v2,
+        stage3_verify_ix(&asset_b_pk, &entry_pk, &v2.pubkey()),
     )
     .await;
     assert_custom_error(res, 6233, "cross-asset verify must fail");
+}
+
+// ============================================================================
+// RFC-013 Phase B — evidence-linked geometry, elevation provenance, quorum
+// ============================================================================
+
+/// Append a geometry version *anchored to an evidence manifest* (Phase B).
+/// The manifest/task PDAs are derived in the handler from the manifest's own
+/// fields, so the instruction carries no seed arguments (AddEvidenceArtifact
+/// precedent) — accounts only.
+#[allow(clippy::too_many_arguments)]
+fn stage3_append_from_evidence_ix(
+    asset_pk: &Pubkey,
+    payer: &Pubkey,
+    version: u32,
+    manifest_pk: &Pubkey,
+    task_pk: &Pubkey,
+    geometry_hash: &[u8; 32],
+    source: u8,
+    dimension: u8,
+    storage_reference: &str,
+    elevation_min_mm: i32,
+    elevation_max_mm: i32,
+    elevation_source: u8,
+) -> Instruction {
+    let (entry_pk, _) = geometry_version_pda(asset_pk, version);
+    let mut data = discriminator("global", "append_geometry_version_from_evidence").to_vec();
+    data.extend_from_slice(geometry_hash);
+    data.push(source);
+    data.push(dimension);
+    data.extend_from_slice(&borsh_ser(&storage_reference.to_string()));
+    data.extend_from_slice(&elevation_min_mm.to_le_bytes());
+    data.extend_from_slice(&elevation_max_mm.to_le_bytes());
+    data.push(elevation_source);
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*asset_pk, false),
+            AccountMeta::new(entry_pk, false),
+            AccountMeta::new_readonly(*manifest_pk, false),
+            AccountMeta::new_readonly(*task_pk, false),
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+#[tokio::test]
+async fn stage3_evidence_linked_geometry() {
+    use terra_registry::evidence_manifest::{self, EvidenceManifest};
+    use terra_registry::spatial_asset::{
+        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+    };
+
+    let (mut ctx, payer) = setup().await;
+
+    // D3 asset (envelope -1000..900000 mm).
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 222).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(
+            &parcel,
+            &payer.pubkey(),
+            spatial_dimension::D3,
+            -1_000,
+            900_000,
+        ),
+    )
+    .await
+    .expect("init spatial asset");
+
+    // Open task.
+    let task_id = [55u8; 32];
+    let (task_pk, _) = task_pda(&task_id);
+    let clock = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap();
+    let deadline = clock.unix_timestamp + 3600;
+    let data = create_task_data_simple(
+        &task_id,
+        &Pubkey::new_unique(),
+        terra_registry::verification_task::task_class::PHYSICAL,
+        deadline,
+        1,
+    );
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("create task");
+
+    // Manifest nonce 0 with one GEOMETRY artifact.
+    let nonce: u16 = 0;
+    let (manifest_pk, _) = evidence_manifest_pda(&task_id, &payer.pubkey(), nonce);
+    let root_hash = [7u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: evidence_manifest_data(&task_id, nonce, &Pubkey::default(), &root_hash),
+        },
+    )
+    .await
+    .expect("submit manifest");
+    let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(art_pk, false),
+                AccountMeta::new(manifest_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: evidence_artifact_data(
+                0,
+                evidence_manifest::artifact_kind::GEOMETRY,
+                terra_registry::observation_v2::observation_source::DRONE,
+                terra_registry::observation_v2::observation_provenance::MULTI_DEVICE,
+                &[9u8; 32],
+                "ipfs://geo-art",
+            ),
+        },
+    )
+    .await
+    .expect("add geometry artifact");
+    let m: EvidenceManifest = read_account(&ctx, manifest_pk).await;
+    assert_eq!(m.artifact_count, 1);
+
+    // Manifest nonce 1 with no artifacts (for the 6239 guard).
+    let (empty_pk, _) = evidence_manifest_pda(&task_id, &payer.pubkey(), 1);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(empty_pk, false),
+                AccountMeta::new_readonly(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: evidence_manifest_data(&task_id, 1, &Pubkey::default(), &[8u8; 32]),
+        },
+    )
+    .await
+    .expect("submit empty manifest");
+
+    // --- happy path: version anchored to manifest nonce 0 -----------------
+    let h = [11u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_from_evidence_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &manifest_pk,
+            &task_pk,
+            &h,
+            geometry_source::PHOTOGRAMMETRY,
+            spatial_dimension::D3,
+            "s3://terra/evidence0.geojson",
+            -1_000,
+            900_000,
+            elevation_source::PHOTOGRAMMETRY,
+        ),
+    )
+    .await
+    .expect("append from evidence");
+    let (entry0_pk, _) = geometry_version_pda(&asset_pk, 0);
+    let e0: GeometryVersion = read_account(&ctx, entry0_pk).await;
+    assert_eq!(e0.evidence_manifest, manifest_pk);
+    assert_eq!(e0.geometry_hash, h);
+    assert_eq!(e0.required, 2);
+    assert_eq!(e0.attest_count, 0);
+    assert_eq!(e0.elevation_source, elevation_source::PHOTOGRAMMETRY);
+    assert!(!e0.verified);
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert_eq!(a.geometry_version_count, 1);
+    assert_eq!(a.latest_geometry, h);
+
+    // Manifest without artifacts → 6239.
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_from_evidence_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &empty_pk,
+            &task_pk,
+            &[12u8; 32],
+            geometry_source::PHOTOGRAMMETRY,
+            spatial_dimension::D3,
+            "s3://terra/empty.geojson",
+            -1_000,
+            900_000,
+            elevation_source::PHOTOGRAMMETRY,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6239, "empty evidence manifest must fail");
+
+    // Cancel the task → anchored append on a terminal task → 6174.
+    let mut cancel = discriminator("global", "cancel_task").to_vec();
+    cancel.extend_from_slice(&task_id);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: cancel,
+        },
+    )
+    .await
+    .expect("cancel task");
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_append_from_evidence_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &manifest_pk,
+            &task_pk,
+            &[13u8; 32],
+            geometry_source::PHOTOGRAMMETRY,
+            spatial_dimension::D3,
+            "s3://terra/closed.geojson",
+            -1_000,
+            900_000,
+            elevation_source::PHOTOGRAMMETRY,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6174, "terminal-task anchored append must fail");
+}
+
+#[tokio::test]
+async fn stage3_geometry_quorum_config() {
+    use terra_registry::spatial_asset::{
+        elevation_source, geometry_source, spatial_dimension, GeometryVersion,
+    };
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 224).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(
+            &parcel,
+            &payer.pubkey(),
+            spatial_dimension::D2_5,
+            -50,
+            1_000,
+        ),
+    )
+    .await
+    .expect("init spatial asset");
+
+    // Global (parcel_type=0, region=[0,0]) quorum config with threshold 3.
+    let config_pk = create_quorum_config(&mut ctx, &payer, 0, [0u8; 2], 3).await;
+
+    // Append with the config passed via remaining_accounts (RFC-013 §5).
+    let mut ix = stage3_append_ix(
+        &asset_pk,
+        &payer.pubkey(),
+        0,
+        &[5u8; 32],
+        geometry_source::SURVEY,
+        spatial_dimension::D2,
+        "ipfs://qc",
+        0,
+        0,
+        elevation_source::NONE,
+    );
+    ix.accounts
+        .push(AccountMeta::new_readonly(config_pk, false));
+    process(&mut ctx, &payer, ix)
+        .await
+        .expect("append with quorum config");
+
+    let (entry_pk, _) = geometry_version_pda(&asset_pk, 0);
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert_eq!(
+        e.required, 3,
+        "configured quorum must override the default 2"
+    );
+    assert_eq!(e.attest_count, 0);
+    assert!(!e.verified);
+
+    // Three distinct validators are required.
+    let v1 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v1).await;
+    process(
+        &mut ctx,
+        &v1,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v1.pubkey()),
+    )
+    .await
+    .expect("attest 1");
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(!e.verified, "quorum 3: one attest must not flip");
+    assert_eq!(e.attest_count, 1);
+
+    let v2 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v2).await;
+    process(
+        &mut ctx,
+        &v2,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v2.pubkey()),
+    )
+    .await
+    .expect("attest 2");
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(
+        !e.verified,
+        "quorum 3: two attests must not flip (default-2 would have)"
+    );
+    assert_eq!(e.attest_count, 2);
+
+    let v3 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v3).await;
+    process(
+        &mut ctx,
+        &v3,
+        stage3_verify_ix(&asset_pk, &entry_pk, &v3.pubkey()),
+    )
+    .await
+    .expect("attest 3");
+    let e: GeometryVersion = read_account(&ctx, entry_pk).await;
+    assert!(e.verified, "third attest completes the configured quorum");
+    assert_eq!(e.verified_by, v3.pubkey());
+    assert_eq!(e.attest_count, 3);
+    assert!(e.verified_at > 0);
 }
 
 // ============================================================================
