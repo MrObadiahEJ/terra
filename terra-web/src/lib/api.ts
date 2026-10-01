@@ -743,6 +743,34 @@ async function request<T>(path: string, init?: RequestInit, retries = 1): Promis
   }
 }
 
+// ---- Demo scenario engine (B5/B6): deterministic, seeded, demo-labelled ----
+
+export interface DemoScenarioInfo {
+  name: string
+  description: string
+  method: string
+  path: string
+}
+
+export interface DemoScenarioEvent {
+  seq: number
+  t_offset_ms: number
+  kind: string
+  detail: string
+  ref: string
+}
+
+export interface DemoScenarioResult {
+  demo: true
+  deterministic: true
+  scenario: string
+  seed: string
+  result: string
+  events: DemoScenarioEvent[]
+  note: string
+  [key: string]: unknown
+}
+
 export const api = {
   // parcels
   listParcels: (bbox?: { minx: number; miny: number; maxx: number; maxy: number }) => {
@@ -1073,6 +1101,16 @@ export const api = {
   parcelSpatialStats: (id: string) => request<ParcelSpatialStats>(`/spatial/parcels/${id}/stats`),
   zoneSpatialStats: () => request<ZoneParcelCount[]>('/spatial/zones/stats'),
   parcelsWithinZone: (zoneId: string) => request<ParcelSpatialStats[]>(`/spatial/zones/${zoneId}/parcels`),
+
+  // ---- Demo scenario engine -----------------------------------------------
+
+  listDemoScenarios: () =>
+    request<{ demo: true; deterministic: true; scenarios: DemoScenarioInfo[] }>('/demo/scenarios'),
+  runDemoScenario: (name: string, seed?: string) =>
+    request<DemoScenarioResult>(`/demo/scenarios/${name}`, {
+      method: 'POST',
+      body: JSON.stringify(seed ? { seed } : {}),
+    }),
 }
 
 export function parseGeoJSON<T>(geoJson: string | null | undefined): T | null {

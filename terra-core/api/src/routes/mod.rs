@@ -2,6 +2,7 @@ use axum::Router;
 
 pub mod authority_registry;
 pub mod cross_border;
+pub mod demo_scenarios;
 pub mod disputes;
 pub mod escrows;
 pub mod evidence;
@@ -46,4 +47,5 @@ pub fn router() -> Router<AppState> {
         .nest("/credentials", threshold_credentials::router())
         .nest("/evidence", evidence::router())
         .nest("/tx", tx_prep::router())
+        .nest("/demo", demo_scenarios::router())
 }
