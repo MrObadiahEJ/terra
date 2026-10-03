@@ -26,7 +26,7 @@ data = json.loads(idl_path.read_text())
 body = json.dumps(data, indent=2)
 ts_path.write_text(
     '// Auto-generated from terra_registry.json — DO NOT EDIT\n'
-    'import type { Idl } from "@coral-xyz/oxn";\n\n'
+    'import type { Idl } from "@coral-xyz/anchor";\n\n'
     f'export const terraRegistry: Idl = {body};\n'
 )
 print("wrote", ts_path)
