@@ -321,14 +321,15 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 142/142 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 143/143 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
 | Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 305/305 (~7 min; run locally) |
-| Unit (API validation logic) | `cargo test -p terra-api` | 68/68 |
+| Unit (API validation logic) | `cargo test -p terra-api` | 86/86 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 4/4 |
-| Migrations on real PostGIS 16 | CI service + local scratch instance | 26/26 apply |
+| ZK membership crate | `cargo test -p terra-zk-membership` | 5/5 |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 27/27 apply |
 | Frontend types | `tsc --noEmit` | clean |
 | Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
 
@@ -388,6 +389,8 @@ The stage map (0–10) and long-term direction live in
 - [x] Frontend transactions explorer (2026-09-30): `/transactions` simulated chain feed (base58 signatures, accounts, Anchor-style logs, exact error codes), broadcast composer with failure injection, toasts, **land-version timeline** (anchored → verified states with per-version WebGL-free SVG isometric 3D skeletons), wallet-signed txs marked `LIVE` with devnet status + Solana Explorer link, realtime validator-API/devnet pills; **WebGL-free 3D land skeleton** added to `/lab` Geometry Vault; `/progress` page removed
 - [x] **P0-ZK-01 framed Groth16 verification (2026-10-01)** — `proof_data` is now the mandatory 901-byte frame of RFC-011 §6.3.1 (`TG16` magic + version + Ed25519 statement signature + 576-byte hash-pinned VK + 256-byte Groth16 proof); on-chain pairing via `solana-bn254`/`alt_bn128` syscalls (public input `SHA-256(statement) mod r`, ≈99k CU full verify); `update_verification_key_hash` pin required before any proof; all proof-layer failures → `InvalidProofData` (6087), guard error codes preserved; new test `zk_groth16_verification_rejections` + framed happy path; test harness `send_tx` kills banks signature-dedup phantom results (root cause of previously flaky double-vote/replay negatives); suites green: registry BPF 303, registry lib 136, identity 6+23, rfc012 21, api 68, geo 4; IDL re-synced **161/67/148/237** (doc-comment only)
 - [x] **Vision Stage 3 Phase B — evidence-linked geometry (2026-10-01)** — RFC-013 §7 row B: `append_geometry_version_from_evidence` (version anchored to an `EvidenceManifest`, task open + non-empty guards, self-derived PDA seeds), `elevation_source` enum with 5 provenance invariants (NONE ⇔ flat D2, NONE ⇒ zero envelope, envelope ⊆ asset box), validator-quorum verification (`attestors`[8] / `attest_count` / `required` snapshotted from global `QuorumConfig (0,[0,0])`, fallback 2; `GeometryVersionAttested` event per attest), errors 6237–6240; +1 ix, +1 event; tests: spatial_asset 11 unit, `stage3_evidence_linked_geometry` + `stage3_geometry_quorum_config` new, quorum flow in verification test, 4 elevation guard cases in lifecycle — suites green: registry BPF **305**, registry lib **142**, identity 6+23, rfc012 21, api 68, geo 4; IDL re-synced **162/67/149/241**; identity test harness `process`/`process_with` adopted the `send_tx` signature-dedup fix (killed a latent duplicate-endorsement flake)
+
+- [x] **Groth16 ownership-proof flow + Track A audit (2026-10-03)** — framed Groth16 proofs wired end-to-end: `ZkPanel` live/dev proving via API `zk/status` + dev prover (fail-closed when disabled, production mode never proves), fixed-width purpose statement + 248-bit public input cross-checked program↔circuit (`ownership_statement_matches_groth16_circuit_encoding`), API verifies with VK frame+hash pinning and `FOR UPDATE` root lookup; identity binding creation now requires owner-wallet signature; demo discipline audited (local demo labelled local, console writes gated by `APPLY`/`EXECUTE`, no demo-as-chain anywhere); fixes: duplicate migration renamed `0027_zk_verification_key_pinning`, api test `AppState` compile (`zk: None`), `build.sh` emits the real `@coral-xyz/anchor` import; suites green: registry BPF **305**, registry lib **143**, identity **6+23**, rfc012 21, api **86**, geo 4, zk-membership **5**, `make ci` clean; `dev` pushed
 
 **Next (in order):**
 
