@@ -44,7 +44,9 @@ export default function ParcelPanel({ address, account, holder }: Props) {
     if (!publicKey) return
     setLoadingRights(true)
     try {
-      const program = getProgram() as any
+      const program = getProgram() as unknown as {
+        account: { rights: { fetch(pda: PublicKey): Promise<unknown> } }
+      }
       const count = account.rightsCount
       const items: RightsAccount[] = []
       for (let i = 0; i < count; i++) {

@@ -55,7 +55,7 @@ function ClickHandler({
   }, [zoomLock, map])
 
   useMapEvents({
-    click(e: any) {
+    click(e: { containerPoint: { x: number; y: number }; latlng: { lat: number; lng: number } }) {
       if (!drawing) return
       const now = performance.now()
       const prev = lastClickRef.current
@@ -127,22 +127,22 @@ export default function LeafletMap({
 
   return (
     <MapContainer
-      {...({
+      {...{
         center: CENTER,
         zoom: DEFAULT_ZOOM,
         zoomControl: false,
         className: 'leaflet-container',
         style: { width: '100%', height: '100%' },
-      } as any)}
+      }}
     >
       <ZoomBottomLeft />
       <TileLayer
-        {...({
+        {...{
           url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
           maxNativeZoom: 20,
           maxZoom: 22,
           attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
-        } as any)}
+        }}
       />
       <ClickHandler
         drawing={drawing}
@@ -178,11 +178,11 @@ export default function LeafletMap({
       {drawVertices.map((v, i) => (
         <CircleMarker
           key={`draw-${i + 1}`}
-          {...({
+          {...{
             center: [v.lat, v.lon],
             radius: 4,
             pathOptions: { color: '#000000', fillColor: '#7fff00', fillOpacity: 1, weight: 1 },
-          } as any)}
+          }}
         />
       ))}
       {drawVertices.length > 1 && (

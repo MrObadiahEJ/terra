@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { api, type OffChainParcel, type GeoStats, type FusionStats } from '../lib/api'
 import { DEMO_PARCELS, DEMO_GEO_STATS, DEMO_FUSION_STATS } from '../lib/demoData'
 import { bytesToHex } from '../lib/codec'
-import type { ParcelAccount } from '../lib/program'
+import type { ParcelAccount, RightsAccount } from '../lib/program'
 
 export interface OnChainParcelItem {
   address: string
@@ -71,7 +71,12 @@ export const useAppStore = create<AppState>()(
           // Dynamic import keeps the Anchor client out of the initial bundle and
           // avoids a hard crash when the wallet is not yet connected.
           const { getProgram } = await import('../lib/program')
-          const program = getProgram() as any
+          const program = getProgram() as unknown as {
+            account: {
+              parcel: { all(): Promise<{ publicKey: { toBase58(): string }; account: ParcelAccount }[]> }
+              rights: { all(): Promise<{ account: RightsAccount }[]> }
+            }
+          }
           const [accounts, rights] = await Promise.all([
             program.account.parcel.all(),
             program.account.rights.all(),
@@ -79,12 +84,12 @@ export const useAppStore = create<AppState>()(
           // Ownership is the Rights PDA with rightsKind === 0 (OWNERSHIP); it is
           // the single source of truth for who holds a parcel.
           const holders = new Map<string, string>()
-          for (const r of rights as any[]) {
+          for (const r of rights) {
             if (r.account.rightsKind === 0) {
               holders.set(r.account.parcel.toBase58(), r.account.holder.toBase58())
             }
           }
-          const items: OnChainParcelItem[] = (accounts as any[]).map((a: any) => ({
+          const items: OnChainParcelItem[] = accounts.map((a) => ({
             address: a.publicKey.toBase58(),
             id: bytesToHex(a.account.id),
             account: a.account,
