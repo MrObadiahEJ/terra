@@ -193,6 +193,12 @@ fn push_str(buf: &mut Vec<u8>, s: &str) {
     buf.extend_from_slice(s.as_bytes());
 }
 
+fn push_fixed_ownership_purpose(buf: &mut Vec<u8>, purpose: &str) {
+    buf.push(purpose.len() as u8);
+    buf.extend_from_slice(purpose.as_bytes());
+    buf.resize(buf.len() + MAX_PROOF_PURPOSE_LEN - purpose.len(), 0);
+}
+
 /// Canonical ownership-proof statement (see module docs). Returns the exact
 /// bytes the prover must sign and the program verifies.
 pub fn ownership_proof_statement(
@@ -213,7 +219,7 @@ pub fn ownership_proof_statement(
     m.extend_from_slice(&root_version.to_le_bytes());
     m.extend_from_slice(nullifier_hash);
     m.extend_from_slice(prover.as_ref());
-    push_str(&mut m, proof_purpose);
+    push_fixed_ownership_purpose(&mut m, proof_purpose);
     m.push(disclosure_type);
     m
 }
@@ -508,7 +514,7 @@ pub fn verify_ownership_proof(
         &statement,
         frame.signature,
     )?;
-    // Groth16 pairing equation over public input SHA-256(statement) mod r
+    // Groth16 pairing equation over the canonical 248-bit SHA-256 statement prefix.
     // (statement-bound: zone, root, version, nullifier, prover, purpose and
     // disclosure are all covered by the circuit's public input).
     require!(
@@ -928,6 +934,37 @@ mod tests {
             a,
             ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "a", 1)
         );
+    }
+
+    #[test]
+    fn ownership_statement_matches_groth16_circuit_encoding() {
+        let zone = Pubkey::new_from_array([1u8; 32]);
+        let root = [2u8; 32];
+        let nullifier = [3u8; 32];
+        let presenter = Pubkey::new_from_array([4u8; 32]);
+        let purpose = "membership";
+        let zone_bytes = zone.to_bytes();
+        let presenter_bytes = presenter.to_bytes();
+        let onchain = ownership_proof_statement(
+            &zone,
+            &root,
+            7,
+            &nullifier,
+            &presenter,
+            purpose,
+            disclosure_type::MEMBERSHIP,
+        );
+        let circuit = terra_zk_membership::canonical_ownership_statement(
+            &zone_bytes,
+            &root,
+            7,
+            &nullifier,
+            &presenter_bytes,
+            purpose,
+            disclosure_type::MEMBERSHIP,
+        )
+        .expect("valid circuit statement");
+        assert_eq!(onchain, circuit);
     }
 
     #[test]

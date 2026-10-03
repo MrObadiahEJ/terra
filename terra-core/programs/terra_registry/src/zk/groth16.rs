@@ -14,7 +14,8 @@
 //! The verification key is hash-pinned per zone root via the existing
 //! `update_verification_key_hash` instruction; the Ed25519 signature binds
 //! the frame to the canonical ownership statement; the Groth16 public input
-//! is `SHA-256(statement) mod r`, binding the proof to the same statement.
+//! is the first 31 bytes of `SHA-256(statement)` (248 bits), binding the proof
+//! to the same statement while remaining a canonical BN254 scalar.
 
 use anchor_lang::prelude::*;
 
@@ -79,7 +80,7 @@ pub fn parse_ownership_frame(data: &[u8]) -> Result<OwnershipProofFrame<'_>> {
 }
 
 // ---------------------------------------------------------------------------
-// Public input: SHA-256(statement) mod r
+// Public input: 248-bit SHA-256(statement) prefix
 // ---------------------------------------------------------------------------
 
 /// BN254 scalar field modulus `r` (big-endian).
@@ -126,10 +127,14 @@ pub fn fr_reduce(mut x: [u8; 32]) -> [u8; 32] {
     x
 }
 
-/// Groth16 public input: `SHA-256(statement) mod r` (big-endian). Shared by
-/// the on-chain verifier and the off-chain test prover.
+/// Groth16 public input: the first 31 bytes of SHA-256(statement), interpreted
+/// as a big-endian 248-bit integer. The leading zero guarantees a canonical
+/// scalar and avoids an in-circuit modular reduction.
 pub fn public_input(statement: &[u8]) -> [u8; 32] {
-    fr_reduce(solana_program::hash::hash(statement).to_bytes())
+    let digest = solana_program::hash::hash(statement).to_bytes();
+    let mut out = [0u8; 32];
+    out[1..].copy_from_slice(&digest[..31]);
+    out
 }
 
 // ---------------------------------------------------------------------------
@@ -277,17 +282,17 @@ mod tests {
         assert_eq!(
             public_input(b"abc"),
             [
-                0x29, 0x4b, 0x2b, 0x66, 0xeb, 0x6c, 0xef, 0x6d, 0x18, 0x50, 0x6f, 0xba, 0xd9, 0x2a,
-                0x19, 0x0c, 0x37, 0x67, 0xa8, 0xca, 0x28, 0xeb, 0x28, 0xe8, 0xe8, 0x6b, 0x1e, 0xa6,
-                0x22, 0x00, 0x15, 0xaa,
+                0x00, 0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d,
+                0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff,
+                0x61, 0xf2, 0x00, 0x15,
             ]
         );
         assert_eq!(
             public_input(b""),
             [
-                0x22, 0x1f, 0x8a, 0x77, 0x14, 0x35, 0x9b, 0x6d, 0xb9, 0xba, 0xdd, 0xee, 0x93, 0x6a,
-                0x57, 0xaf, 0x86, 0xde, 0xa0, 0xc2, 0x7d, 0xb5, 0xd1, 0x07, 0x95, 0x0d, 0xc2, 0xcb,
-                0xb8, 0x52, 0xb8, 0x51,
+                0x00, 0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99,
+                0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99,
+                0x1b, 0x78, 0x52, 0xb8,
             ]
         );
         let x = public_input(b"statement");

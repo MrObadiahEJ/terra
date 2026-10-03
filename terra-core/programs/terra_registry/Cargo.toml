@@ -35,6 +35,7 @@ ark-bn254 = "0.5.0"
 ark-relations = "0.5.0"
 ark-ff = "0.5.0"
 ark-std = "0.5.0"
+terra-zk-membership = { path = "../../zk-membership" }
 solana-program-test = { version = "3.0.0", features = ["agave-unstable-api"] }
 solana-sdk = "3.0.0"
 solana-sdk-ids = "3.0.0"

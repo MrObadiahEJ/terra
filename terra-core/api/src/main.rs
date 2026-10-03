@@ -6,7 +6,9 @@ mod geoutil;
 mod routes;
 mod state;
 mod storage;
+mod zk;
 
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -38,6 +40,16 @@ async fn main() -> Result<()> {
     let geo = load_geo(config.osm_pbf_path.as_deref()).await?;
 
     let storage = Arc::new(storage::from_env()?);
+    let zk = zk::ZkRuntime::from_env()?.map(Arc::new);
+    if let Some(zk) = &zk {
+        tracing::warn!(
+            mode = ?zk.mode(),
+            proving_enabled = zk.is_dev_prover_enabled(),
+            "Groth16 ZK service configured; validate ceremony provenance before production use"
+        );
+    } else {
+        tracing::info!("Groth16 ZK verification disabled: no key configuration");
+    }
 
     // CORS locked to configured origins (default: local Vite dev server).
     // The mirror API is unauthenticated by design for pilot deployments
@@ -74,12 +86,17 @@ async fn main() -> Result<()> {
             geo,
             api_authority: auth::ApiAuthority(config.api_authority_pubkey),
             storage,
+            zk,
         });
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("terra-api listening on {addr}");
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 

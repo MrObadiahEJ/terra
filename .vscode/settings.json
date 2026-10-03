@@ -47,5 +47,17 @@
         "editor.codeActionsOnSave": {
             "source.fixAll.rust-analyzer": "never"
         }
+    },
+    "chat.tools.terminal.autoApprove": {
+        "cargo fmt": true,
+        "cargo test": true,
+        "npx eslint": true,
+        "cargo check": true,
+        "npm run dev": true,
+        "sha256sum": true,
+        "git remote": true,
+        "git add": true,
+        "git commit": true,
+        "git push": true
     }
 }

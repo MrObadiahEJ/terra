@@ -632,6 +632,7 @@ export interface OwnershipRoot {
   version: number
   commitment_count: number
   algorithm_id: number
+  verification_key_hash: string
   snapshot_cid: string
   snapshot_hash: string
   authority_signature: string
@@ -673,9 +674,46 @@ export interface GenerateRootInput {
 export interface VerifyProofInput {
   nullifier_hash: string
   root_version: number
-  prover: string
+  presenter: string
   proof_purpose: string
   disclosure_type: number
+  proof_data: string
+}
+
+export interface ZkServiceStatus {
+  mode: 'disabled' | 'development' | 'production'
+  verification_enabled: boolean
+  development_proving_enabled: boolean
+  circuit: string
+  tree_depth: number
+  verification_key_hash: string | null
+  note: string
+}
+
+export interface PrepareDevProofInput {
+  root_version: number
+  presenter: string
+  proof_purpose: string
+  disclosure_type: number
+  secret: string
+}
+
+export interface PrepareDevProofResponse {
+  nullifier_hash: string
+  statement: string
+  development_only: boolean
+}
+
+export interface GenerateDevProofInput extends PrepareDevProofInput {
+  siblings: string[]
+  path_indices: boolean[]
+  statement_signature: string
+}
+
+export interface GenerateDevProofResponse {
+  proof_data: string
+  verification_key_hash: string
+  development_only: boolean
 }
 
 // ---- PostGIS spatial architecture --------------------------------------------
@@ -714,9 +752,14 @@ export interface ZoneParcelCount {
 
 // ---- client ---------------------------------------------------------------
 
-async function requestUrl<T>(url: string, init?: RequestInit, retries = 1): Promise<T> {
+async function requestUrl<T>(
+  url: string,
+  init?: RequestInit,
+  retries = 1,
+  timeoutMs = 30_000,
+): Promise<T> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30_000)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json' },
@@ -744,7 +787,7 @@ async function requestUrl<T>(url: string, init?: RequestInit, retries = 1): Prom
     const method = init?.method?.toUpperCase() ?? 'GET'
     if (retries > 0 && networkFailure && (method === 'GET' || method === 'HEAD')) {
       await new Promise((r) => setTimeout(r, 1000))
-      return requestUrl<T>(url, init, retries - 1)
+      return requestUrl<T>(url, init, retries - 1, timeoutMs)
     }
     throw err
   } finally {
@@ -752,8 +795,13 @@ async function requestUrl<T>(url: string, init?: RequestInit, retries = 1): Prom
   }
 }
 
-async function request<T>(path: string, init?: RequestInit, retries = 1): Promise<T> {
-  return requestUrl<T>(`${API_BASE}${path}`, init, retries)
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  retries = 1,
+  timeoutMs = 30_000,
+): Promise<T> {
+  return requestUrl<T>(`${API_BASE}${path}`, init, retries, timeoutMs)
 }
 
 async function signedIdentityRequest<T>(
@@ -1156,6 +1204,7 @@ export const api = {
 
   // ---- Zero-knowledge ownership proofs (RFC-011) -----------------------------
 
+  zkStatus: () => request<ZkServiceStatus>('/zk/status'),
   listZoneSets: () => request<ZoneSet[]>('/zk'),
   getZoneSet: (id: string) => request<ZoneSet>(`/zk/${id}`),
   registerZoneSet: (input: RegisterZoneSetInput) =>
@@ -1165,6 +1214,16 @@ export const api = {
     request<OwnershipRoot>(`/zk/${zoneId}/roots`, { method: 'POST', body: JSON.stringify(input) }),
   verifyOwnershipProof: (zoneId: string, input: VerifyProofInput) =>
     request<NullifierRecord>(`/zk/${zoneId}/proofs`, { method: 'POST', body: JSON.stringify(input) }),
+  prepareDevProof: (zoneId: string, input: PrepareDevProofInput) =>
+    request<PrepareDevProofResponse>(`/zk/${zoneId}/dev/prepare`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  generateDevProof: (zoneId: string, input: GenerateDevProofInput) =>
+    request<GenerateDevProofResponse>(`/zk/${zoneId}/dev/prove`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, 0, 180_000),
   listNullifiers: (zoneId: string) => request<NullifierRecord[]>(`/zk/${zoneId}/proofs`),
   invalidateProofVersion: (zoneId: string, version: number) =>
     request<ZoneSet>(`/zk/${zoneId}/invalidate/${version}`, { method: 'POST' }),

@@ -107,7 +107,7 @@ export const BACKEND_OPERATIONS: BackendOperation[] = [
   { id: 'zk-roots-list', group: 'ZK ownership', method: 'GET', path: '/zk/:id/roots', summary: 'List ownership roots' },
   { id: 'zk-roots-create', group: 'ZK ownership', method: 'POST', path: '/zk/:id/roots', summary: 'Generate ownership root', body: '{"root_address":"<address>","merkle_root":"<root>","snapshot_cid":"<cid>","snapshot_hash":"<hash>","commitment_count":0}', sensitive: true },
   { id: 'zk-proofs-list', group: 'ZK ownership', method: 'GET', path: '/zk/:id/proofs', summary: 'List proof nullifiers' },
-  { id: 'zk-proofs-create', group: 'ZK ownership', method: 'POST', path: '/zk/:id/proofs', summary: 'Record ownership proof verification', body: '{"nullifier_hash":"<hash>","root_version":1,"prover":"<wallet>","proof_purpose":"<purpose>","disclosure_type":0}', sensitive: true },
+  { id: 'zk-proofs-create', group: 'ZK ownership', method: 'POST', path: '/zk/:id/proofs', summary: 'Verify and record a Groth16 ownership proof', body: '{"nullifier_hash":"<hash>","root_version":1,"presenter":"<ephemeral-base58-key>","proof_purpose":"membership","disclosure_type":0,"proof_data":"<TG16-v1-frame-hex>"}', sensitive: true },
   { id: 'zk-invalidate', group: 'ZK ownership', method: 'POST', path: '/zk/:id/invalidate/:version', summary: 'Invalidate ownership root version', sensitive: true },
   { id: 'spatial-near', group: 'Spatial & OSM', method: 'GET', path: '/spatial/parcels/near', summary: 'Find nearby parcels', query: '{"lon":11.5,"lat":3.8,"radius_m":1000,"limit":20}' },
   { id: 'spatial-zones', group: 'Spatial & OSM', method: 'GET', path: '/spatial/zones/stats', summary: 'Read spatial zone aggregates' },

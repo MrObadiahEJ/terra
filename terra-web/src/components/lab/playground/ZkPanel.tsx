@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { KeyRound, ShieldCheck } from 'lucide-react'
+import { ed25519 as nobleEd25519 } from '@noble/curves/ed25519'
+import { PublicKey } from '@solana/web3.js'
+import { api, type NullifierRecord, type OwnershipRoot, type ZkServiceStatus, type ZoneSet } from '../../../lib/api'
 import { Broadcast, DemoBanner, Field, VerdictCard } from './shared'
 import { err, pushGate, type Gate, type Verdict } from './helpers'
 
 const MAX_PROOF = 1024 // zk/mod.rs MAX_ZK_PROOF_SIZE
 const MAX_PURPOSE = 128
 const MAX_DISCLOSURE = 2 // disclosure_type::MAX = COUNT
+const HEX_32 = /^[0-9a-f]{64}$/i
 
 type ZAction = 'register_zone_set' | 'generate_ownership_root' | 'verify_ownership_proof' | 'invalidate_proof' | 'update_verification_key_hash'
 
@@ -14,6 +18,20 @@ interface Call {
   ok: boolean
   summary: string
   verdict: Verdict
+}
+
+function parseFieldHex(value: string, label: string): string {
+  const normalized = value.trim().replace(/^0x/i, '')
+  if (!HEX_32.test(normalized)) throw new Error(`${label} must be exactly 32 bytes of hex`)
+  return normalized.toLowerCase()
+}
+
+function parseStatementHex(value: string): Uint8Array {
+  const normalized = value.trim().replace(/^0x/i, '')
+  if (normalized.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(normalized)) {
+    throw new Error('Backend returned a malformed ownership statement')
+  }
+  return Uint8Array.from(normalized.match(/.{2}/g) ?? [], (byte) => Number.parseInt(byte, 16))
 }
 
 export default function ZkPanel() {
@@ -30,10 +48,114 @@ export default function ZkPanel() {
   const [frame, setFrame] = useState<'ok' | 'bad_magic'>('ok')
   const [vkMatch, setVkMatch] = useState(true)
   const [pairing, setPairing] = useState(true)
-  const [ed25519, setEd25519] = useState(true)
+  const [sigValid, setSigValid] = useState(true)
   const [staleVersion, setStaleVersion] = useState(0)
   const [used, setUsed] = useState<string[]>([])
   const [last, setLast] = useState<Call | null>(null)
+  const [service, setService] = useState<ZkServiceStatus | null>(null)
+  const [serviceError, setServiceError] = useState<string | null>(null)
+  const [zoneSets, setZoneSets] = useState<ZoneSet[]>([])
+  const [selectedZoneId, setSelectedZoneId] = useState('')
+  const [ownershipRoots, setOwnershipRoots] = useState<OwnershipRoot[]>([])
+  const [rootVersion, setRootVersion] = useState(0)
+  const [secret, setSecret] = useState('')
+  const [siblingsText, setSiblingsText] = useState('')
+  const [pathIndicesText, setPathIndicesText] = useState('')
+  const [liveBusy, setLiveBusy] = useState(false)
+  const [liveError, setLiveError] = useState<string | null>(null)
+  const [verifiedProof, setVerifiedProof] = useState<NullifierRecord | null>(null)
+
+  useEffect(() => {
+    let active = true
+    api.zkStatus()
+      .then((result) => { if (active) setService(result) })
+      .catch((error: unknown) => { if (active) setServiceError(error instanceof Error ? error.message : String(error)) })
+    api.listZoneSets()
+      .then((result) => {
+        if (!active) return
+        setZoneSets(result)
+        setSelectedZoneId((current) => current || result[0]?.id || '')
+      })
+      .catch((error: unknown) => { if (active) setServiceError(error instanceof Error ? error.message : String(error)) })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    if (!selectedZoneId) return () => { active = false }
+    api.listOwnershipRoots(selectedZoneId)
+      .then((result) => {
+        if (!active) return
+        setOwnershipRoots(result)
+        const current = zoneSets.find((zoneSet) => zoneSet.id === selectedZoneId)?.current_root_version
+        setRootVersion(current ?? result.at(-1)?.version ?? 0)
+      })
+      .catch((error: unknown) => { if (active) setLiveError(error instanceof Error ? error.message : String(error)) })
+    return () => { active = false }
+  }, [selectedZoneId, zoneSets])
+
+  const runLiveProof = async () => {
+    if (!service?.development_proving_enabled) {
+      setLiveError('Live proving is unavailable: configure the API in development mode with a matching proving key.')
+      return
+    }
+    if (!selectedZoneId || rootVersion < 1) {
+      setLiveError('Choose a zone set with a published ownership root.')
+      return
+    }
+    setLiveBusy(true)
+    setLiveError(null)
+    setVerifiedProof(null)
+    let ephemeralSecret: Uint8Array | null = null
+    try {
+      const secretHex = parseFieldHex(secret, 'Private membership secret')
+      const siblings = siblingsText.trim().split(/[\s,]+/).filter(Boolean)
+        .map((value, index) => parseFieldHex(value, `Sibling ${index + 1}`))
+      const pathParts = pathIndicesText.trim().split(/[\s,]+/).filter(Boolean)
+      if (siblings.length !== service.tree_depth) {
+        throw new Error(`Enter exactly ${service.tree_depth} sibling hashes (leaf-to-root order).`)
+      }
+      if (pathParts.length !== service.tree_depth || pathParts.some((value) => value !== '0' && value !== '1')) {
+        throw new Error(`Enter exactly ${service.tree_depth} path bits (0 or 1, leaf-to-root order).`)
+      }
+
+      ephemeralSecret = nobleEd25519.utils.randomSecretKey()
+      const presenter = new PublicKey(nobleEd25519.getPublicKey(ephemeralSecret)).toBase58()
+      const proofContext = {
+        root_version: rootVersion,
+        presenter,
+        proof_purpose: 'membership',
+        disclosure_type: 0,
+        secret: secretHex,
+      }
+      const prepared = await api.prepareDevProof(selectedZoneId, proofContext)
+      const statement = parseStatementHex(prepared.statement)
+      const signature = nobleEd25519.sign(statement, ephemeralSecret)
+      const generated = await api.generateDevProof(selectedZoneId, {
+        ...proofContext,
+        siblings,
+        path_indices: pathParts.map((value) => value === '1'),
+        statement_signature: Array.from(signature as Uint8Array, (byte: number) => byte.toString(16).padStart(2, '0')).join(''),
+      })
+      const record = await api.verifyOwnershipProof(selectedZoneId, {
+        nullifier_hash: prepared.nullifier_hash,
+        root_version: rootVersion,
+        presenter,
+        proof_purpose: 'membership',
+        disclosure_type: 0,
+        proof_data: generated.proof_data,
+      })
+      setVerifiedProof(record)
+      setSecret('')
+      setSiblingsText('')
+      setPathIndicesText('')
+    } catch (error) {
+      setLiveError(error instanceof Error ? error.message : String(error))
+    } finally {
+      ephemeralSecret?.fill(0)
+      setLiveBusy(false)
+    }
+  }
 
   const run = (ix: ZAction) => {
     const gates: Gate[] = []
@@ -107,9 +229,9 @@ export default function ZkPanel() {
         else pass('frame parse (magic 4B + version 1B + body)', 'framed v1 payload ok')
         if (!vkMatch) fail('InvalidProofData', 'hash(frame.verification_key) ≠ root.verification_key_hash — VK pin mismatch')
         else pass('verification_key_hash pin', 'hash(vk) == pinned')
-        if (!ed25519) fail('InvalidProofData', 'Ed25519 statement signature invalid (precompiled sysvar check)')
+        if (!sigValid) fail('InvalidProofData', 'Ed25519 statement signature invalid (precompiled sysvar check)')
         else pass('statement Ed25519 signature', 'covers zone, root, version, nullifier, prover, purpose, disclosure')
-        if (!pairing) fail('InvalidProofData', 'Groth16 pairing equation failed over SHA-256(statement) mod r')
+        if (!pairing) fail('InvalidProofData', 'Groth16 pairing equation failed for the 248-bit SHA-256 statement digest')
         else pass('Groth16 pairing check', 'POSEIDON_GROTH16 proof accepted')
         if (ok) {
           if (nullifier === 'valid' && !used.includes('n-7f3a')) setUsed([...used, 'n-7f3a'])
@@ -144,7 +266,111 @@ export default function ZkPanel() {
 
   return (
     <div className="lab-body">
-      <DemoBanner source="zk/mod.rs + zk/groth16.rs (P0-ZK-01 framing)" />
+      <div className="lab-card space-y-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-[13px] font-semibold flex items-center gap-1.5">
+              <ShieldCheck size={14} /> Live Groth16 membership proof
+            </h3>
+            <p className="text-[11px] text-muted mt-1">
+              Generates a fresh one-time presenter key, proves membership against the selected root,
+              then submits the proof for server-side verification and nullifier recording.
+            </p>
+          </div>
+          <span className={`lab-badge ${service?.verification_enabled ? 'lab-badge-ok' : 'lab-badge-warn'}`}>
+            {service?.mode ?? (serviceError ? 'API OFFLINE' : 'CHECKING')} {service?.mode === 'development' ? 'PROVER' : ''}
+          </span>
+        </div>
+        {service && (
+          <p className="text-[10px] text-muted break-all">
+            {service.circuit} · depth {service.tree_depth} · VK {service.verification_key_hash ?? 'not configured'}
+          </p>
+        )}
+        {serviceError && <p role="alert" className="text-[11px] text-red-700">{serviceError}</p>}
+        <div className="pg-fields">
+          <Field label="zone set">
+            <select
+              className="select-input"
+              value={selectedZoneId}
+              onChange={(event) => {
+                const next = event.target.value
+                setSelectedZoneId(next)
+                if (!next) {
+                  setOwnershipRoots([])
+                  setRootVersion(0)
+                }
+              }}
+            >
+              <option value="">Select a zone set</option>
+              {zoneSets.map((zoneSet) => (
+                <option key={zoneSet.id} value={zoneSet.id}>
+                  {zoneSet.zone_id} · root v{zoneSet.current_root_version}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="current root version">
+            <select className="select-input" value={rootVersion} onChange={(event) => setRootVersion(Number(event.target.value))}>
+              {ownershipRoots.map((root) => (
+                <option key={root.id} value={root.version}>
+                  v{root.version} · {root.commitment_count} commitments
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="private membership secret (hex, 32 bytes)">
+            <input
+              className="select-input font-mono"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={secret}
+              onChange={(event) => setSecret(event.target.value)}
+              placeholder="32-byte private witness"
+            />
+          </Field>
+          <Field label={`Merkle siblings (${service?.tree_depth ?? 20}, leaf-to-root; one hex hash per line)`}>
+            <textarea
+              className="select-input font-mono min-h-24"
+              spellCheck={false}
+              value={siblingsText}
+              onChange={(event) => setSiblingsText(event.target.value)}
+              placeholder={'One 32-byte sibling hash per line'}
+            />
+          </Field>
+          <Field label={`Merkle path bits (${service?.tree_depth ?? 20}, leaf-to-root)`}>
+            <input
+              className="select-input font-mono"
+              spellCheck={false}
+              value={pathIndicesText}
+              onChange={(event) => setPathIndicesText(event.target.value)}
+              placeholder={`20 bits, e.g. ${'0'.repeat(service?.tree_depth ?? 20)}`}
+            />
+          </Field>
+        </div>
+        <p className="text-[10px] text-amber-800">
+          Development proving sends the secret and Merkle witness to this loopback API. Do not expose a development
+          prover through a public reverse proxy. The witness stays in this page only until submission.
+        </p>
+        {liveError && <p role="alert" className="text-[11px] text-red-700">{liveError}</p>}
+        {verifiedProof && (
+          <div className="lab-card" role="status">
+            <p className="text-[12px] font-semibold text-emerald-700">Groth16 proof verified · nullifier recorded</p>
+            <p className="text-[10px] font-mono break-all mt-1">{verifiedProof.nullifier_hash}</p>
+            <p className="text-[10px] text-muted mt-1">One-time presenter: {verifiedProof.prover}</p>
+          </div>
+        )}
+        <button
+          className="btn btn-primary px-3 py-2 text-[12px] self-start"
+          type="button"
+          onClick={() => void runLiveProof()}
+          disabled={liveBusy || !service?.development_proving_enabled || !ownershipRoots.length}
+        >
+          {liveBusy ? 'Building and verifying Groth16 proof…' : 'Generate & verify private membership proof'}
+        </button>
+      </div>
+
+      <DemoBanner source="zk/mod.rs + zk/groth16.rs (guard-chain simulator)" />
 
       <div className="lab-grid mt-3">
         <div className="lab-card space-y-2">
@@ -257,7 +483,7 @@ export default function ZkPanel() {
             </Field>
             <Field label="proof_data frame">
               <select className="select-input" value={proofSize} onChange={(e) => setProofSize(e.target.value as 'valid' | 'empty' | 'oversize')}>
-                <option value="valid">896 B framed v1</option>
+                <option value="valid">901 B TG16 v1</option>
                 <option value="empty">0 B (empty)</option>
                 <option value="oversize">1025 B (&gt; MAX)</option>
               </select>
@@ -275,7 +501,7 @@ export default function ZkPanel() {
               </select>
             </Field>
             <Field label="Ed25519 statement sig">
-              <select className="select-input" value={ed25519 ? 'ok' : 'bad'} onChange={(e) => setEd25519(e.target.value === 'ok')}>
+              <select className="select-input" value={sigValid ? 'ok' : 'bad'} onChange={(e) => setSigValid(e.target.value === 'ok')}>
                 <option value="ok">valid</option>
                 <option value="bad">invalid</option>
               </select>
@@ -291,9 +517,7 @@ export default function ZkPanel() {
             verify_ownership_proof
           </button>
           <p className="text-[10px] text-muted">
-            Production note (honest gap): the Groth16 circuit + trusted setup is the release gate — this panel
-            mirrors the on-chain guard chain and frame parsing (RFC-011 §6.3.1), with the pairing/Ed25519
-            outcomes switchable. Framing proof wiring is tracked as experimental, not implemented.
+            This lower panel is a guard-chain simulator only; use the live proof flow above to generate and verify a real proof.
           </p>
         </div>
       </div>

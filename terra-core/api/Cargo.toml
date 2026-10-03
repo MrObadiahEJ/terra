@@ -27,7 +27,11 @@ sha2 = "0.10"
 solana-sdk = "3"
 solana-program = "3"
 solana-account-decoder = "3"
+ark-bn254 = "0.5"
+ark-ff = "0.5"
+ark-groth16 = "0.5"
 terra-geo = { path = "../geo-engine" }
+terra-zk-membership = { path = "../zk-membership" }
 
 [dev-dependencies]
 tempfile = "3"

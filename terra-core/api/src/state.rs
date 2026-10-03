@@ -5,6 +5,7 @@ use terra_geo::{OsmData, RoadGraph};
 
 use crate::auth::ApiAuthority;
 use crate::storage::StorageBackend;
+use crate::zk::ZkRuntime;
 
 /// Shared application state passed to all handlers.
 #[derive(Clone)]
@@ -16,6 +17,8 @@ pub struct AppState {
     pub api_authority: ApiAuthority,
     /// Storage backend for evidence uploads.
     pub storage: Arc<StorageBackend>,
+    /// Optional Groth16 verifier and development-only local prover.
+    pub zk: Option<Arc<ZkRuntime>>,
 }
 
 pub struct GeoData {

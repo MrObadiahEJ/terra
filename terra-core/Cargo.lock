@@ -678,6 +678,7 @@ dependencies = [
  "ark-crypto-primitives-macros",
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
+ "ark-r1cs-std",
  "ark-relations",
  "ark-serialize 0.5.0",
  "ark-snark",
@@ -689,6 +690,7 @@ dependencies = [
  "merlin",
  "rayon",
  "sha2 0.10.9",
+ "tracing",
 ]
 
 [[package]]
@@ -871,6 +873,23 @@ dependencies = [
  "fnv",
  "hashbrown 0.15.5",
  "rayon",
+]
+
+[[package]]
+name = "ark-r1cs-std"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "941551ef1df4c7a401de7068758db6503598e6f01850bdb2cfdb614a1f9dbea1"
+dependencies = [
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-relations",
+ "ark-std 0.5.0",
+ "educe 0.6.0",
+ "num-bigint 0.4.8",
+ "num-integer",
+ "num-traits",
+ "tracing",
 ]
 
 [[package]]
@@ -9096,6 +9115,9 @@ name = "terra-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-groth16",
  "axum",
  "base64 0.22.1",
  "bs58",
@@ -9113,6 +9135,7 @@ dependencies = [
  "sqlx",
  "tempfile",
  "terra-geo",
+ "terra-zk-membership",
  "thiserror 1.0.69",
  "tokio",
  "tower",
@@ -9164,6 +9187,28 @@ dependencies = [
  "solana-sdk",
  "solana-sdk-ids",
  "terra-identity",
+ "terra-zk-membership",
+]
+
+[[package]]
+name = "terra-zk-membership"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254 0.5.0",
+ "ark-crypto-primitives",
+ "ark-ff 0.5.0",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-serialize 0.5.0",
+ "ark-snark",
+ "ark-std 0.5.0",
+ "hex",
+ "light-poseidon 0.4.0",
+ "rand 0.8.7",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

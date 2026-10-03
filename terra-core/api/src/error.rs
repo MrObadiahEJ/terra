@@ -9,6 +9,8 @@ pub enum AppError {
     BadRequest(String),
     Conflict(String),
     Unauthorized(String),
+    Forbidden(String),
+    Unavailable(String),
     Internal(String),
     Database(sqlx::Error),
 }
@@ -47,6 +49,8 @@ impl IntoResponse for AppError {
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
             AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m.clone()),
+            AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
+            AppError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, m.clone()),
             AppError::Internal(m) => {
                 tracing::error!(error = %m, "internal task failed");
                 (
