@@ -339,6 +339,7 @@ mod tests {
             storage: Arc::new(StorageBackend::Local {
                 root: std::path::PathBuf::from("/tmp/terra-test-evidence"),
             }),
+            zk: None,
         };
         axum::Router::new()
             .route("/upload", post(upload_evidence))

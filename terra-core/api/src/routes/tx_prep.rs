@@ -418,6 +418,7 @@ mod tests {
             storage: Arc::new(StorageBackend::Local {
                 root: std::path::PathBuf::from("/tmp/terra-test"),
             }),
+            zk: None,
         };
         axum::Router::new()
             .route("/prepare", post(prepare_tx))
