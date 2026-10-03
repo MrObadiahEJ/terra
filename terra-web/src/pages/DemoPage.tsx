@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Activity,
@@ -24,6 +24,8 @@ import {
 import { useActivityStore } from '../lib/activityStore'
 import ActivityFeed from '../components/ActivityFeed'
 import { buildLocalDemoScenario } from '../lib/localDemo'
+import ProtocolViz from '../components/demo/ProtocolViz'
+import { STAGE_DEFS, buildStageTrack, spatialStateFor, validatorInfo } from '../lib/protocolStages'
 import TerraGlobe from '../components/map/TerraGlobe'
 import { DEMO_PARCELS } from '../lib/demoData'
 import { polygonAreaM2, polygonCentroid, type LonLat } from '../lib/geo'
@@ -136,6 +138,7 @@ export default function DemoPage() {
   const [sceneSource, setSceneSource] = useState<'loading' | 'osm' | 'api' | 'sample'>('loading')
   const [sceneView, setSceneView] = useState<'2d' | '3d'>('3d')
   const [sceneWebglError, setSceneWebglError] = useState<string | null>(null)
+  const [view, setView] = useState<'events' | 'viz'>('viz')
   const tlRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -208,8 +211,14 @@ export default function DemoPage() {
     }
   }, [])
 
-  const events = data?.events ?? []
+  const events = useMemo(() => data?.events ?? [], [data])
   const last = events.length - 1
+  const track = useMemo(() => buildStageTrack(events, phase), [events, phase])
+  const validators = useMemo(
+    () => (data ? validatorInfo(data) : { labels: [], present: false }),
+    [data],
+  )
+  const spatial = spatialStateFor(track)
 
   // Playback: reveal events using the payload's own deterministic timestamps.
   useEffect(() => {
@@ -506,6 +515,12 @@ export default function DemoPage() {
                     }}
                   />
                 )}
+                {phase >= 0 && spatial.stage && (
+                  <>
+                    <span className={`dm-scene-pulse st-${spatial.stage}`} aria-hidden="true" />
+                    <span className={`dm-scene-state st-${spatial.stage}`}>{spatial.label}</span>
+                  </>
+                )}
                 <span className={`dm-scene-source ${sceneSource === 'sample' ? 'sample' : ''}`}>
                   {sceneSource === 'loading'
                     ? t('loadingMap')
@@ -558,11 +573,32 @@ export default function DemoPage() {
             </aside>
           </section>
 
-          <div className="dm-grid">
-            {/* event timeline */}
+          <div className={`dm-grid ${view === 'viz' ? 'dm-grid--viz' : ''}`}>
             <div className="dm-panel">
               <div className="dm-panel-h">
-                Event timeline <span className="text-muted">(deterministic t offsets)</span>
+                <span>
+                  {view === 'events' ? (
+                    <>Event timeline <span className="text-muted">(deterministic t offsets)</span></>
+                  ) : (
+                    <>Protocol visualization <span className="text-muted">(same event stream)</span></>
+                  )}
+                </span>
+                <div className="land-viewer-seg" role="group" aria-label="Timeline view mode">
+                  <button
+                    className={`land-viewer-segbtn ${view === 'events' ? 'on' : ''}`}
+                    onClick={() => setView('events')}
+                    aria-pressed={view === 'events'}
+                  >
+                    EVENTS
+                  </button>
+                  <button
+                    className={`land-viewer-segbtn ${view === 'viz' ? 'on' : ''}`}
+                    onClick={() => setView('viz')}
+                    aria-pressed={view === 'viz'}
+                  >
+                    VISUALIZATION
+                  </button>
+                </div>
                 <span className="dm-progress">
                   <span
                     className="dm-progress-bar"
@@ -570,45 +606,61 @@ export default function DemoPage() {
                   />
                 </span>
               </div>
-              <div className="dm-tl" ref={tlRef}>
-                {events.map((e, i) =>
-                  i <= phase ? (
-                    <div
-                      key={e.seq}
-                      className={`dm-ev ${i === phase ? 'cur' : ''}`}
-                    >
-                      <span className="dm-ev-seq">{e.seq}</span>
-                      <div className="min-w-0">
-                        <div className="dm-kind">{e.kind}</div>
-                        <div className="text-xs text-muted">{e.detail}</div>
-                        <div className="dm-meta font-mono">
-                          t+{(e.t_offset_ms / 1000).toFixed(2)}s · {e.ref.slice(0, 16)}…
+              {view === 'events' ? (
+                <div className="dm-tl" ref={tlRef}>
+                  {events.map((e, i) =>
+                    i <= phase ? (
+                      <div
+                        key={e.seq}
+                        className={`dm-ev ${i === phase ? 'cur' : ''}`}
+                      >
+                        <span className="dm-ev-seq">{e.seq}</span>
+                        <div className="min-w-0">
+                          <div className="dm-kind">
+                            {e.kind}
+                            <span className={`dm-ev-stage st-${track.stages[i]}`}>
+                              {STAGE_DEFS[track.stages[i]].label}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted">{e.detail}</div>
+                          <div className="dm-meta font-mono">
+                            t+{(e.t_offset_ms / 1000).toFixed(2)}s · {e.ref.slice(0, 16)}…
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : null,
-                )}
-                {phase < 0 && <div className="text-xs text-muted">Press Run…</div>}
-              </div>
+                    ) : null,
+                  )}
+                  {phase < 0 && <div className="text-xs text-muted">Press Run…</div>}
+                </div>
+              ) : (
+                <ProtocolViz
+                  track={track}
+                  events={events}
+                  phase={phase}
+                  validators={validators}
+                  spatial={spatial}
+                />
+              )}
             </div>
 
-            {/* entities from the payload */}
-            <div className="dm-panel">
-              <div className="dm-panel-h">Scenario entities</div>
-              <div className="dm-ents">
-                {entities.map(([k, v]) => (
-                  <div key={k} className="dm-ent">
-                    <span className="dm-ent-k">{k}</span>
-                    {typeof v === 'string' ? (
-                      <span className="dm-ent-v font-mono">{v}</span>
-                    ) : (
-                      <pre className="dm-pre">{JSON.stringify(v, null, 2)}</pre>
-                    )}
-                  </div>
-                ))}
+            {view === 'events' && (
+              <div className="dm-panel">
+                <div className="dm-panel-h">Scenario entities</div>
+                <div className="dm-ents">
+                  {entities.map(([k, v]) => (
+                    <div key={k} className="dm-ent">
+                      <span className="dm-ent-k">{k}</span>
+                      {typeof v === 'string' ? (
+                        <span className="dm-ent-v font-mono">{v}</span>
+                      ) : (
+                        <pre className="dm-pre">{JSON.stringify(v, null, 2)}</pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-muted mt-3 font-mono">{data.note}</div>
               </div>
-              <div className="text-xs text-muted mt-3 font-mono">{data.note}</div>
-            </div>
+            )}
           </div>
         </>
       )}
