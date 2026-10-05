@@ -4188,3 +4188,93 @@ header .wallet-adapter-button {
   .sidenav,
   .sidenav-scrim { transition: none; }
 }
+.welcome-cycle-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+}
+.welcome-cycle-head strong {
+  overflow: hidden;
+  color: #f2f6ef;
+  font-size: 13px;
+  letter-spacing: .01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: welcome-enter .4s ease;
+}
+.welcome-cycle-head span {
+  color: #9ba39b;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.welcome-cubes { overflow: visible; }
+.welcome-cube {
+  animation: cube-rise .5s cubic-bezier(.2, .7, .3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.welcome-cube-bob { animation: welcome-cube-bob 4.5s ease-in-out 1s infinite; }
+@keyframes cube-rise { from { opacity: 0; transform: translateY(26px); } }
+@keyframes welcome-cube-bob { 50% { transform: translateY(-7px); } }
+.cube-face {
+  stroke: #d0efb4;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+.cube-top { fill: #a5df7355; }
+.cube-left { fill: #a5df7326; }
+.cube-right { fill: #a5df733d; }
+.welcome-cube-shadow { fill: #00000066; }
+.welcome-cube-ring {
+  fill: none;
+  stroke: #ffffff;
+  stroke-opacity: .32;
+  stroke-width: .8;
+  stroke-dasharray: 3 6;
+  animation: welcome-dash 10s linear infinite;
+}
+.welcome-cycle-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 7px;
+}
+.welcome-cycle-dots button {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.welcome-cycle-dots button::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 999px;
+  background: #ffffff38;
+  transition: inset .2s ease, background .2s ease;
+}
+.welcome-cycle-dots button.on::after { inset: 6px 3px; background: #c7efa3; }
+.welcome-cycle-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #c7efa3;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.welcome-cycle-open:hover { color: #eafbd8; }
+@media (prefers-reduced-motion: reduce) {
+  .welcome-cube,
+  .welcome-cube-bob,
+  .welcome-cycle-head strong,
+  .welcome-cube-ring { animation: none; }
+}

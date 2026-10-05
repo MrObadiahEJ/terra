@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownRight,
@@ -22,6 +22,28 @@ import { useAppStore } from '../store/appStore'
 
 type FeedState = 'checking' | 'online' | 'offline'
 
+const CUBE_LAYOUT: [number, number][] = [
+  [260, 30],
+  [188, 66],
+  [332, 66],
+  [116, 102],
+  [260, 102],
+  [404, 102],
+  [188, 138],
+  [332, 138],
+]
+
+function cubePaths(x: number, y: number) {
+  const w = 36
+  const h = 18
+  const depth = 40
+  return {
+    top: `M${x},${y} L${x + w},${y + h} L${x},${y + 2 * h} L${x - w},${y + h} Z`,
+    left: `M${x - w},${y + h} L${x},${y + 2 * h} L${x},${y + 2 * h + depth} L${x - w},${y + h + depth} Z`,
+    right: `M${x + w},${y + h} L${x},${y + 2 * h} L${x},${y + 2 * h + depth} L${x + w},${y + h + depth} Z`,
+  }
+}
+
 function formatTime(at: number, locale: string) {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(at)
 }
@@ -32,6 +54,9 @@ export default function WelcomePage() {
   const parcels = useAppStore((state) => state.parcels)
   const loadingParcels = useAppStore((state) => state.loadingParcels)
   const parcelsError = useAppStore((state) => state.parcelsError)
+  const offChainParcels = useAppStore((state) => state.offChainParcels)
+  const loadingOffChain = useAppStore((state) => state.loadingOffChain)
+  const refreshOffChain = useAppStore((state) => state.refreshOffChain)
   const ownedParcels = useMemo(
     () => publicKey ? parcels.filter((parcel) => parcel.holder === publicKey.toBase58()) : [],
     [parcels, publicKey],
@@ -39,6 +64,26 @@ export default function WelcomePage() {
   const demoItems = useActivityStore((state) => state.items)
   const [apiItems, setApiItems] = useState<ActivityItem[]>([])
   const [feedState, setFeedState] = useState<FeedState>('checking')
+  const cycleParcels = useMemo(() => offChainParcels.slice(0, 6), [offChainParcels])
+  const [cycleIndex, setCycleIndex] = useState(0)
+  const [cyclePaused, setCyclePaused] = useState(false)
+
+  useEffect(() => {
+    if (offChainParcels.length === 0 && !loadingOffChain) void refreshOffChain()
+  }, [offChainParcels.length, loadingOffChain, refreshOffChain])
+
+  useEffect(() => {
+    if (cycleParcels.length < 2 || cyclePaused) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const timer = window.setInterval(() => {
+      if (document.hidden) return
+      setCycleIndex((index) => (index + 1) % cycleParcels.length)
+    }, 3500)
+    return () => window.clearInterval(timer)
+  }, [cycleParcels.length, cyclePaused])
+
+  const activeIndex = cycleParcels.length ? cycleIndex % cycleParcels.length : 0
+  const activeParcel = cycleParcels[activeIndex] ?? null
 
   useEffect(() => {
     let live = true
@@ -128,28 +173,69 @@ export default function WelcomePage() {
                 <Link to="/portfolio" aria-label={t('openPortfolio')}><ArrowUpRight size={15} /></Link>
               </div>
             </div>
-            <div className="welcome-art-preview">
+            <div
+              className="welcome-art-preview"
+              onMouseEnter={() => setCyclePaused(true)}
+              onMouseLeave={() => setCyclePaused(false)}
+            >
               <span className="welcome-preview-kicker">{t('spatialPreview')}</span>
-              <svg className="welcome-map-art" viewBox="0 0 560 190" role="img" aria-label="Illustrative 3D land geometry preview">
-              <defs>
-                <linearGradient id="land-fill" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="currentColor" stopOpacity=".28" />
-                  <stop offset="1" stopColor="currentColor" stopOpacity=".03" />
-                </linearGradient>
-              </defs>
-              <path className="welcome-land-shadow" d="m115 139 163-79 174 65-163 48-174-34Z" />
-              <path className="welcome-parcel-side" d="m176 84 101-42 111 41v52l-102 44-110-44V84Z" />
-              <path className="welcome-parcel" d="m176 84 110-43 102 42-102 48-110-47Z" />
-              <path className="welcome-parcel-grid" d="m176 84 110 47m0 0 102-48m-102 48v48m-61-74 105-45m-51 91V66m-51 41v-1" />
-              <path className="welcome-parcel-highlight" d="m176 84 110-43 102 42-102 48-110-47Z" />
-              <circle className="welcome-parcel-node" cx="286" cy="131" r="5" />
-              <circle className="welcome-parcel-node" cx="176" cy="84" r="4" />
-              <circle className="welcome-parcel-node" cx="388" cy="83" r="4" />
-            </svg>
+              {activeParcel && (
+                <div className="welcome-cycle-head">
+                  <strong key={activeParcel.id}>{activeParcel.name}</strong>
+                  <span>
+                    {Math.round(activeParcel.area_m2).toLocaleString('en-US')} m² · {activeParcel.status}
+                  </span>
+                </div>
+              )}
+              <svg
+                key={activeParcel?.id ?? 'static'}
+                className="welcome-map-art welcome-cubes"
+                viewBox="0 0 560 230"
+                role="img"
+                aria-label={activeParcel ? `${activeParcel.name} isometric land block` : 'Isometric land block preview'}
+              >
+                <ellipse className="welcome-cube-ring" cx="260" cy="120" rx="176" ry="92" />
+                <ellipse className="welcome-cube-shadow" cx="260" cy="216" rx="132" ry="11" />
+                {CUBE_LAYOUT.map(([cx, cy], index) => {
+                  const faces = cubePaths(cx, cy)
+                  return (
+                    <g className="welcome-cube" style={{ '--i': index } as CSSProperties} key={`${cx}-${cy}`}>
+                      <g className={index === 0 ? 'welcome-cube-bob' : undefined}>
+                        <path className="cube-face cube-left" d={faces.left} />
+                        <path className="cube-face cube-right" d={faces.right} />
+                        <path className="cube-face cube-top" d={faces.top} />
+                      </g>
+                    </g>
+                  )
+                })}
+                <circle className="welcome-parcel-node" cx="84" cy="120" r="4" />
+                <circle className="welcome-parcel-node" cx="436" cy="120" r="4" />
+                <circle className="welcome-parcel-node" cx="260" cy="28" r="4" />
+              </svg>
               <div className="welcome-art-footer">
                 <span><Layers3 size={13} /> {t('spatialRecord')}</span>
-                <span className="welcome-preview-note">{t('illustrativeGeometry')}</span>
+                {activeParcel ? (
+                  <Link className="welcome-cycle-open" to={`/atlas?parcel=${activeParcel.id}`}>
+                    {t('openAtlas')} <ArrowUpRight size={11} />
+                  </Link>
+                ) : (
+                  <span className="welcome-preview-note">{t('illustrativeGeometry')}</span>
+                )}
               </div>
+              {activeParcel && cycleParcels.length > 1 && (
+                <div className="welcome-cycle-dots">
+                  {cycleParcels.map((parcel, index) => (
+                    <button
+                      key={parcel.id}
+                      type="button"
+                      className={index === activeIndex ? 'on' : ''}
+                      aria-label={parcel.name}
+                      aria-pressed={index === activeIndex}
+                      onClick={() => setCycleIndex(index)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
