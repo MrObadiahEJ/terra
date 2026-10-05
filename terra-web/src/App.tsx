@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Navbar from './components/layout/Navbar'
-import DemoPage from './pages/DemoPage'
-import GlobePage from './pages/GlobePage'
 import WelcomePage from './pages/WelcomePage'
-import LabPage from './pages/LabPage'
-import LandDetailPage from './pages/LandDetailPage'
-import NetworkPage from './pages/NetworkPage'
-import PortfolioPage from './pages/PortfolioPage'
-import StatusPage from './pages/StatusPage'
-import TransactionsPage from './pages/TransactionsPage'
-import ProtocolConsolePage from './pages/ProtocolConsolePage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
 import { LocaleProvider } from './lib/locale'
+
+const GlobePage = lazy(() => import('./pages/GlobePage'))
+const DemoPage = lazy(() => import('./pages/DemoPage'))
+const LabPage = lazy(() => import('./pages/LabPage'))
+const LandDetailPage = lazy(() => import('./pages/LandDetailPage'))
+const NetworkPage = lazy(() => import('./pages/NetworkPage'))
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
+const StatusPage = lazy(() => import('./pages/StatusPage'))
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage'))
+const ProtocolConsolePage = lazy(() => import('./pages/ProtocolConsolePage'))
 
 const TITLES: Record<string, string> = {
   '/': 'Terra — Geospatial trust platform',
@@ -47,6 +48,14 @@ function useSyncParcels() {
     if (publicKey) refresh()
   }, [publicKey, refresh])
 }
+function RouteLoading() {
+  return (
+    <div className="route-loading" role="status" aria-label="Loading">
+      <span />
+    </div>
+  )
+}
+
 function App() {
   useSyncParcels()
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -67,20 +76,22 @@ function App() {
             theme={theme}
             onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
           />
-          <Routes>
-            <Route path="/" element={<Navigate to="/welcome" replace />} />
-            <Route path="/welcome" element={<WelcomePage />} />
-            <Route path="/atlas" element={<GlobePage />} />
-            <Route path="/lab/land" element={<LandDetailPage />} />
-            <Route path="/lab" element={<LabPage />} />
-            <Route path="/demo" element={<DemoPage />} />
-            <Route path="/network" element={<NetworkPage />} />
-            <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/status" element={<StatusPage />} />
-            <Route path="/transactions" element={<TransactionsPage />} />
-            <Route path="/console" element={<ProtocolConsolePage />} />
-            <Route path="*" element={<Navigate to="/welcome" replace />} />
-          </Routes>
+          <Suspense fallback={<RouteLoading />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/welcome" replace />} />
+              <Route path="/welcome" element={<WelcomePage />} />
+              <Route path="/atlas" element={<GlobePage />} />
+              <Route path="/lab/land" element={<LandDetailPage />} />
+              <Route path="/lab" element={<LabPage />} />
+              <Route path="/demo" element={<DemoPage />} />
+              <Route path="/network" element={<NetworkPage />} />
+              <Route path="/portfolio" element={<PortfolioPage />} />
+              <Route path="/status" element={<StatusPage />} />
+              <Route path="/transactions" element={<TransactionsPage />} />
+              <Route path="/console" element={<ProtocolConsolePage />} />
+              <Route path="*" element={<Navigate to="/welcome" replace />} />
+            </Routes>
+          </Suspense>
           <Toasts />
         </div>
       </BrowserRouter>

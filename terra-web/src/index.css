@@ -4278,3 +4278,17 @@ header .wallet-adapter-button {
   .welcome-cycle-head strong,
   .welcome-cube-ring { animation: none; }
 }
+.route-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 55vh;
+}
+.route-loading span {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: welcome-spin .8s linear infinite;
+}
