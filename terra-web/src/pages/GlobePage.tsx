@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import TerraGlobe, { type DrawVertex } from '../components/map/TerraGlobe'
+import LodLadder from '../components/map/LodLadder'
+import { lodFromHeight, lodFromLeafletZoom } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
@@ -54,6 +56,21 @@ export default function GlobePage() {
   const [focus, setFocus] = useState(
     () => parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS,
   )
+  const [lod, setLod] = useState(() => lodFromHeight(DEFAULT_FOCUS.height))
+
+  const onCameraHeight = useCallback((heightM: number) => {
+    setLod((prev) => {
+      const next = lodFromHeight(heightM)
+      return next === prev ? prev : next
+    })
+  }, [])
+
+  const onMapZoom = useCallback((zoom: number) => {
+    setLod((prev) => {
+      const next = lodFromLeafletZoom(zoom)
+      return next === prev ? prev : next
+    })
+  }, [])
 
   // Initial load of off-chain data + stats.
   useEffect(() => {
@@ -180,6 +197,9 @@ export default function GlobePage() {
           onDrawVertexAdd={onVertexAdd}
           onDrawFinish={finishDrawing}
           onParcelClick={onParcelClick}
+          onCameraHeight={onCameraHeight}
+          onMapZoom={onMapZoom}
+          showParcelLabels={lod >= 4}
           onWebGLStatus={(status) => {
             setWebglStatus(status)
             if (status) setViewMode('2d')
@@ -220,6 +240,9 @@ export default function GlobePage() {
             <Square size={12} /> Parcels
           </button>
         </div>
+
+        {/* progressive zoom ladder */}
+        <LodLadder lod={lod} />
 
         <div className="map-controls">
           <div className="map-mode-switch" role="group" aria-label="Map view">

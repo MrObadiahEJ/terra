@@ -28,6 +28,12 @@ interface TerraGlobeProps {
   focus?: { longitude: number; latitude: number; height: number } | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
   onWebGLStatus?: (msg: string | null) => void
+  /** Reports camera height above the ellipsoid (metres) as the view moves. */
+  onCameraHeight?: (heightM: number) => void
+  /** Reports Leaflet zoom level when the 2D fallback map is active. */
+  onMapZoom?: (zoom: number) => void
+  /** Parcel name labels follow progressive disclosure (hidden until close zoom). */
+  showParcelLabels?: boolean
   basemap?: 'imagery' | 'osm'
 }
 
@@ -41,6 +47,9 @@ export default function TerraGlobe({
   viewMode,
   focus,
   onWebGLStatus,
+  onCameraHeight,
+  onMapZoom,
+  showParcelLabels = true,
   basemap = 'imagery',
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -50,6 +59,10 @@ export default function TerraGlobe({
   const onWebGLStatusRef = useRef(onWebGLStatus)
   useEffect(() => {
     onWebGLStatusRef.current = onWebGLStatus
+  })
+  const onCameraHeightRef = useRef(onCameraHeight)
+  useEffect(() => {
+    onCameraHeightRef.current = onCameraHeight
   })
   const onDrawFinishRef = useRef(onDrawFinish)
   useEffect(() => {
@@ -126,7 +139,24 @@ export default function TerraGlobe({
     viewerRef.current = viewer
     onWebGLStatusRef.current?.(null)
 
+    let lastReported = -1
+    const reportHeight = (force: boolean) => {
+      const h = viewer.camera.positionCartographic?.height ?? 0
+      if (!force && lastReported >= 0 && Math.abs(h - lastReported) <= Math.max(lastReported * 0.06, 1)) {
+        return
+      }
+      lastReported = h
+      onCameraHeightRef.current?.(h)
+    }
+    const onCamChange = () => reportHeight(false)
+    const onCamMoveEnd = () => reportHeight(true)
+    reportHeight(true)
+    viewer.camera.changed.addEventListener(onCamChange)
+    viewer.camera.moveEnd.addEventListener(onCamMoveEnd)
+
     return () => {
+      viewer.camera.changed.removeEventListener(onCamChange)
+      viewer.camera.moveEnd.removeEventListener(onCamMoveEnd)
       viewer.destroy()
       viewerRef.current = null
     }
@@ -278,6 +308,7 @@ export default function TerraGlobe({
           terHolder: parcel.holder,
         },
         label: {
+          show: showParcelLabels,
           text: parcel.name,
           font: '12px sans-serif',
           fillColor: Cesium.Color.WHITE,
@@ -288,7 +319,7 @@ export default function TerraGlobe({
       })
     }
 
-  }, [offChainParcels, drawVertices])
+  }, [offChainParcels, drawVertices, showParcelLabels])
 
   // ---- focus camera ---------------------------------------------------------
   useEffect(() => {
@@ -346,6 +377,7 @@ export default function TerraGlobe({
             onDrawFinish={onDrawFinish}
             onParcelClick={onParcelClick}
             focus={focus}
+            onZoom={onMapZoom}
             basemap={basemap}
           />
         </div>

@@ -26,6 +26,7 @@ export interface LeafletMapProps {
   onParcelClick: (id: string) => void
   focus?: { longitude: number; latitude: number; height: number } | null
   basemap?: 'imagery' | 'osm'
+  onZoom?: (zoom: number) => void
 }
 
 const CENTER: [number, number] = [DEFAULT_FOCUS.latitude, DEFAULT_FOCUS.longitude]
@@ -99,6 +100,20 @@ function FocusController({ focus }: { focus: LeafletMapProps['focus'] }) {
   return null
 }
 
+function ZoomReporter({ onZoom }: { onZoom?: (zoom: number) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!onZoom) return
+    const report = () => onZoom(map.getZoom())
+    report()
+    map.on('zoomend', report)
+    return () => {
+      map.off('zoomend', report)
+    }
+  }, [map, onZoom])
+  return null
+}
+
 type Ring = [number, number][]
 
 function parcelRing(parcel: OffChainParcel): Ring | null {
@@ -115,6 +130,7 @@ export default function LeafletMap({
   onDrawFinish,
   onParcelClick,
   focus,
+  onZoom,
 }: LeafletMapProps) {
   const suppressUntilRef = useRef(0)
 
@@ -152,6 +168,7 @@ export default function LeafletMap({
         suppressUntilRef={suppressUntilRef}
       />
       <FocusController focus={focus} />
+      <ZoomReporter onZoom={onZoom} />
 
       {parcels.map(({ parcel, ring }) => (
         <Polygon

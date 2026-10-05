@@ -394,6 +394,8 @@ The stage map (0–10) and long-term direction live in
 
 - [x] **Terra demonstration engine — Sprints 1–4 (2026-10-04)** — `/demo` evolved into the flagship narrative layer instead of a new page: a 9-stage protocol state machine (`protocolStages.ts`) derived from the scenario event stream drives an animated pipeline, validator-network SVG (routed → reviewing → attested, honest counts, `SIMULATION` labelled), a plain-language human timeline, an `EVENTS ⇄ VISUALIZATION` toggle over the same events, and a stage-synced spatial-state badge + pulse on the scene map; all 8 scenarios verified headless (API + local engines), 0 console errors; `tsc`/`eslint`/`vite build` clean
 
+- [x] **Atlas progressive zoom — Sprint 5 (2026-10-05)** — `/atlas` gained an 8-level LOD ladder (Planet → Country → Region → City → Neighborhood → Parcel → Asset → Evidence) driven by Cesium camera height (Leaflet zoom on the 2D fallback); each rung names what the zoom reveals, and disclosure is real: parcel name labels appear only from LOD 4 inward; verified headless (default LOD 4 → zoom-in LOD 5 → zoom-out LOD 1, 0 console errors); `tsc`/`eslint`/`vite build` clean
+
 **Next (in order):**
 
 - [ ] **Devnet deployment** (see checklist above) — deploy-wallet funding (~17.1 SOL) + `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates
