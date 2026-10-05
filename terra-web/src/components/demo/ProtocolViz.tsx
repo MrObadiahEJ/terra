@@ -26,6 +26,47 @@ interface ProtocolVizProps {
 
 type ValidatorState = 'idle' | 'queued' | 'checking' | 'attested'
 
+interface NarrationBarProps {
+  track: StageTrack
+  events: DemoScenarioEvent[]
+  phase: number
+  variant?: 'panel' | 'scene'
+}
+
+export function NarrationBar({ track, events, phase, variant = 'panel' }: NarrationBarProps) {
+  const activeNode = track.nodes[track.active]
+  const current = phase >= 0 ? events[phase] : undefined
+  const Icon = activeNode ? STAGE_ICON[activeNode.id] : null
+  return (
+    <div
+      className={`dm-narrbar dm-narrbar--${variant} ${activeNode ? `st-${activeNode.id}` : 'st-idle'}`}
+      role="status"
+    >
+      {Icon && (
+        <span className="dm-narrbar-ico" aria-hidden="true">
+          <Icon size={15} />
+        </span>
+      )}
+      <span className="dm-narrbar-tx">
+        {activeNode ? (
+          <>
+            <strong>{activeNode.def.headline}</strong>
+            <span>{activeNode.def.human}</span>
+          </>
+        ) : (
+          <span>Run the scenario to watch the protocol happen step by step.</span>
+        )}
+      </span>
+      {activeNode && track.nodes.length > 0 && (
+        <span className="dm-narrbar-step">
+          STEP {track.active + 1}/{track.nodes.length}
+        </span>
+      )}
+      {current && <code className="dm-narrbar-kind">{current.kind}</code>}
+    </div>
+  )
+}
+
 export default function ProtocolViz({ track, events, phase, validators, spatial }: ProtocolVizProps) {
   const limit = Math.min(phase, events.length - 1)
   const rankOf = (id: StageId) => track.nodes.findIndex((node) => node.id === id)

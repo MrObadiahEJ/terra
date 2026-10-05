@@ -3912,3 +3912,52 @@ header .wallet-adapter-button {
 @media (max-width: 768px) {
   .lod-ladder { right: 12px; bottom: 64px; }
 }
+
+/* ---- always-on protocol narration (Sprint 6) ---- */
+.dm-narrbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 10px 0;
+  padding: 7px 10px;
+  border: 1px solid var(--st);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--st-soft);
+  color: var(--ink);
+  font-size: 11px;
+}
+.dm-narrbar-ico { display: inline-flex; flex: none; color: var(--st); }
+.dm-narrbar-tx {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+.dm-narrbar-tx strong { font-size: 11.5px; font-weight: 700; }
+.dm-narrbar-tx span { color: var(--muted); font-size: 11px; }
+.dm-narrbar-step {
+  flex: none;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--st);
+}
+.dm-narrbar-kind {
+  flex: none;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #00000014;
+  color: var(--st);
+}
+.dm-narrbar--scene { margin: 6px 10px 8px; }
+.dm-narrbar--scene .dm-narrbar-tx strong { font-size: 11px; }
+
+@media (max-width: 768px) {
+  .dm-narrbar { flex-wrap: wrap; }
+}

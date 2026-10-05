@@ -396,6 +396,8 @@ The stage map (0–10) and long-term direction live in
 
 - [x] **Atlas progressive zoom — Sprint 5 (2026-10-05)** — `/atlas` gained an 8-level LOD ladder (Planet → Country → Region → City → Neighborhood → Parcel → Asset → Evidence) driven by Cesium camera height (Leaflet zoom on the 2D fallback); each rung names what the zoom reveals, and disclosure is real: parcel name labels appear only from LOD 4 inward; verified headless (default LOD 4 → zoom-in LOD 5 → zoom-out LOD 1, 0 console errors); `tsc`/`eslint`/`vite build` clean
 
+- [x] **Always-on narration — Sprint 6 (2026-10-05)** — the plain-English "what is happening" sentence is no longer trapped in the VISUALIZATION tab: a stage-coloured `NarrationBar` (headline + human copy + STEP n/N + raw event kind, `role="status"`) sits under the scene-map header for every view and under the timeline header while in EVENTS; VIZ keeps its inline caption (no duplication); verified headless across tab switches with live playback updates, 0 console errors; `tsc`/`eslint`/`vite build` clean
+
 **Next (in order):**
 
 - [ ] **Devnet deployment** (see checklist above) — deploy-wallet funding (~17.1 SOL) + `solana-test-validator` + wallet wiring + RFC-005 reconfirm + ZK audit gates

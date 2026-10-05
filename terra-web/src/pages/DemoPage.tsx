@@ -24,7 +24,7 @@ import {
 import { useActivityStore } from '../lib/activityStore'
 import ActivityFeed from '../components/ActivityFeed'
 import { buildLocalDemoScenario } from '../lib/localDemo'
-import ProtocolViz from '../components/demo/ProtocolViz'
+import ProtocolViz, { NarrationBar } from '../components/demo/ProtocolViz'
 import { STAGE_DEFS, buildStageTrack, spatialStateFor, validatorInfo } from '../lib/protocolStages'
 import TerraGlobe from '../components/map/TerraGlobe'
 import { DEMO_PARCELS } from '../lib/demoData'
@@ -493,6 +493,7 @@ export default function DemoPage() {
                   </div>
                 </div>
               </div>
+              <NarrationBar track={track} events={events} phase={phase} variant="scene" />
               <div className="dm-scene-map">
                 {sceneSource === 'loading' ? (
                   <div className="dm-scene-placeholder">Loading parcel geometry…</div>
@@ -606,6 +607,9 @@ export default function DemoPage() {
                   />
                 </span>
               </div>
+              {view === 'events' && (
+                <NarrationBar track={track} events={events} phase={phase} />
+              )}
               {view === 'events' ? (
                 <div className="dm-tl" ref={tlRef}>
                   {events.map((e, i) =>
