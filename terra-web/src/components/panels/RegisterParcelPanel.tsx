@@ -17,6 +17,7 @@ import {
 import { reportTx } from '../../lib/txStore'
 import type { DrawVertex } from '../map/TerraGlobe'
 import { PencilRuler, Square, Loader2, Undo2, Check, Magnet, Grid3x3 } from 'lucide-react'
+import { useLocale } from '../../lib/locale'
 
 interface Props {
   drawing: boolean
@@ -51,6 +52,7 @@ export default function RegisterParcelPanel({
   snapGrid,
   onToggleSnap,
 }: Props) {
+  const { t } = useLocale()
   const { publicKey, send } = useWallet()
   const refreshParcels = useAppStore((s) => s.refreshParcels)
   const refreshOffChain = useAppStore((s) => s.refreshOffChain)
@@ -147,16 +149,18 @@ export default function RegisterParcelPanel({
       }
       addLocalParcel(local)
 
-      const demoMsg =
-        `Demo parcel stored ${savedToApi ? 'locally + API' : 'on this device'} · ` +
+      const details =
         `${area.toFixed(0)} m² · centroid ${centroid[1].toFixed(6)}, ${centroid[0].toFixed(6)} · ` +
         `sha256 ${geometryHash.slice(0, 16)}…`
+      const demoMsg = savedToApi
+        ? t('demoStoredApi', { details })
+        : t('demoStoredLocal', { details })
       setMsg(demoMsg)
       reportTx('register_parcel', true, demoMsg)
       onClearDrawing()
       setName('')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Demo registration failed')
+      setErr(e instanceof Error ? e.message : t('demoRegFailed'))
     } finally {
       setBusy(false)
     }
@@ -214,20 +218,21 @@ export default function RegisterParcelPanel({
         await refreshOffChain()
       } catch (e) {
         setErr(
-          `On-chain registered (${sig.slice(0, 12)}…), but off-chain save failed: ${
-            e instanceof Error ? e.message : e
-          }`,
+          t('offchainSaveFailed', {
+            sig: sig.slice(0, 12) + '…',
+            error: e instanceof Error ? e.message : String(e),
+          }),
         )
       }
 
-      const regMsg = `Parcel registered on-chain: ${sig.slice(0, 12)}…`
+      const regMsg = t('regOnchainMsg', { sig: sig.slice(0, 12) + '…' })
       setMsg(regMsg)
       reportTx('register_parcel', true, regMsg, { sig, source: 'wallet' })
       await refreshParcels()
       onClearDrawing()
       setName('')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Registration failed')
+      setErr(e instanceof Error ? e.message : t('registrationFailed'))
     } finally {
       setBusy(false)
     }
@@ -236,46 +241,40 @@ export default function RegisterParcelPanel({
   return (
     <div className="p-3 text-sm space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Register a parcel</h3>
-        <span className="text-[11px] text-muted">{drawVertices.length} vertices</span>
+        <h3 className="font-semibold">{t('registerParcelTitle')}</h3>
+        <span className="text-[11px] text-muted">{t('verticesCount', { n: drawVertices.length })}</span>
       </div>
 
       {!publicKey && (
-        <p className="text-[12px] text-amber-700">
-          No wallet? Use the demo register below — real SHA-256 hashes and geometry metrics,
-          stored on this device.
-        </p>
+        <p className="text-[12px] text-amber-700">{t('noWalletBlurb')}</p>
       )}
 
       <div className="flex gap-2">
         <button className="btn btn-secondary flex-1 justify-center" onClick={onToggleDrawing}>
           {drawing ? <Square size={14} /> : <PencilRuler size={14} />}
-          {drawing ? 'Stop drawing' : 'Draw parcel'}
+          {drawing ? t('stopDrawing') : t('drawParcel')}
         </button>
         <button
           className="btn btn-ghost"
           onClick={onClearDrawing}
           disabled={drawVertices.length === 0}
         >
-          Clear
+          {t('clearAction')}
         </button>
       </div>
 
       {drawing && (
-        <p className="text-[12px] text-muted">
-          Click the map to add corners · double-click (or click the first corner) to close ·
-          Backspace undoes the last corner.
-        </p>
+        <p className="text-[12px] text-muted">{t('parcelDrawHint')}</p>
       )}
 
       {n >= 2 && (
         <div className="text-[12px] text-muted flex gap-3">
           <span>
-            Perimeter <b>{fmtDist(perimeter)}</b>
+            {t('labelPerimeter')} <b>{fmtDist(perimeter)}</b>
           </span>
           {n >= 3 && (
             <span>
-              Area <b>{fmtArea(area)}</b>
+              {t('labelArea')} <b>{fmtArea(area)}</b>
             </span>
           )}
         </div>
@@ -294,7 +293,7 @@ export default function RegisterParcelPanel({
               <button
                 className="btn btn-ghost p-0.5 shrink-0"
                 onClick={() => onRemoveVertex(i)}
-                title="Remove vertex"
+                title={t('removeVertex')}
               >
                 ✕
               </button>
@@ -307,7 +306,7 @@ export default function RegisterParcelPanel({
         <div className="flex gap-2">
           <button className="btn btn-secondary flex-1 justify-center" onClick={onUndoVertex}>
             <Undo2 size={14} />
-            Undo
+            {t('undoAction')}
           </button>
           <button
             className="btn btn-secondary flex-1 justify-center"
@@ -315,7 +314,7 @@ export default function RegisterParcelPanel({
             disabled={!drawing || n < 3}
           >
             <Check size={14} />
-            Close ring
+            {t('closeRing')}
           </button>
         </div>
       )}
@@ -325,29 +324,29 @@ export default function RegisterParcelPanel({
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${snapGeom ? 'text-emerald-700' : 'text-muted'}`}
             onClick={() => onToggleSnap('geom')}
-            title="Snap corners and edges to parcel boundaries"
+            title={t('snapCornerTitle')}
           >
             <Magnet size={12} />
-            Snap
+            {t('snapAction')}
           </button>
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${snapGrid ? 'text-emerald-700' : 'text-muted'}`}
             onClick={() => onToggleSnap('grid')}
-            title="Round free picks to a 1e-6° grid"
+            title={t('gridSnapTitle')}
           >
             <Grid3x3 size={12} />
-            Grid
+            {t('gridAction')}
           </button>
         </div>
       )}
 
       {validation && !validation.ok && (
-        <p className="text-red-700 text-[12px]">{validation.error}</p>
+        <p className="text-red-700 text-[12px]">{t(validation.error)}</p>
       )}
 
       <input
         className="text-input"
-        placeholder="Parcel name"
+        placeholder={t('parcelNamePlaceholder')}
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
@@ -359,21 +358,21 @@ export default function RegisterParcelPanel({
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : null}
         {busy
-          ? 'Registering…'
+          ? t('registering')
           : publicKey
-            ? 'Register on-chain'
-            : 'Demo register (local)'}
+            ? t('registerOnchain')
+            : t('demoRegisterLocal')}
       </button>
 
       {report && (
         <div className="border rounded p-2 text-[12px] space-y-1">
-          <h4 className="font-semibold">Road-access report</h4>
-          <p>Nearest road: <b>{Math.round(report.nearest_road_m)} m</b></p>
-          <p>Boundary accesses: <b>{report.boundary_accesses}</b></p>
-          <p>Network component: <b>{report.component_km.toFixed(2)} km</b></p>
+          <h4 className="font-semibold">{t('roadAccessReport')}</h4>
+          <p>{t('nearestRoad')} <b>{Math.round(report.nearest_road_m)} m</b></p>
+          <p>{t('boundaryAccesses')} <b>{report.boundary_accesses}</b></p>
+          <p>{t('networkComponent')} <b>{report.component_km.toFixed(2)} km</b></p>
           <p>
-            Sealed reachable:{' '}
-            <b>{report.sealed_reachable ? 'Yes' : 'No'}</b>
+            {t('sealedReachable')}{' '}
+            <b>{report.sealed_reachable ? t('yes') : t('no')}</b>
           </p>
           <p className="font-mono text-[10px] break-all">
             infra: 0b{report.flags.toString(2)}

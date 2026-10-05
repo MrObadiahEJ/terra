@@ -5,7 +5,7 @@ import WelcomePage from './pages/WelcomePage'
 import Toasts from './components/Toasts'
 import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
-import { LocaleProvider } from './lib/locale'
+import { LocaleProvider, useLocale, type TranslationKey } from './lib/locale'
 
 const GlobePage = lazy(() => import('./pages/GlobePage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
@@ -17,26 +17,27 @@ const StatusPage = lazy(() => import('./pages/StatusPage'))
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'))
 const ProtocolConsolePage = lazy(() => import('./pages/ProtocolConsolePage'))
 
-const TITLES: Record<string, string> = {
-  '/': 'Terra — Geospatial trust platform',
-  '/welcome': 'Terra — Land, identity & activity',
-  '/atlas': 'Terra — Land atlas',
-  '/lab': 'Terra Lab — Interactive demos',
-  '/transactions': 'Terra — Transactions',
-  '/portfolio': 'Identity & portfolio — Terra',
-  '/status': 'Protocol status — Terra',
-  '/network': 'Validator network — Terra',
-  '/demo': 'Demo scenarios — Terra',
-  '/console': 'Protocol console — Terra',
+const TITLES: Record<string, TranslationKey> = {
+  '/': 'titleHome',
+  '/welcome': 'titleWelcome',
+  '/atlas': 'titleAtlas',
+  '/lab': 'titleLab',
+  '/transactions': 'titleTransactions',
+  '/portfolio': 'titlePortfolio',
+  '/status': 'titleStatus',
+  '/network': 'titleNetwork',
+  '/demo': 'titleDemo',
+  '/console': 'titleConsole',
 }
 
 function DocumentTitle() {
   const { pathname } = useLocation()
+  const { t } = useLocale()
   useEffect(() => {
     document.title =
-      TITLES[pathname] ??
-      (pathname.startsWith('/lab/land') ? 'Land — Terra' : 'Terra')
-  }, [pathname])
+      (pathname in TITLES ? t(TITLES[pathname]) : null) ??
+      (pathname.startsWith('/lab/land') ? t('titleLand') : t('titleDefault'))
+  }, [pathname, t])
   return null
 }
 
@@ -49,8 +50,9 @@ function useSyncParcels() {
   }, [publicKey, refresh])
 }
 function RouteLoading() {
+  const { t } = useLocale()
   return (
-    <div className="route-loading" role="status" aria-label="Loading">
+    <div className="route-loading" role="status" aria-label={t('loadingEllipsis')}>
       <span />
     </div>
   )

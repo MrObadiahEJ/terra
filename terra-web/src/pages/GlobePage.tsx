@@ -54,7 +54,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
-import { useLocale } from '../lib/locale'
+import { useLocale, type TranslationKey } from '../lib/locale'
 
 function parcelFocus(parcel: OffChainParcel | null): FocusTarget | null {
   if (!parcel) return null
@@ -66,12 +66,12 @@ function parcelFocus(parcel: OffChainParcel | null): FocusTarget | null {
   return { longitude, latitude, height: 1800 }
 }
 
-const LAYER_ROWS: { key: AtlasLayerKey; icon: typeof Square; label: string }[] = [
-  { key: 'parcels', icon: Square, label: 'Parcels' },
-  { key: 'roads', icon: Route, label: 'Roads' },
-  { key: 'buildings', icon: Building2, label: 'Buildings' },
-  { key: 'pois', icon: MapPin, label: 'Places' },
-  { key: 'labels', icon: Tag, label: 'Labels' },
+const LAYER_ROWS: { key: AtlasLayerKey; icon: typeof Square; labelKey: TranslationKey }[] = [
+  { key: 'parcels', icon: Square, labelKey: 'layerParcels' },
+  { key: 'roads', icon: Route, labelKey: 'layerRoads' },
+  { key: 'buildings', icon: Building2, labelKey: 'layerBuildings' },
+  { key: 'pois', icon: MapPin, labelKey: 'layerPlaces' },
+  { key: 'labels', icon: Tag, labelKey: 'layerLabels' },
 ]
 
 export default function GlobePage() {
@@ -525,7 +525,7 @@ export default function GlobePage() {
       <main className="flex-1 relative flex flex-col">
         {webglStatus && (
           <div className="globe-notice">
-            WebGL unavailable — showing the 2D map. Cesium: {webglStatus}
+            {t('atlasWebglNotice', { status: webglStatus })}
           </div>
         )}
         <div className="globe-stage">
@@ -556,24 +556,24 @@ export default function GlobePage() {
         />
 
         <div className="explore-heading">
-          <span className="explore-kicker"><span className="live-dot" /> LAND INTELLIGENCE</span>
-          <h1>Explore the atlas</h1>
-          <p>Discover, verify and manage land from one place.</p>
+          <span className="explore-kicker"><span className="live-dot" /> {t('atlasKicker')}</span>
+          <h1>{t('atlasTitle')}</h1>
+          <p>{t('atlasSubtitle')}</p>
         </div>
 
         {/* stats overlay */}
         <div className="globe-stats absolute top-3 left-3 bg-surface/90 rounded-lg shadow px-3 py-2 text-[11px] pointer-events-none flex flex-wrap gap-3 items-center">
+          <span>{t('statsParcels', { n: offChainParcels.length })}</span>
+          <span>{t('statsRoads', { n: fusionStats?.roads ?? geoStats?.roads ?? 0 })}</span>
+          <span>{t('statsPois', { n: fusionStats?.pois ?? geoStats?.pois ?? 0 })}</span>
           <span>
-            <b>{offChainParcels.length}</b> parcels
-          </span>
-          <span><b>{fusionStats?.roads ?? geoStats?.roads ?? 0}</b> mapped roads in dataset</span>
-          <span><b>{fusionStats?.pois ?? geoStats?.pois ?? 0}</b> mapped places in dataset</span>
-          <span>
-            {geoStats?.road_length_km ? `${geoStats.road_length_km.toFixed(0)} km mapped` : 'Spatial data'}
+            {geoStats?.road_length_km
+              ? t('statsKm', { n: geoStats.road_length_km.toFixed(0) })
+              : t('statsSpatial')}
           </span>
           {usingDemo && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
-              demo data
+              {t('demoDataBadge')}
             </span>
           )}
         </div>
@@ -584,24 +584,24 @@ export default function GlobePage() {
             className={`btn btn-ghost px-2 py-1 gap-1 ${layers.parcels ? 'text-emerald-700' : 'text-muted'}`}
             onClick={() => setLayers((l) => ({ ...l, parcels: !l.parcels }))}
             aria-pressed={layers.parcels}
-            title="Toggle parcel outlines"
+            title={t('toggleParcelOutlines')}
           >
-            <Square size={12} /> Parcels
+            <Square size={12} /> {t('layerParcels')}
           </button>
           <span className="globe-chip-sep" aria-hidden="true" />
           {([
-            ['imagery', 'Satellite'],
-            ['terrain', 'Terrain'],
-            ['osm', 'Streets'],
-          ] as const).map(([style, label]) => (
+            ['imagery', 'basemapSatellite'],
+            ['terrain', 'basemapTerrain'],
+            ['osm', 'basemapStreets'],
+          ] as const).map(([style, labelKey]) => (
             <button
               key={style}
               className={`btn btn-ghost px-2 py-1 ${basemap === style ? 'globe-basemap-on' : 'text-muted'}`}
               onClick={() => setBasemap(style)}
               aria-pressed={basemap === style}
-              title={`Switch basemap to ${label.toLowerCase()}`}
+              title={t('switchBasemap', { label: t(labelKey) })}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
           <span className="globe-chip-sep" aria-hidden="true" />
@@ -610,23 +610,23 @@ export default function GlobePage() {
             onClick={() => setLayersCard((open) => !open)}
             aria-pressed={layersCard}
             aria-expanded={layersCard}
-            title="Map layers"
+            title={t('mapLayers')}
           >
-            <Layers size={12} /> Layers
+            <Layers size={12} /> {t('layersChip')}
           </button>
           {layersCard && (
-            <div className="globe-layers-card" role="group" aria-label="Map layers">
+            <div className="globe-layers-card" role="group" aria-label={t('mapLayers')}>
               <div className="globe-layers-card-head">
-                <span>Map details</span>
+                <span>{t('mapDetails')}</span>
                 <button
                   onClick={() => setLayersCard(false)}
-                  aria-label="Close layer panel"
-                  title="Close"
+                  aria-label={t('closeLayerPanel')}
+                  title={t('close')}
                 >
                   ✕
                 </button>
               </div>
-              {LAYER_ROWS.map(({ key, icon: Icon, label }) => (
+              {LAYER_ROWS.map(({ key, icon: Icon, labelKey }) => (
                 <button
                   key={key}
                   className="layer-row"
@@ -637,7 +637,7 @@ export default function GlobePage() {
                     {layers[key] ? <Check size={11} /> : null}
                   </span>
                   <Icon size={14} />
-                  <span className="flex-1 text-left">{label}</span>
+                  <span className="flex-1 text-left">{t(labelKey)}</span>
                 </button>
               ))}
             </div>
@@ -652,8 +652,8 @@ export default function GlobePage() {
             <button
               className="map-icon-button"
               onClick={() => changeSidenavOpen(true)}
-              title="Show land properties"
-              aria-label="Show land properties"
+              title={t('showLandProperties')}
+              aria-label={t('showLandProperties')}
             >
               <PanelRightOpen size={16} />
             </button>
@@ -662,21 +662,21 @@ export default function GlobePage() {
             <button
               className="map-icon-button"
               onClick={() => zoomStep(0.5)}
-              title="Zoom in"
-              aria-label="Zoom in"
+              title={t('zoomIn')}
+              aria-label={t('zoomIn')}
             >
               <Plus size={16} />
             </button>
             <button
               className="map-icon-button"
               onClick={() => zoomStep(2)}
-              title="Zoom out"
-              aria-label="Zoom out"
+              title={t('zoomOut')}
+              aria-label={t('zoomOut')}
             >
               <Minus size={16} />
             </button>
           </div>
-          <div className="map-mode-switch" role="group" aria-label="Map view">
+          <div className="map-mode-switch" role="group" aria-label={t('mapView')}>
             <button
               className={viewMode === '2d' ? 'active' : ''}
               onClick={() => setViewMode('2d')}
@@ -689,7 +689,7 @@ export default function GlobePage() {
               onClick={() => setViewMode('3d')}
               aria-pressed={viewMode === '3d'}
               disabled={Boolean(webglStatus)}
-              title={webglStatus ? '3D view requires WebGL' : '3D globe view'}
+              title={webglStatus ? t('threeDRequiresWebgl') : t('threeDGlobeView')}
             >
               <Box size={14} /> 3D
             </button>
@@ -697,8 +697,8 @@ export default function GlobePage() {
           <button
             className="map-icon-button"
             onClick={() => setFocus({ ...DEFAULT_FOCUS })}
-            title="Return to pilot area"
-            aria-label="Return to pilot area"
+            title={t('returnPilotArea')}
+            aria-label={t('returnPilotArea')}
           >
             <LocateFixed size={16} />
           </button>
@@ -711,23 +711,23 @@ export default function GlobePage() {
         open={sidenavOpen}
         mode={sidenavMode}
         onClose={closeSidenav}
-        label="Land properties"
+        label={t('landProperties')}
         className="globe-side"
       >
         <div className="land-panel-heading">
           <div>
-            <span className="panel-eyebrow">YOUR PORTFOLIO</span>
+            <span className="panel-eyebrow">{t('yourPortfolio')}</span>
             <h2>{t('ownedLandAssets')}</h2>
           </div>
           <div className="sidenav-tools">
             <span className="asset-count">{offChainParcels.length}</span>
-            <div className="sidenav-mode" role="group" aria-label="Sidebar mode">
+            <div className="sidenav-mode" role="group" aria-label={t('sidebarMode')}>
               <button
                 className={sidenavMode === 'side' ? 'active' : ''}
                 onClick={() => changeSidenavMode('side')}
                 aria-pressed={sidenavMode === 'side'}
-                title="Docked sidebar"
-                aria-label="Docked sidebar"
+                title={t('dockedSidebar')}
+                aria-label={t('dockedSidebar')}
               >
                 <PanelRight size={13} />
               </button>
@@ -735,8 +735,8 @@ export default function GlobePage() {
                 className={sidenavMode === 'over' ? 'active' : ''}
                 onClick={() => changeSidenavMode('over')}
                 aria-pressed={sidenavMode === 'over'}
-                title="Floating sidebar"
-                aria-label="Floating sidebar"
+                title={t('floatingSidebar')}
+                aria-label={t('floatingSidebar')}
               >
                 <PictureInPicture2 size={13} />
               </button>
@@ -744,21 +744,21 @@ export default function GlobePage() {
             <button
               className="sidenav-reduce"
               onClick={closeSidenav}
-              title="Minimize sidebar"
-              aria-label="Minimize sidebar"
+              title={t('minimizeSidebar')}
+              aria-label={t('minimizeSidebar')}
             >
               <PanelRightClose size={15} />
             </button>
           </div>
         </div>
         <div className="portfolio-summary">
-          <div><span>Registered parcels</span><strong>{offChainParcels.length}</strong></div>
-          <div><span>Mapped area</span><strong>{formatArea(offChainParcels.reduce((total, parcel) => total + (parcel.area_m2 ?? 0), 0))}</strong></div>
+          <div><span>{t('registeredParcels')}</span><strong>{offChainParcels.length}</strong></div>
+          <div><span>{t('mappedArea')}</span><strong>{formatArea(offChainParcels.reduce((total, parcel) => total + (parcel.area_m2 ?? 0), 0))}</strong></div>
         </div>
         {shareTarget && (
-          <button className="atlas-share" onClick={shareLand} title={`Copy link to ${shareTarget.name}`}>
+          <button className="atlas-share" onClick={shareLand} title={t('copyLinkTo', { name: shareTarget.name })}>
             <Share2 size={13} />
-            {shareCopied ? 'Link copied!' : 'Share this land'}
+            {shareCopied ? t('linkCopied') : t('shareThisLand')}
           </button>
         )}
         <div className="flex border-b panel-tabs">
@@ -771,7 +771,7 @@ export default function GlobePage() {
               onClick={() => setTab(tabId)}
               aria-pressed={tab === tabId}
             >
-              {tabId === 'register' ? 'Register' : tabId === 'browse' ? 'Browse' : 'Plan'}
+              {tabId === 'register' ? t('tabRegister') : tabId === 'browse' ? t('tabBrowse') : t('tabPlan')}
             </button>
           ))}
         </div>
@@ -817,14 +817,14 @@ export default function GlobePage() {
           ) : selectedParcel ? (
             <>
               <div className="flex items-center justify-between px-3 pt-2">
-                <span className="text-[12px] text-muted">Selected parcel</span>
+                <span className="text-[12px] text-muted">{t('selectedParcel')}</span>
                 <button
                   className="btn btn-ghost p-1"
                   onClick={() => {
                     selectParcel(null)
                     setTab('browse')
                   }}
-                  title="Close"
+                  title={t('close')}
                 >
                   ✕
                 </button>
@@ -837,21 +837,21 @@ export default function GlobePage() {
               />
               {selectedSummary?.off && (
                 <div className="px-3 pb-3 text-[12px] text-muted">
-                  Off-chain record: <b>{selectedSummary.off.status}</b> ·{' '}
+                  {t('offChainRecord')} <b>{selectedSummary.off.status}</b> ·{' '}
                   {selectedSummary.off.area_m2 != null
                     ? `${selectedSummary.off.area_m2.toFixed(0)} m²`
-                    : 'no area'}
+                    : t('noArea')}
                 </div>
               )}
             </>
           ) : selectedOffChain ? (
             <>
               <div className="flex items-center justify-between px-3 pt-2">
-                <span className="text-[12px] text-muted">Selected map parcel</span>
+                <span className="text-[12px] text-muted">{t('selectedMapParcel')}</span>
                 <button
                   className="btn btn-ghost p-1"
                   onClick={() => selectOffChain(null)}
-                  title="Close"
+                  title={t('close')}
                 >
                   ✕
                 </button>
@@ -892,16 +892,17 @@ function DetailsFooter({
   geoStats: ReturnType<typeof useAppStore.getState>['geoStats']
   fusionStats: ReturnType<typeof useAppStore.getState>['fusionStats']
 }) {
+  const { t } = useLocale()
   const [open, setOpen] = useState(false)
   const rows: [string, string][] = []
-  if (geoStats?.nodes != null) rows.push(['OSM nodes', String(geoStats.nodes)])
-  if (geoStats?.roads != null) rows.push(['OSM roads', String(geoStats.roads)])
-  if (geoStats?.road_length_km != null) rows.push(['Road length', `${geoStats.road_length_km.toFixed(1)} km`])
-  if (geoStats?.pois != null) rows.push(['OSM POIs', String(geoStats.pois)])
-  if (fusionStats?.roads != null) rows.push(['DB roads', String(fusionStats.roads)])
-  if (fusionStats?.pois != null) rows.push(['DB POIs', String(fusionStats.pois)])
-  if (fusionStats?.pilot_zones != null) rows.push(['Pilot zones', String(fusionStats.pilot_zones)])
-  if (rows.length === 0) rows.push(['Data not loaded', '—'])
+  if (geoStats?.nodes != null) rows.push([t('statOsmNodes'), String(geoStats.nodes)])
+  if (geoStats?.roads != null) rows.push([t('statOsmRoads'), String(geoStats.roads)])
+  if (geoStats?.road_length_km != null) rows.push([t('statRoadLength'), `${geoStats.road_length_km.toFixed(1)} km`])
+  if (geoStats?.pois != null) rows.push([t('statOsmPois'), String(geoStats.pois)])
+  if (fusionStats?.roads != null) rows.push([t('statDbRoads'), String(fusionStats.roads)])
+  if (fusionStats?.pois != null) rows.push([t('statDbPois'), String(fusionStats.pois)])
+  if (fusionStats?.pilot_zones != null) rows.push([t('statPilotZones'), String(fusionStats.pilot_zones)])
+  if (rows.length === 0) rows.push([t('statDataNotLoaded'), '—'])
 
   return (
     <div className="border-t">
@@ -909,7 +910,7 @@ function DetailsFooter({
         className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-medium hover:bg-bg"
         onClick={() => setOpen((o) => !o)}
       >
-        <span>Geo / data stats</span>
+        <span>{t('geoDataStats')}</span>
         {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
       </button>
       {open && (

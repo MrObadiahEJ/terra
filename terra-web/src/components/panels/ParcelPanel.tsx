@@ -12,8 +12,9 @@ import { bytesToHex } from '../../lib/codec'
 import {
   PARCEL_STATUS,
   RIGHT_KINDS,
-  infraLabels,
+  infraLabelKeys,
 } from '../../lib/constants'
+import { useLocale } from '../../lib/locale'
 import type { ParcelAccount, RightsAccount } from '../../lib/program'
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export default function ParcelPanel({ address, account, holder, onView3D }: Props) {
+  const { t } = useLocale()
   const { publicKey, send } = useWallet()
   const setLastSignature = useAppStore((s) => s.setLastSignature)
   const refreshParcels = useAppStore((s) => s.refreshParcels)
@@ -62,7 +64,7 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
       }
       setRights(items)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to load rights')
+      setErr(e instanceof Error ? e.message : t('failedLoadRights'))
     } finally {
       setLoadingRights(false)
     }
@@ -86,11 +88,11 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
       try {
         const sig = await fn()
         setLastSignature(sig)
-        setMsg(`Transaction confirmed: ${sig.slice(0, 12)}…`)
+        setMsg(t('txConfirmed', { sig: sig.slice(0, 12) + '…' }))
         await refreshParcels()
         await loadRights()
       } catch (e) {
-        setErr(e instanceof Error ? e.message : 'Transaction failed')
+        setErr(e instanceof Error ? e.message : t('txFailed'))
       } finally {
         setBusy(false)
       }
@@ -137,57 +139,57 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
           {account.name}
         </h3>
         <span className="text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-          {PARCEL_STATUS[account.status] ?? 'Unknown'}
+          {t(PARCEL_STATUS[account.status] ?? 'unknownStatus')}
         </span>
       </div>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
-        <dt className="text-muted">Holder</dt>
+        <dt className="text-muted">{t('labelHolder')}</dt>
         <dd className="font-mono break-all">{holder || '—'}</dd>
-        {isHolder && <dt className="text-muted">(you)</dt>}
-        <dt className="text-muted">Parcel ID</dt>
+        {isHolder && <dt className="text-muted">{t('youBadge')}</dt>}
+        <dt className="text-muted">{t('labelParcelId')}</dt>
         <dd className="font-mono break-all text-[10px]">{idHex}</dd>
-        <dt className="text-muted">Geometry Hash</dt>
+        <dt className="text-muted">{t('labelGeoHash')}</dt>
         <dd className="font-mono break-all text-[10px]">
           {bytesToHex(account.geometryHash).slice(0, 24)}…
         </dd>
-        <dt className="text-muted">Created</dt>
+        <dt className="text-muted">{t('labelCreated')}</dt>
         <dd>{new Date(Number(account.createdAt) * 1000).toLocaleString()}</dd>
       </dl>
 
       {onView3D && (
         <button className="btn btn-secondary w-full justify-center" onClick={onView3D}>
-          <Box size={14} /> View in 3D
+          <Box size={14} /> {t('viewIn3D')}
         </button>
       )}
 
       <div>
-        <h4 className="font-semibold mb-1">Infrastructure</h4>
+        <h4 className="font-semibold mb-1">{t('labelInfrastructure')}</h4>
         {account.infrastructureFlags ? (
           <div className="flex flex-wrap gap-1">
-            {infraLabels(account.infrastructureFlags).map((l) => (
-              <span key={l} className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                {l}
+            {infraLabelKeys(account.infrastructureFlags).map((key) => (
+              <span key={key} className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                {t(key)}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-muted text-[12px]">No infrastructure flags set.</p>
+          <p className="text-muted text-[12px]">{t('noInfraFlags')}</p>
         )}
       </div>
 
       <div>
-        <h4 className="font-semibold mb-1">Rights ({account.rightsCount})</h4>
+        <h4 className="font-semibold mb-1">{t('rightsHeading', { count: account.rightsCount })}</h4>
         {loadingRights ? (
-          <p className="text-muted text-[12px]">Loading…</p>
+          <p className="text-muted text-[12px]">{t('loadingEllipsis')}</p>
         ) : rights.length === 0 ? (
-          <p className="text-muted text-[12px]">No rights granted.</p>
+          <p className="text-muted text-[12px]">{t('noRights')}</p>
         ) : (
           <ul className="space-y-1">
             {rights.map((r, i) => (
               <li key={i} className="text-[12px] border rounded p-2">
                 <span className="inline-block bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.5 rounded mr-2">
-                  {RIGHT_KINDS[r.rightsKind] ?? r.rightsKind}
+                  {RIGHT_KINDS[r.rightsKind] != null ? t(RIGHT_KINDS[r.rightsKind]) : r.rightsKind}
                 </span>
                 <span className="font-mono text-[10px]">{r.holder.toBase58().slice(0, 10)}…</span>
                 {r.notes && <p className="text-muted mt-1">{r.notes}</p>}
@@ -200,26 +202,26 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
       {isHolder && (
         <div className="space-y-3 border-t pt-3">
           <div>
-            <h4 className="font-semibold mb-1">Transfer ownership</h4>
+            <h4 className="font-semibold mb-1">{t('transferOwnership')}</h4>
             <div className="flex gap-1">
               <input
                 className="text-input"
-                placeholder="New holder address"
+                placeholder={t('newHolderPlaceholder')}
                 value={transferTo}
                 onChange={(e) => setTransferTo(e.target.value)}
               />
               <button className="btn btn-primary" disabled={!transferTo || transferBusy} onClick={onTransfer}>
-                {transferBusy ? '…' : 'Transfer'}
+                {transferBusy ? '…' : t('transferAction')}
               </button>
             </div>
           </div>
 
           <div>
-            <h4 className="font-semibold mb-1">Grant a right</h4>
+            <h4 className="font-semibold mb-1">{t('grantRightTitle')}</h4>
             <div className="space-y-1">
               <input
                 className="text-input"
-                placeholder="Holder address"
+                placeholder={t('holderAddrPlaceholder')}
                 value={grantHolder}
                 onChange={(e) => setGrantHolder(e.target.value)}
               />
@@ -229,16 +231,16 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
                   value={grantKind}
                   onChange={(e) => setGrantKind(Number(e.target.value))}
                 >
-                  {Object.entries(RIGHT_KINDS).map(([k, v]) => (
+                  {Object.entries(RIGHT_KINDS).map(([k, key]) => (
                     <option key={k} value={k}>
-                      {v}
+                      {t(key)}
                     </option>
                   ))}
                 </select>
               </div>
               <input
                 className="text-input"
-                placeholder="Notes (optional)"
+                placeholder={t('notesPlaceholder')}
                 value={grantNotes}
                 onChange={(e) => setGrantNotes(e.target.value)}
               />
@@ -247,7 +249,7 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
                 disabled={!grantHolder || grantBusy}
                 onClick={onGrant}
               >
-                {grantBusy ? '…' : 'Grant right'}
+                {grantBusy ? '…' : t('grantRightBtn')}
               </button>
             </div>
           </div>

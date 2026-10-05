@@ -1,18 +1,20 @@
+import type { TranslationKey } from './locale'
+
 export interface LodLevel {
   id: number
-  name: string
-  reveals: string
+  nameKey: TranslationKey
+  revealsKey: TranslationKey
 }
 
 export const LOD_LEVELS: LodLevel[] = [
-  { id: 0, name: 'Planet', reveals: 'Earth and activity regions' },
-  { id: 1, name: 'Country', reveals: 'National context and data density' },
-  { id: 2, name: 'Region', reveals: 'Cities and pilot areas' },
-  { id: 3, name: 'City', reveals: 'Roads and mapped areas' },
-  { id: 4, name: 'Neighborhood', reveals: 'Parcel outlines and labels' },
-  { id: 5, name: 'Parcel', reveals: 'Boundary, ID, area and state' },
-  { id: 6, name: 'Asset', reveals: 'Structure, rights and activity' },
-  { id: 7, name: 'Evidence', reveals: 'Observations and geometry versions' },
+  { id: 0, nameKey: 'lodPlanet', revealsKey: 'lodRevealPlanet' },
+  { id: 1, nameKey: 'lodCountry', revealsKey: 'lodRevealCountry' },
+  { id: 2, nameKey: 'lodRegion', revealsKey: 'lodRevealRegion' },
+  { id: 3, nameKey: 'lodCity', revealsKey: 'lodRevealCity' },
+  { id: 4, nameKey: 'lodNeighborhood', revealsKey: 'lodRevealNeighborhood' },
+  { id: 5, nameKey: 'lodParcel', revealsKey: 'lodRevealParcel' },
+  { id: 6, nameKey: 'lodAsset', revealsKey: 'lodRevealAsset' },
+  { id: 7, nameKey: 'lodEvidence', revealsKey: 'lodRevealEvidence' },
 ]
 
 const HEIGHT_BREAKS_M = [5_000_000, 800_000, 150_000, 30_000, 3_000, 500, 80]

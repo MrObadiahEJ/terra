@@ -3,6 +3,7 @@ import { useAppStore, type OnChainParcelItem } from '../../store/appStore'
 import type { OffChainParcel } from '../../lib/api'
 import { PARCEL_STATUS } from '../../lib/constants'
 import { Loader2, RefreshCw, Search, X } from 'lucide-react'
+import { useLocale } from '../../lib/locale'
 
 interface Props {
   onSelect: (p: OnChainParcelItem) => void
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
+  const { t } = useLocale()
   const [query, setQuery] = useState('')
   const parcels = useAppStore((s) => s.parcels)
   const loading = useAppStore((s) => s.loadingParcels)
@@ -47,10 +49,10 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
     return (
       <div className="p-3 text-center">
         <p className="text-muted text-[12px] mb-2">
-          {error ? error : 'No parcels registered yet.'}
+          {error ? error : t('noParcelsYet')}
         </p>
         <button className="btn btn-secondary w-full justify-center" onClick={refresh}>
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> {t('refresh')}
         </button>
       </div>
     )
@@ -63,11 +65,11 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search parcels or owners"
-          aria-label="Search parcels or owners"
+          placeholder={t('searchParcels')}
+          aria-label={t('searchParcels')}
         />
         {query && (
-          <button type="button" onClick={() => setQuery('')} aria-label="Clear parcel search">
+          <button type="button" onClick={() => setQuery('')} aria-label={t('clearSearch')}>
             <X size={14} />
           </button>
         )}
@@ -77,9 +79,9 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
         <>
           <div className="flex items-center gap-2 px-3 py-1.5">
             <span className="text-[12px] font-semibold flex-1">
-              On-chain parcels <span className="text-muted">({filteredParcels.length})</span>
+              {t('onChainParcels')} <span className="text-muted">({filteredParcels.length})</span>
             </span>
-            <button className="btn btn-ghost p-1" onClick={refresh} title="Refresh">
+            <button className="btn btn-ghost p-1" onClick={refresh} title={t('refresh')}>
               <RefreshCw size={13} />
             </button>
           </div>
@@ -101,7 +103,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
                       </div>
                     </div>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0">
-                      {PARCEL_STATUS[p.account.status] ?? '?'}
+                      {PARCEL_STATUS[p.account.status] ? t(PARCEL_STATUS[p.account.status]) : '?'}
                     </span>
                   </button>
                 </li>
@@ -115,11 +117,11 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 mt-1">
             <span className="text-[12px] font-semibold flex-1">
-              Map parcels <span className="text-muted">({filteredOffChainParcels.length})</span>
+              {t('mapParcels')} <span className="text-muted">({filteredOffChainParcels.length})</span>
             </span>
             {demoMode && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
-                demo data
+                {t('demoDataBadge')}
               </span>
             )}
           </div>
@@ -137,7 +139,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="truncate text-[13px]">{p.name}</div>
                       <div className="font-mono text-[10px] text-muted truncate">
-                        {p.area_m2 != null ? `${p.area_m2.toFixed(0)} m²` : 'no area'} ·{' '}
+                        {p.area_m2 != null ? `${p.area_m2.toFixed(0)} m²` : t('noArea')} ·{' '}
                         {p.holder.slice(0, 12)}…
                       </div>
                     </div>
@@ -153,7 +155,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
       )}
       {filteredParcels.length === 0 && filteredOffChainParcels.length === 0 && (
         <p className="parcel-search-empty">
-          {normalizedQuery ? `No parcels match “${query.trim()}”.` : 'No parcels to display.'}
+          {normalizedQuery ? t('noParcelsMatch', { q: query.trim() }) : t('noParcelsDisplay')}
         </p>
       )}
     </div>

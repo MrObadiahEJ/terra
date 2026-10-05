@@ -1,6 +1,8 @@
 // Terra on-chain + off-chain constants shared across the frontend.
 
 // Anchor program id (must match terra-core/programs/terra_registry declare_id).
+import type { TranslationKey } from './locale'
+
 export const TERRA_PROGRAM_ID = 'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage'
 
 // Solana cluster. Terra targets Devnet for the Phase 1 MVP.
@@ -21,33 +23,33 @@ export const DEFAULT_FOCUS = {
 }
 
 // Parcel statuses on-chain (must match lib.rs `parcel_status` module).
-export const PARCEL_STATUS: Record<number, string> = {
-  0: 'Pending',
-  1: 'Registered',
-  2: 'For Sale',
-  3: 'Transferred',
+export const PARCEL_STATUS: Record<number, TranslationKey> = {
+  0: 'statusPending',
+  1: 'statusRegistered',
+  2: 'statusForSale',
+  3: 'statusTransferred',
 }
 
 // Right kinds on-chain (must match lib.rs `right_kind` module).
-export const RIGHT_KINDS: Record<number, string> = {
-  0: 'Ownership',
-  1: 'Usage',
-  2: 'Easement',
-  3: 'Servitude',
-  4: 'Lien',
+export const RIGHT_KINDS: Record<number, TranslationKey> = {
+  0: 'rightOwnership',
+  1: 'rightUsage',
+  2: 'rightEasement',
+  3: 'rightServitude',
+  4: 'rightLien',
 }
 
 // Infrastructure flag bitmask (must match lib.rs `infra_flag` module).
-export const INFRA_FLAGS: { bit: number; label: string }[] = [
-  { bit: 0, label: 'Wastewater' },
-  { bit: 1, label: 'Water' },
-  { bit: 2, label: 'Power' },
-  { bit: 3, label: 'Gas' },
-  { bit: 4, label: 'Telecom' },
-  { bit: 5, label: 'Road Access' },
-  { bit: 6, label: 'Building' },
+export const INFRA_FLAGS: { bit: number; labelKey: TranslationKey }[] = [
+  { bit: 0, labelKey: 'infraWastewater' },
+  { bit: 1, labelKey: 'infraWater' },
+  { bit: 2, labelKey: 'infraPower' },
+  { bit: 3, labelKey: 'infraGas' },
+  { bit: 4, labelKey: 'infraTelecom' },
+  { bit: 5, labelKey: 'infraRoadAccess' },
+  { bit: 6, labelKey: 'infraBuilding' },
 ]
 
-export function infraLabels(mask: number): string[] {
-  return INFRA_FLAGS.filter((f) => (mask & (1 << f.bit)) !== 0).map((f) => f.label)
+export function infraLabelKeys(mask: number): TranslationKey[] {
+  return INFRA_FLAGS.filter((f) => (mask & (1 << f.bit)) !== 0).map((f) => f.labelKey)
 }

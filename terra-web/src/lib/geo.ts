@@ -4,6 +4,8 @@
 // area agree for any vertex count, at any latitude. Equirect helpers are only
 // used for local snap tolerances.
 
+import type { TranslationKey } from './locale'
+
 export type LonLat = [number, number] // [lon, lat]
 
 const EARTH_R = 6371008.8 // mean Earth radius (m)
@@ -221,7 +223,7 @@ export function snapPoint(p: LonLat, opts: SnapOptions): LonLat {
   return quantizeLonLat(p[0], p[1])
 }
 
-export type RingValidation = { ok: true } | { ok: false; error: string }
+export type RingValidation = { ok: true } | { ok: false; error: TranslationKey }
 
 /** Orientation sign of the turn a→b→c (2D cross product in lon/lat). */
 function orientation(a: LonLat, b: LonLat, c: LonLat): number {
@@ -255,20 +257,20 @@ function segmentsTouch(a: LonLat, b: LonLat, c: LonLat, d: LonLat): boolean {
 /** Validate drawn vertices: ≥3 points, finite coords, no self-touch, ≥1 m². */
 export function validateRing(vertices: LonLat[]): RingValidation {
   const n = vertices.length
-  if (n < 3) return { ok: false, error: 'Need at least 3 vertices' }
+  if (n < 3) return { ok: false, error: 'validationNeed3' }
   for (const [lon, lat] of vertices) {
     if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
-      return { ok: false, error: 'Vertex has invalid coordinates' }
+      return { ok: false, error: 'validationBadCoords' }
     }
   }
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       if (j === i + 1 || (i === 0 && j === n - 1)) continue // adjacent corners
       if (segmentsTouch(vertices[i], vertices[(i + 1) % n], vertices[j], vertices[(j + 1) % n])) {
-        return { ok: false, error: 'Boundary touches or crosses itself' }
+        return { ok: false, error: 'validationSelfTouch' }
       }
     }
   }
-  if (polygonAreaM2(vertices) < 1) return { ok: false, error: 'Area is under 1 m²' }
+  if (polygonAreaM2(vertices) < 1) return { ok: false, error: 'validationTinyArea' }
   return { ok: true }
 }

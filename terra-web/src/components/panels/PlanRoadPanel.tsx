@@ -3,6 +3,7 @@ import { Check, Grid3x3, Magnet, Route, Square, Trash2, Undo2 } from 'lucide-rea
 import { lineLengthM, type LonLat } from '../../lib/geo'
 import type { PlannedRoad } from '../../lib/atlasLayers'
 import type { DrawVertex } from '../map/TerraGlobe'
+import { useLocale } from '../../lib/locale'
 
 interface Props {
   drawing: boolean
@@ -37,6 +38,7 @@ export default function PlanRoadPanel({
   snapGrid,
   onToggleSnap,
 }: Props) {
+  const { t } = useLocale()
   const active = drawing && drawKind === 'road'
   const n = drawVertices.length
   const lengthM = useMemo(() => {
@@ -52,40 +54,37 @@ export default function PlanRoadPanel({
   return (
     <div className="p-3 text-sm space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Road planning</h3>
+        <h3 className="font-semibold">{t('roadPlanning')}</h3>
         <span className="text-[11px] text-muted">
-          {plannedRoads.length} planned · {fmtDist(totalLength)}
+          {t('plannedSummary', { count: plannedRoads.length, length: fmtDist(totalLength) })}
         </span>
       </div>
 
       <div className="flex gap-2">
         <button className="btn btn-secondary flex-1 justify-center" onClick={onToggleDrawing}>
           {active ? <Square size={14} /> : <Route size={14} />}
-          {active ? 'Stop drawing' : 'Draw road'}
+          {active ? t('stopDrawing') : t('drawRoad')}
         </button>
         <button
           className="btn btn-ghost"
           onClick={onClearDrawing}
           disabled={n === 0}
         >
-          Clear
+          {t('clearAction')}
         </button>
       </div>
 
       {active && (
-        <p className="text-[12px] text-muted">
-          Click the map to drop points · double-click (or click the first point) to finish ·
-          Backspace undoes the last point. Roads stay open — they are not closed rings.
-        </p>
+        <p className="text-[12px] text-muted">{t('roadDrawHint')}</p>
       )}
 
       {n >= 2 && (
         <div className="text-[12px] text-muted flex gap-3">
           <span>
-            Length <b>{fmtDist(lengthM)}</b>
+            {t('labelLength')} <b>{fmtDist(lengthM)}</b>
           </span>
           <span>
-            Points <b>{n}</b>
+            {t('labelPoints')} <b>{n}</b>
           </span>
         </div>
       )}
@@ -94,7 +93,7 @@ export default function PlanRoadPanel({
         <div className="flex gap-2">
           <button className="btn btn-secondary flex-1 justify-center" onClick={onUndoVertex}>
             <Undo2 size={14} />
-            Undo
+            {t('undoAction')}
           </button>
           <button
             className="btn btn-secondary flex-1 justify-center"
@@ -102,7 +101,7 @@ export default function PlanRoadPanel({
             disabled={!active || n < 2}
           >
             <Check size={14} />
-            Finish road
+            {t('finishRoad')}
           </button>
         </div>
       )}
@@ -112,37 +111,37 @@ export default function PlanRoadPanel({
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${snapGeom ? 'text-emerald-700' : 'text-muted'}`}
             onClick={() => onToggleSnap('geom')}
-            title="Snap points to parcel boundaries"
+            title={t('snapBoundaryTitle')}
           >
             <Magnet size={12} />
-            Snap
+            {t('snapAction')}
           </button>
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${snapGrid ? 'text-emerald-700' : 'text-muted'}`}
             onClick={() => onToggleSnap('grid')}
-            title="Round free picks to a 1e-6° grid"
+            title={t('gridSnapTitle')}
           >
             <Grid3x3 size={12} />
-            Grid
+            {t('gridAction')}
           </button>
         </div>
       )}
 
       {plannedRoads.length > 0 && (
         <div className="space-y-1.5">
-          <h4 className="text-[12px] font-semibold">Planned alignments</h4>
+          <h4 className="text-[12px] font-semibold">{t('plannedAlignments')}</h4>
           {plannedRoads.map((road) => (
             <div key={road.id} className="plan-row">
               <div className="min-w-0">
                 <div className="font-medium truncate">{road.name}</div>
                 <div className="plan-meta">
-                  {fmtDist(road.lengthM)} · {road.vertices.length} points
+                  {t('planMetaLine', { length: fmtDist(road.lengthM), count: road.vertices.length })}
                 </div>
               </div>
               <button
                 className="btn btn-ghost p-1 shrink-0"
                 onClick={() => onRemoveRoad(road.id)}
-                title="Remove road"
+                title={t('removeRoad')}
               >
                 <Trash2 size={13} />
               </button>

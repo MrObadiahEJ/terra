@@ -9,6 +9,7 @@ import {
 } from '../../lib/api'
 import { polygonAreaM2, polygonBbox, polygonCentroid, ringDigest, type LonLat } from '../../lib/geo'
 import { ELEVATION_SOURCES } from '../../lib/labStore'
+import { useLocale } from '../../lib/locale'
 
 interface Props {
   title: string
@@ -44,6 +45,7 @@ function zoneCoversZone(geometry: string | null, target: BBox): boolean {
 const ESTIMATED_SOURCE = ELEVATION_SOURCES.findIndex((s) => s.id === 'ESTIMATED')
 
 export default function RepresentationPanel({ title, ring, source, onBack }: Props) {
+  const { t } = useLocale()
   const metrics = useMemo(() => {
     if (ring.length < 3) return null
     const area = polygonAreaM2(ring)
@@ -106,9 +108,9 @@ export default function RepresentationPanel({ title, ring, source, onBack }: Pro
     return (
       <div className="p-3 text-sm">
         <button className="btn btn-ghost mb-2" onClick={onBack}>
-          <ArrowLeft size={14} /> Back
+          <ArrowLeft size={14} /> {t('back')}
         </button>
-        <p className="text-muted">This selection has no usable geometry.</p>
+        <p className="text-muted">{t('noUsableGeometry')}</p>
       </div>
     )
   }
@@ -116,26 +118,26 @@ export default function RepresentationPanel({ title, ring, source, onBack }: Pro
   return (
     <div className="p-3 text-sm space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <button className="btn btn-ghost p-1 shrink-0" onClick={onBack} title="Back">
+        <button className="btn btn-ghost p-1 shrink-0" onClick={onBack} title={t('back')}>
           <ArrowLeft size={14} />
         </button>
         <h3 className="font-semibold truncate flex-1">{title}</h3>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 shrink-0">
-          {source === 'building' ? 'building' : 'land parcel'}
+          {source === 'building' ? t('badgeBuilding') : t('badgeLandParcel')}
         </span>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
         <div className="flex justify-between">
-          <dt className="text-muted">Area</dt>
+          <dt className="text-muted">{t('labelArea')}</dt>
           <dd className="font-medium">{metrics.area.toFixed(0)} m²</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-muted">Relief (est.)</dt>
+          <dt className="text-muted">{t('labelReliefEst')}</dt>
           <dd className="font-medium">~{Math.round(metrics.elevation)} m</dd>
         </div>
         <div className="flex justify-between col-span-2">
-          <dt className="text-muted">Centroid</dt>
+          <dt className="text-muted">{t('labelCentroid')}</dt>
           <dd className="font-mono">
             {metrics.centroid[1].toFixed(5)}, {metrics.centroid[0].toFixed(5)}
           </dd>
@@ -151,25 +153,19 @@ export default function RepresentationPanel({ title, ring, source, onBack }: Pro
           dimension={metrics.dimension}
           seedHex={seedHex}
         />
-        <p className="text-[10px] text-muted mt-1">
-          Extruded representation derived from the footprint — procedural relief, not a survey or
-          mesh reconstruction. Drag to pan · wheel to zoom · 2D ↔ 3D toggle above.
-        </p>
+        <p className="text-[10px] text-muted mt-1">{t('reprFootnote')}</p>
       </div>
 
       <div className="border rounded p-2">
         <h4 className="font-semibold text-[12px] flex items-center gap-1.5 mb-1">
-          <Boxes size={13} /> Reconstruction assets
+          <Boxes size={13} /> {t('reconstructionAssets')}
         </h4>
         {assets === null ? (
           <p className="text-[11px] text-muted flex items-center gap-1.5">
-            <Loader2 size={11} className="animate-spin" /> Loading pilot-zone assets…
+            <Loader2 size={11} className="animate-spin" /> {t('loadingZoneAssets')}
           </p>
         ) : assets.length === 0 ? (
-          <p className="text-[11px] text-muted">
-            No photogrammetry assets cover this location yet. Assets appear here once a pilot
-            zone over the footprint has survey imagery, point clouds or meshes registered.
-          </p>
+          <p className="text-[11px] text-muted">{t('noZoneAssets')}</p>
         ) : (
           <div className="space-y-1.5">
             {assets.map((asset) => (
@@ -181,11 +177,11 @@ export default function RepresentationPanel({ title, ring, source, onBack }: Pro
                 <p className="text-[11px] text-muted">
                   {[
                     asset.format,
-                    asset.resolution_m != null ? `${asset.resolution_m} m resolution` : null,
-                    asset.point_count != null ? `${asset.point_count.toLocaleString()} points` : null,
+                    asset.resolution_m != null ? t('assetResolution', { n: asset.resolution_m }) : null,
+                    asset.point_count != null ? t('assetPoints', { n: asset.point_count.toLocaleString() }) : null,
                   ]
                     .filter(Boolean)
-                    .join(' · ') || 'details not recorded'}
+                    .join(' · ') || t('assetDetailsMissing')}
                 </p>
               </div>
             ))}
