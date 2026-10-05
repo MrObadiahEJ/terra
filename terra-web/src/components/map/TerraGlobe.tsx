@@ -35,6 +35,8 @@ interface TerraGlobeProps {
   /** Parcel name labels follow progressive disclosure (hidden until close zoom). */
   showParcelLabels?: boolean
   basemap?: 'imagery' | 'terrain' | 'osm'
+  /** Bumped by the layout when a panel reflows the map container; forces a viewport resize. */
+  resizeKey?: number
 }
 
 export default function TerraGlobe({
@@ -51,6 +53,7 @@ export default function TerraGlobe({
   onMapZoom,
   showParcelLabels = true,
   basemap = 'imagery',
+  resizeKey = 0,
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
@@ -172,6 +175,10 @@ export default function TerraGlobe({
       viewerRef.current = null
     }
   }, [basemap])
+
+  useEffect(() => {
+    viewerRef.current?.resize()
+  }, [resizeKey])
 
   // ---- keep drawing flag in sync -------------------------------------------
   useEffect(() => {
@@ -390,6 +397,7 @@ export default function TerraGlobe({
             focus={focus}
             onZoom={onMapZoom}
             basemap={basemap}
+            resizeKey={resizeKey}
           />
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import TerraGlobe, { type DrawVertex } from '../components/map/TerraGlobe'
 import LodLadder from '../components/map/LodLadder'
+import Sidenav, { type SidenavMode } from '../components/layout/Sidenav'
 import { lodFromHeight, lodFromLeafletZoom, LOD_TARGET_HEIGHT } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
@@ -17,6 +18,10 @@ import {
   LocateFixed,
   Map as MapIcon,
   Minus,
+  PanelRight,
+  PanelRightClose,
+  PanelRightOpen,
+  PictureInPicture2,
   Plus,
   Share2,
   Square,
@@ -71,6 +76,35 @@ export default function GlobePage() {
   useEffect(() => {
     localStorage.setItem('terra-atlas-basemap', basemap)
   }, [basemap])
+
+  const [sidenavOpen, setSidenavOpen] = useState(true)
+  const [sidenavMode, setSidenavMode] = useState<SidenavMode>(
+    () => (localStorage.getItem('terra-atlas-sidenav-mode') === 'over' ? 'over' : 'side'),
+  )
+  const [mapResizeKey, setMapResizeKey] = useState(0)
+
+  const settleMapResize = useCallback(() => {
+    window.setTimeout(() => setMapResizeKey((k) => k + 1), 260)
+  }, [])
+
+  const changeSidenavOpen = useCallback(
+    (open: boolean) => {
+      setSidenavOpen(open)
+      settleMapResize()
+    },
+    [settleMapResize],
+  )
+
+  const changeSidenavMode = useCallback(
+    (mode: SidenavMode) => {
+      setSidenavMode(mode)
+      localStorage.setItem('terra-atlas-sidenav-mode', mode)
+      settleMapResize()
+    },
+    [settleMapResize],
+  )
+
+  const closeSidenav = useCallback(() => changeSidenavOpen(false), [changeSidenavOpen])
 
   const onCameraMoved = useCallback((cam: { longitude: number; latitude: number; height: number }) => {
     lastCamRef.current = cam
@@ -175,16 +209,21 @@ export default function GlobePage() {
 
   const onSelectParcel = useCallback((p: OnChainParcelItem) => {
     selectParcel(p)
+    changeSidenavOpen(true)
     const offChain = offChainParcels.find(
       (parcel) => parcel.holder === p.holder && parcel.name === p.account.name,
     )
     if (offChain) focusParcel(offChain)
-  }, [focusParcel, offChainParcels, selectParcel])
+  }, [changeSidenavOpen, focusParcel, offChainParcels, selectParcel])
 
-  const onSelectOffChain = useCallback((parcel: OffChainParcel) => {
-    selectOffChain(parcel)
-    focusParcel(parcel)
-  }, [focusParcel, selectOffChain])
+  const onSelectOffChain = useCallback(
+    (parcel: OffChainParcel) => {
+      selectOffChain(parcel)
+      changeSidenavOpen(true)
+      focusParcel(parcel)
+    },
+    [changeSidenavOpen, focusParcel, selectOffChain],
+  )
 
   const onParcelClick = useCallback(
     (id: string) => {
@@ -197,8 +236,10 @@ export default function GlobePage() {
         .parcels.find((p) => p.holder === off.holder && p.account.name === off.name)
       if (onchain) selectParcel(onchain)
       else selectOffChain(off)
+      setTab('browse')
+      changeSidenavOpen(true)
     },
-    [offChainParcels, selectParcel, selectOffChain],
+    [changeSidenavOpen, offChainParcels, selectParcel, selectOffChain],
   )
 
   // Deep link: /atlas?parcel=<id|name|holder|address> selects and frames the land.
@@ -219,6 +260,7 @@ export default function GlobePage() {
     if (off) {
       selectOffChain(off)
       setTab('browse')
+      changeSidenavOpen(true)
       const nextFocus = parcelFocus(off)
       if (nextFocus) setFocus(nextFocus)
       return
@@ -234,13 +276,14 @@ export default function GlobePage() {
     if (onchain) {
       selectParcel(onchain)
       setTab('browse')
+      changeSidenavOpen(true)
       const linked = offChainParcels.find(
         (p) => p.holder === onchain.holder && p.name === onchain.account.name,
       )
       const nextFocus = linked ? parcelFocus(linked) : null
       if (nextFocus) setFocus(nextFocus)
     }
-  }, [deepLinkParcel, offChainParcels, selectOffChain, selectParcel])
+  }, [changeSidenavOpen, deepLinkParcel, offChainParcels, selectOffChain, selectParcel])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const shareTarget = useMemo(() => {
@@ -290,6 +333,7 @@ export default function GlobePage() {
           onMapZoom={onMapZoom}
           showParcelLabels={lod >= 4}
           basemap={basemap}
+          resizeKey={mapResizeKey}
           onWebGLStatus={(status) => {
             setWebglStatus(status)
             if (status) setViewMode('2d')
@@ -354,6 +398,16 @@ export default function GlobePage() {
         <LodLadder lod={lod} onSelect={jumpToLod} />
 
         <div className="map-controls">
+          {!sidenavOpen && (
+            <button
+              className="map-icon-button"
+              onClick={() => changeSidenavOpen(true)}
+              title="Show land properties"
+              aria-label="Show land properties"
+            >
+              <PanelRightOpen size={16} />
+            </button>
+          )}
           <div className="map-zoom-group">
             <button
               className="map-icon-button"
@@ -403,13 +457,49 @@ export default function GlobePage() {
       </main>
 
       {/* Sidebar */}
-      <aside className="globe-side bg-surface flex flex-col">
+      <Sidenav
+        open={sidenavOpen}
+        mode={sidenavMode}
+        onClose={closeSidenav}
+        label="Land properties"
+        className="globe-side"
+      >
         <div className="land-panel-heading">
           <div>
             <span className="panel-eyebrow">YOUR PORTFOLIO</span>
             <h2>Land assets</h2>
           </div>
-          <span className="asset-count">{offChainParcels.length}</span>
+          <div className="sidenav-tools">
+            <span className="asset-count">{offChainParcels.length}</span>
+            <div className="sidenav-mode" role="group" aria-label="Sidebar mode">
+              <button
+                className={sidenavMode === 'side' ? 'active' : ''}
+                onClick={() => changeSidenavMode('side')}
+                aria-pressed={sidenavMode === 'side'}
+                title="Docked sidebar"
+                aria-label="Docked sidebar"
+              >
+                <PanelRight size={13} />
+              </button>
+              <button
+                className={sidenavMode === 'over' ? 'active' : ''}
+                onClick={() => changeSidenavMode('over')}
+                aria-pressed={sidenavMode === 'over'}
+                title="Floating sidebar"
+                aria-label="Floating sidebar"
+              >
+                <PictureInPicture2 size={13} />
+              </button>
+            </div>
+            <button
+              className="sidenav-reduce"
+              onClick={closeSidenav}
+              title="Minimize sidebar"
+              aria-label="Minimize sidebar"
+            >
+              <PanelRightClose size={15} />
+            </button>
+          </div>
         </div>
         <div className="portfolio-summary">
           <div><span>Registered parcels</span><strong>{offChainParcels.length}</strong></div>
@@ -496,7 +586,7 @@ export default function GlobePage() {
 
         {/* collapsible mini stats footer */}
         <DetailsFooter geoStats={geoStats} fusionStats={fusionStats} />
-      </aside>
+      </Sidenav>
     </div>
   )
 }

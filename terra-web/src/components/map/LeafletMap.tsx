@@ -27,6 +27,8 @@ export interface LeafletMapProps {
   focus?: { longitude: number; latitude: number; height: number } | null
   basemap?: 'imagery' | 'terrain' | 'osm'
   onZoom?: (zoom: number) => void
+  /** Bumped by the layout when a panel reflows the map container; invalidates size. */
+  resizeKey?: number
 }
 
 const TILE_STYLES = {
@@ -95,6 +97,14 @@ function ClickHandler({
   return null
 }
 
+function ResizeInvalidator({ resizeKey }: { resizeKey: number }) {
+  const map = useMap()
+  useEffect(() => {
+    map.invalidateSize()
+  }, [map, resizeKey])
+  return null
+}
+
 /** Default zoom control sits top-left where the stats pill overlaps it. */
 function ZoomBottomLeft() {
   const map = useMap()
@@ -150,6 +160,7 @@ export default function LeafletMap({
   focus,
   onZoom,
   basemap = 'imagery',
+  resizeKey = 0,
 }: LeafletMapProps) {
   const tiles = TILE_STYLES[basemap]
   const suppressUntilRef = useRef(0)
@@ -189,6 +200,7 @@ export default function LeafletMap({
       />
       <FocusController focus={focus} />
       <ZoomReporter onZoom={onZoom} />
+      <ResizeInvalidator resizeKey={resizeKey} />
 
       {parcels.map(({ parcel, ring }) => (
         <Polygon

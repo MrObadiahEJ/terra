@@ -354,10 +354,9 @@ header .wallet-adapter-button {
     height: auto;
   }
   .globe-layout > main {
-    /* main carries .flex-1 (flex-basis: 0) which would collapse it in a
-       column container — an explicit basis is required to keep the map tall. */
-    flex: 0 0 58vh;
-    height: 58vh;
+    flex: 1 1 auto;
+    height: auto;
+    min-height: calc(100vh - 68px);
   }
   .globe-side {
     width: 100%;
@@ -4001,3 +4000,134 @@ header .wallet-adapter-button {
 }
 .atlas-share:hover { background: var(--accent-soft); border-color: var(--accent); }
 .atlas-share:active { transform: translateY(1px); }
+
+/* Material-style sidenav (atlas land panel) */
+.globe-layout { position: relative; overflow: hidden; }
+
+.sidenav-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 930;
+  background: rgba(8, 12, 10, 0.42);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+.sidenav-scrim--visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, visibility 0s;
+}
+@media (min-width: 861px) {
+  .sidenav-scrim--side.sidenav-scrim--visible {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+.sidenav {
+  --sidenav-w: 380px;
+  visibility: hidden;
+  overflow: hidden;
+  background: var(--surface);
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear 0.22s;
+}
+.sidenav--open {
+  visibility: visible;
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s;
+}
+.sidenav--side {
+  position: relative;
+  z-index: 940;
+  flex: 0 0 auto;
+  width: 0;
+  border-left: 1px solid transparent;
+}
+.sidenav--side.sidenav--open {
+  width: var(--sidenav-w);
+  border-left-color: var(--border);
+}
+.sidenav--side .sidenav-inner {
+  width: var(--sidenav-w);
+  margin-left: auto;
+}
+.sidenav--over {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 940;
+  width: var(--sidenav-w);
+  border-left: 1px solid var(--border);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.16);
+  transform: translateX(calc(100% + 12px));
+}
+.sidenav--over.sidenav--open { transform: none; }
+.sidenav-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.sidenav-inner > .flex-1 { min-height: 0; }
+
+.sidenav-tools { display: flex; align-items: center; gap: 6px; }
+.sidenav-mode {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.sidenav-mode > button,
+.sidenav-reduce {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  background: transparent;
+  color: var(--muted);
+}
+.sidenav-mode > button + button { border-left: 1px solid var(--border); }
+.sidenav-mode > button:hover,
+.sidenav-reduce:hover { background: var(--accent-soft); color: var(--ink); }
+.sidenav-mode > button.active { background: var(--accent); color: var(--bg); }
+
+@media (max-width: 860px) {
+  .sidenav--side {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(92vw, var(--sidenav-w));
+    border: none;
+    border-left: 1px solid var(--border);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.16);
+    transform: translateX(calc(100% + 12px));
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.22s;
+  }
+  .sidenav--side.sidenav--open {
+    width: min(92vw, var(--sidenav-w));
+    transform: none;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+  }
+  .sidenav--side .sidenav-inner {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidenav,
+  .sidenav-scrim { transition: none; }
+}
