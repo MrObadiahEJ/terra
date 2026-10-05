@@ -54,12 +54,16 @@ export function shade(hex: string, k: number): string {
 
 /** Normalise a lon/lat ring into the unit square, with rot × 90° applied. */
 export function normalizeRing(ring: LonLat[], rot: number): number[][] {
-  const lons = ring.map((p) => p[0])
-  const lats = ring.map((p) => p[1])
-  const minLon = Math.min(...lons)
-  const maxLon = Math.max(...lons)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
+  let minLon = Infinity
+  let maxLon = -Infinity
+  let minLat = Infinity
+  let maxLat = -Infinity
+  for (const [lon, lat] of ring) {
+    if (lon < minLon) minLon = lon
+    if (lon > maxLon) maxLon = lon
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+  }
   const spanLon = maxLon - minLon || 1e-9
   const spanLat = maxLat - minLat || 1e-9
   return ring.map(([lon, lat]) => {

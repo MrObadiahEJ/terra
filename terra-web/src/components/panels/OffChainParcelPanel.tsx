@@ -27,12 +27,16 @@ export default function OffChainParcelPanel({ parcel }: Props) {
     if (!ring || ring.length < 4) return null
     const c = polygonCentroid(ring)
     const b = polygonBbox(ring)
+    const closed =
+      ring.length > 1 &&
+      ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]
     return {
       area: parcel.area_m2 ?? polygonAreaM2(ring),
       centroid: c,
       bbox: b,
       perimeter: polygonPerimeterM(ring),
-      vertices: ring.length,
+      vertices: closed ? ring.length - 1 : ring.length,
     }
   }, [ring, parcel.area_m2])
 

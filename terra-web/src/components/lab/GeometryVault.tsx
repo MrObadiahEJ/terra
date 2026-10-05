@@ -104,9 +104,13 @@ function ShapePreview({ ring }: { ring: LonLat[] }) {
         return `${x.toFixed(1)},${y.toFixed(1)}`
       })
       .join(' ')
+    const closed =
+      ring.length > 1 &&
+      ring[0][0] === ring[ring.length - 1][0] &&
+      ring[0][1] === ring[ring.length - 1][1]
     return {
       points: pts,
-      areaLabel: `${ring.length} vertices · bbox ${spanLon.toFixed(4)}°×${spanLat.toFixed(4)}°`,
+      areaLabel: `${ring.length - (closed ? 1 : 0)} vertices · bbox ${spanLon.toFixed(4)}°×${spanLat.toFixed(4)}°`,
     }
   }, [ring])
 

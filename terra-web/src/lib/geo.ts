@@ -1,6 +1,8 @@
 // Pure geometry helpers used by the demo layer and the Terra Lab experiments.
-// Local approximations (equirectangular projection + haversine) — accurate to
-// well under 1 % for the small parcels used in the pilot region.
+// Single spherical model (mean Earth radius): haversine for distances and the
+// Chamberlain–Duquette shoelace in (λ, sin φ) for areas — so perimeter and
+// area agree for any vertex count, at any latitude. Equirect helpers are only
+// used for local snap tolerances.
 
 export type LonLat = [number, number] // [lon, lat]
 
@@ -46,50 +48,63 @@ export function polygonBbox(ring: LonLat[]): {
   return { minLon, minLat, maxLon, maxLat }
 }
 
-/** Polygon area in m² (shoelace over a local equirectangular projection). */
+/**
+ * Polygon area in m² — exact shoelace on the sphere by integrating over
+ * (λ, sin φ), where dA = R² dλ d(sin φ). Closed or open rings, any vertex
+ * count; Δλ is wrapped so a ring crossing the antimeridian stays small.
+ */
 export function polygonAreaM2(ring: LonLat[]): number {
   const n = ring.length
   if (n < 3) return 0
-  const lat0 = (ring.reduce((s, p) => s + p[1], 0) / n) * (Math.PI / 180)
-  const kx = DEG_LON_M_EQ * Math.cos(lat0)
-  const ky = DEG_LAT_M
+  const toRad = Math.PI / 180
   let sum = 0
+  let lon1 = ring[n - 1][0] * toRad
+  let sin1 = Math.sin(ring[n - 1][1] * toRad)
   for (let i = 0; i < n; i++) {
-    const [x1, y1] = ring[i]
-    const [x2, y2] = ring[(i + 1) % n]
-    sum += x1 * kx * (y2 * ky) - x2 * kx * (y1 * ky)
+    const lon2 = ring[i][0] * toRad
+    const sin2 = Math.sin(ring[i][1] * toRad)
+    let dLon = lon2 - lon1
+    if (dLon > Math.PI) dLon -= 2 * Math.PI
+    else if (dLon < -Math.PI) dLon += 2 * Math.PI
+    sum += dLon * (sin2 + sin1)
+    lon1 = lon2
+    sin1 = sin2
   }
-  return Math.abs(sum / 2)
+  return (Math.abs(sum) * EARTH_R * EARTH_R) / 2
 }
 
-/** Area-weighted polygon centroid; falls back to vertex average when degenerate. */
+/** Area-weighted polygon centroid in (λ, sin φ) space (same sphere as area
+ *  and perimeter); falls back to vertex average when degenerate. */
 export function polygonCentroid(ring: LonLat[]): LonLat {
   const n = ring.length
   if (n === 0) return [0, 0]
-  if (n < 3) {
-    return [
-      ring.reduce((s, p) => s + p[0], 0) / n,
-      ring.reduce((s, p) => s + p[1], 0) / n,
-    ]
-  }
+  const avg = (): LonLat => [
+    ring.reduce((s, p) => s + p[0], 0) / n,
+    ring.reduce((s, p) => s + p[1], 0) / n,
+  ]
+  if (n < 3) return avg()
+  const toRad = Math.PI / 180
   let a = 0
   let cx = 0
   let cy = 0
   for (let i = 0; i < n; i++) {
-    const [x1, y1] = ring[i]
-    const [x2, y2] = ring[(i + 1) % n]
+    const j = (i + 1) % n
+    const x1 = ring[i][0] * toRad
+    const y1 = Math.sin(ring[i][1] * toRad)
+    const x2 = ring[j][0] * toRad
+    const y2 = Math.sin(ring[j][1] * toRad)
     const cross = x1 * y2 - x2 * y1
     a += cross
     cx += (x1 + x2) * cross
     cy += (y1 + y2) * cross
   }
-  if (Math.abs(a) < 1e-12) {
-    return [
-      ring.reduce((s, p) => s + p[0], 0) / n,
-      ring.reduce((s, p) => s + p[1], 0) / n,
-    ]
-  }
-  return [cx / (3 * a), cy / (3 * a)]
+  if (Math.abs(a) < 1e-15) return avg()
+  const cxr = cx / (3 * a)
+  const cyr = cy / (3 * a)
+  return [
+    (cxr * 180) / Math.PI,
+    (Math.asin(Math.max(-1, Math.min(1, cyr))) * 180) / Math.PI,
+  ]
 }
 
 function haversineM(a: LonLat, b: LonLat): number {

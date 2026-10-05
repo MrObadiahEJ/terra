@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Transaction } from '@solana/web3.js'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
@@ -65,10 +65,17 @@ export default function RegisterParcelPanel({
   const addLocalParcel = useAppStore((s) => s.addLocalParcel)
 
   const n = drawVertices.length
-  const pts = drawVertices.map((v) => [v.lon, v.lat] as LonLat)
-  const perimeter = n >= 3 ? polygonPerimeterM(pts) : n === 2 ? lineLengthM(pts) : 0
-  const area = n >= 3 ? polygonAreaM2(pts) : 0
-  const validation = n >= 3 ? validateRing(pts) : null
+  // Metrics + O(n²) self-intersection validation only recompute when a
+  // vertex changes — keeps 1000-vertex rings responsive while drawing.
+  const { perimeter, area, validation } = useMemo(() => {
+    const pts = drawVertices.map((v) => [v.lon, v.lat] as LonLat)
+    const m = pts.length
+    return {
+      perimeter: m >= 3 ? polygonPerimeterM(pts) : m === 2 ? lineLengthM(pts) : 0,
+      area: m >= 3 ? polygonAreaM2(pts) : 0,
+      validation: m >= 3 ? validateRing(pts) : null,
+    }
+  }, [drawVertices])
   const canSubmit = name.trim() !== '' && validation?.ok === true
 
   // Backspace undoes the last vertex while drawing (but not while typing).
