@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import TerraGlobe, { type DrawVertex } from '../components/map/TerraGlobe'
 import LodLadder from '../components/map/LodLadder'
-import { lodFromHeight, lodFromLeafletZoom } from '../lib/lod'
+import { lodFromHeight, lodFromLeafletZoom, LOD_TARGET_HEIGHT } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
@@ -15,6 +16,9 @@ import {
   ChevronUp,
   LocateFixed,
   Map as MapIcon,
+  Minus,
+  Plus,
+  Share2,
   Square,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
@@ -57,10 +61,21 @@ export default function GlobePage() {
     () => parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS,
   )
   const [lod, setLod] = useState(() => lodFromHeight(DEFAULT_FOCUS.height))
+  const [basemap, setBasemap] = useState<'imagery' | 'terrain' | 'osm'>(
+    () =>
+      (localStorage.getItem('terra-atlas-basemap') as 'imagery' | 'terrain' | 'osm' | null) ??
+      'imagery',
+  )
+  const lastCamRef = useRef({ ...DEFAULT_FOCUS })
 
-  const onCameraHeight = useCallback((heightM: number) => {
+  useEffect(() => {
+    localStorage.setItem('terra-atlas-basemap', basemap)
+  }, [basemap])
+
+  const onCameraMoved = useCallback((cam: { longitude: number; latitude: number; height: number }) => {
+    lastCamRef.current = cam
     setLod((prev) => {
-      const next = lodFromHeight(heightM)
+      const next = lodFromHeight(cam.height)
       return next === prev ? prev : next
     })
   }, [])
@@ -70,6 +85,16 @@ export default function GlobePage() {
       const next = lodFromLeafletZoom(zoom)
       return next === prev ? prev : next
     })
+  }, [])
+
+  const jumpToLod = useCallback((target: number) => {
+    const clamped = Math.max(0, Math.min(target, LOD_TARGET_HEIGHT.length - 1))
+    setFocus({ ...lastCamRef.current, height: LOD_TARGET_HEIGHT[clamped] })
+  }, [])
+
+  const zoomStep = useCallback((factor: number) => {
+    const height = lastCamRef.current.height * factor
+    setFocus({ ...lastCamRef.current, height: Math.min(20_000_000, Math.max(5, height)) })
   }, [])
 
   // Initial load of off-chain data + stats.
@@ -176,6 +201,70 @@ export default function GlobePage() {
     [offChainParcels, selectParcel, selectOffChain],
   )
 
+  // Deep link: /atlas?parcel=<id|name|holder|address> selects and frames the land.
+  const [searchParams] = useSearchParams()
+  const deepLinkParcel = searchParams.get('parcel')
+  const deepLinkDone = useRef(false)
+  /* eslint-disable react-hooks/set-state-in-effect -- URL query is an external system; syncing it into view state */
+  useEffect(() => {
+    if (deepLinkDone.current || !deepLinkParcel || offChainParcels.length === 0) return
+    deepLinkDone.current = true
+    const query = deepLinkParcel.toLowerCase()
+    const off = offChainParcels.find(
+      (p) =>
+        p.id === deepLinkParcel ||
+        p.name.toLowerCase() === query ||
+        p.holder.toLowerCase() === query,
+    )
+    if (off) {
+      selectOffChain(off)
+      setTab('browse')
+      const nextFocus = parcelFocus(off)
+      if (nextFocus) setFocus(nextFocus)
+      return
+    }
+    const onchain = useAppStore
+      .getState()
+      .parcels.find(
+        (p) =>
+          p.address === deepLinkParcel ||
+          p.holder.toLowerCase() === query ||
+          p.account.name.toLowerCase() === query,
+      )
+    if (onchain) {
+      selectParcel(onchain)
+      setTab('browse')
+      const linked = offChainParcels.find(
+        (p) => p.holder === onchain.holder && p.name === onchain.account.name,
+      )
+      const nextFocus = linked ? parcelFocus(linked) : null
+      if (nextFocus) setFocus(nextFocus)
+    }
+  }, [deepLinkParcel, offChainParcels, selectOffChain, selectParcel])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const shareTarget = useMemo(() => {
+    if (selectedOffChain) return { id: selectedOffChain.id, name: selectedOffChain.name }
+    if (selectedSummary?.off) return { id: selectedSummary.off.id, name: selectedSummary.off.name }
+    if (selectedParcel) return { id: selectedParcel.address, name: selectedParcel.account.name }
+    return null
+  }, [selectedOffChain, selectedSummary, selectedParcel])
+
+  const [shareCopied, setShareCopied] = useState(false)
+  const shareLand = useCallback(() => {
+    if (!shareTarget) return
+    const url = `${window.location.origin}/atlas?parcel=${encodeURIComponent(shareTarget.id)}`
+    const confirm = () => {
+      setShareCopied(true)
+      window.setTimeout(() => setShareCopied(false), 2000)
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(confirm).catch(confirm)
+    } else {
+      confirm()
+    }
+  }, [shareTarget])
+
   return (
     <div className="globe-layout">
       {/* 3D globe (2D Leaflet fallback without WebGL) */}
@@ -197,9 +286,10 @@ export default function GlobePage() {
           onDrawVertexAdd={onVertexAdd}
           onDrawFinish={finishDrawing}
           onParcelClick={onParcelClick}
-          onCameraHeight={onCameraHeight}
+          onCameraMoved={onCameraMoved}
           onMapZoom={onMapZoom}
           showParcelLabels={lod >= 4}
+          basemap={basemap}
           onWebGLStatus={(status) => {
             setWebglStatus(status)
             if (status) setViewMode('2d')
@@ -229,7 +319,7 @@ export default function GlobePage() {
           )}
         </div>
 
-        {/* layer toggles */}
+        {/* layer toggles + basemap switcher */}
         <div className="globe-chips absolute top-3 right-3 bg-surface/90 rounded-lg shadow px-2 py-1.5 flex gap-1 text-[11px]">
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${showParcels ? 'text-emerald-700' : 'text-muted'}`}
@@ -239,12 +329,49 @@ export default function GlobePage() {
           >
             <Square size={12} /> Parcels
           </button>
+          <span className="globe-chip-sep" aria-hidden="true" />
+          {([
+            ['imagery', 'Satellite'],
+            ['terrain', 'Terrain'],
+            ['osm', 'Streets'],
+          ] as const).map(([style, label]) => (
+            <button
+              key={style}
+              className={`btn btn-ghost px-2 py-1 ${basemap === style ? 'globe-basemap-on' : 'text-muted'}`}
+              onClick={() => {
+                setBasemap(style)
+                setFocus({ ...lastCamRef.current })
+              }}
+              aria-pressed={basemap === style}
+              title={`Switch basemap to ${label.toLowerCase()}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* progressive zoom ladder */}
-        <LodLadder lod={lod} />
+        <LodLadder lod={lod} onSelect={jumpToLod} />
 
         <div className="map-controls">
+          <div className="map-zoom-group">
+            <button
+              className="map-icon-button"
+              onClick={() => zoomStep(0.5)}
+              title="Zoom in"
+              aria-label="Zoom in"
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              className="map-icon-button"
+              onClick={() => zoomStep(2)}
+              title="Zoom out"
+              aria-label="Zoom out"
+            >
+              <Minus size={16} />
+            </button>
+          </div>
           <div className="map-mode-switch" role="group" aria-label="Map view">
             <button
               className={viewMode === '2d' ? 'active' : ''}
@@ -288,6 +415,12 @@ export default function GlobePage() {
           <div><span>Registered parcels</span><strong>{offChainParcels.length}</strong></div>
           <div><span>Mapped area</span><strong>{formatArea(offChainParcels.reduce((total, parcel) => total + (parcel.area_m2 ?? 0), 0))}</strong></div>
         </div>
+        {shareTarget && (
+          <button className="atlas-share" onClick={shareLand} title={`Copy link to ${shareTarget.name}`}>
+            <Share2 size={13} />
+            {shareCopied ? 'Link copied!' : 'Share this land'}
+          </button>
+        )}
         <div className="flex border-b panel-tabs">
           {(['register', 'browse'] as const).map((t) => (
             <button

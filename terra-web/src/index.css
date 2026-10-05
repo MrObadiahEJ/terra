@@ -3961,3 +3961,43 @@ header .wallet-adapter-button {
 @media (max-width: 768px) {
   .dm-narrbar { flex-wrap: wrap; }
 }
+
+/* ---- atlas: basemap switcher, zoom group, live ladder, share ---- */
+.globe-chip-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--border); }
+.globe-basemap-on { color: #059669; font-weight: 700; }
+:root[data-theme='dark'] .globe-basemap-on { color: #6ee7b7; }
+.map-zoom-group { display: flex; flex-direction: column; gap: 6px; }
+.lod-ladder--live .lod-rung button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.lod-ladder--live .lod-rung button:hover { background: rgba(255, 255, 255, 0.08); }
+.lod-ladder--live .lod-rung.is-active button { color: #ffffff; }
+.lod-ladder--live .lod-rung button:focus-visible { outline: 2px solid #34d399; outline-offset: 1px; }
+.atlas-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 10px 12px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.atlas-share:hover { background: var(--accent-soft); border-color: var(--accent); }
+.atlas-share:active { transform: translateY(1px); }

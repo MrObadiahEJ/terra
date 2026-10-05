@@ -25,9 +25,27 @@ export interface LeafletMapProps {
   onDrawFinish: () => void
   onParcelClick: (id: string) => void
   focus?: { longitude: number; latitude: number; height: number } | null
-  basemap?: 'imagery' | 'osm'
+  basemap?: 'imagery' | 'terrain' | 'osm'
   onZoom?: (zoom: number) => void
 }
+
+const TILE_STYLES = {
+  imagery: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    maxNativeZoom: 20,
+    attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+  },
+  terrain: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    maxNativeZoom: 19,
+    attribution: 'Esri, HERE, Garmin, FAO, NOAA, USGS and others',
+  },
+  osm: {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxNativeZoom: 19,
+    attribution: '© OpenStreetMap contributors',
+  },
+} as const
 
 const CENTER: [number, number] = [DEFAULT_FOCUS.latitude, DEFAULT_FOCUS.longitude]
 const DEFAULT_ZOOM = 13
@@ -131,7 +149,9 @@ export default function LeafletMap({
   onParcelClick,
   focus,
   onZoom,
+  basemap = 'imagery',
 }: LeafletMapProps) {
+  const tiles = TILE_STYLES[basemap]
   const suppressUntilRef = useRef(0)
 
   const parcels = offChainParcels
@@ -154,10 +174,10 @@ export default function LeafletMap({
       <ZoomBottomLeft />
       <TileLayer
         {...{
-          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          maxNativeZoom: 20,
+          url: tiles.url,
+          maxNativeZoom: tiles.maxNativeZoom,
           maxZoom: 22,
-          attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+          attribution: tiles.attribution,
         }}
       />
       <ClickHandler

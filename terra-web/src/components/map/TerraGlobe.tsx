@@ -28,13 +28,13 @@ interface TerraGlobeProps {
   focus?: { longitude: number; latitude: number; height: number } | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
   onWebGLStatus?: (msg: string | null) => void
-  /** Reports camera height above the ellipsoid (metres) as the view moves. */
-  onCameraHeight?: (heightM: number) => void
+  /** Reports camera position (lon/lat in degrees, height above ellipsoid in metres) as the view moves. */
+  onCameraMoved?: (cam: { longitude: number; latitude: number; height: number }) => void
   /** Reports Leaflet zoom level when the 2D fallback map is active. */
   onMapZoom?: (zoom: number) => void
   /** Parcel name labels follow progressive disclosure (hidden until close zoom). */
   showParcelLabels?: boolean
-  basemap?: 'imagery' | 'osm'
+  basemap?: 'imagery' | 'terrain' | 'osm'
 }
 
 export default function TerraGlobe({
@@ -47,7 +47,7 @@ export default function TerraGlobe({
   viewMode,
   focus,
   onWebGLStatus,
-  onCameraHeight,
+  onCameraMoved,
   onMapZoom,
   showParcelLabels = true,
   basemap = 'imagery',
@@ -60,9 +60,9 @@ export default function TerraGlobe({
   useEffect(() => {
     onWebGLStatusRef.current = onWebGLStatus
   })
-  const onCameraHeightRef = useRef(onCameraHeight)
+  const onCameraMovedRef = useRef(onCameraMoved)
   useEffect(() => {
-    onCameraHeightRef.current = onCameraHeight
+    onCameraMovedRef.current = onCameraMoved
   })
   const onDrawFinishRef = useRef(onDrawFinish)
   useEffect(() => {
@@ -100,11 +100,17 @@ export default function TerraGlobe({
                 maximumLevel: 19,
                 credit: '© OpenStreetMap contributors',
               })
-            : new Cesium.UrlTemplateImageryProvider({
-                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                maximumLevel: 20,
-                credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
-              }),
+            : basemap === 'terrain'
+              ? new Cesium.UrlTemplateImageryProvider({
+                  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+                  maximumLevel: 19,
+                  credit: 'Esri, HERE, Garmin, FAO, NOAA, USGS and others',
+                })
+              : new Cesium.UrlTemplateImageryProvider({
+                  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  maximumLevel: 20,
+                  credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+                }),
         ),
         // World Terrain requires a Cesium Ion token. If none is configured we
         // fall back to the bare ellipsoid so the globe works out of the box.
@@ -140,17 +146,22 @@ export default function TerraGlobe({
     onWebGLStatusRef.current?.(null)
 
     let lastReported = -1
-    const reportHeight = (force: boolean) => {
-      const h = viewer.camera.positionCartographic?.height ?? 0
+    const reportCamera = (force: boolean) => {
+      const carto = viewer.camera.positionCartographic
+      const h = carto?.height ?? 0
       if (!force && lastReported >= 0 && Math.abs(h - lastReported) <= Math.max(lastReported * 0.06, 1)) {
         return
       }
       lastReported = h
-      onCameraHeightRef.current?.(h)
+      onCameraMovedRef.current?.({
+        longitude: Cesium.Math.toDegrees(carto?.longitude ?? 0),
+        latitude: Cesium.Math.toDegrees(carto?.latitude ?? 0),
+        height: h,
+      })
     }
-    const onCamChange = () => reportHeight(false)
-    const onCamMoveEnd = () => reportHeight(true)
-    reportHeight(true)
+    const onCamChange = () => reportCamera(false)
+    const onCamMoveEnd = () => reportCamera(true)
+    reportCamera(true)
     viewer.camera.changed.addEventListener(onCamChange)
     viewer.camera.moveEnd.addEventListener(onCamMoveEnd)
 

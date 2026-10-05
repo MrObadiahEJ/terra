@@ -17,6 +17,17 @@ export const LOD_LEVELS: LodLevel[] = [
 
 const HEIGHT_BREAKS_M = [5_000_000, 800_000, 150_000, 30_000, 3_000, 500, 80]
 
+export const LOD_TARGET_HEIGHT: number[] = [
+  10_000_000,
+  1_500_000,
+  400_000,
+  60_000,
+  12_000,
+  1_500,
+  250,
+  40,
+]
+
 export function lodFromHeight(heightM: number): number {
   for (let i = 0; i < HEIGHT_BREAKS_M.length; i++) {
     if (heightM > HEIGHT_BREAKS_M[i]) return i
