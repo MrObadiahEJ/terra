@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAppStore, type OnChainParcelItem } from '../../store/appStore'
 import type { OffChainParcel } from '../../lib/api'
 import { PARCEL_STATUS } from '../../lib/constants'
@@ -20,11 +20,19 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
   const demoMode = useAppStore((s) => s.demoMode)
   const selectedOff = useAppStore((s) => s.selectedOffChain)
   const normalizedQuery = query.trim().toLocaleLowerCase()
-  const filteredParcels = parcels.filter((p) =>
-    `${p.account.name} ${p.holder}`.toLocaleLowerCase().includes(normalizedQuery),
+  const filteredParcels = useMemo(
+    () =>
+      parcels.filter((p) =>
+        `${p.account.name} ${p.holder}`.toLocaleLowerCase().includes(normalizedQuery),
+      ),
+    [parcels, normalizedQuery],
   )
-  const filteredOffChainParcels = offChainParcels.filter((p) =>
-    `${p.name} ${p.holder} ${p.status}`.toLocaleLowerCase().includes(normalizedQuery),
+  const filteredOffChainParcels = useMemo(
+    () =>
+      offChainParcels.filter((p) =>
+        `${p.name} ${p.holder} ${p.status}`.toLocaleLowerCase().includes(normalizedQuery),
+      ),
+    [offChainParcels, normalizedQuery],
   )
 
   if (loading) {

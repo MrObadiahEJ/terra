@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OffChainParcel } from '../../lib/api'
 import type { LonLat } from '../../lib/geo'
 import { polygonAreaM2, polygonBbox, polygonCentroid, polygonPerimeterM, ringDigest } from '../../lib/geo'
-import { MapPin, Loader2 } from 'lucide-react'
+import { Box, MapPin, Loader2 } from 'lucide-react'
 
 interface Props {
   parcel: OffChainParcel
+  onView3D?: () => void
 }
 
 function parseRing(geometry: string | null): LonLat[] | null {
@@ -21,7 +22,7 @@ function parseRing(geometry: string | null): LonLat[] | null {
 
 /** Detail view for parcels that have geometry but no on-chain account
  *  (demo seed data, local demo registrations, API-only records). */
-export default function OffChainParcelPanel({ parcel }: Props) {
+export default function OffChainParcelPanel({ parcel, onView3D }: Props) {
   const ring = useMemo(() => parseRing(parcel.geometry), [parcel.geometry])
   const metrics = useMemo(() => {
     if (!ring || ring.length < 4) return null
@@ -116,6 +117,12 @@ export default function OffChainParcelPanel({ parcel }: Props) {
             )}
           </p>
         </div>
+      )}
+
+      {onView3D && ring && ring.length >= 3 && (
+        <button className="btn btn-secondary w-full justify-center" onClick={onView3D}>
+          <Box size={14} /> View in 3D
+        </button>
       )}
 
       <p className="font-mono text-[10px] text-muted break-all">holder: {parcel.holder}</p>

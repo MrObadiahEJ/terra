@@ -4289,3 +4289,117 @@ header .wallet-adapter-button {
   border-radius: 999px;
   animation: welcome-spin .8s linear infinite;
 }
+
+/* ---- atlas: layers card, road planning, 3D representation ---- */
+.globe-layers-card {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 216px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: 0 8px 30px #0003;
+  backdrop-filter: blur(14px);
+  padding: 6px;
+  z-index: 950;
+  text-align: left;
+}
+.globe-layers-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.globe-layers-card-head button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.globe-layers-card-head button:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.layer-row:hover { background: var(--bg); }
+.layer-box {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  color: #fff;
+}
+.layer-box.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+@media (max-width: 560px) {
+  .globe-layers-card {
+    top: auto;
+    bottom: calc(100% + 6px);
+    right: 0;
+  }
+}
+.plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+.plan-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+.repr-viewer { margin-top: 2px; }
+.asset-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.asset-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--accent-soft);
+  color: #047857;
+  border-radius: 999px;
+  padding: 2px 7px;
+  flex: none;
+}

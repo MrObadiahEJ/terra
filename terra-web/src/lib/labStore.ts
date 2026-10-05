@@ -42,6 +42,7 @@ export const ELEVATION_SOURCES = [
   { code: 3, id: 'LIDAR', label: 'LiDAR point cloud', color: '#06b6d4' },
   { code: 4, id: 'PHOTOGRAMMETRY', label: 'Photogrammetry mesh', color: '#f59e0b' },
   { code: 5, id: 'MANUAL', label: 'Manual entry', color: '#f43f5e' },
+  { code: 6, id: 'ESTIMATED', label: 'Estimated from footprint', color: '#84cc16' },
 ] as const
 
 /** Demo validator wallets for the quorum (lab only — no keys, labels). */

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PublicKey, Transaction } from '@solana/web3.js'
+import { Box } from 'lucide-react'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
 import {
@@ -19,9 +20,10 @@ interface Props {
   address: string
   account: ParcelAccount
   holder: string
+  onView3D?: () => void
 }
 
-export default function ParcelPanel({ address, account, holder }: Props) {
+export default function ParcelPanel({ address, account, holder, onView3D }: Props) {
   const { publicKey, send } = useWallet()
   const setLastSignature = useAppStore((s) => s.setLastSignature)
   const refreshParcels = useAppStore((s) => s.refreshParcels)
@@ -152,6 +154,12 @@ export default function ParcelPanel({ address, account, holder }: Props) {
         <dt className="text-muted">Created</dt>
         <dd>{new Date(Number(account.createdAt) * 1000).toLocaleString()}</dd>
       </dl>
+
+      {onView3D && (
+        <button className="btn btn-secondary w-full justify-center" onClick={onView3D}>
+          <Box size={14} /> View in 3D
+        </button>
+      )}
 
       <div>
         <h4 className="font-semibold mb-1">Infrastructure</h4>

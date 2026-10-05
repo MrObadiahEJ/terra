@@ -12,21 +12,33 @@ import {
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { DEFAULT_FOCUS } from '../../lib/constants'
-import { parseGeoJSON, type OffChainParcel, type RoadRow, type PoiRow } from '../../lib/api'
+import {
+  parseGeoJSON,
+  type OffChainParcel,
+  type RoadRow,
+  type PoiRow,
+  type OsmBuildingFootprint,
+} from '../../lib/api'
+import { roadStyle, type PlannedRoad } from '../../lib/atlasLayers'
 import type { DrawVertex } from './TerraGlobe'
 
 export interface LeafletMapProps {
   offChainParcels: OffChainParcel[]
   roads: RoadRow[]
   pois: PoiRow[]
+  buildings: OsmBuildingFootprint[]
+  plannedRoads: PlannedRoad[]
   drawing: boolean
+  drawKind: 'parcel' | 'road'
   drawVertices: DrawVertex[]
   onDrawVertexAdd: (v: DrawVertex) => void
   onDrawFinish: () => void
   onParcelClick: (id: string) => void
-  focus?: { longitude: number; latitude: number; height: number } | null
+  onBuildingClick?: (osmId: number) => void
+  focus?: { longitude: number; latitude: number; height: number; duration?: number } | null
   basemap?: 'imagery' | 'terrain' | 'osm'
   onZoom?: (zoom: number) => void
+  showLabels?: boolean
   /** Bumped by the layout when a panel reflows the map container; invalidates size. */
   resizeKey?: number
 }
@@ -38,7 +50,7 @@ const TILE_STYLES = {
     attribution: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
   },
   terrain: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topographic_Map/MapServer/tile/{z}/{y}/{x}',
     maxNativeZoom: 19,
     attribution: 'Esri, HERE, Garmin, FAO, NOAA, USGS and others',
   },
@@ -123,7 +135,7 @@ function FocusController({ focus }: { focus: LeafletMapProps['focus'] }) {
   useEffect(() => {
     if (!focus) return
     const zoom = Math.max(12, Math.min(20, Math.round(20 - Math.log2(focus.height / 60))))
-    map.flyTo([focus.latitude, focus.longitude], zoom, { duration: 1.2 })
+    map.flyTo([focus.latitude, focus.longitude], zoom, { duration: focus.duration ?? 1.2 })
   }, [focus, map])
   return null
 }
@@ -152,15 +164,22 @@ function parcelRing(parcel: OffChainParcel): Ring | null {
 
 export default function LeafletMap({
   offChainParcels,
+  roads,
+  pois,
+  buildings,
+  plannedRoads,
   drawing,
+  drawKind,
   drawVertices,
   onDrawVertexAdd,
   onDrawFinish,
   onParcelClick,
+  onBuildingClick,
   focus,
   onZoom,
   basemap = 'imagery',
   resizeKey = 0,
+  showLabels = true,
 }: LeafletMapProps) {
   const tiles = TILE_STYLES[basemap]
   const suppressUntilRef = useRef(0)
@@ -170,7 +189,7 @@ export default function LeafletMap({
     .filter((x): x is { parcel: OffChainParcel; ring: Ring } => x.ring !== null)
 
   const drawPath: Ring = drawVertices.map((v) => [v.lat, v.lon])
-  if (drawVertices.length >= 3) drawPath.push(drawPath[0])
+  if (drawKind !== 'road' && drawVertices.length >= 3) drawPath.push(drawPath[0])
 
   return (
     <MapContainer
@@ -201,6 +220,77 @@ export default function LeafletMap({
       <FocusController focus={focus} />
       <ZoomReporter onZoom={onZoom} />
       <ResizeInvalidator resizeKey={resizeKey} />
+
+      {roads.map((road) => {
+        const poly = parseGeoJSON<{ type: string; coordinates: number[][] }>(road.geometry)
+        if (!poly || poly.type !== 'LineString') return null
+        const style = roadStyle(road.highway)
+        return (
+          <Polyline
+            key={`road-${road.id}`}
+            positions={poly.coordinates.map(([lon, lat]) => [lat, lon] as [number, number])}
+            pathOptions={{ color: style.color, weight: style.width, opacity: 0.95 }}
+          />
+        )
+      })}
+
+      {buildings.map((building) => {
+        const ring = building.geometry?.coordinates?.[0]
+        if (!ring || ring.length < 4) return null
+        return (
+          <Polygon
+            key={`bld-${building.osm_id}`}
+            positions={ring.map(([lon, lat]) => [lat, lon] as [number, number])}
+            pathOptions={{
+              color: '#5c7387',
+              fillColor: '#9fb6c9',
+              fillOpacity: 0.45,
+              weight: 1,
+            }}
+            eventHandlers={{
+              click: () => {
+                if (drawing) return
+                if (performance.now() < suppressUntilRef.current) return
+                onBuildingClick?.(building.osm_id)
+              },
+            }}
+          >
+            {showLabels && building.name ? <Tooltip>{building.name}</Tooltip> : null}
+          </Polygon>
+        )
+      })}
+
+      {pois.map((poi) => {
+        const poly = parseGeoJSON<{ type: string; coordinates: number[] }>(poi.geometry)
+        if (!poly || poly.type !== 'Point') return null
+        const [lon, lat] = poly.coordinates
+        if (lon == null || lat == null) return null
+        return (
+          <CircleMarker
+            key={`poi-${poi.id}`}
+            {...{
+              center: [lat, lon],
+              radius: 5,
+              pathOptions: {
+                color: '#ffffff',
+                fillColor: '#4285f4',
+                fillOpacity: 0.95,
+                weight: 1.5,
+              },
+            }}
+          >
+            {showLabels && poi.name ? <Tooltip>{poi.name}</Tooltip> : null}
+          </CircleMarker>
+        )
+      })}
+
+      {plannedRoads.map((road) => (
+        <Polyline
+          key={`plan-${road.id}`}
+          positions={road.vertices.map((v) => [v.lat, v.lon] as [number, number])}
+          pathOptions={{ color: '#2dd4bf', weight: 4, opacity: 0.95 }}
+        />
+      ))}
 
       {parcels.map(({ parcel, ring }) => (
         <Polygon
@@ -237,7 +327,7 @@ export default function LeafletMap({
       {drawVertices.length > 1 && (
         <Polyline
           positions={drawPath}
-          pathOptions={{ color: '#7fff00', weight: 2, dashArray: '4 6' }}
+          pathOptions={{ color: '#7fff00', weight: drawKind === 'road' ? 3 : 2, dashArray: drawKind === 'road' ? undefined : '4 6' }}
         />
       )}
     </MapContainer>
