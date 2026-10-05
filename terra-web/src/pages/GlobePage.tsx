@@ -27,6 +27,7 @@ import {
   Square,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
+import { useLocale } from '../lib/locale'
 
 function parcelFocus(parcel: OffChainParcel | null): typeof DEFAULT_FOCUS | null {
   if (!parcel) return null
@@ -39,6 +40,7 @@ function parcelFocus(parcel: OffChainParcel | null): typeof DEFAULT_FOCUS | null
 }
 
 export default function GlobePage() {
+  const { t } = useLocale()
   const {
     offChainParcels,
     refreshOffChain,
@@ -467,7 +469,7 @@ export default function GlobePage() {
         <div className="land-panel-heading">
           <div>
             <span className="panel-eyebrow">YOUR PORTFOLIO</span>
-            <h2>Land assets</h2>
+            <h2>{t('ownedLandAssets')}</h2>
           </div>
           <div className="sidenav-tools">
             <span className="asset-count">{offChainParcels.length}</span>
@@ -512,16 +514,16 @@ export default function GlobePage() {
           </button>
         )}
         <div className="flex border-b panel-tabs">
-          {(['register', 'browse'] as const).map((t) => (
+          {(['register', 'browse'] as const).map((tabId) => (
             <button
-              key={t}
+              key={tabId}
               className={`flex-1 py-2 text-[13px] font-medium capitalize hover:bg-bg ${
-                tab === t ? 'border-b-2 border-emerald-500' : 'text-muted'
+                tab === tabId ? 'border-b-2 border-emerald-500' : 'text-muted'
               }`}
-              onClick={() => setTab(t)}
-              aria-pressed={tab === t}
+              onClick={() => setTab(tabId)}
+              aria-pressed={tab === tabId}
             >
-              {t === 'register' ? 'Register' : 'Browse'}
+              {tabId === 'register' ? 'Register' : 'Browse'}
             </button>
           ))}
         </div>

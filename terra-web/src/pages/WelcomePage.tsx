@@ -183,7 +183,7 @@ export default function WelcomePage() {
                 <div className="welcome-cycle-head">
                   <strong key={activeParcel.id}>{activeParcel.name}</strong>
                   <span>
-                    {Math.round(activeParcel.area_m2).toLocaleString('en-US')} m² · {activeParcel.status}
+                    {Math.round(activeParcel.area_m2 ?? 0).toLocaleString(locale === 'zh' ? 'zh-CN' : locale)} m² · {activeParcel.status}
                   </span>
                 </div>
               )}

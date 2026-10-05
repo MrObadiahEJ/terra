@@ -2124,7 +2124,7 @@ header .wallet-adapter-button {
   background: var(--surface);
 }
 .locale-select select {
-  width: 42px;
+  width: 56px;
   border: 0;
   outline: 0;
   color: var(--ink);
@@ -3115,15 +3115,12 @@ header .wallet-adapter-button {
   from { transform: translateX(-26px); }
   to { transform: translateX(338px); }
 }
-@media (max-width: 1215px) {
+@media (max-width: 1390px) {
   .app-header { gap: 14px; padding-inline: 16px; }
   .primary-nav { display: none; }
   .compact-nav { display: block; }
 }
 @media (max-width: 1500px) {
-  .locale-select { display: none; }
-}
-@media (max-width: 1340px) {
   .network-indicator { display: none; }
 }
 @media (max-width: 720px) {

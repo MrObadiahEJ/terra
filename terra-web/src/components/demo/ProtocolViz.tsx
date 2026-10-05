@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Camera, CheckCheck, Eye, FileText, Flag, Fingerprint, MapPin, Share2, Users } from 'lucide-react'
 import type { DemoScenarioEvent } from '../../lib/api'
+import { useLocale } from '../../lib/locale'
 import { STAGE_DEFS, type StageId, type StageTrack } from '../../lib/protocolStages'
 
 const STAGE_ICON: Record<StageId, LucideIcon> = {
@@ -68,6 +69,7 @@ export function NarrationBar({ track, events, phase, variant = 'panel' }: Narrat
 }
 
 export default function ProtocolViz({ track, events, phase, validators, spatial }: ProtocolVizProps) {
+  const { t } = useLocale()
   const limit = Math.min(phase, events.length - 1)
   const rankOf = (id: StageId) => track.nodes.findIndex((node) => node.id === id)
 
@@ -156,8 +158,8 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
         {hasNetwork ? (
           <div className="dm-net">
             <div className="dm-net-h">
-              <span>Validator network</span>
-              <span className="dm-sim-badge">SIMULATION</span>
+              <span>{t('networkTitle')}</span>
+              <span className="dm-sim-badge">{t('simulation')}</span>
             </div>
             <svg viewBox="0 0 340 170" role="img" aria-label="Validator network for the current scenario">
               <g className={spatial.stage ? `st-${spatial.stage}` : 'st-idle'}>

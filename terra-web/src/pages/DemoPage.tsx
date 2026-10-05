@@ -475,7 +475,7 @@ export default function DemoPage() {
           <section className="dm-spatial-grid" aria-label="Spatial parcel and validator replay">
             <div className="dm-scene-panel">
               <div className="dm-panel-h">
-                <span><MapIcon size={14} /> Parcel in context</span>
+                <span><MapIcon size={14} /> {t('parcelContext')}</span>
                 <div className="dm-scene-actions">
                   {sceneParcels.length > 1 && (
                     <select
@@ -549,7 +549,8 @@ export default function DemoPage() {
               {includesValidatorReview ? (
                 <>
                   <div className="dm-reviewers">
-                    {['Reviewer 01', 'Reviewer 02', 'Reviewer 03'].map((reviewer, index) => {
+                    {(['reviewerOne', 'reviewerTwo', 'reviewerThree'] as const).map((reviewerKey, index) => {
+                      const reviewer = t(reviewerKey)
                       const kind = phase >= 0 ? events[phase]?.kind ?? '' : ''
                       const hasReviewStarted = phase >= 0 && phase >= index + 1
                       const decisionReady = kind.includes('QUORUM') || kind.includes('VERIFIED') || kind.includes('FINALIZED')
@@ -559,7 +560,7 @@ export default function DemoPage() {
                       return (
                         <div className="dm-reviewer" key={reviewer}>
                           <span className={`dm-review-avatar ${settled ? 'approved' : hasReviewStarted ? 'checking' : ''}`}>{String(index + 1).padStart(2, '0')}</span>
-                          <span><strong>{t((['reviewerOne', 'reviewerTwo', 'reviewerThree'] as const)[index])}</strong><small>{decisionReady ? t('reviewRecorded') : selectedWinner && index === 0 ? t('seededWinner') : isNotSelected ? t('notSelected') : hasReviewStarted ? t('checkingGates') : t('inQueue')}</small></span>
+                          <span><strong>{t(reviewerKey)}</strong><small>{decisionReady ? t('reviewRecorded') : selectedWinner && index === 0 ? t('seededWinner') : isNotSelected ? t('notSelected') : hasReviewStarted ? t('checkingGates') : t('inQueue')}</small></span>
                           <i className={settled ? 'approved' : hasReviewStarted ? 'checking' : ''} />
                         </div>
                       )

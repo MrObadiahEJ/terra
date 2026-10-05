@@ -21,6 +21,7 @@ import { api, type IdentityView, type OffChainParcel } from '../lib/api'
 import { connection, useWallet } from '../lib/wallet'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
 import { useTxStore } from '../lib/txStore'
+import { useLocale } from '../lib/locale'
 
 type IdentityState = 'disconnected' | 'loading' | 'linked' | 'unlinked' | 'error'
 type AssetFilter = 'owned' | 'map'
@@ -41,6 +42,7 @@ function isNoIdentity(error: unknown) {
 }
 
 export default function PortfolioPage() {
+  const { t } = useLocale()
   const navigate = useNavigate()
   const { publicKey, walletName, signMessage } = useWallet()
   const address = publicKey?.toBase58() ?? null
@@ -245,7 +247,7 @@ export default function PortfolioPage() {
       <section className="portfolio-overview" aria-label="Portfolio overview">
         <article className="portfolio-balance-card">
           <div className="portfolio-card-label"><Wallet size={14} /> Wallet balance</div>
-          <strong>{visibleBalance == null ? (address ? '—' : 'Connect wallet') : visibleBalance.toFixed(4)}</strong>
+          <strong>{visibleBalance == null ? (address ? '—' : t('connectWallet')) : visibleBalance.toFixed(4)}</strong>
           <span>{visibleBalance == null ? (visibleBalanceError ?? (address ? 'Reading Solana devnet' : 'Your wallet balance appears here')) : 'SOL · Solana devnet'}</span>
         </article>
         <article className="portfolio-metric-card">
