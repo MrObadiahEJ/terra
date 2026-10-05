@@ -9,6 +9,7 @@ import { TERRA_RPC_URL } from '../lib/constants'
 import { api } from '../lib/api'
 import { useWallet } from '../lib/wallet'
 import IsoLandSkeleton from '../components/lab/IsoLandSkeleton'
+import SettlementCenter from '../components/settlement/SettlementCenter'
 import { useLocale, type TranslationKey } from '../lib/locale'
 
 const COMPOSE: Array<{ id: string; label: string; fail: { code: string | null; name: string } | null }> = [
@@ -357,9 +358,9 @@ export default function TransactionsPage() {
   const reseed = useTxStore((s) => s.reseed)
   const { publicKey } = useWallet()
 
-  const [view, setView] = useState<'feed' | 'versions'>(() => {
+  const [view, setView] = useState<'feed' | 'versions' | 'settlement'>(() => {
     const viewParam = new URLSearchParams(window.location.search).get('view')
-    return viewParam === 'versions' ? 'versions' : 'feed'
+    return viewParam === 'versions' || viewParam === 'settlement' ? viewParam : 'feed'
   })
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
@@ -447,6 +448,13 @@ export default function TransactionsPage() {
         >
           {t('landVersionsTab')}
           <span className="lab-tab-hint">{t('landVersionsHint')}</span>
+        </button>
+        <button
+          className={`lab-tab ${view === 'settlement' ? 'active' : ''}`}
+          onClick={() => setView('settlement')}
+        >
+          {t('txSettlementTab')}
+          <span className="lab-tab-hint">{t('txSettlementHint')}</span>
         </button>
       </nav>
 
@@ -601,6 +609,8 @@ export default function TransactionsPage() {
       )}
 
       {view === 'versions' && <LandVersionsView />}
+
+      {view === 'settlement' && <SettlementCenter />}
 
       <footer className="lab-foot">
         {t('txsFooterA')}{' '}

@@ -4403,3 +4403,37 @@ header .wallet-adapter-button {
   padding: 2px 7px;
   flex: none;
 }
+
+/* settlement center (transactions → settlement tab) */
+.stl-intro { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; max-width: 72ch; line-height: 1.55; }
+.stl-msg { font-size: 12px; padding: 8px 11px; border-radius: 6px; margin-bottom: 10px; border: 1px solid transparent; line-height: 1.5; }
+.stl-msg.err { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.stl-msg.err code { font: 11px var(--font-mono); overflow-wrap: anywhere; }
+.stl-msg.ok { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.stl-msg b { font-weight: 600; margin-right: 4px; }
+.stl-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.stl-head h3 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin: 0; }
+.stl-form { display: grid; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.stl-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.stl-field { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.stl-field .text-input, .stl-field .select-input { font-size: 12px; }
+.stl-form-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stl-hint { font-size: 10.5px; color: var(--muted); }
+.stl-modes { display: flex; gap: 6px; }
+.stl-mode { font-size: 11px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer; }
+.stl-mode.active { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.stl-row { border-top: 1px solid var(--border); padding: 9px 0; display: grid; gap: 6px; }
+.stl-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stl-row-title { font-size: 12.5px; font-weight: 600; }
+.stl-meta { font-size: 11px; color: var(--muted); font-family: var(--font-mono); display: flex; gap: 10px; flex-wrap: wrap; line-height: 1.5; }
+.stl-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.stl-actions .btn { font-size: 11.5px; }
+.stl-hash { display: flex; gap: 6px; align-items: center; }
+.stl-hash .text-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: 11.5px; }
+.stl-adj { border-top: 1px dashed var(--border); padding-top: 9px; display: grid; gap: 8px; }
+.stl-warn { font-size: 11px; color: #92400e; margin-top: 6px; }
+.stl-empty { font-size: 12px; color: var(--muted); padding: 8px 0 2px; }
+.stl-foot { margin-top: 14px; font-size: 11px; color: var(--muted); line-height: 1.55; }
+:root[data-theme='dark'] .stl-msg.err { background: #45211f; color: #ffc9c2; border-color: #6b2c27; }
+:root[data-theme='dark'] .stl-msg.ok { background: #1e3a25; color: #b9f6ca; border-color: #2f5b3b; }
+:root[data-theme='dark'] .stl-warn { color: #fbbf24; }
