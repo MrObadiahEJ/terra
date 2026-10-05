@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Radio } from 'lucide-react'
 import { api, type ActivityResponse } from '../lib/api'
 import { useActivityStore, type ActivityItem } from '../lib/activityStore'
+import { useLocale, type TranslationKey } from '../lib/locale'
 
 // B4 live activity feed — merges:
 //   * demo-engine events pushed while /demo scenarios play (source: 'demo')
@@ -10,17 +11,20 @@ import { useActivityStore, type ActivityItem } from '../lib/activityStore'
 // Polling pauses on hidden tabs; API errors degrade to the demo-only view.
 // On-chain Solana tx indexing is a named gap (see /status).
 
-function ago(at: number) {
+type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
+
+function ago(at: number, t: Translate) {
   const s = Math.max(1, Math.floor((Date.now() - at) / 1000))
-  if (s < 60) return `${s}s ago`
+  if (s < 60) return t('agoSeconds', { n: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('agoMinutes', { n: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t('agoHours', { n: h })
+  return t('agoDays', { n: Math.floor(h / 24) })
 }
 
 export default function ActivityFeed({ pollMs = 5000 }: { pollMs?: number }) {
+  const { t } = useLocale()
   const demoItems = useActivityStore((s) => s.items)
   const [apiItems, setApiItems] = useState<ActivityItem[]>([])
   const [apiOffline, setApiOffline] = useState(false)
@@ -47,10 +51,10 @@ export default function ActivityFeed({ pollMs = 5000 }: { pollMs?: number }) {
       }
     }
     void tick()
-    const t = setInterval(() => void tick(), pollMs)
+    const timer = setInterval(() => void tick(), pollMs)
     return () => {
       live = false
-      clearInterval(t)
+      clearInterval(timer)
     }
   }, [pollMs])
 
@@ -62,29 +66,29 @@ export default function ActivityFeed({ pollMs = 5000 }: { pollMs?: number }) {
     <section className="af">
       <div className="af-head">
         <span className="af-title">
-          <Radio size={13} /> Live activity
+          <Radio size={13} /> {t('liveActivity')}
         </span>
         <span className="af-src">
           {apiOffline ? (
-            <span className="af-offline">API offline — showing demo events only</span>
+            <span className="af-offline">{t('apiOfflineDemoOnly')}</span>
           ) : (
-            `off-chain API polled every ${pollMs / 1000}s`
+            t('apiPolledEvery', { seconds: pollMs / 1000 })
           )}
         </span>
       </div>
       <div className="af-list">
         {merged.length === 0 && (
           <div className="af-empty">
-            No activity yet — play a scenario on the{' '}
-            <Link to="/demo">Demo page</Link> or create state through the API
-            (parcels, evidence, rights…).
+            {t('activityEmptyA')}
+            <Link to="/demo">{t('activityEmptyB')}</Link>
+            {t('activityEmptyC')}
           </div>
         )}
         {merged.map((it) => (
           <div key={it.id} className="af-item">
             <span
               className={`af-dot af-${it.source}`}
-              title={it.source === 'demo' ? 'demo engine (simulated)' : 'off-chain API (real row)'}
+              title={it.source === 'demo' ? t('demoEngineSimulated') : t('offchainApiRealRow')}
             />
             <div className="af-body">
               <div className="af-kind">
@@ -92,9 +96,9 @@ export default function ActivityFeed({ pollMs = 5000 }: { pollMs?: number }) {
                 <span className="af-sum">{it.summary}</span>
               </div>
               <div className="af-meta">
-                <span>{ago(it.at)}</span>
+                <span>{ago(it.at, t)}</span>
                 {it.source === 'demo' ? <span>demo</span> : <span>api</span>}
-                {it.link && <Link to={it.link}>open ↗</Link>}
+                {it.link && <Link to={it.link}>{t('openExternal')}</Link>}
               </div>
             </div>
           </div>

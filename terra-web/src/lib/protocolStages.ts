@@ -1,4 +1,5 @@
 import type { DemoScenarioEvent, DemoScenarioResult } from './api'
+import type { TranslationKey } from './locale'
 
 export type StageId =
   | 'observation'
@@ -16,6 +17,9 @@ export interface StageDef {
   label: string
   headline: string
   human: string
+  labelKey: TranslationKey
+  headlineKey: TranslationKey
+  humanKey: TranslationKey
 }
 
 export const STAGE_DEFS: Record<StageId, StageDef> = {
@@ -24,54 +28,81 @@ export const STAGE_DEFS: Record<StageId, StageDef> = {
     label: 'Observation',
     headline: 'Observation captured',
     human: 'A real-world event enters Terra: a claim, survey, photo or dispute.',
+    labelKey: 'stageObservationLabel',
+    headlineKey: 'stageObservationHeadline',
+    humanKey: 'stageObservationHuman',
   },
   evidence: {
     id: 'evidence',
     label: 'Evidence',
     headline: 'Evidence assembled',
     human: 'The evidence package is gathered: photo, location, timestamp, device.',
+    labelKey: 'stageEvidenceLabel',
+    headlineKey: 'stageEvidenceHeadline',
+    humanKey: 'stageEvidenceHuman',
   },
   hash: {
     id: 'hash',
     label: 'Commit',
     headline: 'Cryptographically committed',
     human: 'A SHA-256 fingerprint locks the evidence — the commitment is immutable.',
+    labelKey: 'stageCommitLabel',
+    headlineKey: 'stageCommitHeadline',
+    humanKey: 'stageCommitHuman',
   },
   routing: {
     id: 'routing',
     label: 'Routing',
     headline: 'Verification task routed',
     human: 'The task travels through the network to eligible validators.',
+    labelKey: 'stageRoutingLabel',
+    headlineKey: 'stageRoutingHeadline',
+    humanKey: 'stageRoutingHuman',
   },
   review: {
     id: 'review',
     label: 'Review',
     headline: 'Independent review',
     human: 'Validators examine the evidence independently.',
+    labelKey: 'stageReviewLabel',
+    headlineKey: 'stageReviewHeadline',
+    humanKey: 'stageReviewHuman',
   },
   attestation: {
     id: 'attestation',
     label: 'Attestation',
     headline: 'Signed attestations',
     human: 'Validators sign their findings — checks are recorded one by one.',
+    labelKey: 'stageAttestationLabel',
+    headlineKey: 'stageAttestationHeadline',
+    humanKey: 'stageAttestationHuman',
   },
   quorum: {
     id: 'quorum',
     label: 'Consensus',
     headline: 'Quorum reached',
     human: 'The consensus threshold is met; the verdict is final.',
+    labelKey: 'stageConsensusLabel',
+    headlineKey: 'stageConsensusHeadline',
+    humanKey: 'stageConsensusHuman',
   },
   transition: {
     id: 'transition',
     label: 'State',
     headline: 'State transition',
     human: 'The protocol state advances — the decision becomes the new truth.',
+    labelKey: 'stageStateLabel',
+    headlineKey: 'stageStateHeadline',
+    humanKey: 'stageStateHuman',
   },
   geometry: {
     id: 'geometry',
     label: 'Spatial',
     headline: 'Spatial state updated',
     human: 'The parcel on the map reflects the verified reality.',
+    labelKey: 'stageSpatialLabel',
+    headlineKey: 'stageSpatialHeadline',
+    humanKey: 'stageSpatialHuman',
   },
 }
 
@@ -202,22 +233,22 @@ export function buildStageTrack(events: DemoScenarioEvent[], phase: number): Sta
   return { nodes, stages, active }
 }
 
-const SPATIAL_LABEL: Record<StageId, string> = {
-  observation: 'OBSERVED',
-  evidence: 'EVIDENCE GATHERED',
-  hash: 'COMMITTED',
-  routing: 'ROUTED',
-  review: 'UNDER VERIFICATION',
-  attestation: 'UNDER VERIFICATION',
-  quorum: 'UNDER VERIFICATION',
-  transition: 'STATE UPDATED',
-  geometry: 'GEOMETRY VERIFIED',
+const SPATIAL_KEY: Record<StageId, TranslationKey> = {
+  observation: 'spatialObserved',
+  evidence: 'spatialEvidenceGathered',
+  hash: 'spatialCommitted',
+  routing: 'spatialRouted',
+  review: 'spatialUnderVerification',
+  attestation: 'spatialUnderVerification',
+  quorum: 'spatialUnderVerification',
+  transition: 'spatialStateUpdated',
+  geometry: 'spatialGeometryVerified',
 }
 
-export function spatialStateFor(track: StageTrack): { label: string; stage: StageId | null } {
+export function spatialStateFor(track: StageTrack): { labelKey: TranslationKey; stage: StageId | null } {
   const node = track.nodes[track.active]
-  if (!node) return { label: 'IDLE', stage: null }
-  return { label: SPATIAL_LABEL[node.id], stage: node.id }
+  if (!node) return { labelKey: 'spatialIdle', stage: null }
+  return { labelKey: SPATIAL_KEY[node.id], stage: node.id }
 }
 
 export function validatorInfo(result: DemoScenarioResult): { labels: string[]; present: boolean } {

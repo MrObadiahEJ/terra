@@ -13,6 +13,7 @@ import {
 } from '../lib/protocolStatus'
 import { Activity, CheckCircle2, CircleDashed, GitBranch, Info, XCircle } from 'lucide-react'
 import ActivityFeed from '../components/ActivityFeed'
+import { useLocale } from '../lib/locale'
 
 // Protocol status (B10) — honest public progress dashboard.
 // Every row cites real source locations; nothing is green because a fn exists.
@@ -30,6 +31,7 @@ function StatChip({ n, label, cls }: { n: number; label: string; cls: string }) 
 }
 
 export default function StatusPage() {
+  const { t } = useLocale()
   const [track, setTrack] = useState<TrackFilter>('all')
   const [level, setLevel] = useState<LevelFilter>('all')
 
@@ -52,13 +54,12 @@ export default function StatusPage() {
       <header className="land-head">
         <div className="min-w-0">
           <h1 className="land-title">
-            <Activity size={18} /> Terra — Protocol status
+            <Activity size={18} /> {t('statusTitle')}
           </h1>
           <p className="text-[11px] text-muted max-w-3xl">
-            Source of truth: the <span className="font-mono">dev</span> branch itself — Anchor handlers, IDL,
-            integration tests, API routes and shipped frontend. <strong>IMPLEMENTED</strong> requires
-            end-to-end evidence (handler + tests, or a shipped UI); a Rust function merely existing is
-            <strong> not</strong> enough.
+            {t('statusIntroA')}<span className="font-mono">dev</span>{t('statusIntroB')}
+            <strong>{t('statusImplementedWord')}</strong>{t('statusIntroC')}
+            <strong>{t('statusNotWord')}</strong>{t('statusIntroD')}
           </p>
         </div>
         <div className="land-badges">
@@ -68,25 +69,25 @@ export default function StatusPage() {
             target="_blank"
             rel="noreferrer"
           >
-            <GitBranch size={13} /> dev on GitHub
+            <GitBranch size={13} /> {t('devOnGitHub')}
           </a>
           <Link className="btn btn-secondary px-2 py-1" to="/lab?tab=vault">
-            Open the Lab ↗
+            {t('openTheLab')}
           </Link>
         </div>
       </header>
 
       {/* live IDL counters + status tallies */}
       <div className="st-stats">
-        <StatChip n={idlInstructions} label="IDL instructions" cls="st-n-ink" />
-        <StatChip n={idlAccounts} label="IDL accounts" cls="st-n-ink" />
-        <StatChip n={idlEvents} label="IDL events" cls="st-n-ink" />
-        <StatChip n={idlTypes} label="IDL types" cls="st-n-ink" />
+        <StatChip n={idlInstructions} label={t('idlInstructions')} cls="st-n-ink" />
+        <StatChip n={idlAccounts} label={t('idlAccounts')} cls="st-n-ink" />
+        <StatChip n={idlEvents} label={t('idlEvents')} cls="st-n-ink" />
+        <StatChip n={idlTypes} label={t('idlTypes')} cls="st-n-ink" />
         <span className="st-sep" />
-        <StatChip n={counts.implemented} label="implemented" cls="st-n-ok" />
-        <StatChip n={counts.partial} label="partial" cls="st-n-warn" />
-        <StatChip n={counts.experimental} label="experimental" cls="st-n-info" />
-        <StatChip n={counts.planned} label="planned" cls="st-n-mut" />
+        <StatChip n={counts.implemented} label={t('countImplemented')} cls="st-n-ok" />
+        <StatChip n={counts.partial} label={t('countPartial')} cls="st-n-warn" />
+        <StatChip n={counts.experimental} label={t('countExperimental')} cls="st-n-info" />
+        <StatChip n={counts.planned} label={t('countPlanned')} cls="st-n-mut" />
       </div>
 
       <ActivityFeed />
@@ -98,16 +99,16 @@ export default function StatusPage() {
             className={`land-viewer-segbtn ${track === 'all' ? 'on' : ''}`}
             onClick={() => setTrack('all')}
           >
-            All
+            {t('allWord')}
           </button>
-          {STATUS_TRACKS.map((t) => (
+          {STATUS_TRACKS.map((trackId) => (
             <button
-              key={t}
-              className={`land-viewer-segbtn ${track === t ? 'on' : ''}`}
-              onClick={() => setTrack(t)}
-              title={TRACK_META[t].hint}
+              key={trackId}
+              className={`land-viewer-segbtn ${track === trackId ? 'on' : ''}`}
+              onClick={() => setTrack(trackId)}
+              title={t(TRACK_META[trackId].hintKey)}
             >
-              {TRACK_META[t].label}
+              {t(TRACK_META[trackId].labelKey)}
             </button>
           ))}
         </div>
@@ -116,7 +117,7 @@ export default function StatusPage() {
             className={`st-level-chip ${level === 'all' ? 'on' : ''}`}
             onClick={() => setLevel('all')}
           >
-            all levels
+            {t('allLevels')}
           </button>
           {STATUS_LEVELS.map((l) => (
             <button
@@ -124,26 +125,23 @@ export default function StatusPage() {
               className={`st-level-chip ${level === l ? 'on' : ''} lvl-${l}`}
               onClick={() => setLevel(l)}
             >
-              {STATUS_META[l].label}
+              {t(STATUS_META[l].labelKey)}
             </button>
           ))}
         </div>
         <span className="flex-1" />
         <span className="text-[10px] text-muted font-mono">
-          {modules.length} / {STATUS_MODULES.length} modules
+          {t('modulesCount', { modules: modules.length, total: STATUS_MODULES.length })}
         </span>
       </div>
 
       {/* legend */}
       <div className="st-legend">
         <span className="text-[10px] text-muted">
-          <CheckCircle2 size={11} className="inline align-[-1px] text-emerald-600" /> implemented — proven
-          end-to-end in source/tests{'   '}
-          <Info size={11} className="inline align-[-1px] text-indigo-600" /> experimental — real code, not
-          production-proven{'   '}
-          <XCircle size={11} className="inline align-[-1px] text-amber-600" /> partial — named gap remains{'   '}
-          <CircleDashed size={11} className="inline align-[-1px] text-slate-400" /> planned — designed, not
-          started
+          <CheckCircle2 size={11} className="inline align-[-1px] text-emerald-600" /> {t('legendImplemented')}{'   '}
+          <Info size={11} className="inline align-[-1px] text-indigo-600" /> {t('legendExperimental')}{'   '}
+          <XCircle size={11} className="inline align-[-1px] text-amber-600" /> {t('legendPartial')}{'   '}
+          <CircleDashed size={11} className="inline align-[-1px] text-slate-400" /> {t('legendPlanned')}
         </span>
       </div>
 
@@ -155,9 +153,9 @@ export default function StatusPage() {
             <article key={m.id} className={`st-card ${m.status}`}>
               <div className="st-card-head">
                 <span className="st-card-name">{m.name}</span>
-                <span className={`lab-badge ${meta.badge}`}>{meta.label}</span>
+                <span className={`lab-badge ${meta.badge}`}>{t(meta.labelKey)}</span>
               </div>
-              <div className="st-card-track">{TRACK_META[m.track].label}</div>
+              <div className="st-card-track">{t(TRACK_META[m.track].labelKey)}</div>
               <code className="st-card-ev" title={m.evidence}>
                 {m.evidence}
               </code>
@@ -179,17 +177,24 @@ export default function StatusPage() {
           )
         })}
         {modules.length === 0 && (
-          <p className="text-[12px] text-muted">No modules match the current filter.</p>
+          <p className="text-[12px] text-muted">{t('noModulesMatch')}</p>
         )}
       </div>
 
       <footer className="st-foot">
         <p className="text-[10px] text-muted">
-          Honest by construction: statuses were derived from <span className="font-mono">terra-core</span>{' '}
-          modules, <span className="font-mono">tests/integration.rs</span> (339 test fns), the generated
-          IDL ({idlInstructions} instructions / {idlAccounts} accounts / {idlEvents} events / {idlTypes}{' '}
-          types) and the {21} REST route groups. When a feature is only half-wired (auto vault rotation,
-          hardware attestation, production ZK setup), it is listed as PARTIAL or EXPERIMENTAL — not green.
+          {t('statusFooter1')}
+          <span className="font-mono">terra-core</span>
+          {t('statusFooter2')}
+          <span className="font-mono">tests/integration.rs</span>
+          {t('statusFooter3', {
+            instructions: idlInstructions,
+            accounts: idlAccounts,
+            events: idlEvents,
+            types: idlTypes,
+          })}
+          {t('stPartial')} / {t('stExperimental')}
+          {t('statusFooter4')}
         </p>
       </footer>
     </div>

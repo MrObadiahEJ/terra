@@ -9,6 +9,7 @@ import { TERRA_RPC_URL } from '../lib/constants'
 import { api } from '../lib/api'
 import { useWallet } from '../lib/wallet'
 import IsoLandSkeleton from '../components/lab/IsoLandSkeleton'
+import { useLocale, type TranslationKey } from '../lib/locale'
 
 const COMPOSE: Array<{ id: string; label: string; fail: { code: string | null; name: string } | null }> = [
   { id: 'init_spatial_asset', label: 'init_spatial_asset', fail: { code: '6231', name: 'InvalidSpatialDimension' } },
@@ -27,6 +28,18 @@ const STATUS_FILTERS = [
 ] as const
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]['id']
+
+const FILTER_KEYS: Record<StatusFilter, TranslationKey> = {
+  all: 'txFilterAll',
+  confirmed: 'txFilterConfirmed',
+  failed: 'txFilterFailed',
+}
+
+const PHASE_KEYS: Record<'signing' | 'broadcasting' | 'confirming', TranslationKey> = {
+  signing: 'phaseSigning',
+  broadcasting: 'phaseBroadcasting',
+  confirming: 'phaseConfirming',
+}
 type Phase = 'signing' | 'broadcasting' | 'confirming' | null
 type Probe = 'checking' | 'online' | 'offline'
 
@@ -40,14 +53,16 @@ function shortSig(sig: string) {
   return sig.length > 12 ? `${sig.slice(0, 4)}…${sig.slice(-4)}` : sig
 }
 
-function timeAgo(t: number) {
-  const s = Math.max(1, Math.floor((Date.now() - t) / 1000))
-  if (s < 60) return `${s}s ago`
+type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string
+
+function timeAgo(at: number, t: Translate) {
+  const s = Math.max(1, Math.floor((Date.now() - at) / 1000))
+  if (s < 60) return t('agoSeconds', { n: s })
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return t('agoMinutes', { n: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+  if (h < 24) return t('agoHours', { n: h })
+  return t('agoDays', { n: Math.floor(h / 24) })
 }
 
 function fmtIso(iso: string | null): string {
@@ -71,7 +86,8 @@ function isLogError(line: string) {
 
 /** Best-effort devnet confirmation for wallet-signed txs (fails soft offline). */
 function LiveStatus({ sig }: { sig: string }) {
-  const [st, setSt] = useState<string>('checking…')
+  const { t } = useLocale()
+  const [st, setSt] = useState<string>(() => t('liveChecking'))
   useEffect(() => {
     let cancel = false
     ;(async () => {
@@ -83,22 +99,23 @@ function LiveStatus({ sig }: { sig: string }) {
         )
         if (cancel) return
         const s = r.value[0]
-        if (!s) setSt('not found on devnet')
-        else if (s.err) setSt('failed on devnet')
-        else setSt(`devnet ${s.confirmationStatus ?? 'confirmed'}`)
+        if (!s) setSt(t('liveNotFound'))
+        else if (s.err) setSt(t('liveFailed'))
+        else setSt(t('liveDevnetStatus', { status: s.confirmationStatus ?? 'confirmed' }))
       } catch {
-        if (!cancel) setSt('devnet unreachable')
+        if (!cancel) setSt(t('liveUnreachable'))
       }
     })()
     return () => {
       cancel = true
     }
-  }, [sig])
-  return <span className="tx-live-status">devnet status: {st}</span>
+  }, [sig, t])
+  return <span className="tx-live-status">{t('devnetStatusPrefix')}{st}</span>
 }
 
 /** Realtime pills: off-chain validator API + devnet RPC + wallet identity. */
 function StatusPills() {
+  const { t } = useLocale()
   const { publicKey } = useWallet()
   const [apiSt, setApiSt] = useState<Probe>('checking')
   const [apiCount, setApiCount] = useState<number | null>(null)
@@ -127,79 +144,80 @@ function StatusPills() {
       }
     }
     probe()
-    const t = setInterval(probe, 20000)
+    const timer = setInterval(probe, 20000)
     return () => {
       cancel = true
-      clearInterval(t)
+      clearInterval(timer)
     }
   }, [])
 
   return (
     <div className="tx-pills">
-      <span className={`tx-pill probe-${apiSt}`} title="Off-chain validator/API feed">
+      <span className={`tx-pill probe-${apiSt}`} title={t('offChainFeedTitle')}>
         <span className="tx-pill-dot" />
         {apiSt === 'checking'
-          ? 'Checking validator API…'
+          ? t('checkingValidatorApi')
           : apiSt === 'online'
-            ? `Validator API live · ${apiCount ?? 0} parcels`
-            : 'API offline — demo mode'}
+            ? t('validatorApiLive', { n: apiCount ?? 0 })
+            : t('apiOfflineDemoMode')}
       </span>
-      <span className={`tx-pill probe-${rpcSt}`} title="Solana devnet RPC">
+      <span className={`tx-pill probe-${rpcSt}`} title={t('devnetRpcTitle')}>
         <span className="tx-pill-dot" />
         {rpcSt === 'checking'
-          ? 'Checking devnet…'
+          ? t('checkingDevnet')
           : rpcSt === 'online'
-            ? `Devnet slot ${slot}`
-            : 'RPC unreachable — demo mode'}
+            ? t('devnetSlot', { slot: slot ?? 0 })
+            : t('rpcUnreachable')}
       </span>
-      <span className={`tx-pill ${publicKey ? 'probe-online' : ''}`} title="Terra wallet">
+      <span className={`tx-pill ${publicKey ? 'probe-online' : ''}`} title={t('terraWalletTitle')}>
         <span className="tx-pill-dot" />
-        {publicKey ? `Terra wallet ${shortSig(publicKey.toBase58())}` : 'No wallet — demo signer'}
+        {publicKey ? t('terraWalletShort', { sig: shortSig(publicKey.toBase58()) }) : t('noWalletDemoSigner')}
       </span>
     </div>
   )
 }
 
 function TxDetail({ tx }: { tx: DemoTx }) {
+  const { t } = useLocale()
   return (
     <div className="tx-detail">
       <div className="tx-meta-grid">
         <div>
-          <span className="tx-meta-label">Signature</span>
+          <span className="tx-meta-label">{t('txSignature')}</span>
           <span className="font-mono text-[11px] break-all">{tx.sig}</span>
         </div>
         <div>
-          <span className="tx-meta-label">Block time</span>
+          <span className="tx-meta-label">{t('txBlockTime')}</span>
           <span className="font-mono text-[11px]">{new Date(tx.blockTime).toISOString().replace('.000Z', 'Z')}</span>
         </div>
         <div>
-          <span className="tx-meta-label">Slot</span>
+          <span className="tx-meta-label">{t('txSlotLabel')}</span>
           <span className="font-mono text-[11px]">{tx.slot}</span>
         </div>
         <div>
-          <span className="tx-meta-label">Fee / compute</span>
+          <span className="tx-meta-label">{t('txFeeCompute')}</span>
           <span className="font-mono text-[11px]">
             {tx.feeLamports} lamports · {tx.computeUnits} CU
           </span>
         </div>
         <div>
-          <span className="tx-meta-label">Source</span>
+          <span className="tx-meta-label">{t('txSource')}</span>
           <span className="font-mono text-[11px]">
-            {tx.source === 'wallet' ? 'wallet · signed' : 'demo · simulated'}
+            {tx.source === 'wallet' ? t('walletSigned') : t('demoSimulated')}
           </span>
         </div>
       </div>
 
       {tx.source === 'wallet' && (
         <div className="tx-live">
-          <span className="lab-badge lab-badge-info">LIVE · devnet</span>
+<span className="lab-badge lab-badge-info">{t('txLiveDevnet')}</span>
           <a
             className="tx-live-link"
             href={`https://explorer.solana.com/tx/${tx.sig}?cluster=devnet`}
             target="_blank"
             rel="noreferrer"
           >
-            View on Solana Explorer ↗
+            {t('viewOnExplorer')}
           </a>
           <LiveStatus sig={tx.sig} />
         </div>
@@ -215,7 +233,7 @@ function TxDetail({ tx }: { tx: DemoTx }) {
         </div>
       )}
 
-      <div className="tx-section-label">Accounts</div>
+<div className="tx-section-label">{t('txAccounts')}</div>
       <div className="tx-accts">
         {tx.accounts.map((a, i) => (
           <div className="tx-acct" key={a.pubkey + i}>
@@ -225,7 +243,7 @@ function TxDetail({ tx }: { tx: DemoTx }) {
         ))}
       </div>
 
-      <div className="tx-section-label">Program logs</div>
+<div className="tx-section-label">{t('txProgramLogs')}</div>
       <pre className="tx-logs">
         {tx.logs.map((l, i) => (
           <div key={i} className={isLogError(l) ? 'e' : /success/i.test(l) ? 's' : ''}>
@@ -249,6 +267,7 @@ function VersionField({ label, value, mono }: { label: string; value: string; mo
 /** Land version history: every anchored geometry version through time, each
  *  with its state (anchored → verified) and a WebGL-free 3D skeleton. */
 function LandVersionsView() {
+  const { t } = useLocale()
   const versions = useLabVault((s) => s.versions)
   const latest = versions.length ? versions[versions.length - 1].version : -1
   const verified = versions.filter((v) => v.verified).length
@@ -256,13 +275,12 @@ function LandVersionsView() {
   if (versions.length === 0) {
     return (
       <div className="lab-card txv-empty">
-        <h3 className="text-[13px] font-semibold mb-1">No land versions yet</h3>
+<h3 className="text-[13px] font-semibold mb-1">{t('noLandVersions')}</h3>
         <p className="text-[12px] text-muted mb-3">
-          Anchor geometry in the Lab — each version then appears here with its full state history
-          (anchored → verified) and a WebGL-free 3D skeleton of that exact snapshot.
+          {t('txvEmptyBody')}
         </p>
         <Link className="btn btn-primary" to="/lab?tab=vault">
-          Open Geometry Vault →
+          {t('openGeometryVault')}
         </Link>
       </div>
     )
@@ -272,11 +290,10 @@ function LandVersionsView() {
     <div>
       <div className="txv-summary">
         <span>
-          <b className="font-mono">{versions.length}</b> anchored ·{' '}
-          <b className="font-mono">{verified}</b> verified · cap {MAX_GEOMETRY_VERSIONS}
+          {t('txvSummary', { anchored: versions.length, verified, cap: MAX_GEOMETRY_VERSIONS })}
         </span>
         <Link className="btn btn-secondary px-2 py-1 text-[11px]" to="/lab?tab=vault">
-          Anchor new version →
+          {t('anchorNewVersion')}
         </Link>
       </div>
 
@@ -295,10 +312,10 @@ function LandVersionsView() {
                 <div className="txv-card-head">
                   <span className="txv-ver">v{v.version}</span>
                   <span className={`lab-badge ${v.verified ? 'lab-badge-ok' : 'lab-badge-warn'}`}>
-                    {v.verified ? 'VERIFIED' : 'ANCHORED'}
+                    {v.verified ? t('verifiedWord') : t('anchoredWord')}
                   </span>
                   <span className="txv-pos">
-                    {v.version === latest ? 'latest' : `superseded by v${v.version + 1}+`}
+                    {v.version === latest ? t('latestWord') : t('supersededBy', { n: v.version + 1 })}
                   </span>
                   <span className="flex-1" />
                   <span className="txv-time">{fmtIso(v.submittedAt)}</span>
@@ -306,21 +323,21 @@ function LandVersionsView() {
                 <div className="txv-body">
                   <div className="txv-fields">
                     <VersionField
-                      label="verified at"
+                      label={t('fieldVerifiedAt')}
                       value={
                         v.verified && v.verifiedAt
                           ? `${fmtIso(v.verifiedAt)} (${durationBetween(v.submittedAt, v.verifiedAt)})`
-                          : 'pending'
+                          : t('pendingWord')
                       }
                     />
-                    <VersionField label="source" value={`${src?.id ?? v.source} — ${src?.label ?? '?'}`} />
-                    <VersionField label="dimension" value={dim?.label ?? String(v.dimension)} />
-                    <VersionField label="submitted by" value={who(v.submittedBy)} />
-                    <VersionField label="verified by" value={v.verifiedBy ? who(v.verifiedBy) : '—'} />
-                    <VersionField label="storage ref" value={v.storageReference} />
-                    <VersionField label="digest" value={`${v.geometryHash.slice(0, 24)}…`} mono />
+                    <VersionField label={t('fieldSource')} value={`${src?.id ?? v.source} — ${src?.label ?? '?'}`} />
+                    <VersionField label={t('fieldDimension')} value={dim?.label ?? String(v.dimension)} />
+                    <VersionField label={t('fieldSubmittedBy')} value={who(v.submittedBy)} />
+                    <VersionField label={t('fieldVerifiedBy')} value={v.verifiedBy ? who(v.verifiedBy) : '—'} />
+                    <VersionField label={t('fieldStorageRef')} value={v.storageReference} />
+                    <VersionField label={t('fieldDigest')} value={`${v.geometryHash.slice(0, 24)}…`} mono />
                   </div>
-                  <div className="txv-iso" title="3D skeleton of this exact version">
+<div className="txv-iso" title={t('versionSkeletonTitle')}>
                     <IsoLandSkeleton ring={v.ring} compact />
                   </div>
                 </div>
@@ -334,14 +351,15 @@ function LandVersionsView() {
 }
 
 export default function TransactionsPage() {
+  const { t } = useLocale()
   const txs = useTxStore((s) => s.txs)
   const clear = useTxStore((s) => s.clear)
   const reseed = useTxStore((s) => s.reseed)
   const { publicKey } = useWallet()
 
   const [view, setView] = useState<'feed' | 'versions'>(() => {
-    const t = new URLSearchParams(window.location.search).get('view')
-    return t === 'versions' ? 'versions' : 'feed'
+    const viewParam = new URLSearchParams(window.location.search).get('view')
+    return viewParam === 'versions' ? 'versions' : 'feed'
   })
   const [status, setStatus] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
@@ -407,30 +425,28 @@ export default function TransactionsPage() {
     <div className="tx">
       <header className="lab-head">
         <h1 className="lab-title">
-          <Activity size={20} /> Transactions
+          <Activity size={20} /> {t('txsTitle')}
         </h1>
         <p className="lab-sub">
-          Chain explorer for the Terra demo network — Lab actions, broadcasts and wallet-signed
-          transactions with real-shaped signatures, accounts, program logs and error codes. Wallet
-          transactions are verified against devnet; everything else runs fully offline.
+          {t('txsSubtitle')}
         </p>
         <StatusPills />
       </header>
 
-      <nav className="lab-tabs" aria-label="Transactions views">
+<nav className="lab-tabs" aria-label={t('txsViewsNav')}>
         <button
           className={`lab-tab ${view === 'feed' ? 'active' : ''}`}
           onClick={() => setView('feed')}
         >
-          Transaction feed
-          <span className="lab-tab-hint">demo chain · live wallet txs</span>
+          {t('txFeedTab')}
+          <span className="lab-tab-hint">{t('txFeedHint')}</span>
         </button>
         <button
           className={`lab-tab ${view === 'versions' ? 'active' : ''}`}
           onClick={() => setView('versions')}
         >
-          Land versions
-          <span className="lab-tab-hint">geometry through time</span>
+          {t('landVersionsTab')}
+          <span className="lab-tab-hint">{t('landVersionsHint')}</span>
         </button>
       </nav>
 
@@ -438,19 +454,19 @@ export default function TransactionsPage() {
         <>
           <div className="tx-stats">
             <div className="tx-stat">
-              <span className="tx-stat-label">Transactions</span>
+              <span className="tx-stat-label">{t('txCountLabel')}</span>
               <b>{stats.total}</b>
             </div>
             <div className="tx-stat">
-              <span className="tx-stat-label">Confirmation rate</span>
+              <span className="tx-stat-label">{t('txConfirmationRate')}</span>
               <b>{stats.rate}%</b>
             </div>
             <div className="tx-stat">
-              <span className="tx-stat-label">Fees paid</span>
+              <span className="tx-stat-label">{t('txFeesPaid')}</span>
               <b>{stats.fees} SOL</b>
             </div>
             <div className="tx-stat">
-              <span className="tx-stat-label">Avg compute</span>
+              <span className="tx-stat-label">{t('txAvgCompute')}</span>
               <b>{stats.cu} CU</b>
             </div>
           </div>
@@ -458,11 +474,11 @@ export default function TransactionsPage() {
           <section className="lab-card tx-composer">
             <div className="flex items-center gap-1.5 mb-2">
               <Radio size={14} />
-              <h3 className="text-[13px] font-semibold">Broadcast a demo transaction</h3>
+              <h3 className="text-[13px] font-semibold">{t('broadcastDemoTx')}</h3>
             </div>
             <div className="tx-composer-row">
               <label className="text-[11px] text-muted">
-                Instruction
+                {t('instructionLabel')}
                 <select
                   className="select-input"
                   value={composeIx}
@@ -483,23 +499,23 @@ export default function TransactionsPage() {
                   onChange={(e) => setInjectFail(e.target.checked)}
                   disabled={!!phase}
                 />
-                Inject failure
+                {t('injectFailure')}
                 <span className="font-mono text-[10px] text-muted">
                   {(() => {
                     const f = COMPOSE.find((c) => c.id === composeIx)?.fail
-                    return f ? `${f.name} (${f.code})` : 'runtime error'
+                    return f ? `${f.name} (${f.code})` : t('runtimeError')
                   })()}
                 </span>
               </label>
               <button className="btn btn-primary" onClick={send} disabled={!!phase}>
-                {phase ? `${phase}…` : 'Sign & send'}
+                {phase ? `${t(PHASE_KEYS[phase])}…` : t('signAndSend')}
               </button>
             </div>
             <div className="tx-stepper" aria-hidden>
               {(['signing', 'broadcasting', 'confirming'] as const).map((p, i) => (
                 <span key={p} className={`tx-step ${phase === p ? 'on' : ''} ${phase ? '' : 'idle'}`}>
                   {i > 0 && <span className="tx-step-arrow">→</span>}
-                  {p}
+                  {t(PHASE_KEYS[p])}
                 </span>
               ))}
             </div>
@@ -513,7 +529,7 @@ export default function TransactionsPage() {
                   className={`tx-chip ${status === f.id ? 'active' : ''}`}
                   onClick={() => setStatus(f.id)}
                 >
-                  {f.label}
+                  {t(FILTER_KEYS[f.id])}
                 </button>
               ))}
             </div>
@@ -521,7 +537,7 @@ export default function TransactionsPage() {
               <Search size={13} />
               <input
                 className="text-input"
-                placeholder="Search signature, instruction, error…"
+                placeholder={t('txSearchPlaceholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -530,7 +546,7 @@ export default function TransactionsPage() {
               className="btn btn-secondary px-2 py-1 text-[11px] gap-1"
               onClick={() => (txs.length ? clear() : reseed())}
             >
-              <RotateCcw size={12} /> {txs.length ? 'Clear feed' : 'Restore demo feed'}
+              <RotateCcw size={12} /> {txs.length ? t('clearFeed') : t('restoreFeed')}
             </button>
           </div>
 
@@ -538,8 +554,8 @@ export default function TransactionsPage() {
             {filtered.length === 0 && (
               <div className="tx-empty">
                 {txs.length === 0
-                  ? 'Feed cleared — restore it or broadcast a transaction above. Lab actions also repopulate it.'
-                  : 'No transactions match this filter.'}
+                  ? t('txFeedCleared')
+                  : t('txNoMatch')}
               </div>
             )}
             {filtered.map((tx) => {
@@ -558,7 +574,7 @@ export default function TransactionsPage() {
                         <span
                           className={`lab-badge ${tx.status === 'confirmed' ? 'lab-badge-ok' : 'lab-badge-err'}`}
                         >
-                          {tx.status}
+                          {t(tx.status === 'confirmed' ? 'confirmedWord' : 'failedWord')}
                         </span>
                         {tx.source === 'wallet' && <span className="lab-badge lab-badge-info">LIVE</span>}
                         {tx.error && (
@@ -571,7 +587,7 @@ export default function TransactionsPage() {
                       <span className="tx-sum">{tx.summary}</span>
                       <span className="tx-meta">
                         <span className="font-mono">{shortSig(tx.sig)}</span> · slot {tx.slot} ·{' '}
-                        {tx.feeLamports} lamports · {timeAgo(tx.blockTime)}
+                        {tx.feeLamports} lamports · {timeAgo(tx.blockTime, t)}
                       </span>
                     </span>
                     <ChevronDown size={14} className={`tx-caret ${isOpen ? 'open' : ''}`} />
@@ -587,10 +603,11 @@ export default function TransactionsPage() {
       {view === 'versions' && <LandVersionsView />}
 
       <footer className="lab-foot">
-        Demo feed for offline environments; wallet transactions are checked against{' '}
-        <span className="font-mono">devnet</span>. Error codes are the exact{' '}
-        <span className="font-mono">6000 + variant index</span> values from{' '}
-        <span className="font-mono">TerraError</span>; program logs mirror Anchor's on-chain format.
+        {t('txsFooterA')}{' '}
+        <span className="font-mono">devnet</span>{t('txsFooterB')}{' '}
+        <span className="font-mono">6000 + variant index</span>{' '}
+        {t('txsFooterC')}{' '}
+        <span className="font-mono">TerraError</span>{t('txsFooterD')}
       </footer>
     </div>
   )

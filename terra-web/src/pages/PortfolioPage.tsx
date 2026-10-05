@@ -30,8 +30,8 @@ function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-5)}`
 }
 
-function formatArea(area: number | null) {
-  if (area == null) return 'Area not measured'
+function formatArea(area: number | null, notMeasured: string) {
+  if (area == null) return notMeasured
   if (area >= 1_000_000) return `${(area / 1_000_000).toFixed(2)} km²`
   if (area >= 10_000) return `${(area / 10_000).toFixed(2)} ha`
   return `${Math.round(area).toLocaleString()} m²`
@@ -146,7 +146,7 @@ export default function PortfolioPage() {
       if (balanceResult.status === 'fulfilled') {
         setBalance(balanceResult.value / 1_000_000_000)
       } else {
-        setBalanceError(balanceResult.reason instanceof Error ? balanceResult.reason.message : 'Balance unavailable')
+        setBalanceError(balanceResult.reason instanceof Error ? balanceResult.reason.message : t('balanceUnavailable'))
       }
       if (identityResult.status === 'fulfilled') {
         setIdentity(identityResult.value)
@@ -155,14 +155,14 @@ export default function PortfolioPage() {
         setIdentityState('unlinked')
       } else {
         setIdentityError(
-          identityResult.reason instanceof Error ? identityResult.reason.message : 'Identity service unavailable',
+          identityResult.reason instanceof Error ? identityResult.reason.message : t('identityServiceUnavailable'),
         )
         setIdentityState('error')
       }
       setIdentityWallet(wallet)
     })
     return () => { current = false }
-  }, [identityAttempt, publicKey])
+  }, [identityAttempt, publicKey, t])
 
   useEffect(() => {
     void refreshOffChain()
@@ -171,22 +171,22 @@ export default function PortfolioPage() {
   const bindIdentity = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!publicKey || !signMessage) {
-      setBindingError('This wallet cannot sign identity requests. Choose a wallet that supports message signing.')
+      setBindingError(t('walletCannotSign'))
       return
     }
     if (credential.trim().length < 24) {
-      setBindingError('Use a private, high-entropy phrase with at least 24 characters.')
+      setBindingError(t('phraseMin24'))
       return
     }
     let recoveryKey: PublicKey
     try {
       recoveryKey = new PublicKey(recovery.trim())
     } catch {
-      setBindingError('Enter a valid Solana recovery wallet address.')
+      setBindingError(t('validRecoveryAddress'))
       return
     }
     if (recoveryKey.equals(publicKey)) {
-      setBindingError('The recovery wallet must be different from the connected wallet.')
+      setBindingError(t('recoveryMustDiffer'))
       return
     }
 
@@ -213,7 +213,7 @@ export default function PortfolioPage() {
       setCredential('')
       setRecovery('')
     } catch (error) {
-      setBindingError(error instanceof Error ? error.message : 'Identity link failed')
+      setBindingError(error instanceof Error ? error.message : t('identityLinkFailed'))
     } finally {
       setBinding(false)
     }
@@ -234,36 +234,36 @@ export default function PortfolioPage() {
     <main className="portfolio-page">
       <header className="portfolio-page-head">
         <div>
-          <span className="portfolio-eyebrow"><span className="live-dot" /> LAND OWNER CONSOLE</span>
-          <h1>Identity &amp; portfolio</h1>
-          <p>Your wallet, identity commitment and land records in one secure workspace.</p>
+          <span className="portfolio-eyebrow"><span className="live-dot" /> {t('landOwnerConsole')}</span>
+          <h1>{t('portfolioTitle')}</h1>
+          <p>{t('portfolioSubtitle')}</p>
         </div>
         <button className="btn btn-secondary portfolio-refresh" onClick={() => void refresh()} disabled={refreshing}>
           {refreshing ? <LoaderCircle size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          Refresh portfolio
+          {t('refreshPortfolio')}
         </button>
       </header>
 
-      <section className="portfolio-overview" aria-label="Portfolio overview">
+<section className="portfolio-overview" aria-label={t('portfolioOverview')}>
         <article className="portfolio-balance-card">
-          <div className="portfolio-card-label"><Wallet size={14} /> Wallet balance</div>
+<div className="portfolio-card-label"><Wallet size={14} /> {t('walletBalance')}</div>
           <strong>{visibleBalance == null ? (address ? '—' : t('connectWallet')) : visibleBalance.toFixed(4)}</strong>
-          <span>{visibleBalance == null ? (visibleBalanceError ?? (address ? 'Reading Solana devnet' : 'Your wallet balance appears here')) : 'SOL · Solana devnet'}</span>
+          <span>{visibleBalance == null ? (visibleBalanceError ?? (address ? t('readingDevnet') : t('balanceAppearsHere'))) : 'SOL · Solana devnet'}</span>
         </article>
         <article className="portfolio-metric-card">
-          <div className="portfolio-card-label"><Landmark size={14} /> Owned land assets</div>
+<div className="portfolio-card-label"><Landmark size={14} /> {t('pfOwnedLandAssets')}</div>
           <strong>{address ? ownedAssetCount : '—'}</strong>
-          <span>{address ? `${myChainParcels.length} on-chain · ${standaloneMapParcels.length} mapped` : 'Connect to view holdings'}</span>
+          <span>{address ? t('holdingsSplit', { chain: myChainParcels.length, mapped: standaloneMapParcels.length }) : t('connectHoldings')}</span>
         </article>
         <article className="portfolio-metric-card">
-          <div className="portfolio-card-label"><MapPin size={14} /> Mapped area</div>
-          <strong>{address ? formatArea(mappedArea) : '—'}</strong>
-          <span>{address ? 'Measured from linked parcel geometry' : 'Area linked to your wallet'}</span>
+<div className="portfolio-card-label"><MapPin size={14} /> {t('mappedArea')}</div>
+          <strong>{address ? formatArea(mappedArea, t('areaNotMeasured')) : '—'}</strong>
+          <span>{address ? t('measuredFromGeometry') : t('areaLinkedWallet')}</span>
         </article>
         <article className="portfolio-metric-card">
-          <div className="portfolio-card-label"><BadgeCheck size={14} /> Identity</div>
-          <strong>{visibleIdentityState === 'linked' ? 'Linked' : visibleIdentityState === 'loading' ? 'Checking' : visibleIdentityState === 'unlinked' ? 'Not linked' : '—'}</strong>
-          <span>{identityState === 'linked' ? 'Wallet identity commitment' : 'Private identity & recovery'}</span>
+<div className="portfolio-card-label"><BadgeCheck size={14} /> {t('identityStat')}</div>
+          <strong>{visibleIdentityState === 'linked' ? t('identityLinked') : visibleIdentityState === 'loading' ? t('identityChecking') : visibleIdentityState === 'unlinked' ? t('identityNotLinked') : '—'}</strong>
+          <span>{identityState === 'linked' ? t('walletIdentityCommitment') : t('privateIdentityRecovery')}</span>
         </article>
       </section>
 
@@ -272,75 +272,75 @@ export default function PortfolioPage() {
           <div className="portfolio-section-head">
             <div className="portfolio-section-icon"><Fingerprint size={17} /></div>
             <div>
-              <span className="portfolio-eyebrow">SELF-SOVEREIGN IDENTITY</span>
-              <h2>Identity &amp; recovery</h2>
+              <span className="portfolio-eyebrow">{t('ssiEyebrow')}</span>
+              <h2>{t('identityRecoveryHeading')}</h2>
             </div>
           </div>
           {!address ? (
             <div className="portfolio-empty">
-              <p>Connect a wallet to check for an existing identity or set up a recovery wallet.</p>
-              <span>Your identity commitment is tied to the wallet that signs it.</span>
+              <p>{t('identityEmptyHint')}</p>
+              <span>{t('identityTiedHint')}</span>
             </div>
           ) : visibleIdentityState === 'loading' ? (
-            <div className="portfolio-inline-status"><LoaderCircle size={16} className="animate-spin" /> Looking up this wallet…</div>
+            <div className="portfolio-inline-status"><LoaderCircle size={16} className="animate-spin" /> {t('lookingUpWallet')}</div>
           ) : visibleIdentityState === 'linked' && identity ? (
             <div className="identity-summary">
-              <div className="identity-linked-badge"><BadgeCheck size={14} /> Identity linked to this wallet</div>
+              <div className="identity-linked-badge"><BadgeCheck size={14} /> {t('identityLinkedToWallet')}</div>
               <dl>
-                <div><dt>Owner wallet</dt><dd title={identity.owner}>{shortAddress(identity.owner)}</dd></div>
-                <div><dt>Recovery wallet</dt><dd title={identity.recovery}>{shortAddress(identity.recovery)}</dd></div>
-                <div><dt>Commitment</dt><dd title={identity.identity_hash}>{identity.identity_hash.slice(0, 12)}…{identity.identity_hash.slice(-8)}</dd></div>
-                <div><dt>Linked parcels</dt><dd>{identity.parcel_count}</dd></div>
-                <div><dt>Created</dt><dd>{new Date(identity.created_at).toLocaleDateString()}</dd></div>
+                <div><dt>{t('ownerWallet')}</dt><dd title={identity.owner}>{shortAddress(identity.owner)}</dd></div>
+                <div><dt>{t('recoveryWallet')}</dt><dd title={identity.recovery}>{shortAddress(identity.recovery)}</dd></div>
+                <div><dt>{t('commitmentLabel')}</dt><dd title={identity.identity_hash}>{identity.identity_hash.slice(0, 12)}…{identity.identity_hash.slice(-8)}</dd></div>
+                <div><dt>{t('linkedParcelsLabel')}</dt><dd>{identity.parcel_count}</dd></div>
+                <div><dt>{t('labelCreated')}</dt><dd>{new Date(identity.created_at).toLocaleDateString()}</dd></div>
               </dl>
-              <p className="identity-privacy-note"><Shield size={13} /> Credential text is not retained here. Keep your recovery wallet secure.</p>
+              <p className="identity-privacy-note"><Shield size={13} /> {t('identityPrivacyNote')}</p>
             </div>
           ) : visibleIdentityState === 'error' ? (
             <div className="portfolio-callout portfolio-callout-error">
               <CircleHelp size={15} />
-              <span>{identityError || 'Could not check the identity service.'}</span>
+              <span>{identityError || t('identityServiceFailed')}</span>
               <button className="btn btn-ghost" onClick={() => {
                 setIdentityWallet(null)
                 setIdentityAttempt((n) => n + 1)
-              }}>Retry</button>
+              }}>{t('retryWord')}</button>
             </div>
           ) : (
             <>
-              <p className="portfolio-copy">Create a private identity commitment and attach a recovery wallet. The connected wallet signs the request.</p>
+<p className="portfolio-copy">{t('identityFormCopy')}</p>
               <form className="identity-form" onSubmit={(event) => void bindIdentity(event)}>
                 <label>
-                  Private identity phrase
+                  {t('privateIdentityPhrase')}
                   <input
                     className="text-input"
                     type="password"
                     autoComplete="new-password"
                     value={credential}
                     onChange={(event) => setCredential(event.target.value)}
-                    placeholder="Use a unique, high-entropy phrase"
+                    placeholder={t('phrasePlaceholder')}
                     minLength={24}
                     required
                   />
                 </label>
                 <label>
-                  Recovery wallet address
+                  {t('recoveryWalletAddress')}
                   <input
                     className="text-input"
                     value={recovery}
                     onChange={(event) => setRecovery(event.target.value)}
-                    placeholder="Solana public address"
+                    placeholder={t('solanaAddressPlaceholder')}
                     autoComplete="off"
                     required
                   />
                 </label>
                 <div className="identity-privacy-note">
                   <Shield size={14} />
-                  <span>Only a SHA-256 commitment and wallet addresses are sent. Never use a national ID, password, or low-entropy secret: hashes of predictable values can be guessed.</span>
+                  <span>{t('identityFormPrivacy')}</span>
                 </div>
                 {bindingError && <div className="portfolio-callout portfolio-callout-error">{bindingError}</div>}
                 <button className="btn btn-primary identity-submit" type="submit" disabled={binding || !signMessage}>
-                  {binding ? <><LoaderCircle size={14} className="animate-spin" /> Signing &amp; linking…</> : <><Fingerprint size={14} /> Create identity link</>}
+                  {binding ? <><LoaderCircle size={14} className="animate-spin" /> {t('signingAndLinking')}</> : <><Fingerprint size={14} /> {t('createIdentityLink')}</>}
                 </button>
-                {!signMessage && <span className="text-xs text-muted">This wallet does not support signing messages.</span>}
+                {!signMessage && <span className="text-xs text-muted">{t('walletNoSignMessage')}</span>}
               </form>
             </>
           )}
@@ -351,42 +351,42 @@ export default function PortfolioPage() {
           <div className="portfolio-section-head">
             <div className="portfolio-section-icon"><Wallet size={17} /></div>
             <div>
-              <span className="portfolio-eyebrow">CONNECTED SIGNER</span>
-              <h2>Wallet</h2>
+              <span className="portfolio-eyebrow">{t('connectedSigner')}</span>
+              <h2>{t('walletHeading')}</h2>
             </div>
           </div>
           {address ? (
             <div className="wallet-summary">
               <div className="wallet-profile">
                 <span className="wallet-avatar">{(walletName || 'W').slice(0, 1).toUpperCase()}</span>
-                <div><strong>{walletName || 'Solana wallet'}</strong><span>Connected on Solana devnet</span></div>
+                <div><strong>{walletName || t('solanaWallet')}</strong><span>{t('connectedOnDevnet')}</span></div>
                 <BadgeCheck size={16} className="wallet-verified-icon" />
               </div>
               <button
                 className="wallet-address-copy"
                 onClick={() => void navigator.clipboard.writeText(address)}
-                title="Copy wallet address"
-                aria-label="Copy full wallet address"
+                title={t('copyWalletAddress')}
+                aria-label={t('copyWalletAddressFull')}
               >
                 <span>{shortAddress(address)}</span><Copy size={13} />
               </button>
               <div className="wallet-security-note">
                 <Shield size={15} />
-                <span>Transactions require approval in your wallet. Terra never has access to your private keys.</span>
+                <span>{t('walletSecurityNote')}</span>
               </div>
               <a className="portfolio-explorer-link" href={`https://explorer.solana.com/address/${address}?cluster=devnet`} target="_blank" rel="noreferrer">
-                View wallet on Solana Explorer <ArrowRight size={13} />
+                {t('viewWalletExplorer')} <ArrowRight size={13} />
               </a>
             </div>
           ) : (
             <div className="portfolio-empty">
-              <p>No wallet connected</p>
-              <span>Connect Phantom, Solflare, Backpack or another Wallet Standard wallet from the top bar.</span>
+              <p>{t('walletNotConnected')}</p>
+              <span>{t('walletConnectHint')}</span>
             </div>
           )}
           <div className="portfolio-activity-link">
-            <span><ArrowDownToLine size={14} /> Recent transactions <b>{transactionCount}</b></span>
-            <Link to="/transactions">View activity <ArrowRight size={13} /></Link>
+            <span><ArrowDownToLine size={14} /> {t('recentTransactions')} <b>{transactionCount}</b></span>
+            <Link to="/transactions">{t('viewActivity')} <ArrowRight size={13} /></Link>
           </div>
         </article>
       </section>
@@ -395,56 +395,56 @@ export default function PortfolioPage() {
         <div className="portfolio-section-head portfolio-assets-head">
           <div className="portfolio-section-icon"><BriefcaseBusiness size={17} /></div>
           <div className="portfolio-assets-title">
-            <span className="portfolio-eyebrow">LAND REGISTRY</span>
-            <h2>Assets</h2>
+            <span className="portfolio-eyebrow">{t('landRegistryEyebrow')}</span>
+            <h2>{t('assetsHeading')}</h2>
           </div>
-          <div className="land-viewer-seg" role="group" aria-label="Asset list filter">
-            <button className={`land-viewer-segbtn ${assetFilter === 'owned' ? 'on' : ''}`} onClick={() => setAssetFilter('owned')}>My assets</button>
-            <button className={`land-viewer-segbtn ${assetFilter === 'map' ? 'on' : ''}`} onClick={() => setAssetFilter('map')}>Map records</button>
+          <div className="land-viewer-seg" role="group" aria-label={t('assetListFilter')}>
+            <button className={`land-viewer-segbtn ${assetFilter === 'owned' ? 'on' : ''}`} onClick={() => setAssetFilter('owned')}>{t('myAssets')}</button>
+            <button className={`land-viewer-segbtn ${assetFilter === 'map' ? 'on' : ''}`} onClick={() => setAssetFilter('map')}>{t('mapRecords')}</button>
           </div>
         </div>
         <div className="portfolio-asset-toolbar">
           <label className="parcel-search portfolio-asset-search">
             <MapPin size={15} />
-            <input value={assetQuery} onChange={(event) => setAssetQuery(event.target.value)} placeholder="Search land assets" aria-label="Search land assets" />
+            <input value={assetQuery} onChange={(event) => setAssetQuery(event.target.value)} placeholder={t('searchLandAssets')} aria-label={t('searchLandAssets')} />
           </label>
-          <Link className="btn btn-primary" to="/atlas"><MapPin size={14} /> Open land atlas</Link>
+          <Link className="btn btn-primary" to="/atlas"><MapPin size={14} /> {t('openLandAtlas')}</Link>
         </div>
         {!address && assetFilter === 'owned' ? (
           <div className="portfolio-empty asset-empty">
-            <p>Connect a wallet to see verified holdings.</p>
-            <span>Explore the pilot area to preview sample land parcels.</span>
-            <Link to="/atlas">Explore demo parcels <ArrowRight size={13} /></Link>
+            <p>{t('connectSeeHoldings')}</p>
+            <span>{t('explorePilotHint')}</span>
+            <Link to="/atlas">{t('exploreDemoParcels')} <ArrowRight size={13} /></Link>
           </div>
         ) : assetFilter === 'owned' && myChainParcels.length === 0 && mapRecords.length === 0 ? (
           <div className="portfolio-empty asset-empty">
-            <p>No parcels are linked to this wallet yet.</p>
-            <span>Draw a boundary and register a parcel, or browse map records.</span>
-            <Link to="/atlas">Register or explore land <ArrowRight size={13} /></Link>
+            <p>{t('noLinkedParcels')}</p>
+            <span>{t('drawBoundaryHint')}</span>
+            <Link to="/atlas">{t('registerOrExplore')} <ArrowRight size={13} /></Link>
           </div>
         ) : (
           <div className="portfolio-asset-list">
             {myChainParcels.map((parcel) => (
               <button key={parcel.address} className="portfolio-asset-row" onClick={() => openChainParcel(parcel)}>
                 <span className="asset-row-icon"><Landmark size={16} /></span>
-                <span className="asset-row-main"><strong>{parcel.account.name}</strong><span>{shortAddress(parcel.address)} · on-chain ownership</span></span>
-                <span className="asset-row-status">Verified owner</span><ArrowRight size={14} className="asset-row-arrow" />
+                <span className="asset-row-main"><strong>{parcel.account.name}</strong><span>{shortAddress(parcel.address)} · {t('onchainOwnership')}</span></span>
+                <span className="asset-row-status">{t('verifiedOwner')}</span><ArrowRight size={14} className="asset-row-arrow" />
               </button>
             ))}
             {mapRecords.map((parcel) => (
               <button key={parcel.id} className="portfolio-asset-row" onClick={() => openMapParcel(parcel)}>
                 <span className="asset-row-icon"><MapPin size={16} /></span>
-                <span className="asset-row-main"><strong>{parcel.name}</strong><span>{formatArea(parcel.area_m2)} · {parcel.holder === address ? 'linked to this wallet' : shortAddress(parcel.holder)}</span></span>
-                <span className={`asset-row-status ${parcel.holder === address ? 'owned' : ''} ${demoMode ? 'demo' : ''}`}>{demoMode ? 'Demo' : parcel.holder === address ? parcel.status : 'Map record'}</span>
+                <span className="asset-row-main"><strong>{parcel.name}</strong><span>{formatArea(parcel.area_m2, t('areaNotMeasured'))} · {parcel.holder === address ? t('linkedToThisWallet') : shortAddress(parcel.holder)}</span></span>
+                <span className={`asset-row-status ${parcel.holder === address ? 'owned' : ''} ${demoMode ? 'demo' : ''}`}>{demoMode ? t('demoBadge') : parcel.holder === address ? parcel.status : t('mapRecord')}</span>
                 <ArrowRight size={14} className="asset-row-arrow" />
               </button>
             ))}
             {assetFilter === 'map' && mapRecords.length === 0 && (
-              <div className="portfolio-empty asset-empty"><p>No map records match this search.</p></div>
+              <div className="portfolio-empty asset-empty"><p>{t('noMapRecordsMatch')}</p></div>
             )}
           </div>
         )}
-        {demoMode && <div className="portfolio-demo-note"><Shield size={13} /> Demo parcels are illustrative records, not wallet-owned land or chain state.</div>}
+        {demoMode && <div className="portfolio-demo-note"><Shield size={13} /> {t('demoParcelsNote')}</div>}
       </section>
     </main>
   )

@@ -20,6 +20,7 @@ import {
 import LandViewer, { type VolumeLayer } from '../components/lab/LandViewer'
 import ElevationCrossSection from '../components/lab/ElevationCrossSection'
 import { ArrowLeft, MapPin, ShieldCheck, ScrollText, Box, Pause, Play } from 'lucide-react'
+import { useLocale } from '../lib/locale'
 
 // Land detail view (/lab/land) — click-through from the Geometry Vault.
 // Shows every prop of the selected land (SpatialAsset + GeometryVersion) and
@@ -41,6 +42,7 @@ function Row({ k, v, title }: { k: string; v: string; title?: string }) {
 }
 
 export default function LandDetailPage() {
+  const { t } = useLocale()
   const v = useLabVault()
   const [params, setParams] = useSearchParams()
   const [timelinePlaying, setTimelinePlaying] = useState(false)
@@ -147,19 +149,19 @@ export default function LandDetailPage() {
     return () => window.clearInterval(timer)
   }, [timelinePlaying, timelineIndex, timelineLength, v.versions, setParams])
 
-  const title = entry ? `Land — GeometryVersion v${entry.version}` : 'Land — current claim'
+  const title = entry ? t('landVersionTitle', { version: entry.version }) : t('landCurrentClaim')
   const required = entry?.required ?? (v.quorumConfig > 0 ? v.quorumConfig : DEFAULT_GEOMETRY_QUOROM)
 
   return (
     <div className="land">
       <div className="land-crumb">
         <Link className="btn btn-ghost px-2 py-1 gap-1" to="/lab?tab=vault">
-          <ArrowLeft size={13} /> Lab / Geometry Vault
+          <ArrowLeft size={13} /> {t('labGeometryVault')}
         </Link>
-        <span className="text-muted">/ land details</span>
+        <span className="text-muted">{t('landDetailsCrumb')}</span>
         <span className="flex-1" />
         <Link className="btn btn-secondary px-2 py-1" to="/transactions?view=versions">
-          Version timeline ↗
+          {t('versionTimelineLink')}
         </Link>
       </div>
 
@@ -169,22 +171,22 @@ export default function LandDetailPage() {
             <MapPin size={18} /> {title}
           </h1>
           <p className="font-mono text-[11px] text-muted break-all">
-            sha256(ring JSON) = {digest ? `${digest.slice(0, 40)}…` : 'hashing…'}
+            sha256(ring JSON) = {digest ? `${digest.slice(0, 40)}…` : t('hashingEllipsis')}
           </p>
         </div>
         <div className="land-badges">
           {entry ? (
             entry.verified ? (
-              <span className="lab-badge lab-badge-ok">✓ verified — quorum met</span>
+              <span className="lab-badge lab-badge-ok">{t('verifiedQuorumMet')}</span>
             ) : (
               <span className="lab-badge lab-badge-warn">
-                claim · quorum {entry.attestors.length}/{required}
+                {t('claimQuorumBadge', { done: entry.attestors.length, required })}
               </span>
             )
           ) : v.initialized ? (
-            <span className="lab-badge lab-badge-info">unanchored preview</span>
+            <span className="lab-badge lab-badge-info">{t('unanchoredPreview')}</span>
           ) : (
-            <span className="lab-badge lab-badge-err">asset not initialized</span>
+            <span className="lab-badge lab-badge-err">{t('assetNotInitialized')}</span>
           )}
           {entry?.evidenceManifest && <span className="lab-badge lab-badge-info">{entry.evidenceManifest}</span>}
           <span className="lab-badge lab-badge-info">3D · SVG · no WebGL</span>
@@ -193,8 +195,8 @@ export default function LandDetailPage() {
 
       {notFound && (
         <p className="lab-msg err">
-          GeometryVersion v{vRaw} not found — the vault has {v.versions.length} anchored version
-          {v.versions.length === 1 ? '' : 's'}. <Link to="/lab/land">Back to latest land view</Link>
+          {t('geometryVersionNotFound', { version: vRaw ?? '', count: v.versions.length })}{' '}
+          <Link to="/lab/land">{t('backToLandView')}</Link>
         </p>
       )}
 
@@ -237,14 +239,14 @@ export default function LandDetailPage() {
                 <Row k="elevation_envelope" v={`${v.elevationMinMm} … ${v.elevationMaxMm} mm`} />
                 <Row k="geometry_version_count" v={`${v.versions.length} / ${MAX_GEOMETRY_VERSIONS}`} />
                 <Row k="quorum_config" v={v.quorumConfig > 0 ? `(0,[0,0]) → ${v.quorumConfig}` : `unset → fallback ${DEFAULT_GEOMETRY_QUOROM}`} />
-                <Row k="evidence_manifest" v={v.manifestNonce === null ? 'none submitted' : `#${v.manifestNonce} · ${v.manifestArtifacts} artifacts`} />
-                <Row k="task" v={v.taskCancelled ? 'CANCELLED (terminal → 6174)' : 'open'} />
+                <Row k="evidence_manifest" v={v.manifestNonce === null ? t('noneSubmitted') : `#${v.manifestNonce} · ${v.manifestArtifacts} artifacts`} />
+                <Row k="task" v={v.taskCancelled ? t('taskCancelledValue') : t('taskOpenValue')} />
                 <Row k="created_at" v={v.createdAt ?? '—'} />
               </div>
             ) : (
               <p className="text-[12px] text-muted">
-                Not initialized — run <span className="font-mono">init_spatial_asset</span> in the{' '}
-                <Link to="/lab?tab=vault">vault</Link> first.
+                {t('notInitializedA')}<span className="font-mono">init_spatial_asset</span>{t('notInitializedB')}
+                <Link to="/lab?tab=vault">{t('vaultWord')}</Link>{t('notInitializedC')}
               </p>
             )}
           </div>
@@ -252,7 +254,7 @@ export default function LandDetailPage() {
           <div className="lab-card">
             <h3 className="text-[13px] font-semibold mb-2 flex items-center gap-1.5">
               {entry?.verified ? <ShieldCheck size={14} /> : <ScrollText size={14} />}
-              {entry ? `GeometryVersion v${entry.version}` : 'GeometryVersion — pending'}
+              {entry ? t('geometryVersionV', { version: entry.version }) : t('geometryVersionPending')}
             </h3>
             {entry ? (
               <div className="lab-field-table">
@@ -272,8 +274,8 @@ export default function LandDetailPage() {
               </div>
             ) : (
               <p className="text-[12px] text-muted">
-                The current shape has not been anchored yet — append it in the{' '}
-                <Link to="/lab?tab=vault">vault</Link> to mint a GeometryVersion.
+                {t('unanchoredYetA')}
+                <Link to="/lab?tab=vault">{t('vaultWord')}</Link>{t('unanchoredYetB')}
               </p>
             )}
             {entry && entry.attestors.length > 0 && (
@@ -317,19 +319,16 @@ export default function LandDetailPage() {
               onVolumeClick={openStratum}
             />
             <p className="text-[10px] text-muted mt-1">
-              Drag to pan · wheel to zoom · switch 2D (top-down relief) ↔ 3D (isometric extrusion) ·
-              90° rotate. Pure SVG — works on machines without WebGL.
+              {t('svgNavHint')}
             </p>
             <p className="text-[10px] text-muted mt-1">
-              <strong>Rights volumes</strong> — CadaSPACE-style strata: each anchored version is drawn at its
-              elevation envelope (subsurface → surface → air rights); click a stratum (or a chip below) to open
-              that version's land details. Dashed box = the asset's full envelope.
+              <strong>{t('rightsVolumesLead')}</strong>{t('rightsVolumesBody')}
             </p>
           </div>
 
           <div className="lab-card">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-              <h3 className="text-[13px] font-semibold">Elevation cross-section</h3>
+              <h3 className="text-[13px] font-semibold">{t('elevationCrossSection')}</h3>
               <span className={`lab-badge ${elevSource === 0 ? 'lab-badge-warn' : 'lab-badge-ok'}`}>
                 {ELEVATION_SOURCES[elevSource]?.id ?? 'NONE'}
               </span>
@@ -351,46 +350,46 @@ export default function LandDetailPage() {
       <div className="lab-card mt-3">
         <div className="land-time-head">
           <div>
-            <h3 className="text-[13px] font-semibold">Land through time</h3>
-            <p className="text-[10px] text-muted">4D history · scrub geometry states and replay the record</p>
+            <h3 className="text-[13px] font-semibold">{t('landThroughTime')}</h3>
+            <p className="text-[10px] text-muted">{t('landTimeHint')}</p>
           </div>
           <button
             className="btn btn-secondary px-2 py-1 gap-1"
             type="button"
             onClick={() => setTimelinePlaying((playing) => !playing)}
             disabled={timelineLength < 2}
-            aria-label={timelinePlaying ? 'Pause timeline playback' : 'Play timeline playback'}
+            aria-label={timelinePlaying ? t('pauseTimeline') : t('playTimeline')}
           >
             {timelinePlaying ? <Pause size={13} /> : <Play size={13} />}
-            {timelinePlaying ? 'Pause' : 'Play'}
+            {timelinePlaying ? t('pauseWord') : t('playWord')}
           </button>
         </div>
         <label className="land-time-scrubber">
-          <span>Claim</span>
+          <span>{t('claimLabel')}</span>
           <input
             type="range"
             min={0}
             max={Math.max(0, timelineLength - 1)}
             step={1}
             value={timelineIndex}
-            aria-label="Scrub land geometry through time"
+            aria-label={t('scrubGeometry')}
             onChange={(event) => {
               const index = Number(event.target.value)
               setTimelinePlaying(false)
               setParams({ v: index === 0 ? 'claim' : String(v.versions[index - 1].version) })
             }}
           />
-          <span>{v.versions.length ? `v${v.versions[v.versions.length - 1].version}` : 'Current'}</span>
+          <span>{v.versions.length ? `v${v.versions[v.versions.length - 1].version}` : t('currentWord')}</span>
         </label>
         <div className="land-timeline">
           <Link
             className={`land-tl-chip ${!entry && !notFound ? 'active' : ''}`}
             to="/lab/land?v=claim"
-            title="Current unanchored claim"
+            title={t('currentUnanchoredClaim')}
             onClick={() => setTimelinePlaying(false)}
           >
             <span className="land-tl-v">claim</span>
-            <span className="land-tl-s">{SPATIAL_DIMENSIONS[v.dimensionality]?.id ?? 'D2'} · next append</span>
+            <span className="land-tl-s">{SPATIAL_DIMENSIONS[v.dimensionality]?.id ?? 'D2'} · {t('nextAppend')}</span>
           </Link>
           {v.versions.map((x) => (
             <Link

@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Camera, CheckCheck, Eye, FileText, Flag, Fingerprint, MapPin, Share2, Users } from 'lucide-react'
 import type { DemoScenarioEvent } from '../../lib/api'
-import { useLocale } from '../../lib/locale'
+import { useLocale, type TranslationKey } from '../../lib/locale'
 import { STAGE_DEFS, type StageId, type StageTrack } from '../../lib/protocolStages'
 
 const STAGE_ICON: Record<StageId, LucideIcon> = {
@@ -22,7 +22,7 @@ interface ProtocolVizProps {
   events: DemoScenarioEvent[]
   phase: number
   validators: { labels: string[]; present: boolean }
-  spatial: { label: string; stage: StageId | null }
+  spatial: { labelKey: TranslationKey; stage: StageId | null }
 }
 
 type ValidatorState = 'idle' | 'queued' | 'checking' | 'attested'
@@ -35,6 +35,7 @@ interface NarrationBarProps {
 }
 
 export function NarrationBar({ track, events, phase, variant = 'panel' }: NarrationBarProps) {
+  const { t } = useLocale()
   const activeNode = track.nodes[track.active]
   const current = phase >= 0 ? events[phase] : undefined
   const Icon = activeNode ? STAGE_ICON[activeNode.id] : null
@@ -51,16 +52,16 @@ export function NarrationBar({ track, events, phase, variant = 'panel' }: Narrat
       <span className="dm-narrbar-tx">
         {activeNode ? (
           <>
-            <strong>{activeNode.def.headline}</strong>
-            <span>{activeNode.def.human}</span>
+            <strong>{t(activeNode.def.headlineKey)}</strong>
+            <span>{t(activeNode.def.humanKey)}</span>
           </>
         ) : (
-          <span>Run the scenario to watch the protocol happen step by step.</span>
+          <span>{t('demoRunPrompt')}</span>
         )}
       </span>
       {activeNode && track.nodes.length > 0 && (
         <span className="dm-narrbar-step">
-          STEP {track.active + 1}/{track.nodes.length}
+          {t('stepOf', { n: track.active + 1, m: track.nodes.length })}
         </span>
       )}
       {current && <code className="dm-narrbar-kind">{current.kind}</code>}
@@ -133,24 +134,24 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
               )}
               <span className={`dm-pnode st-${node.id} ${cls}`}>
                 <span className="dm-pnode-ico"><Icon size={16} /></span>
-                <span className="dm-pnode-lb">{node.def.label}</span>
+                <span className="dm-pnode-lb">{t(node.def.labelKey)}</span>
                 <small>ev&nbsp;{node.firstSeq}</small>
               </span>
             </Fragment>
           )
         })}
-        {track.nodes.length === 0 && <span className="text-xs text-muted">Press Run…</span>}
+        {track.nodes.length === 0 && <span className="text-xs text-muted">{t('pressRun')}</span>}
       </div>
 
       <div className="dm-viz-cap">
         {activeNode ? (
           <>
-            <strong>{activeNode.def.headline}</strong>
-            <span>{activeNode.def.human}</span>
+            <strong>{t(activeNode.def.headlineKey)}</strong>
+            <span>{t(activeNode.def.humanKey)}</span>
             {current && <code className="dm-viz-code">{current.kind}</code>}
           </>
         ) : (
-          <span>Run the scenario to watch the protocol happen step by step.</span>
+          <span>{t('demoRunPrompt')}</span>
         )}
       </div>
 
@@ -161,11 +162,11 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
               <span>{t('networkTitle')}</span>
               <span className="dm-sim-badge">{t('simulation')}</span>
             </div>
-            <svg viewBox="0 0 340 170" role="img" aria-label="Validator network for the current scenario">
+            <svg viewBox="0 0 340 170" role="img" aria-label={t('validatorNetAria')}>
               <g className={spatial.stage ? `st-${spatial.stage}` : 'st-idle'}>
                 <rect x="14" y="64" width="96" height="42" rx="9" className="net-parcel" />
-                <text x="62" y="82" textAnchor="middle" className="net-hd">PARCEL</text>
-                <text x="62" y="97" textAnchor="middle" className="net-state">{spatial.label}</text>
+                <text x="62" y="82" textAnchor="middle" className="net-hd">{t('parcelWord')}</text>
+                <text x="62" y="97" textAnchor="middle" className="net-state">{t(spatial.labelKey)}</text>
               </g>
               {ys.slice(0, validatorCount).map((y, i) => {
                 const state = stateOf(i)
@@ -186,13 +187,13 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
           </div>
         ) : (
           <div className="dm-net dm-net-note">
-            <span>Validator review</span>
-            <p className="text-xs text-muted">This scenario does not route work to validators — it exercises a different part of the protocol.</p>
+            <span>{t('validatorReview')}</span>
+            <p className="text-xs text-muted">{t('noValidatorRouting')}</p>
           </div>
         )}
 
         <div className="dm-sum">
-          <div className="dm-sum-h">What is happening</div>
+          <div className="dm-sum-h">{t('whatIsHappening')}</div>
           {track.nodes.map((node) => {
             const reached = track.active >= rankOf(node.id)
             const value =
@@ -200,17 +201,17 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
                 ? `${revealedAttestation}/${validatorCount}`
                 : reached
                   ? '✓'
-                  : 'pending'
+                  : t('pendingWord')
             return (
               <div className="dm-sum-row" key={node.id}>
-                <b className={`st-${node.id} dm-sum-lb`}>{node.def.label}</b>
+                <b className={`st-${node.id} dm-sum-lb`}>{t(node.def.labelKey)}</b>
                 <span className={`dm-sum-val ${reached ? 'ok' : ''}`}>{value}</span>
               </div>
             )
           })}
           {hasNetwork && (
             <div className="dm-sum-row">
-              <b>Consensus</b>
+              <b>{t('consensusWord')}</b>
               <span className="dm-sum-val">{attestedCount}/{validatorCount}</span>
             </div>
           )}
@@ -218,16 +219,16 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
             <i style={{ width: `${track.nodes.length ? ((track.active + 1) / track.nodes.length) * 100 : 0}%` }} />
           </div>
           <div className="dm-sum-row">
-            <b>Spatial state</b>
-            <span className={`dm-spatial-chip ${spatial.stage ? `st-${spatial.stage}` : 'st-idle'}`}>{spatial.label}</span>
+            <b>{t('spatialStateWord')}</b>
+            <span className={`dm-spatial-chip ${spatial.stage ? `st-${spatial.stage}` : 'st-idle'}`}>{t(spatial.labelKey)}</span>
           </div>
         </div>
       </div>
 
       <div className="dm-nar-wrap">
-        <div className="dm-sum-h">Human timeline <span className="text-muted">— the same events, in plain language</span></div>
+        <div className="dm-sum-h">{t('humanTimeline')} <span className="text-muted">{t('humanTimelineHint')}</span></div>
         <div className="dm-nar">
-          {phase < 0 && <div className="text-xs text-muted">Press Run…</div>}
+          {phase < 0 && <div className="text-xs text-muted">{t('pressRun')}</div>}
           {events.slice(0, limit + 1).map((event, i) => {
             const stage = track.stages[i]
             const def = STAGE_DEFS[stage]
@@ -236,7 +237,7 @@ export default function ProtocolViz({ track, events, phase, validators, spatial 
               <div className={`dm-nar-item st-${stage}`} key={event.seq}>
                 <span className="dm-nar-ico"><Icon size={13} /></span>
                 <div className="min-w-0">
-                  <div className="dm-nar-lb">{def.headline}</div>
+                  <div className="dm-nar-lb">{t(def.headlineKey)}</div>
                   <div className="dm-nar-tx">{event.detail}</div>
                 </div>
               </div>

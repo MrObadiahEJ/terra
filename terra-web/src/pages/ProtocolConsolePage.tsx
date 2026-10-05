@@ -109,7 +109,7 @@ export default function ProtocolConsolePage() {
       return
     }
     if (requiresConfirmation && (!armed || confirmation !== requiredPhrase)) {
-      setError(`Review the impact, acknowledge the notice, and type ${requiredPhrase} to continue.`)
+      setError(t('reviewImpactPhrase', { phrase: requiredPhrase }))
       return
     }
 
@@ -118,10 +118,10 @@ export default function ProtocolConsolePage() {
     let body: unknown
     try {
       path = operationPath(selected, pathParams)
-      query = parseObjectInput(queryInput, 'Query parameters')
+      query = parseObjectInput(queryInput, t('queryParameters'))
       body = selected.method === 'GET' || !bodyInput.trim() ? undefined : JSON.parse(bodyInput)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Invalid request input')
+      setError(cause instanceof Error ? cause.message : t('invalidRequestInput'))
       return
     }
 
@@ -132,13 +132,13 @@ export default function ProtocolConsolePage() {
         value = await api.serviceHealth()
       } else if (selected.id === 'identity-bind' && isRecord(body) && signMessage) {
         if ('national_id' in body || 'phone' in body || 'display_name' in body) {
-          throw new Error('For privacy, use the Portfolio identity workflow for optional personal details.')
+          throw new Error(t('privacyPortfolioHint'))
         }
         const identityHash = body.identity_hash
         const owner = body.owner
         const recovery = body.recovery
         if (typeof identityHash !== 'string' || typeof owner !== 'string' || typeof recovery !== 'string') {
-          throw new Error('Identity binding requires string fields: identity_hash, owner, and recovery')
+          throw new Error(t('identityBindingStrings'))
         }
         value = await api.bindIdentity({ identity_hash: identityHash, owner, recovery }, signMessage)
       } else {
@@ -150,7 +150,7 @@ export default function ProtocolConsolePage() {
       setConfirmation('')
       setArmed(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Backend request failed')
+      setError(cause instanceof Error ? cause.message : t('backendRequestFailed'))
     } finally {
       setBusy(false)
     }
@@ -170,7 +170,7 @@ export default function ProtocolConsolePage() {
         <span className="backend-api-badge"><span /> {t('consoleApiBadge')}</span>
       </header>
 
-      <section className="backend-notice" aria-label="API operation safeguards">
+      <section className="backend-notice" aria-label={t('apiSafeguardsAria')}>
         <span className="backend-notice-icon"><AlertTriangle size={17} /></span>
         <div>
           <strong>{t('consoleWarningTitle')}</strong>
@@ -260,7 +260,7 @@ export default function ProtocolConsolePage() {
                 placeholder="{}"
               />
               {selected.path.startsWith('/geo/') || selected.path === '/spatial/parcels/near' || selected.path === '/fusion/roads' || selected.path === '/fusion/pois'
-                ? <small>Spatial query examples use the Soa pilot region and are only a starting point; they do not imply parcel ownership.</small>
+                ? <small>{t('spatialQueryNote')}</small>
                 : null}
             </label>
 

@@ -333,10 +333,10 @@ export default function DemoPage() {
 
   const badge: { cls: string; text: string } | null = {
     idle: null,
-    checking: { cls: 'lab-badge-info', text: 'checking…' },
-    same: { cls: 'lab-badge-ok', text: 'byte-identical ✓' },
-    diff: { cls: 'lab-badge-err', text: 'MISMATCH ✗' },
-    error: { cls: 'lab-badge-err', text: 'API unreachable' },
+    checking: { cls: 'lab-badge-info', text: t('detChecking') },
+    same: { cls: 'lab-badge-ok', text: t('detSame') },
+    diff: { cls: 'lab-badge-err', text: t('detDiff') },
+    error: { cls: 'lab-badge-err', text: t('detError') },
   }[det]
 
   return (
@@ -371,10 +371,10 @@ export default function DemoPage() {
       </div>
       <div className="dm-catalogue-status">
         <span className={`lab-badge ${catalogueSource === 'local' ? 'lab-badge-warn' : 'lab-badge-info'}`}>
-          {catalogueSource === 'checking' ? 'CHECKING SCENARIO API' : catalogueSource === 'api' ? 'API CATALOGUE' : 'BUILT-IN CATALOGUE'}
+          {catalogueSource === 'checking' ? t('scenarioChecking') : catalogueSource === 'api' ? t('apiCatalogue') : t('builtinCatalogue')}
         </span>
         <span className="text-xs text-muted">
-          {catalogueSource === 'local' ? 'The scenario API is unavailable; previews still run in this browser.' : 'Seeded demos are reproducible. No wallet approval or chain write is required.'}
+          {catalogueSource === 'local' ? t('scenarioApiOffline') : t('seededDemosHint')}
         </span>
       </div>
       <p className="text-xs text-muted mb-2">
@@ -384,7 +384,7 @@ export default function DemoPage() {
       {/* controls */}
       <div className="dm-row">
         <label className="text-xs text-muted" htmlFor="dm-seed">
-          seed
+          {t('seedLabel')}
         </label>
         <input
           id="dm-seed"
@@ -394,19 +394,19 @@ export default function DemoPage() {
           onChange={(e) => setSeed(e.target.value)}
         />
         <button className="btn btn-primary px-3 py-1.5" onClick={() => void run()} disabled={busy}>
-          {busy ? 'Running…' : 'Run scenario'}
+          {busy ? t('runningEllipsis') : t('runScenario')}
         </button>
         <button
           className="btn btn-secondary px-3 py-1.5 gap-1"
           onClick={checkDeterminism}
           disabled={busy || det === 'checking'}
         >
-          <Fingerprint size={13} /> Verify determinism
+          <Fingerprint size={13} /> {t('verifyDeterminism')}
         </button>
         {badge && (
           <span className={`lab-badge ${badge.cls}`}>{badge.text}</span>
         )}
-        <span className="text-xs text-muted">speed</span>
+        <span className="text-xs text-muted">{t('speedLabel')}</span>
         <div className="land-viewer-seg">
           {[1, 2, 4].map((s) => (
             <button
@@ -446,21 +446,21 @@ export default function DemoPage() {
                 disabled={events.length < 2}
               >
                 {playing ? <Pause size={13} /> : <Play size={13} />}
-                {playing ? 'Pause' : phase >= last ? 'Replay' : 'Play'}
+                {playing ? t('pauseWord') : phase >= last ? t('replayWord') : t('playWord')}
               </button>
               <button
                 className="btn btn-ghost px-2 py-1 gap-1"
                 onClick={step}
                 disabled={playing || phase >= last}
               >
-                <ChevronRight size={13} /> Step
+                <ChevronRight size={13} /> {t('stepWord')}
               </button>
               <button
                 className="btn btn-ghost px-2 py-1 gap-1"
                 onClick={restart}
                 disabled={phase <= 0 && !playing}
               >
-                <RotateCcw size={13} /> Restart
+                <RotateCcw size={13} /> {t('restartWord')}
               </button>
             </span>
           </div>
@@ -468,11 +468,11 @@ export default function DemoPage() {
           {offlineReason && (
             <div className="dm-banner dm-banner-offline">
               <AlertTriangle size={14} />
-              <span>Scenario API unavailable ({offlineReason}). This repeatable browser-only preview keeps the demo interactive; it does not write chain state.</span>
+              <span>{t('offlineBanner', { reason: offlineReason })}</span>
             </div>
           )}
 
-          <section className="dm-spatial-grid" aria-label="Spatial parcel and validator replay">
+          <section className="dm-spatial-grid" aria-label={t('spatialReplayAria')}>
             <div className="dm-scene-panel">
               <div className="dm-panel-h">
                 <span><MapIcon size={14} /> {t('parcelContext')}</span>
@@ -482,21 +482,21 @@ export default function DemoPage() {
                       className="dm-scene-select"
                       value={selectedSceneParcel?.id ?? ''}
                       onChange={(event) => setSelectedSceneParcelId(event.target.value)}
-                      aria-label="Choose a parcel for the demo scene"
+                      aria-label={t('chooseSceneParcel')}
                     >
                       {sceneParcels.map((parcel) => <option key={parcel.id} value={parcel.id}>{parcel.name}</option>)}
                     </select>
                   )}
-                  <div className="land-viewer-seg" role="group" aria-label="Parcel map view">
+                  <div className="land-viewer-seg" role="group" aria-label={t('parcelMapView')}>
                     <button className={`land-viewer-segbtn ${sceneView === '2d' ? 'on' : ''}`} onClick={() => setSceneView('2d')} aria-pressed={sceneView === '2d'}><MapIcon size={12} /> 2D</button>
-                    <button className={`land-viewer-segbtn ${sceneView === '3d' ? 'on' : ''}`} onClick={() => setSceneView('3d')} aria-pressed={sceneView === '3d'} disabled={Boolean(sceneWebglError)} title={sceneWebglError ? '3D view requires WebGL' : '3D globe view'}><Box size={12} /> 3D</button>
+                    <button className={`land-viewer-segbtn ${sceneView === '3d' ? 'on' : ''}`} onClick={() => setSceneView('3d')} aria-pressed={sceneView === '3d'} disabled={Boolean(sceneWebglError)} title={sceneWebglError ? t('view3dRequiresWebgl') : t('view3dGlobe')}><Box size={12} /> 3D</button>
                   </div>
                 </div>
               </div>
               <NarrationBar track={track} events={events} phase={phase} variant="scene" />
               <div className="dm-scene-map">
                 {sceneSource === 'loading' ? (
-                  <div className="dm-scene-placeholder">Loading parcel geometry…</div>
+                  <div className="dm-scene-placeholder">{t('loadingParcelGeometry')}</div>
                 ) : (
                   <TerraGlobe
                     offChainParcels={sceneParcels}
@@ -519,7 +519,7 @@ export default function DemoPage() {
                 {phase >= 0 && spatial.stage && (
                   <>
                     <span className={`dm-scene-pulse st-${spatial.stage}`} aria-hidden="true" />
-                    <span className={`dm-scene-state st-${spatial.stage}`}>{spatial.label}</span>
+                    <span className={`dm-scene-state st-${spatial.stage}`}>{t(spatial.labelKey)}</span>
                   </>
                 )}
                 <span className={`dm-scene-source ${sceneSource === 'sample' ? 'sample' : ''}`}>
@@ -531,11 +531,11 @@ export default function DemoPage() {
                         ? t('sampleLot')
                         : t('registeredGeometry')}
                 </span>
-                {sceneWebglError && <span className="dm-scene-fallback">3D unavailable — showing 2D map</span>}
+                {sceneWebglError && <span className="dm-scene-fallback">{t('threeDUnavailable')}</span>}
               </div>
               <div className="dm-scene-foot">
                 <strong>{selectedSceneParcel?.name ?? t('parcelContext')}</strong>
-                <span>{selectedSceneParcel?.area_m2 ? `${(selectedSceneParcel.area_m2 / 10_000).toFixed(2)} ha` : 'Area not recorded'}</span>
+                <span>{selectedSceneParcel?.area_m2 ? `${(selectedSceneParcel.area_m2 / 10_000).toFixed(2)} ha` : t('areaNotRecorded')}</span>
                 <span>{sceneSource === 'osm' ? t('imageryContext') : sceneSource === 'sample' ? t('sampleLot') : t('noMapOverlays')}</span>
               </div>
             </div>
@@ -580,25 +580,25 @@ export default function DemoPage() {
               <div className="dm-panel-h">
                 <span>
                   {view === 'events' ? (
-                    <>Event timeline <span className="text-muted">(deterministic t offsets)</span></>
+                    <>{t('eventTimeline')} <span className="text-muted">{t('deterministicOffsets')}</span></>
                   ) : (
-                    <>Protocol visualization <span className="text-muted">(same event stream)</span></>
+                    <>{t('protocolVizHeading')} <span className="text-muted">{t('sameEventStream')}</span></>
                   )}
                 </span>
-                <div className="land-viewer-seg" role="group" aria-label="Timeline view mode">
+                <div className="land-viewer-seg" role="group" aria-label={t('timelineViewMode')}>
                   <button
                     className={`land-viewer-segbtn ${view === 'events' ? 'on' : ''}`}
                     onClick={() => setView('events')}
                     aria-pressed={view === 'events'}
                   >
-                    EVENTS
+                    {t('eventsWord')}
                   </button>
                   <button
                     className={`land-viewer-segbtn ${view === 'viz' ? 'on' : ''}`}
                     onClick={() => setView('viz')}
                     aria-pressed={view === 'viz'}
                   >
-                    VISUALIZATION
+                    {t('visualizationWord')}
                   </button>
                 </div>
                 <span className="dm-progress">
@@ -624,7 +624,7 @@ export default function DemoPage() {
                           <div className="dm-kind">
                             {e.kind}
                             <span className={`dm-ev-stage st-${track.stages[i]}`}>
-                              {STAGE_DEFS[track.stages[i]].label}
+                              {t(STAGE_DEFS[track.stages[i]].labelKey)}
                             </span>
                           </div>
                           <div className="text-xs text-muted">{e.detail}</div>
@@ -635,7 +635,7 @@ export default function DemoPage() {
                       </div>
                     ) : null,
                   )}
-                  {phase < 0 && <div className="text-xs text-muted">Press Run…</div>}
+                  {phase < 0 && <div className="text-xs text-muted">{t('pressRun')}</div>}
                 </div>
               ) : (
                 <ProtocolViz
@@ -650,7 +650,7 @@ export default function DemoPage() {
 
             {view === 'events' && (
               <div className="dm-panel">
-                <div className="dm-panel-h">Scenario entities</div>
+                <div className="dm-panel-h">{t('scenarioEntities')}</div>
                 <div className="dm-ents">
                   {entities.map(([k, v]) => (
                     <div key={k} className="dm-ent">
@@ -672,10 +672,7 @@ export default function DemoPage() {
 
       {!data && !err && (
         <div className="dm-panel text-xs text-muted">
-        The verification walkthrough starts automatically. Choose another scenario or seed
-        above, then use <strong>Run scenario</strong> to replay it. The API or deterministic
-        local preview returns entities, ordered events and a result. No wallet, chain writes
-        or unrepeatable randomness.
+        {t('walkthroughA')}<strong>{t('runScenario')}</strong>{t('walkthroughB')}
         </div>
       )}
     </div>

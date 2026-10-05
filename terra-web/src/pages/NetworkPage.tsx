@@ -25,7 +25,14 @@ import {
   type DemoValidator,
 } from '../lib/validatorDemo'
 import { Activity, Building2, Globe2, MapPin, RotateCw } from 'lucide-react'
-import { useLocale } from '../lib/locale'
+import { useLocale, type TranslationKey } from '../lib/locale'
+
+const TASK_LABEL_KEYS: Record<string, TranslationKey> = {
+  'task-survey-lagos': 'taskLandSurvey',
+  'task-docs-global': 'taskDocsGlobal',
+  'task-legal-pt': 'taskLegalPt',
+  'task-imagery': 'taskImagery',
+}
 
 // Validator network (B3) — demo dataset + a faithful JS mirror of routing.rs.
 // Every ✓/✗ below runs the same predicates as route_task (availability →
@@ -221,17 +228,16 @@ export default function NetworkPage() {
             <Activity size={18} /> Terra — {t('networkTitle')}
           </h1>
           <p className="text-[11px] text-muted max-w-3xl">
-            Deterministic demo network (no <span className="font-mono">/validators</span> API yet — see{' '}
-            <Link to="/status">/status</Link>). The inspector below runs a{' '}
-            <strong>faithful JS mirror of routing.rs</strong>: the same six gates in the same order, then
-            the deterministic winner pick and random admission gate. Click any row for "why selected".
+            {t('netIntroA')}<span className="font-mono">/validators</span>{t('netIntroB')}
+            <Link to="/status">/status</Link>{t('netIntroC')}
+            <strong>{t('netMirror')}</strong>{t('netIntroD')}
           </p>
         </div>
         <div className="land-badges">
           <span className="lab-badge lab-badge-info">routing.rs mirror</span>
-          <span className="lab-badge lab-badge-warn">DEMO dataset</span>
+          <span className="lab-badge lab-badge-warn">{t('netDemoDataset')}</span>
           <Link className="btn btn-secondary px-2 py-1" to="/lab?tab=pipeline">
-            Verification lab ↗
+            {t('verificationLab')}
           </Link>
         </div>
       </header>
@@ -261,7 +267,7 @@ export default function NetworkPage() {
             {jurisdictions.length ? jurisdictions.map((profile) => (
               <div className="net-profile-row" key={profile.id}>
                 <span className="net-profile-mark">{profile.country_code.slice(0, 2).toUpperCase()}</span>
-                <div><strong>{profile.jurisdiction_name}</strong><small>{profile.country_code.toUpperCase()} · {profile.authority || 'Authority not named'}</small></div>
+                <div><strong>{profile.jurisdiction_name}</strong><small>{profile.country_code.toUpperCase()} · {profile.authority || t('authorityNotNamed')}</small></div>
                 <span className={`net-profile-status ${profile.status.toLowerCase()}`}>{profile.status}</span>
               </div>
             )) : (
@@ -277,8 +283,8 @@ export default function NetworkPage() {
             {registries.length ? registries.map((registry) => (
               <div className="net-profile-row" key={registry.pubkey}>
                 <span className="net-profile-mark authority"><Building2 size={15} /></span>
-                <div><strong>Authority registry</strong><small>{registry.validators.length} validators · {registry.mode === 1 ? 'peer consensus' : 'bootstrap'} · {registry.pubkey.slice(0, 8)}…</small></div>
-                <span className="net-profile-status active">registered</span>
+                <div><strong>{t('authorityRegistryCard')}</strong><small>{t('validatorsCount', { n: registry.validators.length })} · {registry.mode === 1 ? t('peerConsensus') : t('bootstrapWord')} · {registry.pubkey.slice(0, 8)}…</small></div>
+                <span className="net-profile-status active">{t('registryRegistered')}</span>
               </div>
             )) : (
               <div className="net-directory-empty">{profilesLoading ? t('loadingRegistries') : profilesError ? t('registryUnavailable') : t('noRegistries')}</div>
@@ -304,20 +310,20 @@ export default function NetworkPage() {
 
       {/* task selector */}
       <div className="net-tasks">
-        {DEMO_TASKS.map((t) => (
+        {DEMO_TASKS.map((task) => (
           <button
-            key={t.id}
-            className={`net-task ${t.id === taskId ? 'on' : ''}`}
+            key={task.id}
+            className={`net-task ${task.id === taskId ? 'on' : ''}`}
             onClick={() => {
-              setTaskId(t.id)
+              setTaskId(task.id)
               setSelectedId(null)
             }}
           >
-            <span className="net-task-label">{t.label}</span>
+            <span className="net-task-label">{TASK_LABEL_KEYS[task.id] ? t(TASK_LABEL_KEYS[task.id]) : task.label}</span>
             <span className="net-task-sub">
-              cap {t.capabilityCode === 255 ? 'ANY' : CAPABILITY_CODES[t.capabilityCode]} · min_rep{' '}
-              {t.minReputation} · {t.jurisdiction ? `jur ${t.jurisdiction}` : 'any jur'}
-              {t.radiusM > 0 ? ` · ${(t.radiusM / 1000).toFixed(0)} km` : ''}
+              cap {task.capabilityCode === 255 ? 'ANY' : CAPABILITY_CODES[task.capabilityCode]} · min_rep{' '}
+              {task.minReputation} · {task.jurisdiction ? `jur ${task.jurisdiction}` : 'any jur'}
+              {task.radiusM > 0 ? ` · ${(task.radiusM / 1000).toFixed(0)} km` : ''}
             </span>
           </button>
         ))}
@@ -326,7 +332,7 @@ export default function NetworkPage() {
       {/* requirement + routing result */}
       <div className="net-row">
         <div className="lab-card flex-1">
-          <h3 className="text-[13px] font-semibold mb-2">Task requirement (mirrors TaskRequirement)</h3>
+          <h3 className="text-[13px] font-semibold mb-2">{t('taskRequirementHeading')}</h3>
           <div className="lab-field-table">
             <div className="lab-field-row">
               <span className="font-mono text-[10px] text-muted">min_tier</span>
@@ -366,13 +372,13 @@ export default function NetworkPage() {
           <h3 className="text-[13px] font-semibold mb-2">route_task result</h3>
           <div className="net-flow">
             <span className="net-flow-step">
-              {eligibleIds.length} / {rows.length} eligible
+              {t('netEligibleFlow', { n: eligibleIds.length, m: rows.length })}
             </span>
             <span className="net-flow-arrow">→</span>
             <span className="net-flow-step mono">slot {slot}</span>
             <span className="net-flow-arrow">→</span>
             <span className={`net-flow-step ${gatePass ? 'win' : winnerId ? 'warn' : ''}`}>
-              {winnerId ? (gatePass ? `winner ${winnerId}` : 'gate REJECTED') : 'no eligible'}
+              {winnerId ? (gatePass ? t('netWinner', { id: winnerId }) : t('netGateRejected')) : t('netNoEligible')}
             </span>
           </div>
           <div className="net-seed mono" title="route_seed(task_id, blockhash, slot) — demo string hash">
@@ -383,16 +389,16 @@ export default function NetworkPage() {
               draw_bps({winnerId}) = {winnerDraw} {gatePass ? '<' : '≥'} admit {admitBps(competitors)} bps
               {' — '}
               {gatePass
-                ? 'random gate PASS'
-                : 'NotRouteWinner — the random admission gate rejected this draw at this slot'}
+                ? t('netRandomGatePass')
+                : t('netNotRouteWinner')}
             </div>
           )}
           <div className="flex gap-1.5 mt-2 flex-wrap">
             <button className="btn btn-secondary px-2 py-1 gap-1" onClick={() => setSlot((s) => s + 1)}>
-              <RotateCw size={12} /> Advance slot (re-roll)
+              <RotateCw size={12} /> {t('advanceSlot')}
             </button>
             <button className="btn btn-ghost px-2 py-1" onClick={() => setSlot(DEMO_INITIAL_SLOT)}>
-              Reset slot
+              {t('resetSlot')}
             </button>
           </div>
         </div>
@@ -402,22 +408,22 @@ export default function NetworkPage() {
       <div className="lab-card">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
           <h3 className="text-[13px] font-semibold">
-            Eligibility matrix — is_eligible() per candidate (click a row for details)
+            {t('eligibilityHeading')}
           </h3>
           <span className="lab-badge lab-badge-info">
-            {GATE_KEYS.map((k) => GATE_LABELS[k]).join(' → ')} → random → winner
+            {GATE_KEYS.map((k) => GATE_LABELS[k]).join(' → ')}{t('netFlowSuffix')}
           </span>
         </div>
         <div className="net-tablewrap">
           <table className="net-table">
             <thead>
               <tr>
-                <th>validator</th>
-                <th>country</th>
+                <th>{t('thValidator')}</th>
+                <th>{t('thCountry')}</th>
                 {GATE_KEYS.map((k) => (
                   <th key={k}>{GATE_LABELS[k]}</th>
                 ))}
-                <th>result</th>
+                <th>{t('thResult')}</th>
               </tr>
             </thead>
             <tbody>
@@ -437,9 +443,9 @@ export default function NetworkPage() {
                     ))}
                     <td>
                       {isWinner && gatePass ? (
-                        <span className="lab-badge lab-badge-ok">WINNER</span>
+                        <span className="lab-badge lab-badge-ok">{t('winnerWord')}</span>
                       ) : isEligible ? (
-                        <span className="lab-badge lab-badge-info">eligible</span>
+                        <span className="lab-badge lab-badge-info">{t('eligibleWord')}</span>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
@@ -454,13 +460,13 @@ export default function NetworkPage() {
         {/* why-selected detail */}
         <div className="net-detail">
           <div className="flex items-center gap-2 flex-wrap">
-            <strong className="text-[12px]">Why {detailRow.v.id}?</strong>
+<strong className="text-[12px]">{t('whyValidator', { id: detailRow.v.id })}</strong>
             <span className="lab-badge lab-badge-info">{detailRow.v.name}</span>
             <span className="text-[10px] text-muted">
               {detailRow.v.countryName} · {TIERS[detailRow.v.tier]} · rep {detailRow.v.reputation} bps
             </span>
             {detailRow.v.id === winnerId && gatePass && (
-              <span className="lab-badge lab-badge-ok">route winner</span>
+<span className="lab-badge lab-badge-ok">{t('routeWinner')}</span>
             )}
           </div>
           <ul className="net-why">
@@ -468,23 +474,23 @@ export default function NetworkPage() {
               <li key={k} className={detailRow.e[k].pass ? 'ok' : 'no'}>
                 <span className="net-why-k">{GATE_LABELS[k]}</span>
                 <span>{detailRow.e[k].detail}</span>
-                <span className="net-why-m">{detailRow.e[k].pass ? 'PASS' : 'FAIL'}</span>
+                <span className="net-why-m">{detailRow.e[k].pass ? t('passWord') : t('failWord')}</span>
               </li>
             ))}
             {detailRow.v.id === winnerId && winnerDraw !== null && (
               <li className={gatePass ? 'ok' : 'no'}>
-                <span className="net-why-k">random</span>
+                <span className="net-why-k">{t('netRandom')}</span>
                 <span>
                   draw_bps {winnerDraw} vs admit {admitBps(competitors)} bps (competitor_count {competitors}
-                  {competitors === 1 ? ' — always passes' : ''})
+                  {competitors === 1 ? t('alwaysPasses') : ''})
                 </span>
-                <span className="net-why-m">{gatePass ? 'PASS' : 'FAIL'}</span>
+                <span className="net-why-m">{gatePass ? t('passWord') : t('failWord')}</span>
               </li>
             )}
           </ul>
           {!detailRow.e.eligible && (
             <p className="text-[10px] text-muted mt-1">
-              First failing gate in route order decides — later gates are shown for transparency.
+              {t('firstFailingGate')}
             </p>
           )}
         </div>
@@ -493,11 +499,11 @@ export default function NetworkPage() {
       {/* presence plot */}
       <div className="lab-card">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-          <h3 className="text-[13px] font-semibold">Presence plot — validator locations (equirectangular)</h3>
+<h3 className="text-[13px] font-semibold">{t('presencePlotHeading')}</h3>
           <span className="flex gap-2 text-[10px] text-muted items-center">
-            <i className="net-dot" style={{ background: '#10b981' }} /> online/available
-            <i className="net-dot" style={{ background: '#f59e0b' }} /> busy
-            <i className="net-dot" style={{ background: '#ef4444' }} /> suspended
+            <i className="net-dot" style={{ background: '#10b981' }} /> {t('legendOnline')}
+            <i className="net-dot" style={{ background: '#f59e0b' }} /> {t('legendBusy')}
+            <i className="net-dot" style={{ background: '#ef4444' }} /> {t('legendSuspended')}
             {task.radiusM > 0 && (
               <>
                 <i className="net-dot" style={{ background: 'transparent', border: '1.5px dashed #6366f1' }} />
@@ -539,8 +545,8 @@ export default function NetworkPage() {
             return (
               <g key={row.v.id} className="net-mk" onClick={() => setSelectedId(row.v.id)}>
                 <title>
-                  {row.v.id} — {row.v.name} ({row.v.presence?.city ?? 'no presence'})
-                  {isWinner ? ' — WINNER' : isEligible ? ' — eligible' : ''}
+                  {row.v.id} — {row.v.name} ({row.v.presence?.city ?? t('noPresence')})
+                  {isWinner ? t('winnerSuffix') : isEligible ? t('eligibleSuffix') : ''}
                 </title>
                 {isWinner && <circle cx={p.x} cy={p.y} r="10" fill="none" stroke="#10b981" strokeWidth="2" />}
                 <circle
@@ -613,12 +619,12 @@ export default function NetworkPage() {
 
       <footer className="st-foot">
         <p className="text-[10px] text-muted">
-          Deterministic: the same task + slot always reroutes to the same winner. The six gates mirror{' '}
-          <span className="font-mono">routing.rs</span> exactly (including stale-presence and DECLARED-is-too-
-          weak capability rules); the sha256 draws are represented by a sync FNV-1a with identical bps
-          semantics — flagged because it is DEMO, not on-chain entropy. When the random gate rejects a
-          winner, advance the slot: that is precisely the <span className="font-mono">NotRouteWinner</span>{' '}
-          retry path. Live validator data awaits the <Link to="/status">/validators API (planned)</Link>.
+          {t('netFooterA')}
+          <span className="font-mono">routing.rs</span>
+          {t('netFooterB')}
+          <span className="font-mono">NotRouteWinner</span>
+          {t('netFooterC')}
+          <Link to="/status">{t('netValidatorsPlanned')}</Link>{'.'}
         </p>
       </footer>
     </div>

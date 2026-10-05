@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 import type { DemoTx } from '../lib/txStore'
 import { useTxStore } from '../lib/txStore'
+import { useLocale } from '../lib/locale'
 
 export default function Toasts() {
+  const { t } = useLocale()
   const [tx, setTx] = useState<DemoTx | null>(null)
 
   useEffect(() => {
@@ -30,14 +32,14 @@ export default function Toasts() {
       <span className={`tx-dot ${tx.status}`} />
       <div className="tx-toast-body">
         <span className="tx-toast-title">
-          {tx.status === 'confirmed' ? 'Confirmed' : 'Failed'} · {tx.instruction}
+          {tx.status === 'confirmed' ? t('confirmedWord') : t('failedWord')} · {tx.instruction}
         </span>
         <span className="tx-toast-sum">{tx.summary}</span>
         <Link className="tx-toast-link" to="/transactions" onClick={() => setTx(null)}>
-          View in explorer →
+          {t('viewInExplorer')}
         </Link>
       </div>
-      <button className="tx-toast-x" onClick={() => setTx(null)} aria-label="Dismiss">
+      <button className="tx-toast-x" onClick={() => setTx(null)} aria-label={t('dismissLabel')}>
         <X size={13} />
       </button>
     </div>

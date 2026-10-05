@@ -48,7 +48,7 @@ export default function Navbar({ theme, onToggleTheme }: Props) {
 
   return (
     <header className="app-header">
-      <NavLink to="/welcome" className="brand-lockup" aria-label="Terra home">
+      <NavLink to="/welcome" className="brand-lockup" aria-label={t('terraHomeAria')}>
         <span className="brand-mark"><TerraLogo size={34} /></span>
         <span className="brand-name">terra<span className="brand-period">.</span></span>
       </NavLink>

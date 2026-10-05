@@ -134,7 +134,7 @@ export default function WelcomePage() {
             </div>
           </div>
 
-          <div className="welcome-art" aria-label="Terra land asset preview">
+          <div className="welcome-art" aria-label={t('landAssetPreviewAria')}>
             <div className="welcome-art-top">
               <span><span className="welcome-live-dot" /> {t('walletOverview')}</span>
               <span className={`welcome-art-tag ${publicKey ? 'connected' : ''}`}>
@@ -192,7 +192,7 @@ export default function WelcomePage() {
                 className="welcome-map-art welcome-cubes"
                 viewBox="0 0 560 230"
                 role="img"
-                aria-label={activeParcel ? `${activeParcel.name} isometric land block` : 'Isometric land block preview'}
+                aria-label={activeParcel ? t('isoBlockOf', { name: activeParcel.name }) : t('isoBlockPreview')}
               >
                 <ellipse className="welcome-cube-ring" cx="260" cy="120" rx="176" ry="92" />
                 <ellipse className="welcome-cube-shadow" cx="260" cy="216" rx="132" ry="11" />
@@ -240,7 +240,7 @@ export default function WelcomePage() {
           </div>
         </section>
 
-        <section className="welcome-summary" aria-label="Platform overview">
+        <section className="welcome-summary" aria-label={t('platformOverviewAria')}>
           <article className="welcome-stat">
             <span className="welcome-stat-icon"><Radio size={16} /></span>
             <div><strong>{feedState === 'checking' ? '…' : apiItems.length}</strong><span>{t('recentApiRecords')}</span></div>

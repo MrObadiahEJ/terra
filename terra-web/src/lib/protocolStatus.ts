@@ -1,3 +1,5 @@
+import type { TranslationKey } from './locale'
+
 // Protocol status — B10 honest progress dashboard.
 //
 // Status reflects end-to-end capability verified against the `dev` source tree
@@ -24,17 +26,17 @@ export interface StatusModule {
   gaps: string[]
 }
 
-export const STATUS_META: Record<StatusLevel, { label: string; badge: string }> = {
-  implemented: { label: 'IMPLEMENTED', badge: 'lab-badge-ok' },
-  partial: { label: 'PARTIAL', badge: 'lab-badge-warn' },
-  experimental: { label: 'EXPERIMENTAL', badge: 'lab-badge-info' },
-  planned: { label: 'PLANNED', badge: 'lab-badge-mut' },
+export const STATUS_META: Record<StatusLevel, { labelKey: TranslationKey; badge: string }> = {
+  implemented: { labelKey: 'stImplemented', badge: 'lab-badge-ok' },
+  partial: { labelKey: 'stPartial', badge: 'lab-badge-warn' },
+  experimental: { labelKey: 'stExperimental', badge: 'lab-badge-info' },
+  planned: { labelKey: 'stPlanned', badge: 'lab-badge-mut' },
 }
 
-export const TRACK_META: Record<StatusTrack, { label: string; hint: string }> = {
-  protocol: { label: 'Protocol', hint: 'terra_registry + terra_identity (Anchor)' },
-  infra: { label: 'Infrastructure', hint: 'API, demo engine, devnet loop' },
-  frontend: { label: 'Frontend', hint: 'terra-web observability layer' },
+export const TRACK_META: Record<StatusTrack, { labelKey: TranslationKey; hintKey: TranslationKey }> = {
+  protocol: { labelKey: 'trackProtocol', hintKey: 'trackProtocolHint' },
+  infra: { labelKey: 'trackInfra', hintKey: 'trackInfraHint' },
+  frontend: { labelKey: 'trackFrontend', hintKey: 'trackFrontendHint' },
 }
 
 export const STATUS_LEVELS: StatusLevel[] = ['implemented', 'partial', 'experimental', 'planned']
