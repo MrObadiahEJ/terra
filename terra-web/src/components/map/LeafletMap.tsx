@@ -29,7 +29,7 @@ export interface LeafletMapProps {
   buildings: OsmBuildingFootprint[]
   plannedRoads: PlannedRoad[]
   drawing: boolean
-  drawKind: 'parcel' | 'road'
+  drawKind: 'parcel' | 'road' | 'measure'
   drawVertices: DrawVertex[]
   onDrawVertexAdd: (v: DrawVertex) => void
   onDrawFinish: () => void
@@ -41,6 +41,8 @@ export interface LeafletMapProps {
   showLabels?: boolean
   /** Bumped by the layout when a panel reflows the map container; invalidates size. */
   resizeKey?: number
+  /** Tier-capped native tile depth, mirroring the 3D globe's imagery budget. */
+  imageryMaxLevel?: number
 }
 
 const TILE_STYLES = {
@@ -180,6 +182,7 @@ export default function LeafletMap({
   basemap = 'imagery',
   resizeKey = 0,
   showLabels = true,
+  imageryMaxLevel,
 }: LeafletMapProps) {
   const tiles = TILE_STYLES[basemap]
   const suppressUntilRef = useRef(0)
@@ -189,7 +192,7 @@ export default function LeafletMap({
     .filter((x): x is { parcel: OffChainParcel; ring: Ring } => x.ring !== null)
 
   const drawPath: Ring = drawVertices.map((v) => [v.lat, v.lon])
-  if (drawKind !== 'road' && drawVertices.length >= 3) drawPath.push(drawPath[0])
+  if (drawKind === 'parcel' && drawVertices.length >= 3) drawPath.push(drawPath[0])
 
   return (
     <MapContainer
@@ -205,7 +208,10 @@ export default function LeafletMap({
       <TileLayer
         {...{
           url: tiles.url,
-          maxNativeZoom: tiles.maxNativeZoom,
+          maxNativeZoom:
+            imageryMaxLevel !== undefined
+              ? Math.min(tiles.maxNativeZoom, imageryMaxLevel)
+              : tiles.maxNativeZoom,
           maxZoom: 22,
           attribution: tiles.attribution,
         }}
@@ -327,7 +333,11 @@ export default function LeafletMap({
       {drawVertices.length > 1 && (
         <Polyline
           positions={drawPath}
-          pathOptions={{ color: '#7fff00', weight: drawKind === 'road' ? 3 : 2, dashArray: drawKind === 'road' ? undefined : '4 6' }}
+          pathOptions={{
+            color: drawKind === 'measure' ? '#d97706' : '#7fff00',
+            weight: drawKind === 'road' ? 3 : 2,
+            dashArray: drawKind === 'road' ? undefined : '4 6',
+          }}
         />
       )}
     </MapContainer>

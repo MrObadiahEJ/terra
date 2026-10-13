@@ -1,5 +1,5 @@
 import { reportTx } from '../../../lib/txStore'
-import { terraRegistry } from '../../../idl/terraRegistry'
+import terraRegistry from '../../../idl/terra_registry.json'
 
 const ERR_CODE = new Map<string, number>()
 for (const e of terraRegistry.errors ?? []) ERR_CODE.set(e.name, e.code)

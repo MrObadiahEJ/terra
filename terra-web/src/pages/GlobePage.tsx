@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import TerraGlobe, { type DrawVertex, type FocusTarget } from '../components/map/TerraGlobe'
+import TerraGlobe, { type DrawVertex, type FocusTarget, type ViewCommand } from '../components/map/TerraGlobe'
 import LodLadder from '../components/map/LodLadder'
 import Sidenav, { type SidenavMode } from '../components/layout/Sidenav'
 import { lodFromHeight, lodFromLeafletZoom, LOD_TARGET_HEIGHT } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
 import ParcelListPanel from '../components/panels/ParcelListPanel'
+import MediaPanel from '../components/panels/MediaPanel'
 import ParcelPanel from '../components/panels/ParcelPanel'
 import OffChainParcelPanel from '../components/panels/OffChainParcelPanel'
 import BuildingPanel from '../components/panels/BuildingPanel'
@@ -20,6 +21,10 @@ import {
   type RoadRow,
   type PoiRow,
 } from '../lib/api'
+import { listModels, type ThreeDModel } from '../lib/reconstruction'
+import SpatialHistoryPanel from '../components/panels/SpatialHistoryPanel'
+import { listSpatialModels } from '../lib/spatial'
+import { searchLocal, searchPlaces, type SearchResult } from '../lib/search'
 import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
 import {
   buildingRing,
@@ -27,6 +32,7 @@ import {
   saveAtlasLayers,
   loadPlannedRoads,
   savePlannedRoads,
+  selectBuildingsForTier,
   type AtlasLayerKey,
   type AtlasLayers,
   type PlannedRoad,
@@ -39,22 +45,42 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
+  Compass,
   LocateFixed,
   Map as MapIcon,
   MapPin,
   Minus,
+  Move3d,
   PanelRight,
   PanelRightClose,
   PanelRightOpen,
   PictureInPicture2,
   Plus,
+  RotateCcw,
   Route,
+  Ruler,
+  Search,
   Share2,
   Square,
   Tag,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
 import { useLocale, type TranslationKey } from '../lib/locale'
+import {
+  detectHardwareCap,
+  loadTierPreference,
+  saveTierPreference,
+  stepDownTier,
+  TIER_SETTINGS,
+  type GraphicsTier,
+  type TierPreference,
+} from '../lib/perfTier'
+import {
+  clearIonToken,
+  loadIonToken,
+  saveIonToken,
+  type TerrainStatus,
+} from '../lib/cesiumTerrain'
 
 function parcelFocus(parcel: OffChainParcel | null): FocusTarget | null {
   if (!parcel) return null
@@ -74,6 +100,20 @@ const LAYER_ROWS: { key: AtlasLayerKey; icon: typeof Square; labelKey: Translati
   { key: 'labels', icon: Tag, labelKey: 'layerLabels' },
 ]
 
+const TIER_LABEL: Record<GraphicsTier, TranslationKey> = {
+  low: 'tierLow',
+  medium: 'tierMedium',
+  high: 'tierHigh',
+  ultra: 'tierUltra',
+}
+
+const TERRAIN_LABEL: Record<TerrainStatus, TranslationKey> = {
+  flat: 'terrainBadgeFlat',
+  loading: 'terrainBadgeLoading',
+  keyless: 'terrainBadgeRelief',
+  ion: 'terrainBadgeIon',
+}
+
 export default function GlobePage() {
   const { t } = useLocale()
   const offChainParcels = useAppStore((s) => s.offChainParcels)
@@ -88,10 +128,15 @@ export default function GlobePage() {
   const demoMode = useAppStore((s) => s.demoMode)
 
   const [drawing, setDrawing] = useState(false)
-  const [drawKind, setDrawKind] = useState<'parcel' | 'road'>('parcel')
+  // GEV controls: search, one-shot camera commands, measure mode.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchBusy, setSearchBusy] = useState(false)
+  const [viewCommand, setViewCommand] = useState<ViewCommand | null>(null)
+  const [drawKind, setDrawKind] = useState<'parcel' | 'road' | 'measure'>('parcel')
   const [webglStatus, setWebglStatus] = useState<string | null>(null)
   const [drawVertices, setDrawVertices] = useState<DrawVertex[]>([])
-  const [tab, setTab] = useState<'register' | 'browse' | 'plan'>('browse')
+  const [tab, setTab] = useState<'register' | 'browse' | 'plan' | 'media'>('browse')
   const [layers, setLayers] = useState<AtlasLayers>(loadAtlasLayers)
   const [layersCard, setLayersCard] = useState(false)
   const [plannedRoads, setPlannedRoads] = useState<PlannedRoad[]>(loadPlannedRoads)
@@ -109,9 +154,22 @@ export default function GlobePage() {
   const [viewMode, setViewMode] = useState<'3d' | '2d'>(() =>
     localStorage.getItem('terra-map-view') === '2d' ? '2d' : '3d',
   )
-  const [focus, setFocus] = useState<FocusTarget>(
-    () => parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS,
-  )
+  const [focus, setFocus] = useState<FocusTarget>(() => {
+    // Deep link: ?c=lon,lat,height — shared camera position (GEV share links).
+    const c = new URLSearchParams(window.location.search).get('c')
+    if (c) {
+      const [lon, lat, h] = c.split(',').map(Number)
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        return {
+          longitude: lon,
+          latitude: lat,
+          height: Number.isFinite(h) && h > 0 ? h : 2_500_000,
+          duration: 0,
+        }
+      }
+    }
+    return parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS
+  })
   const [lod, setLod] = useState(() => lodFromHeight(DEFAULT_FOCUS.height))
   const [basemap, setBasemap] = useState<'imagery' | 'terrain' | 'osm'>(
     () =>
@@ -123,6 +181,60 @@ export default function GlobePage() {
   useEffect(() => {
     localStorage.setItem('terra-atlas-basemap', basemap)
   }, [basemap])
+
+  const [tierPref, setTierPref] = useState<TierPreference>(() => loadTierPreference())
+  const [tierStep, setTierStep] = useState(0)
+  const [fps, setFps] = useState<number | null>(null)
+  const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('flat')
+  const [hudNotice, setHudNotice] = useState<string | null>(null)
+  const [ionDraft, setIonDraft] = useState(() => loadIonToken())
+  const [hasIonToken, setHasIonToken] = useState(() => Boolean(loadIonToken()))
+  const [ionRev, setIonRev] = useState(0)
+  const hardwareCap = useMemo(() => detectHardwareCap(), [])
+
+  const resolvedTier = useMemo<GraphicsTier>(() => {
+    if (tierPref !== 'auto') return tierPref
+    let tier = hardwareCap
+    for (let i = 0; i < tierStep && tier !== 'low'; i += 1) tier = stepDownTier(tier)
+    return tier
+  }, [tierPref, tierStep, hardwareCap])
+
+  useEffect(() => {
+    saveTierPreference(tierPref)
+  }, [tierPref])
+
+  useEffect(() => {
+    if (!hudNotice) return
+    const timer = window.setTimeout(() => setHudNotice(null), 6000)
+    return () => window.clearTimeout(timer)
+  }, [hudNotice])
+
+  const changeTierPref = useCallback((pref: TierPreference) => {
+    setTierPref(pref)
+    setTierStep(0)
+  }, [])
+
+  const onTierCapped = useCallback(() => {
+    if (tierPref !== 'auto' || resolvedTier === 'low') return
+    const next = stepDownTier(resolvedTier)
+    setTierStep((step) => step + 1)
+    setHudNotice(t('tierDowngraded', { tier: t(TIER_LABEL[next]) }))
+  }, [tierPref, resolvedTier, t])
+
+  const applyIonToken = useCallback(() => {
+    saveIonToken(ionDraft)
+    setHasIonToken(Boolean(ionDraft.trim()))
+    setIonRev((rev) => rev + 1)
+    setHudNotice(t('ionTokenSaved'))
+  }, [ionDraft, t])
+
+  const removeIonToken = useCallback(() => {
+    clearIonToken()
+    setIonDraft('')
+    setHasIonToken(false)
+    setIonRev((rev) => rev + 1)
+    setHudNotice(t('ionTokenRemoved'))
+  }, [t])
 
   useEffect(() => {
     saveAtlasLayers(layers)
@@ -161,12 +273,17 @@ export default function GlobePage() {
 
   const closeSidenav = useCallback(() => changeSidenavOpen(false), [changeSidenavOpen])
 
+  const camMoveTickRef = useRef(0)
+  const [camMoveTick, setCamMoveTick] = useState(0)
+
   const onCameraMoved = useCallback((cam: { longitude: number; latitude: number; height: number }) => {
     lastCamRef.current = cam
     setLod((prev) => {
       const next = lodFromHeight(cam.height)
       return next === prev ? prev : next
     })
+    camMoveTickRef.current += 1
+    setCamMoveTick(camMoveTickRef.current)
   }, [])
 
   const onMapZoom = useCallback((zoom: number) => {
@@ -205,11 +322,78 @@ export default function GlobePage() {
 
   const visibleRoads = useMemo(() => (layers.roads ? roads ?? [] : []), [layers.roads, roads])
   const visiblePois = useMemo(() => (layers.pois ? pois ?? [] : []), [layers.pois, pois])
-  const visibleBuildings = useMemo(
-    () => (layers.buildings ? buildings ?? [] : []),
-    [layers.buildings, buildings],
+  const visibleBuildings = useMemo(() => {
+    if (!layers.buildings) return []
+    return selectBuildingsForTier(
+      buildings ?? [],
+      TIER_SETTINGS[resolvedTier].buildingCap,
+      resolvedTier,
+    )
+  }, [layers.buildings, buildings, resolvedTier])
+  const showLabels = layers.labels && lod >= TIER_SETTINGS[resolvedTier].labelMinLod
+
+  // 3D reconstruction models for the selected parcel (RFC-013 Ph.C). Only
+  // high/ultra load the tileset — weak machines keep the memory headroom.
+  const [parcelModels, setParcelModels] = useState<{
+    parcelId: string
+    rows: ThreeDModel[]
+  } | null>(null)
+  // Explicit "open on globe" from a Phase C model claim (bypasses the tier
+  // gate); bound to the parcel it was requested for, so a selection change
+  // invalidates it by derivation — no setState-in-effect reset needed.
+  const [tilesetOverride, setTilesetOverride] = useState<{ parcelId: string; uri: string } | null>(
+    null,
   )
-  const showLabels = layers.labels && lod >= 4
+  const modelTokenRef = useRef(0)
+  const selectedParcelId = selectedParcel?.address ?? selectedOffChain?.id ?? null
+  useEffect(() => {
+    if (!selectedParcelId) return
+    const token = ++modelTokenRef.current
+    // Pipeline models (0029) + on-chain model claims mirrored for the parcel
+    // PDA (RFC-013 Phases C–E); tileset-shaped rows feed the auto loader.
+    const pipeline = listModels(selectedParcelId).catch(() => [] as ThreeDModel[])
+    const onchain = selectedParcel
+      ? listSpatialModels(selectedParcel.address)
+          .then((rows) =>
+            rows
+              .filter(
+                (m) => m.model_format === 3 || m.storage_reference.includes('tileset.json'),
+              )
+              .map(
+                (m): ThreeDModel => ({
+                  id: m.pubkey,
+                  parcel_id: m.parcel_pubkey,
+                  reconstruction_job_id: null,
+                  uri: m.storage_reference,
+                  format: '3dtiles',
+                  content_hash: m.model_hash,
+                  created_at: m.chain_submitted_at ?? '',
+                }),
+              ),
+          )
+          .catch(() => [] as ThreeDModel[])
+      : Promise.resolve([] as ThreeDModel[])
+    Promise.all([pipeline, onchain])
+      .then(([rows, chainRows]) => {
+        if (token === modelTokenRef.current) {
+          setParcelModels({ parcelId: selectedParcelId, rows: [...rows, ...chainRows] })
+        }
+      })
+      .catch(() => {
+        if (token === modelTokenRef.current) setParcelModels({ parcelId: selectedParcelId, rows: [] })
+      })
+  }, [selectedParcelId, selectedParcel])
+  const tilesetUrl = useMemo(() => {
+    if (tilesetOverride && tilesetOverride.parcelId === selectedParcelId) {
+      return tilesetOverride.uri
+    }
+    if (resolvedTier !== 'high' && resolvedTier !== 'ultra') return null
+    if (!parcelModels || parcelModels.parcelId !== selectedParcelId) return null
+    const model =
+      parcelModels.rows.find((m) => m.uri.includes('tileset.json') || m.format === '3dtiles') ??
+      parcelModels.rows[0]
+    return model?.uri ?? null
+  }, [parcelModels, selectedParcelId, resolvedTier, tilesetOverride])
 
   // Lazily fetch each dataset the first time its layer is switched on.
   useEffect(() => {
@@ -234,20 +418,68 @@ export default function GlobePage() {
           if (!cancelled) setPois(DEMO_POIS)
         })
     }
-    if (layers.buildings && buildings === null) {
-      api
-        .osmBuildingFootprints(500)
-        .then((rows) => {
-          if (!cancelled) setBuildings(rows)
-        })
-        .catch(() => {
-          if (!cancelled) setBuildings([])
-        })
-    }
     return () => {
       cancelled = true
     }
-  }, [layers.roads, layers.pois, layers.buildings, roads, pois, buildings])
+  }, [layers.roads, layers.pois, roads, pois])
+
+  // ---- buildings: viewport-bounded, tier-capped (never fetched on Low) -----
+  const buildingQueryRef = useRef({ lon: Number.NaN, lat: Number.NaN, tier: '', token: 0 })
+  const refreshBuildings = useCallback(
+    (
+      cam: { longitude: number; latitude: number; height: number },
+      tier: GraphicsTier,
+      layerOn: boolean,
+    ) => {
+      const cap = TIER_SETTINGS[tier].buildingCap
+      if (!layerOn || cap <= 0) {
+        setBuildings((prev) => (prev && prev.length === 0 ? prev : []))
+        return
+      }
+      const span = Math.min(0.06, Math.max(0.015, cam.height / 9000))
+      const grid = 0.008
+      const lon = Math.round(cam.longitude / grid) * grid
+      const lat = Math.round(cam.latitude / grid) * grid
+      const query = buildingQueryRef.current
+      if (query.lon === lon && query.lat === lat && query.tier === tier) return
+      query.lon = lon
+      query.lat = lat
+      query.tier = tier
+      const token = ++query.token
+      api
+        .osmBuildingFootprints(cap, 0, {
+          minx: lon - span,
+          miny: lat - span * 0.7,
+          maxx: lon + span,
+          maxy: lat + span * 0.7,
+        })
+        .then((rows) => {
+          if (buildingQueryRef.current.token === token) setBuildings(rows)
+        })
+        .catch(() => {
+          if (buildingQueryRef.current.token === token) setBuildings([])
+        })
+    },
+    [],
+  )
+  useEffect(() => {
+    refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
+  }, [refreshBuildings, resolvedTier, layers.buildings])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
+      // Shareable camera link: keep ?c=lon,lat,height in sync (replaceState
+      // so history is not spammed by every pan/zoom).
+      const cam = lastCamRef.current
+      const url = new URL(window.location.href)
+      url.searchParams.set(
+        'c',
+        `${cam.longitude.toFixed(5)},${cam.latitude.toFixed(5)},${Math.round(cam.height)}`,
+      )
+      window.history.replaceState(null, '', url)
+    }, 2200)
+    return () => window.clearTimeout(timer)
+  }, [camMoveTick, refreshBuildings, resolvedTier, layers.buildings])
 
   useEffect(() => {
     localStorage.setItem('terra-map-view', viewMode)
@@ -283,6 +515,11 @@ export default function GlobePage() {
       setDrawing(false)
       return
     }
+    if (drawKind === 'measure') {
+      // Keep the measured line on screen; just stop placing points.
+      if (drawVertices.length >= 2) setDrawing(false)
+      return
+    }
     if (drawVertices.length >= 3) setDrawing(false)
   }, [drawKind, drawVertices])
 
@@ -296,15 +533,15 @@ export default function GlobePage() {
       })
       const [lon, lat] = snapped
       const dup = current.findIndex((v) => v.lon === lon && v.lat === lat)
-      // Clicking the first corner closes the ring (roads finish after 2 points);
-      // other repeats are dropped.
-      const minClose = drawKind === 'road' ? 2 : 3
+      // Clicking the first corner closes the ring (roads finish after 2 points,
+      // measurements never close); other repeats are dropped.
+      const minClose = drawKind === 'road' ? 2 : drawKind === 'measure' ? Number.POSITIVE_INFINITY : 3
       if (dup === 0 && current.length >= minClose) {
         finishDrawing()
         return
       }
       if (dup >= 0) return
-      setDrawVertices([...current, { lon, lat }])
+      setDrawVertices([...current, { lon, lat, h: raw.h }])
     },
     [drawKind, drawVertices, finishDrawing, snapGeom, snapGrid, snapRings],
   )
@@ -320,6 +557,43 @@ export default function GlobePage() {
     if (key === 'geom') setSnapGeom((v) => !v)
     else setSnapGrid((v) => !v)
   }, [])
+
+  // ---- GEV: search / view commands / measure --------------------------------
+  const localResults = useMemo(() => searchLocal(searchQuery, 6), [searchQuery])
+  const pickSearch = useCallback((r: SearchResult) => {
+    setFocus({ longitude: r.longitude, latitude: r.latitude, height: r.height, duration: 1.4 })
+    setSearchOpen(false)
+    setSearchQuery(r.label)
+  }, [])
+  const submitSearch = useCallback(async () => {
+    if (localResults.length > 0) {
+      pickSearch(localResults[0])
+      return
+    }
+    const q = searchQuery.trim()
+    if (!q) return
+    setSearchBusy(true)
+    try {
+      const remote = await searchPlaces(q)
+      if (remote.length > 0) pickSearch(remote[0])
+    } finally {
+      setSearchBusy(false)
+    }
+  }, [localResults, pickSearch, searchQuery])
+  const toggleMeasure = useCallback(() => {
+    if (drawKind === 'measure') {
+      setDrawing(false)
+      setDrawKind('parcel')
+    } else {
+      setDrawVertices([])
+      setDrawKind('measure')
+      setDrawing(true)
+    }
+  }, [drawKind])
+  const measureLenM = useMemo(() => {
+    if (drawKind !== 'measure' || drawVertices.length < 2) return 0
+    return lineLengthM(drawVertices.map((v) => [v.lon, v.lat] as LonLat))
+  }, [drawKind, drawVertices])
 
   const selectedSummary = useMemo(() => {
     if (!selectedParcel) return null
@@ -553,6 +827,14 @@ export default function GlobePage() {
             setWebglStatus(status)
             if (status) setViewMode('2d')
           }}
+          graphicsTier={resolvedTier}
+          autoTier={tierPref === 'auto'}
+          ionTokenRev={ionRev}
+          onFps={setFps}
+          onTierCapped={onTierCapped}
+          onTerrainStatus={setTerrainStatus}
+          tilesetUrl={tilesetUrl}
+          viewCommand={viewCommand}
         />
 
         <div className="explore-heading">
@@ -571,12 +853,123 @@ export default function GlobePage() {
               ? t('statsKm', { n: geoStats.road_length_km.toFixed(0) })
               : t('statsSpatial')}
           </span>
+          <span
+            className={`terrain-badge terrain-${terrainStatus}`}
+            title={
+              terrainStatus === 'flat' && !TIER_SETTINGS[resolvedTier].terrain
+                ? t('terrainNeedsTier')
+                : undefined
+            }
+          >
+            {t(TERRAIN_LABEL[terrainStatus])}
+          </span>
           {usingDemo && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
               {t('demoDataBadge')}
             </span>
           )}
         </div>
+
+        {/* GEV tool cluster: search, measure, view commands */}
+        <div className="globe-gev">
+          <div className="globe-chips bg-surface/90 rounded-lg shadow px-1.5 py-1 flex gap-1 text-[11px]">
+            <button
+              className={`btn btn-ghost px-2 py-1 gap-1 ${searchOpen ? 'globe-basemap-on' : 'text-muted'}`}
+              onClick={() => setSearchOpen((o) => !o)}
+              aria-pressed={searchOpen}
+              title={t('searchTitle')}
+            >
+              <Search size={12} /> {t('searchAction')}
+            </button>
+            <span className="globe-chip-sep" aria-hidden="true" />
+            <button
+              className={`btn btn-ghost px-2 py-1 gap-1 ${drawKind === 'measure' && drawing ? 'text-amber-700' : 'text-muted'}`}
+              onClick={toggleMeasure}
+              aria-pressed={drawKind === 'measure' && drawing}
+              title={t('measureTitle')}
+            >
+              <Ruler size={12} /> {t('measureAction')}
+            </button>
+            <span className="globe-chip-sep" aria-hidden="true" />
+            <button
+              className="btn btn-ghost px-2 py-1"
+              onClick={() => setViewCommand({ kind: 'reset', nonce: Date.now() })}
+              title={t('resetViewTitle')}
+            >
+              <RotateCcw size={12} />
+            </button>
+            <button
+              className="btn btn-ghost px-2 py-1"
+              onClick={() => setViewCommand({ kind: 'north', nonce: Date.now() })}
+              title={t('northUpTitle')}
+            >
+              <Compass size={12} />
+            </button>
+            <button
+              className="btn btn-ghost px-2 py-1"
+              onClick={() => setViewCommand({ kind: 'tilt', nonce: Date.now() })}
+              title={t('tiltTitle')}
+            >
+              <Move3d size={12} />
+            </button>
+          </div>
+          {drawKind === 'measure' && drawVertices.length >= 1 && (
+            <div className="measure-bar">
+              <Ruler size={12} className="text-muted" />
+              <span>
+                {t('labelLength')} <b>{measureLenM >= 1000 ? `${(measureLenM / 1000).toFixed(2)} km` : `${measureLenM.toFixed(1)} m`}</b>
+                {' · '}
+                {t('labelPoints')} <b>{drawVertices.length}</b>
+              </span>
+              <button
+                className="btn btn-ghost px-1.5 py-0.5 text-[11px]"
+                onClick={() => setDrawVertices([])}
+                disabled={drawVertices.length === 0}
+              >
+                {t('clearAction')}
+              </button>
+            </div>
+          )}
+          {searchOpen && (
+            <div className="globe-search">
+              <input
+                autoFocus
+                className="text-input w-full"
+                placeholder={t('searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void submitSearch()
+                  if (e.key === 'Escape') setSearchOpen(false)
+                }}
+              />
+              {localResults.map((r) => (
+                <button
+                  key={r.id}
+                  className="btn btn-ghost justify-start px-2 py-1 text-left"
+                  onClick={() => pickSearch(r)}
+                >
+                  {r.label}
+                </button>
+              ))}
+              {localResults.length === 0 && (
+                <button
+                  className="btn btn-ghost justify-start px-2 py-1 text-left"
+                  disabled={searchBusy || !searchQuery.trim()}
+                  onClick={() => void submitSearch()}
+                >
+                  {searchBusy ? '…' : t('searchOnline')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {hudNotice && (
+          <div className="hud-notice" role="status">
+            {hudNotice}
+          </div>
+        )}
 
         {/* layer toggles + basemap switcher */}
         <div className="globe-chips absolute top-3 right-3 bg-surface/90 rounded-lg shadow px-2 py-1.5 flex gap-1 text-[11px]">
@@ -604,6 +997,23 @@ export default function GlobePage() {
               {t(labelKey)}
             </button>
           ))}
+          <span className="globe-chip-sep" aria-hidden="true" />
+          <select
+            className="globe-tier-select"
+            value={tierPref}
+            onChange={(event) => changeTierPref(event.target.value as TierPreference)}
+            aria-label={t('graphicsTierLabel')}
+            title={t('graphicsTierLabel')}
+          >
+            <option value="auto">{t('tierAuto')}</option>
+            <option value="low">{t('tierLow')}</option>
+            <option value="medium">{t('tierMedium')}</option>
+            <option value="high">{t('tierHigh')}</option>
+            <option value="ultra">{t('tierUltra')}</option>
+          </select>
+          <span className="perf-readout">
+            {fps !== null ? t('fpsLabel', { n: fps }) : t('fpsIdle')}
+          </span>
           <span className="globe-chip-sep" aria-hidden="true" />
           <button
             className={`btn btn-ghost px-2 py-1 gap-1 ${layersCard ? 'globe-basemap-on' : 'text-muted'}`}
@@ -640,6 +1050,29 @@ export default function GlobePage() {
                   <span className="flex-1 text-left">{t(labelKey)}</span>
                 </button>
               ))}
+              <div className="ion-token-row">
+                <label htmlFor="terra-ion-token">{t('ionTokenField')}</label>
+                <div className="ion-token-input">
+                  <input
+                    id="terra-ion-token"
+                    type="password"
+                    value={ionDraft}
+                    placeholder="••••••••"
+                    onChange={(event) => setIonDraft(event.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button className="btn btn-ghost px-2 py-1" onClick={applyIonToken}>
+                    {t('ionTokenSave')}
+                  </button>
+                  {hasIonToken && (
+                    <button className="btn btn-ghost px-2 py-1" onClick={removeIonToken}>
+                      {t('ionTokenRemove')}
+                    </button>
+                  )}
+                </div>
+                <p>{t('ionTokenHint')}</p>
+              </div>
             </div>
           )}
         </div>
@@ -762,7 +1195,7 @@ export default function GlobePage() {
           </button>
         )}
         <div className="flex border-b panel-tabs">
-          {(['register', 'browse', 'plan'] as const).map((tabId) => (
+          {(['register', 'browse', 'plan', 'media'] as const).map((tabId) => (
             <button
               key={tabId}
               className={`flex-1 py-2 text-[13px] font-medium capitalize hover:bg-bg ${
@@ -771,7 +1204,13 @@ export default function GlobePage() {
               onClick={() => setTab(tabId)}
               aria-pressed={tab === tabId}
             >
-              {tabId === 'register' ? t('tabRegister') : tabId === 'browse' ? t('tabBrowse') : t('tabPlan')}
+              {tabId === 'register'
+                ? t('tabRegister')
+                : tabId === 'browse'
+                  ? t('tabBrowse')
+                  : tabId === 'plan'
+                    ? t('tabPlan')
+                    : t('mediaGallery')}
             </button>
           ))}
         </div>
@@ -807,6 +1246,10 @@ export default function GlobePage() {
               snapGrid={snapGrid}
               onToggleSnap={onToggleSnap}
             />
+          ) : tab === 'media' ? (
+            <MediaPanel
+              parcelId={selectedParcel?.address ?? selectedOffChain?.id ?? null}
+            />
           ) : repr ? (
             <RepresentationPanel
               title={repr.title}
@@ -834,6 +1277,12 @@ export default function GlobePage() {
                 account={selectedParcel.account}
                 holder={selectedParcel.holder}
                 onView3D={viewSelectedOff3D ?? undefined}
+              />
+              <SpatialHistoryPanel
+                parcelPubkey={selectedParcel.address}
+                onOpenModel={(uri) =>
+                  setTilesetOverride({ parcelId: selectedParcel.address, uri })
+                }
               />
               {selectedSummary?.off && (
                 <div className="px-3 pb-3 text-[12px] text-muted">

@@ -31,6 +31,10 @@ impl AppError {
     pub fn unauthorized(msg: impl Into<String>) -> Self {
         AppError::Unauthorized(msg.into())
     }
+
+    pub fn internal(msg: impl Into<String>) -> Self {
+        AppError::Internal(msg.into())
+    }
 }
 
 impl From<sqlx::Error> for AppError {

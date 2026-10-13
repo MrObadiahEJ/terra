@@ -26,18 +26,18 @@ Related: [`../README.md`](../README.md) (repo status) ·
 
 ---
 
-## Where we are today (verified 2026-09-28)
+## Where we are today (verified 2026-10-13)
 
 | Layer | State |
 |-------|-------|
-| On-chain programs | `terra_registry` **162 instructions · 67 accounts · 149 events · 241 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
-| Protocol specs | **RFC-003 → RFC-013** — 003–012 delivered (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture), RFC-013 (spatial pipeline) Phase A delivered |
-| Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path + **Vision Stage 3 Phase A** (spatial assets, versioned geometry) |
-| Tests | Registry BPF integration **305/305**, identity BPF **23/23**, unit libs **142 + 6**, RFC-012 structure **21**, geo **4**, API **68** — all green; CI **4/4** |
+| On-chain programs | `terra_registry` **165 instructions · 71 accounts · 152 events · 247 errors**; `terra_identity` **8 · 2 · 8 · 29** — IDL checked in and synced |
+| Protocol specs | **RFC-003 → RFC-013** — 003–012 delivered (vault, escrow, staking, cross-border, disputes, subdivision, time-bound, guardianship, ZK, global architecture), RFC-013 (spatial pipeline) Phases A–E delivered (2026-10-13), devnet deploy pending |
+| Hardening | RFC-012 **Phases 0–10 complete** + Tier A1–A3 + B6 program boundary + P0-2 removal path + **Vision Stage 3 Phases A–E** (spatial assets, versioned geometry, evidence link, quorum verify, 3D models, snapshots, AI/GIS worker loop) |
+| Tests | Registry BPF integration **307/307**, identity BPF **23/23**, unit libs **153 + 6**, RFC-012 structure **21**, geo **6**, API **99** — all green; CI **4/4** |
 | Release | `main` = stable (`d22ef61`), CI green; active work on `dev` |
-| Off-chain | PostGIS mirror (migrations `0001…0026`), Axum REST API (21 route modules), OSM geo-engine with on-chain road-access digest |
+| Off-chain | PostGIS mirror (migrations `0001…0031`), Axum REST API (26 route modules, incl. `/spatial-accounts` + reconstruction worker), OSM geo-engine with on-chain road-access digest |
 | Frontend | React 19 + Vite: 3D Cesium globe with automatic **2D Leaflet fallback when WebGL is unavailable**, `/lab` interactive experiments (incl. WebGL-free SVG 3D land skeleton), `/transactions` demo chain explorer, typed API client, wallet adapter |
-| Next | Vision Stage 3 Phases B–E (evidence-linked geometry → snapshots → 3D models → AI/GIS loop) per [RFC-013](rfc-013-spatial-intelligence-pipeline.md); **devnet deployment** (both programs + wallet wiring); mainnet gates (RFC-005 reconfirm, ZK audit) |
+| Next | **Devnet deployment** (both programs + wallet wiring — faucet-limited at time of writing); mainnet gates (RFC-005 reconfirm, ZK audit) per [RFC-013](rfc-013-spatial-intelligence-pipeline.md) |
 
 ---
 

@@ -29970,6 +29970,449 @@ async fn stage3_geometry_quorum_config() {
     assert!(e.verified_at > 0);
 }
 
+// ---------------------------------------------------------------------------
+// Stage 3 Phase C (RFC-013): 3D models & spatial snapshots
+// ---------------------------------------------------------------------------
+
+fn three_d_model_meta_pda(asset_pk: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"three_d_model_meta", asset_pk.as_ref()], &PROGRAM_ID)
+}
+
+fn three_d_model_pda(asset_pk: &Pubkey, model_version: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"three_d_model",
+            asset_pk.as_ref(),
+            &model_version.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+fn spatial_snapshot_meta_pda(asset_pk: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"spatial_snapshot_meta", asset_pk.as_ref()], &PROGRAM_ID)
+}
+
+fn spatial_snapshot_pda(asset_pk: &Pubkey, snapshot_index: u32) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            b"spatial_snapshot",
+            asset_pk.as_ref(),
+            &snapshot_index.to_le_bytes(),
+        ],
+        &PROGRAM_ID,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stage3_register_model_ix(
+    asset_pk: &Pubkey,
+    payer: &Pubkey,
+    model_version: u32,
+    model_hash: &[u8; 32],
+    storage_reference: &str,
+    model_format: u8,
+    geometry_version: u32,
+) -> Instruction {
+    let (meta_pk, _) = three_d_model_meta_pda(asset_pk);
+    let (model_pk, _) = three_d_model_pda(asset_pk, model_version);
+    let mut data = discriminator("global", "register_3d_model").to_vec();
+    data.extend_from_slice(model_hash);
+    data.extend_from_slice(&borsh_ser(&storage_reference.to_string()));
+    data.push(model_format);
+    data.extend_from_slice(&geometry_version.to_le_bytes());
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*asset_pk, false),
+            AccountMeta::new(meta_pk, false),
+            AccountMeta::new(model_pk, false),
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+fn stage3_verify_model_ix(model_pk: &Pubkey, validator: &Pubkey) -> Instruction {
+    let (profile_pk, _) = validator_profile_pda(validator);
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*model_pk, false),
+            AccountMeta::new_readonly(profile_pk, false),
+            AccountMeta::new_readonly(*validator, true),
+        ],
+        data: discriminator("global", "verify_3d_model").to_vec(),
+    }
+}
+
+fn stage3_snapshot_ix(
+    asset_pk: &Pubkey,
+    payer: &Pubkey,
+    snapshot_index: u32,
+    label: &str,
+) -> Instruction {
+    let (meta_pk, _) = spatial_snapshot_meta_pda(asset_pk);
+    let (snapshot_pk, _) = spatial_snapshot_pda(asset_pk, snapshot_index);
+    let mut data = discriminator("global", "create_spatial_snapshot").to_vec();
+    data.extend_from_slice(&borsh_ser(&label.to_string()));
+    Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(*asset_pk, false),
+            AccountMeta::new(meta_pk, false),
+            AccountMeta::new(snapshot_pk, false),
+            AccountMeta::new(*payer, true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data,
+    }
+}
+
+#[tokio::test]
+async fn stage3_3d_model_lifecycle() {
+    use terra_registry::spatial_asset::{
+        elevation_source, geometry_source, spatial_dimension, GeometryVersion,
+    };
+    use terra_registry::three_d_model::{model_format, ThreeDModel, ThreeDModelMeta};
+
+    let (mut ctx, payer) = setup().await;
+    create_registry_ok(&mut ctx, &payer).await;
+
+    // Asset with one anchored geometry version (models must derive from it).
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 230).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(&parcel, &payer.pubkey(), spatial_dimension::D3, 0, 500_000),
+    )
+    .await
+    .expect("init spatial asset");
+    let h0 = [7u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &h0,
+            geometry_source::PHOTOGRAMMETRY,
+            spatial_dimension::D3,
+            "s3://terra/geo0.geojson",
+            0,
+            500_000,
+            elevation_source::PHOTOGRAMMETRY,
+        ),
+    )
+    .await
+    .expect("append v0");
+
+    // --- register m0 (claim: tileset built from geometry v0) --------------
+    let mh0 = [0x11u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &mh0,
+            "ipfs://bafy-model0/tileset.json",
+            model_format::CESIUM_TILESET,
+            0,
+        ),
+    )
+    .await
+    .expect("register m0");
+    let (model0_pk, _) = three_d_model_pda(&asset_pk, 0);
+    let m0: ThreeDModel = read_account(&ctx, model0_pk).await;
+    assert_eq!(m0.asset, asset_pk);
+    assert_eq!(m0.parcel, parcel);
+    assert_eq!(m0.model_version, 0);
+    assert_eq!(m0.geometry_version, 0);
+    assert_eq!(m0.model_hash, mh0);
+    assert_eq!(m0.storage_reference, "ipfs://bafy-model0/tileset.json");
+    assert_eq!(m0.model_format, model_format::CESIUM_TILESET);
+    assert!(!m0.verified);
+    assert!(m0.submitted_at > 0);
+    let meta: ThreeDModelMeta = read_account(&ctx, three_d_model_meta_pda(&asset_pk).0).await;
+    assert_eq!(meta.asset, asset_pk);
+    assert_eq!(meta.count, 1);
+
+    // --- provenance: model must reference an anchored geometry version ----
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0x22u8; 32],
+            "ipfs://bafy-ghost",
+            model_format::GLTF,
+            1, // cursor is 1 → version 1 does not exist yet
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6243, "model must derive from an anchored version");
+
+    // --- format / hash / storage-reference guards -------------------------
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0x22u8; 32],
+            "ipfs://bafy-badfmt",
+            model_format::UNKNOWN,
+            0,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6241, "UNKNOWN format must fail");
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0x22u8; 32],
+            "ipfs://bafy-badfmt2",
+            model_format::MAX + 1,
+            0,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6241, "out-of-range format must fail");
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0u8; 32],
+            "ipfs://bafy-emptyhash",
+            model_format::GLTF,
+            0,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6002, "zero model hash must fail");
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &[0x22u8; 32],
+            "",
+            model_format::GLTF,
+            0,
+        ),
+    )
+    .await;
+    assert_custom_error(res, 6134, "empty storage reference must fail");
+
+    // --- register m1 (glTF from the same geometry v0) ---------------------
+    let mh1 = [0x33u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_register_model_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &mh1,
+            "ipfs://bafy-model1/mesh.glb",
+            model_format::GLTF,
+            0,
+        ),
+    )
+    .await
+    .expect("register m1");
+    let meta: ThreeDModelMeta = read_account(&ctx, three_d_model_meta_pda(&asset_pk).0).await;
+    assert_eq!(meta.count, 2);
+    let (_gm0, _) = geometry_version_pda(&asset_pk, 0);
+    let g0: GeometryVersion = read_account(&ctx, _gm0).await;
+    assert_eq!(g0.version, 0, "registering models must not touch geometry history");
+
+    // --- verify: unregistered signer cannot flip the claim ----------------
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_verify_model_ix(&model0_pk, &payer.pubkey()),
+    )
+    .await;
+    assert!(res.is_err(), "non-validator verify must fail");
+
+    let v1 = Keypair::new();
+    phase7_init_validator(&mut ctx, &payer, &v1).await;
+    process(&mut ctx, &v1, stage3_verify_model_ix(&model0_pk, &v1.pubkey()))
+        .await
+        .expect("verify m0");
+    let m0: ThreeDModel = read_account(&ctx, model0_pk).await;
+    assert!(m0.verified, "validator signature flips the claim to a fact");
+    assert_eq!(m0.verified_by, v1.pubkey());
+    assert!(m0.verified_at > 0);
+
+    // double verify rejected (6244).
+    let res = process(&mut ctx, &v1, stage3_verify_model_ix(&model0_pk, &v1.pubkey()))
+        .await;
+    assert_custom_error(res, 6244, "double verify must fail");
+
+    // m1 stays an unverified claim — models verify independently.
+    let (model1_pk, _) = three_d_model_pda(&asset_pk, 1);
+    let m1: ThreeDModel = read_account(&ctx, model1_pk).await;
+    assert!(!m1.verified);
+}
+
+#[tokio::test]
+async fn stage3_spatial_snapshot_lifecycle() {
+    use terra_registry::spatial_asset::{
+        elevation_source, geometry_source, spatial_dimension, SpatialAsset,
+    };
+    use terra_registry::spatial_snapshot::{SpatialSnapshot, SpatialSnapshotMeta};
+
+    let (mut ctx, payer) = setup().await;
+
+    let parcel = stage3_register_parcel(&mut ctx, &payer, 240).await;
+    let (asset_pk, _) = spatial_asset_pda(&parcel);
+    process(
+        &mut ctx,
+        &payer,
+        stage3_init_ix(
+            &parcel,
+            &payer.pubkey(),
+            spatial_dimension::D3,
+            -50,
+            1_200_000,
+        ),
+    )
+    .await
+    .expect("init spatial asset");
+
+    // Empty-history snapshot first: cursor 0, all-zero latest hash.
+    process(
+        &mut ctx,
+        &payer,
+        stage3_snapshot_ix(&asset_pk, &payer.pubkey(), 0, "before any version"),
+    )
+    .await
+    .expect("snapshot 0");
+    let (s0_pk, _) = spatial_snapshot_pda(&asset_pk, 0);
+    let s0: SpatialSnapshot = read_account(&ctx, s0_pk).await;
+    assert_eq!(s0.asset, asset_pk);
+    assert_eq!(s0.parcel, parcel);
+    assert_eq!(s0.snapshot_index, 0);
+    assert_eq!(s0.geometry_version_count, 0);
+    assert_eq!(s0.latest_geometry, [0u8; 32]);
+    assert_eq!(s0.dimensionality, spatial_dimension::D3);
+    assert_eq!(s0.elevation_min_mm, -50);
+    assert_eq!(s0.elevation_max_mm, 1_200_000);
+    assert_eq!(s0.label, "before any version");
+    assert!(s0.created_at > 0);
+    let meta: SpatialSnapshotMeta = read_account(&ctx, spatial_snapshot_meta_pda(&asset_pk).0).await;
+    assert_eq!(meta.count, 1);
+
+    // Append v0 (D2 survey — no elevation provenance) + v1 (2.5D DEM).
+    let h0 = [0x41u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            0,
+            &h0,
+            geometry_source::SURVEY,
+            spatial_dimension::D2,
+            "ipfs://geo-a",
+            0,
+            0,
+            elevation_source::NONE,
+        ),
+    )
+    .await
+    .expect("append v0");
+    let h1 = [0x42u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            1,
+            &h1,
+            geometry_source::DRONE_PHOTO,
+            spatial_dimension::D2_5,
+            "ipfs://geo-b",
+            110_000,
+            880_000,
+            elevation_source::DEM,
+        ),
+    )
+    .await
+    .expect("append v1");
+    process(
+        &mut ctx,
+        &payer,
+        stage3_snapshot_ix(&asset_pk, &payer.pubkey(), 1, "2024 baseline"),
+    )
+    .await
+    .expect("snapshot 1");
+    let (s1_pk, _) = spatial_snapshot_pda(&asset_pk, 1);
+    let s1: SpatialSnapshot = read_account(&ctx, s1_pk).await;
+    assert_eq!(s1.snapshot_index, 1);
+    assert_eq!(s1.geometry_version_count, 2);
+    assert_eq!(s1.latest_geometry, h1);
+    assert_eq!(s1.label, "2024 baseline");
+
+    // Later appends never rewrite earlier snapshots (copy semantics).
+    let h2 = [0x43u8; 32];
+    process(
+        &mut ctx,
+        &payer,
+        stage3_append_ix(
+            &asset_pk,
+            &payer.pubkey(),
+            2,
+            &h2,
+            geometry_source::LIDAR,
+            spatial_dimension::D3,
+            "ipfs://geo-c",
+            105_000,
+            890_000,
+            elevation_source::LIDAR,
+        ),
+    )
+    .await
+    .expect("append v2");
+    let s0_after: SpatialSnapshot = read_account(&ctx, s0_pk).await;
+    let s1_after: SpatialSnapshot = read_account(&ctx, s1_pk).await;
+    assert_eq!(s0_after.geometry_version_count, 0, "s0 must stay frozen");
+    assert_eq!(s1_after.geometry_version_count, 2, "s1 must stay frozen");
+    let a: SpatialAsset = read_account(&ctx, asset_pk).await;
+    assert_eq!(a.geometry_version_count, 3, "live cursor keeps advancing");
+
+    // Label longer than 64 bytes is rejected, not truncated.
+    let long_label = "x".repeat(65);
+    let res = process(
+        &mut ctx,
+        &payer,
+        stage3_snapshot_ix(&asset_pk, &payer.pubkey(), 2, &long_label),
+    )
+    .await;
+    assert_custom_error(res, 6246, "oversized label must fail");
+}
+
 // ============================================================================
 // P0-REMAINING — remaining_accounts adversarial coverage
 // (docs/remaining-accounts-matrix.md, findings F1 / F2)

@@ -77,6 +77,10 @@ pub struct BuildingFootprintView {
     pub osm_id: i64,
     pub name: Option<String>,
     pub building: String,
+    /// Mapped height in metres (`height=*`), when present.
+    pub height_m: Option<f32>,
+    /// Mapped storey count (`building:levels=*`), when present.
+    pub levels: Option<i16>,
     /// OSM-mapped building footprint; not a legal parcel outline.
     pub geometry: Value,
 }
@@ -126,6 +130,8 @@ async fn buildings(
             osm_id: building.id,
             name: building.name.clone(),
             building: building.building.clone(),
+            height_m: building.height_m,
+            levels: building.levels,
             geometry: json!({
                 "type": "Polygon",
                 "coordinates": [building.ring.iter().map(|point| [point.x, point.y]).collect::<Vec<_>>()]
@@ -254,6 +260,8 @@ mod tests {
             id: 1,
             name: None,
             building: "yes".into(),
+            height_m: None,
+            levels: None,
             ring: coords.iter().map(|(x, y)| Coord { x: *x, y: *y }).collect(),
         }
     }

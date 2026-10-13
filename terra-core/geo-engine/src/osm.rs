@@ -34,8 +34,37 @@ pub struct BuildingFootprint {
     pub id: i64,
     pub name: Option<String>,
     pub building: String,
+    /// Mapped height in metres (`height=*` tag), when present.
+    pub height_m: Option<f32>,
+    /// Mapped storey count (`building:levels=*` tag), when present.
+    pub levels: Option<i16>,
     /// Closed polygon ring in [longitude, latitude] order.
     pub ring: Vec<Coord<f64>>,
+}
+
+/// Parse an OSM `height=*` value like "12", "12 m", or "12.5m" into metres.
+fn parse_height_m(raw: &str) -> Option<f32> {
+    let digits: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    let value: f32 = digits.parse().ok()?;
+    if value.is_finite() && value > 0.0 && value < 1000.0 {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+/// Parse an OSM `building:levels=*` value into a storey count.
+fn parse_levels(raw: &str) -> Option<i16> {
+    let value: f32 = parse_height_m(raw)?;
+    let rounded = value.round();
+    if (1.0..=200.0).contains(&rounded) {
+        Some(rounded as i16)
+    } else {
+        None
+    }
 }
 
 /// Everything we care about from a PBF extract.
@@ -90,6 +119,8 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                     way.id(),
                     tags.get("name").cloned(),
                     kind.clone(),
+                    tags.get("height").and_then(|raw| parse_height_m(raw)),
+                    tags.get("building:levels").and_then(|raw| parse_levels(raw)),
                     refs.clone(),
                 ));
             }
@@ -114,7 +145,7 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
 
     data.buildings = building_ways
         .into_iter()
-        .filter_map(|(id, name, building, refs)| {
+        .filter_map(|(id, name, building, height_m, levels, refs)| {
             if refs.len() < 4 || refs.first() != refs.last() {
                 return None;
             }
@@ -126,6 +157,8 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                 id,
                 name,
                 building,
+                height_m,
+                levels,
                 ring,
             })
         })
@@ -190,4 +223,27 @@ where
         tags: map,
         coord,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_height_m, parse_levels};
+
+    #[test]
+    fn height_parses_bare_and_suffixed_values() {
+        assert_eq!(parse_height_m("12"), Some(12.0));
+        assert_eq!(parse_height_m("12 m"), Some(12.0));
+        assert_eq!(parse_height_m("12.5m"), Some(12.5));
+        assert_eq!(parse_height_m("0"), None);
+        assert_eq!(parse_height_m("nonsense"), None);
+        assert_eq!(parse_height_m("5000"), None);
+    }
+
+    #[test]
+    fn levels_parses_and_bounds_storey_counts() {
+        assert_eq!(parse_levels("3"), Some(3));
+        assert_eq!(parse_levels("3.4"), Some(3));
+        assert_eq!(parse_levels("0"), None);
+        assert_eq!(parse_levels("999"), None);
+    }
 }

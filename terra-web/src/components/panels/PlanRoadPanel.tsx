@@ -7,7 +7,7 @@ import { useLocale } from '../../lib/locale'
 
 interface Props {
   drawing: boolean
-  drawKind: 'parcel' | 'road'
+  drawKind: 'parcel' | 'road' | 'measure'
   drawVertices: DrawVertex[]
   plannedRoads: PlannedRoad[]
   onToggleDrawing: () => void

@@ -13,9 +13,11 @@ pub mod health;
 pub mod identities;
 pub mod parcels;
 pub mod pilot_zones;
+pub mod reconstruction;
 pub mod recovery;
 pub mod rights;
 pub mod spatial;
+pub mod spatial_accounts;
 pub mod staking;
 pub mod subdivision;
 pub mod threshold_credentials;
@@ -40,6 +42,7 @@ pub fn router() -> Router<AppState> {
         .nest("/staking", staking::router())
         .nest("/zk", zk_proofs::router())
         .nest("/spatial", spatial::router())
+        .nest("/spatial-accounts", spatial_accounts::router())
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())
@@ -47,6 +50,7 @@ pub fn router() -> Router<AppState> {
         .nest("/recovery", recovery::router())
         .nest("/credentials", threshold_credentials::router())
         .nest("/evidence", evidence::router())
+        .nest("/reconstruction", reconstruction::router())
         .nest("/tx", tx_prep::router())
         .nest("/demo", demo_scenarios::router())
         .nest("/activity", activity::router())

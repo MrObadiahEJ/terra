@@ -268,9 +268,11 @@ pub mod quorum;
 pub mod recovery;
 pub mod routing;
 pub mod spatial_asset;
+pub mod spatial_snapshot;
 pub mod staking;
 pub mod subdivision;
 pub mod task_economics;
+pub mod three_d_model;
 pub mod time_bound;
 pub mod validator_profile;
 pub mod validator_registry;
@@ -1964,6 +1966,43 @@ pub mod terra_registry {
     /// the append-time quorum threshold is reached (RFC-013 Phase B).
     pub fn verify_geometry_version(ctx: Context<VerifyGeometryVersion>) -> Result<()> {
         spatial_asset::verify_geometry_version(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // 3D models & spatial snapshots (RFC-013 Phase C)
+    // -----------------------------------------------------------------------
+
+    /// Register an off-chain 3D model claim against an anchored geometry
+    /// version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain
+    /// geometry, only hash + storage pointer).
+    #[allow(clippy::too_many_arguments)]
+    pub fn register_3d_model(
+        ctx: Context<Register3DModel>,
+        model_hash: [u8; 32],
+        storage_reference: String,
+        model_format: u8,
+        geometry_version: u32,
+    ) -> Result<()> {
+        three_d_model::register_3d_model(
+            ctx,
+            model_hash,
+            storage_reference,
+            model_format,
+            geometry_version,
+        )
+    }
+
+    /// A registered validator attests a registered model's hash
+    /// (claim → fact, same split as geometry verification).
+    pub fn verify_3d_model(ctx: Context<Verify3DModel>) -> Result<()> {
+        three_d_model::verify_3d_model(ctx)
+    }
+
+    /// Freeze a point-in-time copy of the asset's spatial indexes
+    /// (RFC-012 §5 `SpatialSnapshot`, RFC-013 §8.5 — snapshots copy the
+    /// cursor; later appends never mutate them).
+    pub fn create_spatial_snapshot(ctx: Context<CreateSpatialSnapshot>, label: String) -> Result<()> {
+        spatial_snapshot::create_spatial_snapshot(ctx, label)
     }
 
     // -----------------------------------------------------------------------
@@ -3715,6 +3754,102 @@ pub struct VerifyGeometryVersion<'info> {
     )]
     pub profile: Account<'info, validator_profile::ValidatorProfile>,
     pub validator: Signer<'info>,
+}
+
+// ---------------------------------------------------------------------------
+// 3D model & spatial snapshot contexts (RFC-013 Phase C)
+// ---------------------------------------------------------------------------
+
+/// Permissionless: registering a model is an anchor, not authority.
+#[derive(Accounts)]
+pub struct Register3DModel<'info> {
+    #[account(
+        mut,
+        seeds = [b"spatial_asset", asset.parcel.as_ref()],
+        bump,
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    /// Per-asset model cursor (created lazily on first registration).
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + three_d_model::ThreeDModelMeta::INIT_SPACE,
+        seeds = [b"three_d_model_meta", asset.key().as_ref()],
+        bump,
+    )]
+    pub meta: Account<'info, three_d_model::ThreeDModelMeta>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + three_d_model::ThreeDModel::INIT_SPACE,
+        seeds = [
+            b"three_d_model",
+            asset.key().as_ref(),
+            &meta.count.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub model: Account<'info, three_d_model::ThreeDModel>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Registered validator attests a registered model's hash (claim → fact).
+#[derive(Accounts)]
+pub struct Verify3DModel<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"three_d_model",
+            model.asset.as_ref(),
+            &model.model_version.to_le_bytes(),
+        ],
+        bump,
+    )]
+    pub model: Account<'info, three_d_model::ThreeDModel>,
+    #[account(
+        seeds = [b"validator_profile", validator.key().as_ref()],
+        bump,
+        constraint = profile.wallet == validator.key() @ TerraError::NotAuthorized,
+    )]
+    pub profile: Account<'info, validator_profile::ValidatorProfile>,
+    pub validator: Signer<'info>,
+}
+
+/// Permissionless: a snapshot is an observation about history, not a right.
+#[derive(Accounts)]
+pub struct CreateSpatialSnapshot<'info> {
+    #[account(
+        mut,
+        seeds = [b"spatial_asset", asset.parcel.as_ref()],
+        bump,
+    )]
+    pub asset: Account<'info, spatial_asset::SpatialAsset>,
+    /// Per-asset snapshot cursor (created lazily on the first snapshot).
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + spatial_snapshot::SpatialSnapshotMeta::INIT_SPACE,
+        seeds = [b"spatial_snapshot_meta", asset.key().as_ref()],
+        bump,
+    )]
+    pub meta: Account<'info, spatial_snapshot::SpatialSnapshotMeta>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + spatial_snapshot::SpatialSnapshot::INIT_SPACE,
+        seeds = [
+            b"spatial_snapshot",
+            asset.key().as_ref(),
+            &meta.count.to_le_bytes(),
+        ],
+        bump
+    )]
+    pub snapshot: Account<'info, spatial_snapshot::SpatialSnapshot>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 // ---------------------------------------------------------------------------
@@ -7009,6 +7144,41 @@ pub struct GeometryVersionVerified {
     pub required: u8,
 }
 
+#[event]
+pub struct ThreeDModelRegistered {
+    pub model: Pubkey,
+    pub asset: Pubkey,
+    pub parcel: Pubkey,
+    pub model_version: u32,
+    pub geometry_version: u32,
+    pub model_hash: [u8; 32],
+    pub model_format: u8,
+    pub submitted_by: Pubkey,
+    pub submitted_at: i64,
+}
+
+#[event]
+pub struct ThreeDModelVerified {
+    pub model: Pubkey,
+    pub asset: Pubkey,
+    pub verified_by: Pubkey,
+    pub verified_at: i64,
+}
+
+#[event]
+pub struct SpatialSnapshotCreated {
+    pub snapshot: Pubkey,
+    pub asset: Pubkey,
+    pub parcel: Pubkey,
+    pub snapshot_index: u32,
+    pub geometry_version_count: u32,
+    /// UTF-8 byte length of the label (the event never carries the string
+    /// itself — read it from the account).
+    pub label_len: u8,
+    pub created_by: Pubkey,
+    pub created_at: i64,
+}
+
 // ---------------------------------------------------------------------------
 // Challenge / Audit events
 // ---------------------------------------------------------------------------
@@ -7728,6 +7898,20 @@ pub enum TerraError {
     EmptyEvidenceManifest,
     #[msg("Geometry version quorum list has no free attestation slot")]
     GeometryQuorumFull,
+
+    // 3D models & spatial snapshots (RFC-013 Phase C)
+    #[msg("Unknown 3D model format, or format is the UNKNOWN placeholder")]
+    InvalidModelFormat,
+    #[msg("Spatial asset has reached the maximum number of 3D models")]
+    ThreeDModelsFull,
+    #[msg("Model geometry version does not exist in the asset's version history")]
+    ModelGeometryVersionMismatch,
+    #[msg("3D model is already verified")]
+    ThreeDModelAlreadyVerified,
+    #[msg("Spatial asset has reached the maximum number of snapshots")]
+    SpatialSnapshotsFull,
+    #[msg("Snapshot label is too long")]
+    InvalidSnapshotLabel,
 }
 
 #[cfg(test)]

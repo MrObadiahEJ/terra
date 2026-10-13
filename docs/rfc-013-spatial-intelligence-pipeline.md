@@ -1,8 +1,8 @@
 # RFC-013 — Spatial intelligence pipeline (Vision Stage 3)
 
-- **Status:** Phase A implemented on `dev` (2026-09-28); **Phase B implemented (2026-10-01)** — Stage 3 marked 🟡 In progress
+- **Status:** Phase A implemented on `dev` (2026-09-28); **Phase B implemented (2026-10-01)**; **Phases C–E delivered (2026-10-13)** — Stage 3 marked 🟡 In progress (devnet deployment remains)
 - **Depends on:** [RFC-012](rfc-012-global-physical-digital-trust-architecture.md) (architecture contract: §5 entity catalog, Design Rules 9 & 10, core invariant §0)
-- **Implements:** `SpatialAsset`, `GeometryVersion` (Phase A) · evidence-anchored append, elevation provenance, validator-quorum verification (Phase B) · plans `ThreeDModel`, `SpatialSnapshot` (Phase C — already named in RFC-012 §5)
+- **Implements:** `SpatialAsset`, `GeometryVersion` (Phase A) · evidence-anchored append, elevation provenance, validator-quorum verification (Phase B) · `ThreeDModel`, `SpatialSnapshot` on-chain accounts + API mirror + globe history UI (Phases C–E core, 2026-10-13)
 - **Related:** [`docs/VISION.md`](VISION.md) Domain 5 (2D → 3D → 4D) and the stage map §13
 
 ---
@@ -136,9 +136,9 @@ accounts are Phase E (see below).
 |-------|-------|--------|
 | **A** | On-chain `SpatialAsset` + `GeometryVersion` (init / append / verify, 3 ixs, 2 accounts, 3 events, 6 errors), unit + BPF tests, IDL, docs | ✅ **Delivered 2026-09-28** |
 | **B** | Geometry linked to the evidence stack: `append_geometry_version_from_evidence` (version anchored to an `EvidenceManifest`), elevation provenance (`elevation_source` + 5 invariants), validator-quorum verification (`attestors`/`attest_count`/`required` snapshot via global `QuorumConfig`), +1 ix, +1 event, +4 errors (6237–6240) | ✅ **Delivered 2026-10-01** |
-| **C** | `ThreeDModel` account (off-chain model ref + hash, DR10) and `SpatialSnapshot` point-in-time reads — the 4D layer of RFC-012 §5 | ⬜ |
-| **D** | AI/GIS worker integration (photo/LiDAR → geometry draft → anchor), provenance attribution, globe rendering of version history | ⬜ |
-| **E** | API mirror + REST routes for spatial accounts; devnet deployment | ⬜ |
+| **C** | `ThreeDModel` account (off-chain model ref + hash, DR10) and `SpatialSnapshot` point-in-time reads — the 4D layer of RFC-012 §5 | ✅ **Delivered 2026-10-13** — `register_3d_model` / `verify_3d_model` / `create_spatial_snapshot` (3 ixs, 4 accounts incl. lazy cursors, 3 events, 6 errors 6241–6246), unit tests |
+| **D** | AI/GIS worker integration (photo/LiDAR → geometry draft → anchor), provenance attribution, globe rendering of version history | ✅ **Delivered 2026-10-13** — provenance attribution + geometry-history UI (timeline, point-in-time snapshots, model claims → globe tilesets); AI/GIS worker pipeline (migration `0031`, job lease/progress/complete, PostGIS convex-hull draft generator, SHA-256 `geometry_hash`, ready-to-sign `append_geometry_version` anchor prep, draft anchor confirmation) |
+| **E** | API mirror + REST routes for spatial accounts; devnet deployment | 🟡 **2026-10-13** — migration `0030` (4 mirror tables) + REST `/spatial-accounts/*` (assets/versions/models/snapshots/history, 6 endpoints) delivered; devnet deployment still ⬜ (faucet-limited) |
 
 ## 8. Testing (Phases A + B)
 
@@ -156,8 +156,14 @@ accounts are Phase E (see below).
   artifact, anchored append asserts `evidence_manifest` link, empty manifest
   6239, cancelled task 6174), `stage3_geometry_quorum_config` (**new** —
   global `QuorumConfig (0,[0,0])` → `required = 3`: 1st/2nd attest not
-  verified, 3rd flips) — integration **305/305**
-- IDL synced: **162 / 67 / 149 / 241** (`terra-web/src/idl/`)
+  verified, 3rd flips), `stage3_3d_model_lifecycle` (**new** — register m0
+  tileset from geometry v0 + m1 glTF, provenance 6243 (model must derive from
+  an anchored version), format 6241, empty-hash 6002, empty-ref 6134, verify
+  flips claim, non-validator reject, double-verify 6244, unverified sibling),
+  `stage3_spatial_snapshot_lifecycle` (**new** — empty-history snapshot,
+  cursor copies live index, later appends never rewrite earlier snapshots,
+  label > 64 bytes → 6246) — integration **307/307**
+- IDL synced: **165 / 71 / 152 / 247** (`terra-web/src/idl/`)
 
 ## 9. Open questions (Phase B+)
 
@@ -180,5 +186,7 @@ accounts are Phase E (see below).
 
 Start at [RFC-012 §8.1](rfc-012-global-physical-digital-trust-architecture.md)
 for the architecture contract and devnet checklist, then pick a Phase C–E
-slice from §7. Stage 3 remains 🟡 until the AI/GIS loop (D) runs end-to-end;
-Stages 4–5 build on `ThreeDModel`/`SpatialSnapshot` (C).
+slice from §7. Stage 3 remains 🟡 until both programs land on devnet
+(faucet-limited at time of writing); the AI/GIS loop (D) and the mirror +
+REST (E core) already run end-to-end. Stages 4–5 build on
+`ThreeDModel`/`SpatialSnapshot` (C).

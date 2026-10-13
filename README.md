@@ -412,7 +412,14 @@ governance will be published past the devnet pilot.
 
 ## License
 
-*(To be finalized — Apache-2.0 or MIT recommended, given the multi-country ambition.)*
+Source code is licensed under the [Apache License 2.0](LICENSE). See
+[TRADEMARKS.md](TRADEMARKS.md) for the name/logo policy — the code license
+does not cover the marks.
+
+Data licenses are separate from the code license: OpenStreetMap data is
+© OpenStreetMap contributors (ODL/ODbL), Esri basemap tiles are subject to
+Esri's terms, Cesium ion assets are subject to ion's terms, and evidence
+files uploaded by users remain the property of their uploaders.
 
 ## Disclaimer
 

@@ -9,16 +9,20 @@ import {
   type PoiRow,
   type OsmBuildingFootprint,
 } from '../../lib/api'
-import { roadStyle, type PlannedRoad } from '../../lib/atlasLayers'
+import { buildingHeightM, roadStyle, type PlannedRoad } from '../../lib/atlasLayers'
+import { FpsWatchdog, TIER_SETTINGS, type GraphicsTier } from '../../lib/perfTier'
+import { resolveTerrain, type TerrainStatus } from '../../lib/cesiumTerrain'
 import LeafletMap from './LeafletMap'
 
-// Set your Cesium Ion token here to unlock World Terrain + 3D Tiles
-// (e.g. photorealistic city tiles and photogrammetry mesh support).
+// Ion stays off by default: world terrain and 3D tiles are an explicit,
+// per-browser upgrade (the token lives in localStorage, never in this file).
 Cesium.Ion.defaultAccessToken = ''
 
 export interface DrawVertex {
   lon: number
   lat: number
+  /** Picked surface height in metres (terrain when available, else 0). */
+  h?: number
 }
 
 export interface FocusTarget {
@@ -29,7 +33,14 @@ export interface FocusTarget {
   duration?: number
 }
 
-type DrawKind = 'parcel' | 'road'
+type DrawKind = 'parcel' | 'road' | 'measure'
+
+/** One-shot camera commands driven from the page (reset / north-up / tilt). */
+export interface ViewCommand {
+  kind: 'reset' | 'north' | 'tilt'
+  /** Bumped per press so repeating the same command re-fires the effect. */
+  nonce: number
+}
 
 interface TerraGlobeProps {
   offChainParcels: OffChainParcel[]
@@ -58,26 +69,44 @@ interface TerraGlobeProps {
   basemap?: 'imagery' | 'terrain' | 'osm'
   /** Bumped by the layout when a panel reflows the map container; forces a viewport resize. */
   resizeKey?: number
+  /** Resolved graphics tier driving terrain, imagery depth, resolution and render mode. */
+  graphicsTier?: GraphicsTier
+  /** True while the tier preference is "auto" — only then may the FPS watchdog step down. */
+  autoTier?: boolean
+  /** Bumped when the ion token changes so terrain is re-resolved. */
+  ionTokenRev?: number
+  /** Rolling FPS report (null while the scene is idle). */
+  onFps?: (fps: number | null) => void
+  /** The watchdog sustained <30 fps in auto mode — the page should step the tier down. */
+  onTierCapped?: () => void
+  onTerrainStatus?: (status: TerrainStatus) => void
+  /** Optional 3D Tiles tileset (photogrammetry model, RFC-013 Ph.C). */
+  tilesetUrl?: string | null
+  /** One-shot camera commands (reset view, north-up, tilt). */
+  viewCommand?: ViewCommand | null
 }
 
-function basemapProvider(style: 'imagery' | 'terrain' | 'osm'): Cesium.UrlTemplateImageryProvider {
+function basemapProvider(
+  style: 'imagery' | 'terrain' | 'osm',
+  maxLevel: number,
+): Cesium.UrlTemplateImageryProvider {
   if (style === 'osm') {
     return new Cesium.UrlTemplateImageryProvider({
       url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-      maximumLevel: 19,
+      maximumLevel: Math.min(19, maxLevel),
       credit: '© OpenStreetMap contributors',
     })
   }
   if (style === 'terrain') {
     return new Cesium.UrlTemplateImageryProvider({
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topographic_Map/MapServer/tile/{z}/{y}/{x}',
-      maximumLevel: 19,
+      maximumLevel: Math.min(19, maxLevel),
       credit: 'Esri, HERE, Garmin, FAO, NOAA, USGS and others',
     })
   }
   return new Cesium.UrlTemplateImageryProvider({
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    maximumLevel: 20,
+    maximumLevel: maxLevel,
     credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
   })
 }
@@ -110,11 +139,22 @@ export default function TerraGlobe({
   showLabels = true,
   basemap = 'imagery',
   resizeKey = 0,
+  graphicsTier = 'high',
+  autoTier = true,
+  ionTokenRev = 0,
+  onFps,
+  onTierCapped,
+  onTerrainStatus,
+  tilesetUrl = null,
+  viewCommand = null,
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const drawingRef = useRef(false)
   const appliedBasemapRef = useRef<string | null>(null)
+  const terrainActiveRef = useRef(false)
+  // Bumped whenever the terrain provider changes so effects that sample
+  // terrain heights (building bases) can re-run after tiles become available.
   const [webglError, setWebglError] = useState<string | null>(null)
   const onWebGLStatusRef = useRef(onWebGLStatus)
   useEffect(() => {
@@ -127,6 +167,18 @@ export default function TerraGlobe({
   const onDrawFinishRef = useRef(onDrawFinish)
   useEffect(() => {
     onDrawFinishRef.current = onDrawFinish
+  })
+  const onFpsRef = useRef(onFps)
+  useEffect(() => {
+    onFpsRef.current = onFps
+  })
+  const onTierCappedRef = useRef(onTierCapped)
+  useEffect(() => {
+    onTierCappedRef.current = onTierCapped
+  })
+  const onTerrainStatusRef = useRef(onTerrainStatus)
+  useEffect(() => {
+    onTerrainStatusRef.current = onTerrainStatus
   })
   const lastClickRef = useRef<{ t: number; x: number; y: number } | null>(null)
   const suppressPickRef = useRef(0)
@@ -156,15 +208,15 @@ export default function TerraGlobe({
         fullscreenButton: false,
         infoBox: false,
         selectionIndicator: false,
-        baseLayer: new Cesium.ImageryLayer(basemapProvider(basemap)),
-        // World Terrain requires a Cesium Ion token. If none is configured we
-        // fall back to the bare ellipsoid so the globe works out of the box.
-        terrain:
-          Cesium.Ion.defaultAccessToken
-            ? Cesium.Terrain.fromWorldTerrain()
-            : undefined,
+        baseLayer: new Cesium.ImageryLayer(
+          basemapProvider(basemap, TIER_SETTINGS[graphicsTier].imageryMaxLevel),
+        ),
+        // Terrain streams in asynchronously below, gated by the graphics tier:
+        // the globe starts on the flat ellipsoid and gains relief when the
+        // tier allows it (keyless mesh, or ion world terrain with a token).
+        terrain: undefined,
       })
-      appliedBasemapRef.current = basemap
+      appliedBasemapRef.current = `${basemap}@${TIER_SETTINGS[graphicsTier].imageryMaxLevel}`
 
       viewer.scene.globe.enableLighting = true
       viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1
@@ -190,18 +242,33 @@ export default function TerraGlobe({
 
     viewerRef.current = viewer
     onWebGLStatusRef.current?.(null)
+    if (import.meta.env.DEV) {
+      // Dev-only handle so headless/CDP debugging can inspect the live scene.
+      ;(window as unknown as { __terraViewer?: Cesium.Viewer }).__terraViewer = viewer
+      ;(window as unknown as { __terraCesium?: typeof Cesium }).__terraCesium = Cesium
+    }
 
     let lastReported = -1
+    let lastLon = Number.NaN
+    let lastLat = Number.NaN
     const reportCamera = (force: boolean) => {
       const carto = viewer.camera.positionCartographic
       const h = carto?.height ?? 0
-      if (!force && lastReported >= 0 && Math.abs(h - lastReported) <= Math.max(lastReported * 0.06, 1)) {
-        return
-      }
+      const lon = Cesium.Math.toDegrees(carto?.longitude ?? 0)
+      const lat = Cesium.Math.toDegrees(carto?.latitude ?? 0)
+      const heightStable =
+        !force && lastReported >= 0 && Math.abs(h - lastReported) <= Math.max(lastReported * 0.06, 1)
+      const lonlatStable =
+        !Number.isNaN(lastLon) &&
+        Math.abs(lon - lastLon) < 0.0004 &&
+        Math.abs(lat - lastLat) < 0.0004
+      if (heightStable && lonlatStable) return
       lastReported = h
+      lastLon = lon
+      lastLat = lat
       onCameraMovedRef.current?.({
-        longitude: Cesium.Math.toDegrees(carto?.longitude ?? 0),
-        latitude: Cesium.Math.toDegrees(carto?.latitude ?? 0),
+        longitude: lon,
+        latitude: lat,
         height: h,
       })
     }
@@ -217,18 +284,111 @@ export default function TerraGlobe({
       viewer.destroy()
       viewerRef.current = null
       appliedBasemapRef.current = null
+      if (import.meta.env.DEV) {
+        delete (window as unknown as { __terraViewer?: Cesium.Viewer }).__terraViewer
+        delete (window as unknown as { __terraCesium?: typeof Cesium }).__terraCesium
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- viewer is built once; basemap changes swap imagery below
   }, [])
 
   // ---- basemap: swap imagery in place (no viewer rebuild, camera persists) --
+  // The key also carries the tier's imagery depth, so a tier change re-adds
+  // the layer at its new maximumLevel.
   useEffect(() => {
     const viewer = viewerRef.current
-    if (!viewer || appliedBasemapRef.current === basemap) return
-    appliedBasemapRef.current = basemap
+    if (!viewer) return
+    const key = `${basemap}@${TIER_SETTINGS[graphicsTier].imageryMaxLevel}`
+    if (appliedBasemapRef.current === key) return
+    appliedBasemapRef.current = key
     viewer.imageryLayers.removeAll()
-    viewer.imageryLayers.addImageryProvider(basemapProvider(basemap))
-  }, [basemap])
+    viewer.imageryLayers.addImageryProvider(
+      basemapProvider(basemap, TIER_SETTINGS[graphicsTier].imageryMaxLevel),
+    )
+    viewer.scene.requestRender()
+  }, [basemap, graphicsTier])
+
+  // ---- tier settings: resolution, render mode, MSAA ------------------------
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    const settings = TIER_SETTINGS[graphicsTier]
+    // Viewer.resolutionScale drives CesiumWidget's render scale (Scene has no
+    // public resolutionScale in the TS types even though runtime reads one).
+    viewer.resolutionScale = settings.resolutionScale
+    viewer.scene.requestRenderMode = settings.requestRenderMode
+    try {
+      viewer.scene.msaaSamples = settings.msaaSamples
+    } catch {
+      /* WebGL1 has no MSAA render targets */
+    }
+    viewer.scene.requestRender()
+  }, [graphicsTier])
+
+  // ---- terrain: resolve per tier, fall back to the flat ellipsoid ----------
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    let cancelled = false
+    if (!TIER_SETTINGS[graphicsTier].terrain) {
+      viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+      viewer.scene.globe.depthTestAgainstTerrain = false
+      viewer.scene.globe.enableLighting = true
+      terrainActiveRef.current = false
+      onTerrainStatusRef.current?.('flat')
+      viewer.scene.requestRender()
+      return
+    }
+    onTerrainStatusRef.current?.('loading')
+    resolveTerrain(graphicsTier).then((resolution) => {
+      if (cancelled) return
+      if (!resolution) {
+        viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider()
+        viewer.scene.globe.depthTestAgainstTerrain = false
+        viewer.scene.globe.enableLighting = true
+        terrainActiveRef.current = false
+        onTerrainStatusRef.current?.('flat')
+        viewer.scene.requestRender()
+        return
+      }
+      viewer.terrainProvider = resolution.provider
+      viewer.scene.globe.depthTestAgainstTerrain = true
+      // The keyless Re:Earth mesh ships vertex normals that Cesium's sun
+      // lighting shades almost black; ion world terrain has proper normals
+      // and keeps the day/night shading. (GEV also renders this mesh unlit.)
+      viewer.scene.globe.enableLighting = resolution.source === 'ion'
+      terrainActiveRef.current = true
+      onTerrainStatusRef.current?.(resolution.source)
+      viewer.scene.requestRender()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [graphicsTier, ionTokenRev])
+
+  // ---- FPS watchdog: readout always, auto step-down only in auto mode ------
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    const watchdog = new FpsWatchdog({
+      allowDowngrade: autoTier,
+      onFps: (fps) => onFpsRef.current?.(fps),
+      onDowngrade: () => onTierCappedRef.current?.(),
+    })
+    watchdog.start((cb) => {
+      // Capture the scene, not the viewer: this effect's cleanup can run
+      // after the viewer is destroyed, and viewer.scene would then throw.
+      const scene = viewer.scene
+      const handler = () => cb()
+      scene.postRender.addEventListener(handler)
+      return () => {
+        scene.postRender.removeEventListener(handler)
+      }
+    })
+    return () => {
+      watchdog.stop()
+    }
+  }, [autoTier, graphicsTier])
 
   useEffect(() => {
     viewerRef.current?.resize()
@@ -264,20 +424,28 @@ export default function TerraGlobe({
           onDrawFinishRef.current?.()
           return
         }
-        // Terrain is off (Ion token cleared above), so the analytic ellipsoid
-        // pick is ground truth; globe.pick occasionally returns a far-side hit
-        // tens of km along the ray, so only trust it if the ellipsoid misses.
+        // With terrain active the ground is the mesh, so globe.pick first —
+        // the analytic ellipsoid would land metres below the surface and the
+        // vertex would drift at oblique angles. On the flat ellipsoid the
+        // order flips: globe.pick can return a far-side hit tens of km along
+        // the ray, so only trust it if the ellipsoid misses.
         const ray = viewer.camera.getPickRay(movement.position)
-        let cartesian = viewer.camera.pickEllipsoid(
-          movement.position,
-          viewer.scene.globe.ellipsoid,
-        )
-        if (!cartesian && ray) cartesian = viewer.scene.globe.pick(ray, viewer.scene)
+        let cartesian: Cesium.Cartesian3 | undefined
+        if (terrainActiveRef.current) {
+          if (ray) cartesian = viewer.scene.globe.pick(ray, viewer.scene)
+          if (!cartesian) {
+            cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid)
+          }
+        } else {
+          cartesian = viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid)
+          if (!cartesian && ray) cartesian = viewer.scene.globe.pick(ray, viewer.scene)
+        }
         if (!cartesian) return
         const carto = Cesium.Cartographic.fromCartesian(cartesian)
         onDrawVertexAdd({
           lon: Cesium.Math.toDegrees(carto.longitude),
           lat: Cesium.Math.toDegrees(carto.latitude),
+          h: carto.height,
         })
       } else {
         if (now < suppressPickRef.current) return
@@ -328,12 +496,13 @@ export default function TerraGlobe({
     }
   }, [])
 
-  // ---- data layers: parcels, buildings, roads, POIs, planned roads ---------
-  // (split from the draw overlay so adding a vertex never rebuilds the world)
+  // ---- data layers: parcels, roads, POIs, planned roads -------------------
+  // (split from the draw overlay so adding a vertex never rebuilds the world;
+  //  buildings live in their own effect below — they sample terrain heights)
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
-    removeEntitiesByIdPrefix(viewer, ['ter-', 'bld-', 'road-', 'poi-', 'plan-'])
+    removeEntitiesByIdPrefix(viewer, ['ter-', 'road-', 'poi-', 'plan-'])
 
     // off-chain parcels -> footprints
     for (const parcel of offChainParcels) {
@@ -370,39 +539,7 @@ export default function TerraGlobe({
       })
     }
 
-    // building footprints -> selectable translucent polygons
-    for (const building of buildings) {
-      const ring = building.geometry?.coordinates?.[0]
-      if (!ring || ring.length < 4) continue
-      const hierarchy = ring.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat))
-      viewer.entities.add({
-        id: `bld-${building.osm_id}`,
-        polygon: {
-          hierarchy: new Cesium.PolygonHierarchy(hierarchy),
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          material: Cesium.Color.fromCssColorString('#9fb6c9').withAlpha(0.55),
-          outline: true,
-          outlineColor: Cesium.Color.fromCssColorString('#5c7387'),
-          classificationType: Cesium.ClassificationType.TERRAIN,
-        },
-        properties: {
-          bldId: building.osm_id,
-          bldName: building.name ?? '',
-        },
-        label: showLabels
-          ? {
-              show: true,
-              text: building.name ?? '',
-              font: '11px sans-serif',
-              fillColor: Cesium.Color.WHITE,
-              pixelOffset: new Cesium.Cartesian2(0, -14),
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              showBackground: true,
-              backgroundColor: Cesium.Color.BLACK.withAlpha(0.45),
-            }
-          : undefined,
-      })
-    }
+    // building footprints are extruded in their own effect (terrain-aware)
 
     // roads -> class-coloured clamped polylines
     for (const road of roads) {
@@ -465,7 +602,96 @@ export default function TerraGlobe({
         },
       })
     }
-  }, [offChainParcels, buildings, roads, pois, plannedRoads, showLabels])
+  }, [offChainParcels, roads, pois, plannedRoads, showLabels])
+
+  useEffect(() => {
+    viewerRef.current?.scene.requestRender()
+  }, [offChainParcels, roads, pois, plannedRoads, showLabels, drawVertices])
+
+  // ---- extruded building footprints (tier-capped, terrain-sampled) --------
+  // Extruded OSM footprints. Ground-relative heights let Cesium clamp both
+  // the roof and the base to the terrain surface (or the ellipsoid on flat
+  // tiers) — manual getHeight sampling mid-stream produced wild values
+  // (−1.8 km over a 500 m valley), so no sampling/retries are needed.
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    removeEntitiesByIdPrefix(viewer, ['bld-'])
+    if (buildings.length === 0) return
+    const labelsAllowed = showLabels && graphicsTier !== 'medium'
+    // Ground-relative clamping only when a real terrain mesh is active — on
+    // flat tiers (and while terrain tiles are still streaming) ground
+    // primitives stay invisible, so extrude against the ellipsoid instead.
+    const groundClamp = terrainActiveRef.current
+    for (const building of buildings) {
+      const ring = building.geometry?.coordinates?.[0]
+      if (!ring || ring.length < 4) continue
+      const hierarchy = ring.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat))
+      viewer.entities.add({
+        id: `bld-${building.osm_id}`,
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(hierarchy),
+          height: buildingHeightM(building),
+          extrudedHeight: 0,
+          ...(groundClamp
+            ? {
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+                extrudedHeightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              }
+            : {}),
+          material: Cesium.Color.fromCssColorString('#9fb6c9').withAlpha(0.72),
+        },
+        properties: {
+          bldId: building.osm_id,
+          bldName: building.name ?? '',
+        },
+        label:
+          labelsAllowed && building.name
+            ? {
+                text: building.name,
+                font: '11px sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                pixelOffset: new Cesium.Cartesian2(0, -14),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                showBackground: true,
+                backgroundColor: Cesium.Color.BLACK.withAlpha(0.45),
+              }
+            : undefined,
+      })
+    }
+    viewer.scene.requestRender()
+  }, [buildings, showLabels, graphicsTier])
+
+  // Optional 3D Tiles model (photogrammetry scaffolding, RFC-013 Ph.C).
+  // The page only supplies a URL on high/ultra tiers; a failed load never
+  // breaks the globe, and the primitive is destroyed on unmount/replace.
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer || !tilesetUrl) return
+    let tileset: Cesium.Cesium3DTileset | null = null
+    let cancelled = false
+    Cesium.Cesium3DTileset.fromUrl(tilesetUrl)
+      .then((loaded) => {
+        if (cancelled) {
+          loaded.destroy()
+          return
+        }
+        tileset = loaded
+        viewer.scene.primitives.add(loaded)
+        viewer.scene.requestRender()
+      })
+      .catch((err) => {
+        console.warn('3D tileset load failed:', tilesetUrl, err)
+      })
+    return () => {
+      cancelled = true
+      if (tileset) {
+        viewer.scene.primitives.remove(tileset)
+        if (!tileset.isDestroyed()) tileset.destroy()
+        viewer.scene.requestRender()
+      }
+    }
+  }, [tilesetUrl])
 
   // ---- active drawing overlay (vertices + rubber-band line) ----------------
   useEffect(() => {
@@ -476,30 +702,72 @@ export default function TerraGlobe({
     drawVertices.forEach((v, i) => {
       viewer.entities.add({
         id: `draw-v-${i + 1}`,
-        position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat),
+        position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, v.h ?? 0),
         point: {
           pixelSize: 8,
-          color: Cesium.Color.LIME,
+          color: drawKind === 'measure' ? Cesium.Color.ORANGE : Cesium.Color.LIME,
           outlineColor: Cesium.Color.BLACK,
           outlineWidth: 2,
         },
       })
     })
     if (drawVertices.length >= 2) {
-      const path = drawVertices.map((v) => Cesium.Cartesian3.fromDegrees(v.lon, v.lat))
-      // Parcels close into a ring; road alignments stay open.
-      if (drawKind !== 'road' && drawVertices.length >= 3) path.push(path[0])
+      const path = drawVertices.map((v) => Cesium.Cartesian3.fromDegrees(v.lon, v.lat, v.h ?? 0))
+      // Parcels close into a ring; road alignments and measurements stay open.
+      if (drawKind === 'parcel' && drawVertices.length >= 3) path.push(path[0])
       viewer.entities.add({
         id: 'draw-line',
         polyline: {
           positions: path,
           width: drawKind === 'road' ? 3 : 2,
-          material: Cesium.Color.LIME.withAlpha(0.9),
+          material:
+            drawKind === 'measure'
+              ? Cesium.Color.ORANGE.withAlpha(0.95)
+              : Cesium.Color.LIME.withAlpha(0.9),
           clampToGround: true,
         },
       })
     }
   }, [drawVertices, drawKind])
+
+  // ---- one-shot camera commands (reset / north-up / tilt) -------------------
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer || !viewCommand) return
+    const camera = viewer.camera
+    if (viewCommand.kind === 'reset') {
+      camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(
+          DEFAULT_FOCUS.longitude,
+          DEFAULT_FOCUS.latitude,
+          DEFAULT_FOCUS.height,
+        ),
+        duration: 1.0,
+      })
+      return
+    }
+    if (viewCommand.kind === 'north') {
+      camera.setView({
+        destination: camera.position,
+        orientation: { heading: 0, pitch: camera.pitch, roll: 0 },
+      })
+      viewer.scene.requestRender()
+      return
+    }
+    // tilt: swing the camera to a ~45° pitch around the ground point below.
+    const carto = Cesium.Cartographic.fromCartesian(camera.position)
+    const target = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 0)
+    const distance = camera.positionCartographic?.height ?? 5_000_000
+    const offset = new Cesium.HeadingPitchRange(
+      camera.heading,
+      Cesium.Math.toRadians(-45),
+      distance,
+    )
+    camera.lookAt(target, offset)
+    // lookAt pins the camera to the target; release so free navigation works.
+    camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+    viewer.scene.requestRender()
+  }, [viewCommand])
 
   // ---- focus camera ---------------------------------------------------------
   useEffect(() => {
@@ -518,12 +786,27 @@ export default function TerraGlobe({
   useEffect(() => {
     const scene = viewerRef.current?.scene
     if (!scene) return
+    let morphed = false
     if (viewMode === '2d' && scene.mode !== Cesium.SceneMode.SCENE2D) {
       scene.morphTo2D(0.7)
+      morphed = true
     } else if (viewMode === '3d' && scene.mode !== Cesium.SceneMode.SCENE3D) {
       scene.morphTo3D(0.7)
+      morphed = true
     }
-  }, [viewMode])
+    if (!morphed || !TIER_SETTINGS[graphicsTier].requestRenderMode) return
+    // The morph animates over 0.7 s but request-render mode only paints on
+    // demand; keep requesting frames for its duration so it stays smooth.
+    const tick = window.setInterval(() => scene.requestRender(), 80)
+    const stop = window.setTimeout(() => {
+      window.clearInterval(tick)
+      scene.requestRender()
+    }, 900)
+    return () => {
+      window.clearInterval(tick)
+      window.clearTimeout(stop)
+    }
+  }, [viewMode, graphicsTier])
 
   // Cesium may append its error panel asynchronously after the constructor
   // throws; keep purging leftover widget DOM so it can't overlay the 2D map.
@@ -565,6 +848,7 @@ export default function TerraGlobe({
             basemap={basemap}
             resizeKey={resizeKey}
             showLabels={showLabels}
+            imageryMaxLevel={TIER_SETTINGS[graphicsTier].imageryMaxLevel}
           />
         </div>
       </div>

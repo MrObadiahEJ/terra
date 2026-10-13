@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { terraRegistry } from '../idl/terraRegistry'
+import terraRegistry from '../idl/terra_registry.json'
 import {
   STATUS_LEVELS,
   STATUS_META,

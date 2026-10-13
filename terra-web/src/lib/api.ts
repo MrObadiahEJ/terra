@@ -39,10 +39,21 @@ export interface Poi {
   lat: number
 }
 
+export interface BboxQuery {
+  minx: number
+  miny: number
+  maxx: number
+  maxy: number
+}
+
 export interface OsmBuildingFootprint {
   osm_id: number
   name: string | null
   building: string
+  /** Mapped height in metres (`height=*`), when present. */
+  height_m?: number | null
+  /** Mapped storey count (`building:levels=*`), when present. */
+  levels?: number | null
   geometry: { type: 'Polygon'; coordinates: number[][][] }
 }
 
@@ -914,8 +925,12 @@ export const api = {
         (category ? `&category=${encodeURIComponent(category)}` : ''),
     ),
   geoStats: () => request<GeoStats>(`/geo/stats`),
-  osmBuildingFootprints: (limit = 500, offset = 0) =>
-    request<OsmBuildingFootprint[]>(`/geo/buildings?limit=${limit}&offset=${offset}`),
+  osmBuildingFootprints: (limit = 500, offset = 0, bbox?: BboxQuery) => {
+    const q = bbox
+      ? `&minx=${bbox.minx}&miny=${bbox.miny}&maxx=${bbox.maxx}&maxy=${bbox.maxy}`
+      : ''
+    return request<OsmBuildingFootprint[]>(`/geo/buildings?limit=${limit}&offset=${offset}${q}`)
+  },
 
   // fusion (PostGIS — requires ingestion)
   fusionStats: () => request<FusionStats>(`/fusion/stats`),

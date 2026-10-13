@@ -294,4 +294,6 @@ Anyone picking this up: start from [`docs/VISION.md`](../../docs/VISION.md) (nor
 
 ## License
 
-This project is proprietary. All rights reserved.
+Apache License 2.0 — see the repository root [LICENSE](../LICENSE). See
+[TRADEMARKS.md](../TRADEMARKS.md) for the name/logo policy. Data licensing
+(OSM, Esri, ion, uploaded evidence) is separate from the code license.

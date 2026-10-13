@@ -41,6 +41,14 @@ impl StorageBackend {
                 }),
         }
     }
+
+    /// Load the raw bytes previously stored under `storage_ref`.
+    /// Returns `Ok(None)` when the ref no longer resolves (deleted file).
+    pub async fn load(&self, storage_ref: &str) -> Result<Option<Vec<u8>>> {
+        match self {
+            StorageBackend::Local { root } => load_local(root, storage_ref).await,
+        }
+    }
 }
 
 pub struct StoredArtifact {
@@ -84,6 +92,24 @@ async fn store_local(
 
     // Return a relative path the IPFS adapter would otherwise turn into a CID.
     Ok(format!("{date_dir}/{id}_{safe_name}"))
+}
+
+async fn load_local(root: &Path, storage_ref: &str) -> Result<Option<Vec<u8>>> {
+    // storage_ref is a relative YYYY/MM/DD/… path written by store_local;
+    // canonicalize both sides so a crafted ref cannot escape the root.
+    let candidate = root.join(storage_ref);
+    let canonical_root = root
+        .canonicalize()
+        .context("canonicalizing evidence storage root")?;
+    match tokio::fs::canonicalize(&candidate).await {
+        Ok(path) if path.starts_with(&canonical_root) => tokio::fs::read(&path)
+            .await
+            .context("reading evidence file")
+            .map(Some),
+        Ok(_) => anyhow::bail!("storage_ref escapes the evidence root"),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(err).context("resolving evidence storage_ref"),
+    }
 }
 
 // ---------------------------------------------------------------------------

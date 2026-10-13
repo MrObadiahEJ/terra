@@ -3530,6 +3530,151 @@
       "args": []
     },
     {
+      "name": "create_spatial_snapshot",
+      "docs": [
+        "Freeze a point-in-time copy of the asset's spatial indexes",
+        "(RFC-012 §5 `SpatialSnapshot`, RFC-013 §8.5 — snapshots copy the",
+        "cursor; later appends never mutate them)."
+      ],
+      "discriminator": [
+        115,
+        65,
+        62,
+        122,
+        178,
+        145,
+        229,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset.parcel",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "meta",
+          "docs": [
+            "Per-asset snapshot cursor (created lazily on the first snapshot)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  115,
+                  110,
+                  97,
+                  112,
+                  115,
+                  104,
+                  111,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "snapshot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  115,
+                  110,
+                  97,
+                  112,
+                  115,
+                  104,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "path": "meta.count",
+                "account": "SpatialSnapshotMeta"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "label",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "create_stake_pool",
       "discriminator": [
         198,
@@ -9782,6 +9927,162 @@
       "args": []
     },
     {
+      "name": "register_3d_model",
+      "docs": [
+        "Register an off-chain 3D model claim against an anchored geometry",
+        "version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain",
+        "geometry, only hash + storage pointer)."
+      ],
+      "discriminator": [
+        210,
+        186,
+        7,
+        195,
+        234,
+        47,
+        114,
+        9
+      ],
+      "accounts": [
+        {
+          "name": "asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  112,
+                  97,
+                  116,
+                  105,
+                  97,
+                  108,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset.parcel",
+                "account": "SpatialAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "meta",
+          "docs": [
+            "Per-asset model cursor (created lazily on first registration)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  104,
+                  114,
+                  101,
+                  101,
+                  95,
+                  100,
+                  95,
+                  109,
+                  111,
+                  100,
+                  101,
+                  108,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "model",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  104,
+                  114,
+                  101,
+                  101,
+                  95,
+                  100,
+                  95,
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "asset"
+              },
+              {
+                "kind": "account",
+                "path": "meta.count",
+                "account": "ThreeDModelMeta"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "model_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_reference",
+          "type": "string"
+        },
+        {
+          "name": "model_format",
+          "type": "u8"
+        },
+        {
+          "name": "geometry_version",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "register_device",
       "discriminator": [
         210,
@@ -14695,6 +14996,99 @@
       ]
     },
     {
+      "name": "verify_3d_model",
+      "docs": [
+        "A registered validator attests a registered model's hash",
+        "(claim → fact, same split as geometry verification)."
+      ],
+      "discriminator": [
+        218,
+        202,
+        119,
+        99,
+        154,
+        197,
+        225,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "model",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  104,
+                  114,
+                  101,
+                  101,
+                  95,
+                  100,
+                  95,
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "model.asset",
+                "account": "ThreeDModel"
+              },
+              {
+                "kind": "account",
+                "path": "model.model_version",
+                "account": "ThreeDModel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "validator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "verify_and_slash",
       "discriminator": [
         247,
@@ -16338,6 +16732,32 @@
       ]
     },
     {
+      "name": "SpatialSnapshot",
+      "discriminator": [
+        156,
+        60,
+        119,
+        78,
+        61,
+        63,
+        161,
+        245
+      ]
+    },
+    {
+      "name": "SpatialSnapshotMeta",
+      "discriminator": [
+        123,
+        54,
+        165,
+        171,
+        172,
+        35,
+        63,
+        23
+      ]
+    },
+    {
       "name": "StakePool",
       "discriminator": [
         121,
@@ -16400,6 +16820,32 @@
         127,
         79,
         134
+      ]
+    },
+    {
+      "name": "ThreeDModel",
+      "discriminator": [
+        117,
+        174,
+        95,
+        32,
+        116,
+        194,
+        171,
+        170
+      ]
+    },
+    {
+      "name": "ThreeDModelMeta",
+      "discriminator": [
+        231,
+        80,
+        5,
+        178,
+        80,
+        198,
+        86,
+        7
       ]
     },
     {
@@ -18069,6 +18515,19 @@
       ]
     },
     {
+      "name": "SpatialSnapshotCreated",
+      "discriminator": [
+        74,
+        109,
+        89,
+        169,
+        182,
+        165,
+        45,
+        64
+      ]
+    },
+    {
       "name": "StakeDeposited",
       "discriminator": [
         69,
@@ -18235,6 +18694,32 @@
         113,
         123,
         103
+      ]
+    },
+    {
+      "name": "ThreeDModelRegistered",
+      "discriminator": [
+        107,
+        244,
+        21,
+        221,
+        200,
+        103,
+        215,
+        89
+      ]
+    },
+    {
+      "name": "ThreeDModelVerified",
+      "discriminator": [
+        13,
+        186,
+        124,
+        19,
+        47,
+        165,
+        98,
+        63
       ]
     },
     {
@@ -19794,6 +20279,36 @@
       "code": 6240,
       "name": "GeometryQuorumFull",
       "msg": "Geometry version quorum list has no free attestation slot"
+    },
+    {
+      "code": 6241,
+      "name": "InvalidModelFormat",
+      "msg": "Unknown 3D model format, or format is the UNKNOWN placeholder"
+    },
+    {
+      "code": 6242,
+      "name": "ThreeDModelsFull",
+      "msg": "Spatial asset has reached the maximum number of 3D models"
+    },
+    {
+      "code": 6243,
+      "name": "ModelGeometryVersionMismatch",
+      "msg": "Model geometry version does not exist in the asset's version history"
+    },
+    {
+      "code": 6244,
+      "name": "ThreeDModelAlreadyVerified",
+      "msg": "3D model is already verified"
+    },
+    {
+      "code": 6245,
+      "name": "SpatialSnapshotsFull",
+      "msg": "Spatial asset has reached the maximum number of snapshots"
+    },
+    {
+      "code": 6246,
+      "name": "InvalidSnapshotLabel",
+      "msg": "Snapshot label is too long"
     }
   ],
   "types": [
@@ -26105,6 +26620,170 @@
       }
     },
     {
+      "name": "SpatialSnapshot",
+      "docs": [
+        "A frozen copy of a spatial asset's indexes at one instant",
+        "(RFC-012 §5 `SpatialSnapshot`).",
+        "",
+        "PDA: `[\"spatial_snapshot\", asset, snapshot_index_le_bytes]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "The owning `SpatialAsset` PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "docs": [
+              "Redundant parcel key for cheap off-chain joins."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "snapshot_index",
+            "docs": [
+              "0-based append index (from [`SpatialSnapshotMeta`])."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "geometry_version_count",
+            "docs": [
+              "Geometry cursor copied at creation: versions `[0, N)` existed then.",
+              "Never changes afterwards (append-only history is safe to replay)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "latest_geometry",
+            "docs": [
+              "Latest geometry hash at snapshot time (all-zero if none yet)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "dimensionality",
+            "docs": [
+              "Asset dimensionality copied at creation (`spatial_dimension`)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "elevation_min_mm",
+            "docs": [
+              "Asset elevation envelope copied at creation, millimetres."
+            ],
+            "type": "i32"
+          },
+          {
+            "name": "elevation_max_mm",
+            "type": "i32"
+          },
+          {
+            "name": "label",
+            "docs": [
+              "Short human label for timelines (e.g. \"2022 baseline\"), <= 64 bytes."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_by",
+            "docs": [
+              "Whoever paid to create this snapshot (permissionless)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SpatialSnapshotCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "snapshot",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "snapshot_index",
+            "type": "u32"
+          },
+          {
+            "name": "geometry_version_count",
+            "type": "u32"
+          },
+          {
+            "name": "label_len",
+            "docs": [
+              "UTF-8 byte length of the label (the event never carries the string",
+              "itself — read it from the account)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "created_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SpatialSnapshotMeta",
+      "docs": [
+        "Append-only cursor for a spatial asset's snapshots.",
+        "",
+        "PDA: `[\"spatial_snapshot_meta\", asset]` — created lazily on the first",
+        "snapshot (`init_if_needed`), so `SpatialAsset`'s deployed layout is",
+        "untouched."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "The owning `SpatialAsset` PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "docs": [
+              "Next snapshot index (0..=MAX_SPATIAL_SNAPSHOTS)."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "StakeDeposited",
       "type": {
         "kind": "struct",
@@ -26898,6 +27577,206 @@
           {
             "name": "draw_bps",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThreeDModel",
+      "docs": [
+        "One append-only entry in a spatial asset's 3D model history",
+        "(RFC-012 §5 `ThreeDModel`).",
+        "",
+        "PDA: `[\"three_d_model\", asset, model_version_le_bytes]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "The owning `SpatialAsset` PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "docs": [
+              "Redundant parcel key for cheap off-chain joins."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "model_version",
+            "docs": [
+              "0-based append index (from `ThreeDModelMeta`)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "geometry_version",
+            "docs": [
+              "Geometry version this model was reconstructed from (provenance —",
+              "always < `asset.geometry_version_count` at registration time)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "model_hash",
+            "docs": [
+              "SHA-256 canonical digest of the off-chain model bundle."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_reference",
+            "docs": [
+              "Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "model_format",
+            "docs": [
+              "`model_format` code of the referenced bundle."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "docs": [
+              "Whoever paid to register this claim (permissionless)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "verified",
+            "docs": [
+              "Claim → fact: true once a registered validator verified the hash."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "verified_by",
+            "docs": [
+              "Validator who verified (zero until verified)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThreeDModelMeta",
+      "docs": [
+        "Append-only cursor for a spatial asset's 3D models.",
+        "",
+        "PDA: `[\"three_d_model_meta\", asset]` — created lazily on the first",
+        "registration (`init_if_needed`), so `SpatialAsset`'s deployed layout is",
+        "untouched."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset",
+            "docs": [
+              "The owning `SpatialAsset` PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "count",
+            "docs": [
+              "Next model version index (0..=MAX_3D_MODELS)."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThreeDModelRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "model",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "model_version",
+            "type": "u32"
+          },
+          {
+            "name": "geometry_version",
+            "type": "u32"
+          },
+          {
+            "name": "model_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "model_format",
+            "type": "u8"
+          },
+          {
+            "name": "submitted_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ThreeDModelVerified",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "model",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "verified_at",
+            "type": "i64"
           }
         ]
       }

@@ -1,5 +1,7 @@
-use axum::extract::{Multipart, Path, State};
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::extract::{Multipart, Path, Query, State};
+use axum::http::{header, HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,7 @@ pub fn router() -> Router<AppState> {
         .route("/upload", post(upload_evidence))
         .route("/", get(list_evidence_uploads))
         .route("/{id}", get(get_evidence_upload))
+        .route("/{id}/file", get(get_evidence_file))
 }
 
 // ---------------------------------------------------------------------------
@@ -23,6 +26,10 @@ pub fn router() -> Router<AppState> {
 // persists to the storage backend, records metadata in the database, and
 // returns the content hash + storage reference that the client should use
 // when calling the on-chain `add_evidence` instruction.
+//
+// Optional fields: `parcel_id` (links the upload to a parcel for the
+// off-chain gallery) and the `x-wallet` header (Ed25519-signed like every
+// authenticated request; when present the wallet is recorded as uploaded_by).
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -35,6 +42,7 @@ pub struct EvidenceUploadRow {
     pub content_type: String,
     pub size_bytes: i64,
     pub uploaded_by: Option<String>,
+    pub parcel_id: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -46,17 +54,40 @@ pub struct UploadResponse {
     pub filename: String,
     pub content_type: String,
     pub size_bytes: u64,
+    pub parcel_id: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct EvidenceListParams {
+    pub parcel_id: Option<String>,
+    pub content_hash: Option<String>,
+}
+
+const SELECT_UPLOAD: &str = "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
+     uploaded_by, parcel_id, created_at";
 
 /// Upload evidence file. Requires authenticated request (SignedRequest).
 /// The caller's wallet address is recorded as `uploaded_by` for provenance.
 pub async fn upload_evidence(
     State(state): State<AppState>,
     _auth: SignedRequest,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<UploadResponse>), AppError> {
+    // Optional caller wallet: proof of who uploaded, stored as uploaded_by.
+    let mut uploaded_by: Option<String> = None;
+    if let Some(wallet) = headers
+        .get("x-wallet")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+    {
+        _auth.verify_wallet(&wallet, "POST", "/api/v1/evidence/upload")?;
+        uploaded_by = Some(wallet);
+    }
+
     let mut filename = String::from("unknown");
     let mut content_type = String::from("application/octet-stream");
+    let mut parcel_id: Option<String> = None;
     let mut data: Option<Vec<u8>> = None;
 
     while let Some(field) = multipart
@@ -64,8 +95,8 @@ pub async fn upload_evidence(
         .await
         .map_err(|e| AppError::bad_request(format!("multipart error: {e}")))?
     {
-        if let Some(name) = field.name() {
-            if name == "file" {
+        match field.name() {
+            Some("file") => {
                 filename = field.file_name().unwrap_or("unknown").to_string();
                 content_type = field
                     .content_type()
@@ -79,6 +110,15 @@ pub async fn upload_evidence(
                         .to_vec(),
                 );
             }
+            Some("parcel_id") => {
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|e| AppError::bad_request(format!("read error: {e}")))?;
+                let value = value.trim().to_string();
+                parcel_id = if value.is_empty() { None } else { Some(value) };
+            }
+            _ => {}
         }
     }
 
@@ -110,10 +150,10 @@ pub async fn upload_evidence(
     let id = Uuid::new_v4();
     let row = sqlx::query_as::<_, EvidenceUploadRow>(
         "INSERT INTO evidence_uploads
-            (id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
+            (id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, uploaded_by, parcel_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes,
-                   uploaded_by, created_at",
+                   uploaded_by, parcel_id, created_at",
     )
     .bind(id)
     .bind(hex::encode(artifact.content_hash))
@@ -122,6 +162,8 @@ pub async fn upload_evidence(
     .bind(&filename)
     .bind(&content_type)
     .bind(artifact.size_bytes as i64)
+    .bind(&uploaded_by)
+    .bind(&parcel_id)
     .fetch_one(&state.pool)
     .await?;
 
@@ -134,21 +176,53 @@ pub async fn upload_evidence(
             filename: row.filename,
             content_type: row.content_type,
             size_bytes: artifact.size_bytes,
+            parcel_id: row.parcel_id,
         }),
     ))
 }
 
-/// List uploaded evidence records.
+/// List uploaded evidence records, optionally filtered by parcel or hash.
 pub async fn list_evidence_uploads(
     State(state): State<AppState>,
+    Query(params): Query<EvidenceListParams>,
 ) -> Result<Json<Vec<EvidenceUploadRow>>, AppError> {
-    let rows = sqlx::query_as::<_, EvidenceUploadRow>(
-        "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes,
-                uploaded_by, created_at
-         FROM evidence_uploads ORDER BY created_at DESC LIMIT 100",
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let rows = match (params.parcel_id, params.content_hash) {
+        (Some(parcel), Some(hash)) => {
+            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                "{SELECT_UPLOAD} FROM evidence_uploads WHERE parcel_id = $1 AND content_hash = $2 \
+                 ORDER BY created_at DESC LIMIT 200"
+            ))
+            .bind(parcel)
+            .bind(hash)
+            .fetch_all(&state.pool)
+            .await?
+        }
+        (Some(parcel), None) => {
+            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                "{SELECT_UPLOAD} FROM evidence_uploads WHERE parcel_id = $1 \
+                 ORDER BY created_at DESC LIMIT 200"
+            ))
+            .bind(parcel)
+            .fetch_all(&state.pool)
+            .await?
+        }
+        (None, Some(hash)) => {
+            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                "{SELECT_UPLOAD} FROM evidence_uploads WHERE content_hash = $1 \
+                 ORDER BY created_at DESC LIMIT 200"
+            ))
+            .bind(hash)
+            .fetch_all(&state.pool)
+            .await?
+        }
+        (None, None) => {
+            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                "{SELECT_UPLOAD} FROM evidence_uploads ORDER BY created_at DESC LIMIT 100"
+            ))
+            .fetch_all(&state.pool)
+            .await?
+        }
+    };
     Ok(Json(rows))
 }
 
@@ -157,15 +231,89 @@ pub async fn get_evidence_upload(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<EvidenceUploadRow>, AppError> {
-    let row = sqlx::query_as::<_, EvidenceUploadRow>(
-        "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes,
-                uploaded_by, created_at
-         FROM evidence_uploads WHERE id = $1",
-    )
+    let row = sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+        "{SELECT_UPLOAD} FROM evidence_uploads WHERE id = $1"
+    ))
     .bind(id)
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(row))
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/evidence/{id}/file — stream the stored bytes.
+//
+// Single-range support (206) so <video> elements can seek; everything else
+// gets the full body (200). Evidence files are capped at EVIDENCE_MAX_SIZE
+// (50 MB default), so the body is buffered rather than streamed from disk.
+// ---------------------------------------------------------------------------
+
+fn parse_single_range(value: &str, len: usize) -> Option<(usize, usize)> {
+    let spec = value.trim().strip_prefix("bytes=")?;
+    if spec.contains(',') {
+        return None; // multi-range not supported — caller falls back to 200
+    }
+    let (start_s, end_s) = spec.split_once('-')?;
+    let start: usize = start_s.trim().parse().ok()?;
+    let end: usize = if end_s.trim().is_empty() {
+        len.saturating_sub(1)
+    } else {
+        end_s.trim().parse().ok()?
+    };
+    if start >= len || end < start {
+        return None;
+    }
+    Some((start, end.min(len - 1)))
+}
+
+pub async fn get_evidence_file(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    let row = sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+        "{SELECT_UPLOAD} FROM evidence_uploads WHERE id = $1"
+    ))
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found("evidence upload not found"))?;
+
+    let bytes = state
+        .storage
+        .load(&row.storage_ref)
+        .await
+        .map_err(|e| AppError::internal(format!("storage read error: {e}")))?
+        .ok_or_else(|| AppError::not_found("evidence bytes no longer stored"))?;
+
+    let len = bytes.len();
+    let content_type = row.content_type.clone();
+
+    let range = headers
+        .get(header::RANGE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| parse_single_range(value, len));
+
+    let (status, body, content_range) = match range {
+        Some((start, end)) => (
+            StatusCode::PARTIAL_CONTENT,
+            bytes[start..=end].to_vec(),
+            Some(format!("bytes {start}-{end}/{len}")),
+        ),
+        None => (StatusCode::OK, bytes, None),
+    };
+
+    // Let hyper derive Content-Length from the body actually being sent (the
+    // slice for range responses); Content-Range reports the full length.
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = status;
+    let headers_mut = response.headers_mut();
+    headers_mut.insert(header::CONTENT_TYPE, content_type.parse().unwrap());
+    headers_mut.insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());
+    if let Some(content_range) = content_range {
+        headers_mut.insert(header::CONTENT_RANGE, content_range.parse().unwrap());
+    }
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -189,12 +337,14 @@ mod tests {
             filename: "test.txt".into(),
             content_type: "text/plain".into(),
             size_bytes: 42,
+            parcel_id: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("content_hash"));
         assert!(json.contains("storage_ref"));
         assert!(json.contains("filename"));
         assert!(json.contains("size_bytes"));
+        assert!(json.contains("parcel_id"));
     }
 
     #[test]
@@ -206,6 +356,7 @@ mod tests {
             filename: "photo.jpg".into(),
             content_type: "image/jpeg".into(),
             size_bytes: 1024 * 512,
+            parcel_id: Some("PARCEL-1".into()),
         };
         let json = serde_json::to_string(&resp).unwrap();
         let decoded: UploadResponse = serde_json::from_str(&json).unwrap();
@@ -213,6 +364,7 @@ mod tests {
         assert_eq!(decoded.content_hash, resp.content_hash);
         assert_eq!(decoded.storage_ref, resp.storage_ref);
         assert_eq!(decoded.size_bytes, resp.size_bytes);
+        assert_eq!(decoded.parcel_id.as_deref(), Some("PARCEL-1"));
     }
 
     // -----------------------------------------------------------------------
@@ -435,6 +587,7 @@ mod tests {
             content_type: "application/pdf".into(),
             size_bytes: 1024,
             uploaded_by: None,
+            parcel_id: Some("PARCEL-2".into()),
             created_at: chrono::Utc::now(),
         };
         let json = serde_json::to_string(&row).unwrap();
@@ -443,5 +596,54 @@ mod tests {
         assert!(json.contains("filename"));
         assert!(json.contains("size_bytes"));
         assert!(json.contains("uploaded_by"));
+        assert!(json.contains("parcel_id"));
+    }
+
+    // -----------------------------------------------------------------------
+    // File serving — range parsing + storage load
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn range_parsing_supports_common_forms() {
+        // Full open-ended range.
+        assert_eq!(parse_single_range("bytes=0-99", 200), Some((0, 99)));
+        // Open-ended suffix of the body.
+        assert_eq!(parse_single_range("bytes=100-", 200), Some((100, 199)));
+        // End clamped to the last byte.
+        assert_eq!(parse_single_range("bytes=150-999", 200), Some((150, 199)));
+        // Multi-range unsupported → None (caller answers 200).
+        assert_eq!(parse_single_range("bytes=0-1,5-9", 200), None);
+        // Start beyond EOF → unsatisfiable → None.
+        assert_eq!(parse_single_range("bytes=500-", 200), None);
+        // Malformed / non-bytes values.
+        assert_eq!(parse_single_range("items=0-1", 200), None);
+        assert_eq!(parse_single_range("bytes=abc-", 200), None);
+        assert_eq!(parse_single_range("", 200), None);
+    }
+
+    #[tokio::test]
+    async fn storage_local_load_roundtrips() {
+        let tmp = tempfile::tempdir().unwrap();
+        let backend = crate::storage::StorageBackend::Local {
+            root: tmp.path().to_path_buf(),
+        };
+
+        let data = b"roundtrip me";
+        let artifact = backend.store("a.txt", "text/plain", data).await.unwrap();
+        let loaded = backend.load(&artifact.storage_ref).await.unwrap().unwrap();
+        assert_eq!(loaded, data);
+    }
+
+    #[tokio::test]
+    async fn storage_local_load_rejects_traversal_and_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let backend = crate::storage::StorageBackend::Local {
+            root: tmp.path().to_path_buf(),
+        };
+
+        // Crafted traversal ref must not escape the root.
+        assert!(backend.load("../../etc/passwd").await.is_err());
+        // A benign missing ref is simply None.
+        assert!(backend.load("2099/01/01/ghost.bin").await.unwrap().is_none());
     }
 }
