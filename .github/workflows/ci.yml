@@ -109,7 +109,7 @@ jobs:
         working-directory: terra-core
 
   frontend:
-    name: Frontend Type Check
+    name: Frontend Type Check + Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -131,4 +131,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: TypeScript type check
-        run: pnpm exec tsc --noEmit
+        run: pnpm exec tsc -b
+
+      - name: Unit tests
+        run: pnpm exec vitest run
