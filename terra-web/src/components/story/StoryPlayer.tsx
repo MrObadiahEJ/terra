@@ -17,6 +17,8 @@ import {
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { useLocale } from '../../lib/locale'
+import type { TranslationKey } from '../../lib/locale'
+import { GEOMETRY_SOURCE_KEYS, codeKey } from '../../lib/spatial'
 import { Pause, Play, SkipBack, SkipForward, Link2, Gauge } from 'lucide-react'
 import {
   activeCaptions,
@@ -280,6 +282,19 @@ export const StoryPlayer = forwardRef<StoryPlayerHandle, Props>(function StoryPl
           <span>{currentStop.label}</span>
           {currentStop.geometry_version !== undefined && (
             <span className="story-stop-ver">v{currentStop.geometry_version}</span>
+          )}
+          {currentStop.provenance && (
+            <span
+              className={`story-stop-prov ${currentStop.provenance.verified ? 'is-verified' : 'is-unverified'}`}
+            >
+              {t(codeKey(GEOMETRY_SOURCE_KEYS, currentStop.provenance.source) as TranslationKey)}
+              {' · '}
+              {currentStop.provenance.verified
+                ? t('storyProvVerified')
+                : t('storyProvUnverified')}
+              {' · '}
+              {t('storyProvAttestations', { n: currentStop.provenance.attest_count })}
+            </span>
           )}
         </div>
       )}

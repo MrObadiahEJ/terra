@@ -22,6 +22,30 @@ export interface CameraTrack {
 
 export type StoryStopKind = 'start' | 'waypoint' | 'arrival' | 'version'
 
+/**
+ * Provenance of a geometry version referenced by a history stop. Field codes
+ * mirror the RFC-013 mirrors in lib/spatial.ts (GEOMETRY_SOURCE_KEYS,
+ * SPATIAL_DIMENSION_KEYS, ELEVATION_SOURCE_KEYS). This is a read-only
+ * snapshot copied into the story document — the story never becomes the
+ * source of truth and never writes chain state.
+ */
+export interface StopProvenance {
+  /** GeometrySource code (0..7): manual, survey, drone, satellite, lidar, … */
+  source: number
+  /** SpatialDimension code (0..2): 2D, 2.5D, 3D. */
+  dimension: number
+  /** ElevationSource code (0..5); 0 = NONE (flat). */
+  elevation_source: number
+  verified: boolean
+  verified_by?: string
+  attest_count: number
+  attestors?: string[]
+  /** Evidence manifest ref (RFC-012 evidence chain), when linked. */
+  evidence_manifest?: string
+  /** Anchored geometry digest, when known. */
+  geometry_hash?: string
+}
+
 export interface StoryStop {
   id: string
   label: string
@@ -36,6 +60,8 @@ export interface StoryStop {
   asset_pubkey?: string
   geometry_version?: number
   caption?: string
+  /** Present on history version stops; absent otherwise. */
+  provenance?: StopProvenance
 }
 
 export type NavigationMethod = 'road-graph' | 'great-circle' | 'drawn'

@@ -4947,3 +4947,87 @@ header .wallet-adapter-button {
   font-size: 13px;
 }
 
+/* ---- story: road-graph routing + version provenance (RFC-014 Ph.02) ------ */
+.story-stop-prov {
+  padding-left: 6px;
+  border-left: 1px solid rgba(229, 238, 252, 0.25);
+  opacity: 0.9;
+}
+.story-stop-prov.is-verified {
+  color: #4ade80;
+}
+.story-stop-prov.is-unverified {
+  color: #fbbf24;
+}
+.story-provenance {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.story-prov-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+.story-prov-hint {
+  margin: 2px 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.story-prov-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.story-prov-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.story-prov-row:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.story-prov-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.story-prov-state {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.story-prov-state.is-verified {
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+.story-prov-state.is-unverified {
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+.story-prov-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.story-prov-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+

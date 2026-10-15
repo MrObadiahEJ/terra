@@ -8,9 +8,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Film, History, Map as MapIcon, Plus, Trash2, Compass } from 'lucide-react'
 import { listStories, createStory, deleteStory } from '../story/api'
-import { demoHistory, demoJourney } from '../story/demo'
+import { demoHistory, demoJourney, demoRoadJourney } from '../story/demo'
+import { buildRoadRoute, parseRoadSegments, snapToRoadNetwork } from '../story/roads'
+import { api, type RoadRow } from '../lib/api'
+import { DEMO_ROADS } from '../lib/demoData'
 import { buildTrackFromStops, bearingDeg, suggestLegSeconds, haversineM } from '../story/timeline'
-import type { StoryDefinition, StoryRow, StoryStop } from '../story/types'
+import type { NavigationPath, StoryDefinition, StoryRow, StoryStop } from '../story/types'
 import { useLocale } from '../lib/locale'
 import type { TranslationKey } from '../lib/locale'
 
@@ -21,12 +24,12 @@ const TYPE_KEYS: Record<string, TranslationKey> = {
   discovery: 'storyTypeDiscovery',
 }
 
-/** Preset creator points around the atlas demo focus (Basel). */
+/** Preset creator points on (and near) the bundled road network. */
 const PRESET_POINTS: Array<{ label: string; lon: number; lat: number }> = [
-  { label: 'Gate', lon: 9.515, lat: 47.141 },
-  { label: 'Bridge', lon: 9.5205, lat: 47.1438 },
-  { label: 'Square', lon: 9.525, lat: 47.14 },
-  { label: 'Park', lon: 9.512, lat: 47.145 },
+  { label: 'RN1 west', lon: 11.478, lat: 3.836 },
+  { label: 'RN1 junction', lon: 11.495, lat: 3.844 },
+  { label: 'RN1 east', lon: 11.522, lat: 3.857 },
+  { label: 'Ekoa Link', lon: 11.517, lat: 3.851 },
 ]
 
 export default function StoriesPage() {
@@ -37,6 +40,9 @@ export default function StoriesPage() {
   const [picked, setPicked] = useState<number[]>([0, 1])
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // Road network for road-graph routing; the bundled demo dataset until the
+  // fusion API answers with a non-empty set.
+  const [roads, setRoads] = useState<RoadRow[]>(DEMO_ROADS)
 
   const refresh = useCallback(() => {
     listStories()
@@ -49,6 +55,21 @@ export default function StoriesPage() {
 
   useEffect(refresh, [refresh])
 
+  useEffect(() => {
+    let cancelled = false
+    api
+      .roads()
+      .then((rows) => {
+        if (!cancelled && rows.length > 0) setRoads(rows)
+      })
+      .catch(() => {
+        /* keep the bundled demo road network */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const togglePoint = (idx: number) => {
     setPicked((p) => (p.includes(idx) ? p.filter((x) => x !== idx) : [...p, idx].sort()))
   }
@@ -58,7 +79,17 @@ export default function StoriesPage() {
     setSaving(true)
     setNotice(null)
     try {
-      const ordered = picked.map((i) => PRESET_POINTS[i])
+      const segments = parseRoadSegments(roads)
+      // Snap stops onto the mapped network when one is close, so the camera
+      // and the route agree; otherwise leave the point exactly where chosen.
+      const ordered = picked.map((i) => {
+        const p = PRESET_POINTS[i]
+        const snapped = snapToRoadNetwork(segments, [p.lon, p.lat])
+        if (snapped && snapped.distanceM <= 250) {
+          return { label: p.label, lon: snapped.lon, lat: snapped.lat }
+        }
+        return { label: p.label, lon: p.lon, lat: p.lat }
+      })
       let clock = 0
       const stops: StoryStop[] = ordered.map((p, i) => {
         const kind = i === 0 ? 'start' : i === ordered.length - 1 ? 'arrival' : 'waypoint'
@@ -83,6 +114,22 @@ export default function StoriesPage() {
       })
       const duration = Math.max(clock + 3, 8)
       const id = `story-${Date.now().toString(36)}`
+      // Each leg is routed on the mapped road graph when possible; otherwise
+      // it stays an explicitly illustrative great-circle transition.
+      const routes: NavigationPath[] = ordered.slice(1).map((p, i) => {
+        const prev = ordered[i]
+        const from: [number, number] = [prev.lon, prev.lat]
+        const to: [number, number] = [p.lon, p.lat]
+        return (
+          buildRoadRoute(roads, from, to, `leg-${i}`) ?? {
+            id: `leg-${i}`,
+            method: 'great-circle' as const,
+            coordinates: [from, to],
+            length_m: haversineM(from, to),
+            label: 'Illustrative transition (aerial)',
+          }
+        )
+      })
       const def: StoryDefinition = {
         schema_version: 1,
         id,
@@ -90,19 +137,7 @@ export default function StoriesPage() {
         title: title.trim() || 'Untitled journey',
         stops,
         camera_track: buildTrackFromStops(stops),
-        routes: ordered.slice(1).map((p, i) => {
-          const prev = ordered[i]
-          return {
-            id: `leg-${i}`,
-            method: 'great-circle' as const,
-            coordinates: [
-              [prev.lon, prev.lat],
-              [p.lon, p.lat],
-            ] as [number, number][],
-            length_m: haversineM([prev.lon, prev.lat], [p.lon, p.lat]),
-            label: 'Illustrative transition (aerial)',
-          }
-        }),
+        routes,
         captions: [],
         duration_s: Number(duration.toFixed(1)),
       }
@@ -126,7 +161,7 @@ export default function StoriesPage() {
     }
   }
 
-  const demos: StoryDefinition[] = [demoJourney(), demoHistory()]
+  const demos: StoryDefinition[] = [demoRoadJourney(), demoJourney(), demoHistory()]
 
   return (
     <div className="p-4 max-w-3xl mx-auto space-y-6 text-sm">

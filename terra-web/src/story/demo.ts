@@ -3,8 +3,10 @@
 // no server. They are clearly labelled demo content, never presented as
 // verified world facts.
 
-import { bearingDeg, haversineM, buildTrackFromStops } from './timeline'
-import type { StoryDefinition, StoryStop } from './types'
+import { bearingDeg, haversineM, buildTrackFromStops, suggestLegSeconds } from './timeline'
+import { buildRoadRoute } from './roads'
+import { DEMO_ROADS } from '../lib/demoData'
+import type { NavigationPath, StoryDefinition, StoryStop } from './types'
 
 const DEMO_AREA: [number, number] = [9.515, 47.141] // atlas demo focus
 
@@ -105,18 +107,45 @@ export function demoHistory(): StoryDefinition {
       geometry_version: 0,
       heading_deg: 20,
       caption: 'V1: SURVEY claim, D2 — an observation, not yet a verified fact.',
+      provenance: {
+        source: 1,
+        dimension: 0,
+        elevation_source: 0,
+        verified: false,
+        attest_count: 0,
+      },
     }),
     stop('v3', 'V3 — drone observation', 'version', 8, DEMO_AREA[0] + 0.002, DEMO_AREA[1] + 0.001, 800, {
       asset_pubkey: asset,
       geometry_version: 1,
       heading_deg: 80,
       caption: 'Later versions add evidence. Unverified ≠ established.',
+      provenance: {
+        source: 2,
+        dimension: 1,
+        elevation_source: 3,
+        verified: true,
+        verified_by: 'DemoValidator111111111111111111111111111111',
+        attest_count: 2,
+        attestors: ['DemoValidator111111111111111111111111111111'],
+        evidence_manifest: 'demo-manifest-g1',
+        geometry_hash: 'demo-g1',
+      },
     }),
     stop('v5', 'V5 — LiDAR update', 'version', 16, DEMO_AREA[0] + 0.001, DEMO_AREA[1] + 0.002, 700, {
       asset_pubkey: asset,
       geometry_version: 2,
       heading_deg: 150,
       caption: 'Provenance and validation state travel with every version.',
+      provenance: {
+        source: 4,
+        dimension: 2,
+        elevation_source: 3,
+        verified: true,
+        verified_by: 'DemoValidator111111111111111111111111111111',
+        attest_count: 3,
+        geometry_hash: 'demo-g2',
+      },
     }),
   ]
   return {
@@ -125,7 +154,7 @@ export function demoHistory(): StoryDefinition {
     story_type: 'history',
     title: 'Demo history — geometry versions of one parcel',
     description:
-      'Offline demo story over seeded mirror data. Geometry history ≠ ownership history.',
+      'Offline demo story over seeded mirror data, with a read-only provenance snapshot per version. Geometry history ≠ ownership history.',
     stops,
     camera_track: buildTrackFromStops(stops),
     routes: [],
@@ -136,9 +165,81 @@ export function demoHistory(): StoryDefinition {
   }
 }
 
+/** One honest illustrative leg when the road graph cannot carry it. */
+function greatCircleLeg(
+  id: string,
+  from: [number, number],
+  to: [number, number],
+): NavigationPath {
+  return {
+    id,
+    method: 'great-circle',
+    coordinates: [from, to],
+    length_m: haversineM(from, to),
+    label: 'Illustrative transition (aerial)',
+  }
+}
+
+/**
+ * Journey along mapped roads: stops sit on vertices of the RN1 Soa Link in
+ * the bundled demo road dataset, and each leg is routed on the road graph
+ * (`method: 'road-graph'`) with a great-circle fallback if routing fails.
+ * Offline and deterministic — no API needed.
+ */
+export function demoRoadJourney(): StoryDefinition {
+  const rn1 = DEMO_ROADS.find((r) => r.id === 1)
+  const coords: [number, number][] = rn1?.geometry
+    ? (JSON.parse(rn1.geometry).coordinates as [number, number][])
+    : []
+  const west = coords[0] ?? [11.478, 3.836]
+  const mid = coords[Math.floor(coords.length / 2)] ?? [11.507, 3.85]
+  const east = coords[coords.length - 1] ?? [11.522, 3.857]
+
+  const leg1S = suggestLegSeconds(west, mid)
+  const leg2S = suggestLegSeconds(mid, east)
+  const clock1 = Number(leg1S.toFixed(1))
+  const clock2 = Number((leg1S + leg2S).toFixed(1))
+
+  const stops: StoryStop[] = [
+    stop('rn1-west', 'RN1 — Soa west', 'start', 0, west[0], west[1], 380, {
+      heading_deg: bearingDeg(west, mid),
+      caption: 'Following mapped roads, not a straight line across the map.',
+    }),
+    stop('rn1-mid', 'RN1 — market junction', 'waypoint', clock1, mid[0], mid[1], 400, {
+      heading_deg: bearingDeg(mid, east),
+    }),
+    stop('rn1-east', 'RN1 — Soa east', 'arrival', clock2, east[0], east[1], 420, {
+      heading_deg: bearingDeg(mid, east),
+      caption: 'Arrival. Every leg is labelled with the method that built it.',
+    }),
+  ]
+
+  const routes: NavigationPath[] = [
+    buildRoadRoute(DEMO_ROADS, west, mid, 'rn1-leg-1') ?? greatCircleLeg('rn1-leg-1', west, mid),
+    buildRoadRoute(DEMO_ROADS, mid, east, 'rn1-leg-2') ?? greatCircleLeg('rn1-leg-2', mid, east),
+  ]
+
+  return {
+    schema_version: 1,
+    id: 'demo-road-journey',
+    story_type: 'journey',
+    title: 'Demo journey — RN1 Soa Link on the road graph',
+    description:
+      'Offline demo. Stops sit on the bundled road dataset and each leg is routed on the mapped network; disconnected gaps fall back to a dashed great-circle transition.',
+    stops,
+    camera_track: buildTrackFromStops(stops),
+    routes,
+    captions: stops
+      .filter((s) => s.caption)
+      .map((s) => ({ time_s: s.time_s + 0.4, duration_s: 4, text: s.caption as string, stop_id: s.id })),
+    duration_s: Number((clock2 + 3).toFixed(1)),
+  }
+}
+
 export const DEMO_STORIES: Record<string, () => StoryDefinition> = {
   'demo-journey': demoJourney,
   'demo-history': demoHistory,
+  'demo-road-journey': demoRoadJourney,
 }
 
 export function isDemoStoryId(id: string): boolean {

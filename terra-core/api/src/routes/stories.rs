@@ -12,7 +12,7 @@
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post, put};
+use axum::routing::{get, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -24,8 +24,14 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/stories", get(list_stories).post(create_story))
-        .route("/stories/{id}", get(get_story).put(update_story).delete(delete_story))
-        .route("/stories/{id}/exports", get(list_exports).post(create_export))
+        .route(
+            "/stories/{id}",
+            get(get_story).put(update_story).delete(delete_story),
+        )
+        .route(
+            "/stories/{id}/exports",
+            get(list_exports).post(create_export),
+        )
         .route("/exports/{id}", put(update_export))
 }
 
@@ -82,6 +88,36 @@ pub struct StoryStop {
     pub geometry_version: Option<u32>,
     #[serde(default)]
     pub caption: Option<String>,
+    /// Read-only provenance snapshot for history version stops (RFC-013
+    /// mirrors). Absent on journey/discovery stops. The story is never the
+    /// source of truth — this only records what the chain showed when the
+    /// story was created.
+    #[serde(default)]
+    pub provenance: Option<StopProvenance>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StopProvenance {
+    /// GeometrySource code (0..=7).
+    pub source: u8,
+    /// SpatialDimension code (0..=2).
+    pub dimension: u8,
+    /// ElevationSource code (0..=5); 0 = NONE.
+    #[serde(default)]
+    pub elevation_source: u8,
+    #[serde(default)]
+    pub verified: bool,
+    #[serde(default)]
+    pub verified_by: Option<String>,
+    #[serde(default)]
+    pub attest_count: u32,
+    #[serde(default)]
+    pub attestors: Vec<String>,
+    #[serde(default)]
+    pub evidence_manifest: Option<String>,
+    #[serde(default)]
+    pub geometry_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,9 +193,7 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
             "stops must be 2..={MAX_STOPS} (product limit, not a protocol maximum)"
         )));
     }
-    if def.camera_track.keyframes.len() < 2
-        || def.camera_track.keyframes.len() > MAX_KEYFRAMES
-    {
+    if def.camera_track.keyframes.len() < 2 || def.camera_track.keyframes.len() > MAX_KEYFRAMES {
         return Err(AppError::bad_request(format!(
             "camera_track needs 2..={MAX_KEYFRAMES} keyframes"
         )));
@@ -195,6 +229,54 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
                 "stops[{i}].height_m out of range"
             )));
         }
+        if let Some(p) = &stop.provenance {
+            if p.source > 7 {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.source out of range (0..=7)"
+                )));
+            }
+            if p.dimension > 2 {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.dimension out of range (0..=2)"
+                )));
+            }
+            if p.elevation_source > 5 {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.elevation_source out of range (0..=5)"
+                )));
+            }
+            if p.attest_count > 1024 {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.attest_count out of range"
+                )));
+            }
+            if p.attestors.len() > 64 {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.attestors exceeds 64"
+                )));
+            }
+            if let Some(v) = &p.verified_by {
+                if v.trim().is_empty() || v.len() > 128 {
+                    return Err(AppError::bad_request(format!(
+                        "stops[{i}].provenance.verified_by must be 1..=128 characters"
+                    )));
+                }
+            }
+            if let Some(m) = &p.evidence_manifest {
+                if m.trim().is_empty() || m.len() > 512 {
+                    return Err(AppError::bad_request(format!(
+                        "stops[{i}].provenance.evidence_manifest must be 1..=512 characters"
+                    )));
+                }
+            }
+            if let Some(h) = &p.geometry_hash {
+                if h.trim().is_empty() || h.len() > 128 {
+                    return Err(AppError::bad_request(format!(
+                        "stops[{i}].provenance.geometry_hash must be 1..=128 characters"
+                    )));
+                }
+            }
+        }
     }
 
     let mut prev_t = f64::NEG_INFINITY;
@@ -220,9 +302,7 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
                 "camera keyframe {i} height_m out of range"
             )));
         }
-        if !finite_in(kf.heading_deg, -360.0, 360.0)
-            || !finite_in(kf.pitch_deg, -90.0, 90.0)
-        {
+        if !finite_in(kf.heading_deg, -360.0, 360.0) || !finite_in(kf.pitch_deg, -90.0, 90.0) {
             return Err(AppError::bad_request(format!(
                 "camera keyframe {i} heading/pitch out of range"
             )));
@@ -274,25 +354,23 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
     }
 
     match def.story_type.as_str() {
-        "journey" => {
+        "journey"
             if !def.stops.iter().any(|s| s.kind == "start")
-                || !def.stops.iter().any(|s| s.kind == "arrival")
-            {
-                return Err(AppError::bad_request(
-                    "journey stories need at least one start and one arrival stop",
-                ));
-            }
+                || !def.stops.iter().any(|s| s.kind == "arrival") =>
+        {
+            return Err(AppError::bad_request(
+                "journey stories need at least one start and one arrival stop",
+            ));
         }
-        "history" => {
+        "history"
             if !def
                 .stops
                 .iter()
-                .any(|s| s.geometry_version.is_some() || s.asset_pubkey.is_some())
-            {
-                return Err(AppError::bad_request(
-                    "history stories must reference geometry versions or a spatial asset",
-                ));
-            }
+                .any(|s| s.geometry_version.is_some() || s.asset_pubkey.is_some()) =>
+        {
+            return Err(AppError::bad_request(
+                "history stories must reference geometry versions or a spatial asset",
+            ));
         }
         _ => {}
     }
@@ -418,10 +496,7 @@ impl StoryDbRow {
     }
 }
 
-async fn story_row(
-    pool: &sqlx::PgPool,
-    id: &str,
-) -> Result<StoryWithDefinition, AppError> {
+async fn story_row(pool: &sqlx::PgPool, id: &str) -> Result<StoryWithDefinition, AppError> {
     let row = sqlx::query_as::<_, StoryDbRow>(&format!(
         "{SELECT_STORY}, definition FROM stories WHERE id = $1"
     ))
@@ -430,10 +505,7 @@ async fn story_row(
     .await?
     .ok_or_else(|| AppError::not_found("story not found"))?;
     let (story, definition) = row.into_parts()?;
-    Ok(StoryWithDefinition {
-        story,
-        definition,
-    })
+    Ok(StoryWithDefinition { story, definition })
 }
 
 pub async fn list_stories(
@@ -488,7 +560,10 @@ pub async fn get_story(
     Ok(Json(story_row(&state.pool, &id).await?))
 }
 
-fn check_author(story_author: &Option<String>, headers: &axum::http::HeaderMap) -> Result<(), AppError> {
+fn check_author(
+    story_author: &Option<String>,
+    headers: &axum::http::HeaderMap,
+) -> Result<(), AppError> {
     // Unattributed stories are open to any signed caller (v0 demo posture);
     // attributed stories only accept the author's wallet.
     let Some(expected) = story_author else {
@@ -497,7 +572,9 @@ fn check_author(story_author: &Option<String>, headers: &axum::http::HeaderMap) 
     let provided = caller_wallet(headers)
         .ok_or_else(|| AppError::unauthorized("x-wallet required for attributed stories"))?;
     if provided != *expected {
-        return Err(AppError::unauthorized("only the story author may modify it"));
+        return Err(AppError::unauthorized(
+            "only the story author may modify it",
+        ));
     }
     Ok(())
 }
@@ -560,12 +637,10 @@ pub async fn create_story(
         return Err(e.into());
     }
 
-    let story = sqlx::query_as::<_, Story>(&format!(
-        "{SELECT_STORY} FROM stories WHERE id = $1"
-    ))
-    .bind(&def.id)
-    .fetch_one(&state.pool)
-    .await?;
+    let story = sqlx::query_as::<_, Story>(&format!("{SELECT_STORY} FROM stories WHERE id = $1"))
+        .bind(&def.id)
+        .fetch_one(&state.pool)
+        .await?;
 
     Ok((
         StatusCode::CREATED,
@@ -661,7 +736,9 @@ fn validate_export(input: &NewExport) -> Result<(), AppError> {
         return Err(AppError::bad_request("aspect must be 9:16, 16:9 or 1:1"));
     }
     if !(160..=1920).contains(&input.width) || !(160..=1920).contains(&input.height) {
-        return Err(AppError::bad_request("width/height must be within 160..=1920"));
+        return Err(AppError::bad_request(
+            "width/height must be within 160..=1920",
+        ));
     }
     if !(10..=60).contains(&input.fps) {
         return Err(AppError::bad_request("fps must be within 10..=60"));
@@ -721,7 +798,9 @@ pub async fn update_export(
             "status must be running, done, failed or cancelled",
         ));
     }
-    let progress = input.progress.unwrap_or(if input.status == "done" { 1.0 } else { 0.0 });
+    let progress = input
+        .progress
+        .unwrap_or(if input.status == "done" { 1.0 } else { 0.0 });
     if !(0.0..=1.0).contains(&progress) {
         return Err(AppError::bad_request("progress must be within 0..=1"));
     }
@@ -791,6 +870,7 @@ mod tests {
                     asset_pubkey: None,
                     geometry_version: None,
                     caption: Some("At the gate".into()),
+                    provenance: None,
                 },
                 StoryStop {
                     id: "s1".into(),
@@ -806,6 +886,7 @@ mod tests {
                     asset_pubkey: None,
                     geometry_version: None,
                     caption: None,
+                    provenance: None,
                 },
             ],
             camera_track: CameraTrack {
@@ -871,6 +952,7 @@ mod tests {
                 asset_pubkey: None,
                 geometry_version: None,
                 caption: None,
+                provenance: None,
             });
         }
         assert!(validate_definition(&d).is_err());
@@ -897,6 +979,43 @@ mod tests {
         assert!(validate_definition(&d).is_err());
         d.stops[1].geometry_version = Some(3);
         assert!(validate_definition(&d).is_ok());
+    }
+
+    #[test]
+    fn history_stop_accepts_provenance() {
+        let mut d = minimal_journey();
+        d.story_type = "history".into();
+        d.stops[1].kind = "version".into();
+        d.stops[1].geometry_version = Some(2);
+        d.stops[1].provenance = Some(StopProvenance {
+            source: 4,
+            dimension: 2,
+            elevation_source: 3,
+            verified: true,
+            verified_by: Some("Validator111".into()),
+            attest_count: 3,
+            attestors: vec!["Validator111".into()],
+            evidence_manifest: Some("manifest-1".into()),
+            geometry_hash: Some("abc123".into()),
+        });
+        assert!(validate_definition(&d).is_ok());
+    }
+
+    #[test]
+    fn rejects_out_of_range_provenance() {
+        let mut d = minimal_journey();
+        d.stops[0].provenance = Some(StopProvenance {
+            source: 9,
+            dimension: 0,
+            elevation_source: 0,
+            verified: false,
+            verified_by: None,
+            attest_count: 0,
+            attestors: vec![],
+            evidence_manifest: None,
+            geometry_hash: None,
+        });
+        assert!(validate_definition(&d).is_err());
     }
 
     #[test]

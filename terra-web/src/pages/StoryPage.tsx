@@ -14,8 +14,20 @@ import { DEMO_STORIES, isDemoStoryId } from '../story/demo'
 import { parseStoryLink } from '../story/url'
 import type { StoryDefinition, StoryWithDefinition } from '../story/types'
 import { useLocale } from '../lib/locale'
+import type { TranslationKey } from '../lib/locale'
+import {
+  ELEVATION_SOURCE_KEYS,
+  GEOMETRY_SOURCE_KEYS,
+  SPATIAL_DIMENSION_KEYS,
+  codeKey,
+} from '../lib/spatial'
 import { ArrowLeft, Download, Video } from 'lucide-react'
 import { exportStoryVideo, ASPECT_PRESETS, type ExportProgress } from '../story/export'
+
+/** Compact a long hex/ref for display. */
+function shortRef(ref: string): string {
+  return ref.length > 16 ? `${ref.slice(0, 10)}…${ref.slice(-4)}` : ref
+}
 
 export default function StoryPage() {
   const { storyId = '' } = useParams()
@@ -128,6 +140,8 @@ export default function StoryPage() {
     )
   }
 
+  const provenanceStops = story.stops.filter((s) => s.provenance)
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="story-header">
@@ -180,6 +194,68 @@ export default function StoryPage() {
           onTimeChange={onTimeChange}
         />
       </div>
+
+      {provenanceStops.length > 0 && (
+        <section className="story-provenance" aria-label={t('storyProvenanceTitle')}>
+          <h2 className="story-prov-title">{t('storyProvenanceTitle')}</h2>
+          <p className="story-prov-hint">{t('storyProvenanceHint')}</p>
+          <ul className="story-prov-list">
+            {provenanceStops.map((s) => {
+              const p = s.provenance
+              if (!p) return null
+              return (
+                <li key={s.id} className="story-prov-row">
+                  <div className="story-prov-head">
+                    <span className="font-medium">{s.label}</span>
+                    {s.geometry_version !== undefined && (
+                      <span className="story-stop-ver">v{s.geometry_version}</span>
+                    )}
+                    <span
+                      className={`story-prov-state ${p.verified ? 'is-verified' : 'is-unverified'}`}
+                    >
+                      {p.verified ? t('storyProvVerified') : t('storyProvUnverified')}
+                    </span>
+                  </div>
+                  <div className="story-prov-meta">
+                    <span>
+                      {t('storyProvSource')}:{' '}
+                      {t(codeKey(GEOMETRY_SOURCE_KEYS, p.source) as TranslationKey)}
+                    </span>
+                    <span>
+                      {t('storyProvDimension')}:{' '}
+                      {t(codeKey(SPATIAL_DIMENSION_KEYS, p.dimension) as TranslationKey)}
+                    </span>
+                    <span>
+                      {t('storyProvElevation')}:{' '}
+                      {t(codeKey(ELEVATION_SOURCE_KEYS, p.elevation_source) as TranslationKey)}
+                    </span>
+                    <span>{t('storyProvAttestations', { n: p.attest_count })}</span>
+                  </div>
+                  {(p.verified_by || p.evidence_manifest || p.geometry_hash) && (
+                    <div className="story-prov-refs">
+                      {p.verified_by && (
+                        <span className="font-mono">
+                          {t('storyProvVerifiedBy')}: {shortRef(p.verified_by)}
+                        </span>
+                      )}
+                      {p.evidence_manifest && (
+                        <span className="font-mono">
+                          {t('storyProvEvidence')}: {shortRef(p.evidence_manifest)}
+                        </span>
+                      )}
+                      {p.geometry_hash && (
+                        <span className="font-mono">
+                          {t('storyProvHash')}: {shortRef(p.geometry_hash)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       {meta && (
         <p className="story-meta">

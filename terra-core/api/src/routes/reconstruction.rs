@@ -122,11 +122,11 @@ pub async fn create_capture_session(
     let id = Uuid::new_v4().to_string();
     let media_count = input.evidence_refs.as_ref().map(|r| r.len() as i32).unwrap_or(0);
 
-    let row = sqlx::query_as::<_, CaptureSession>(&format!(
+    let row = sqlx::query_as::<_, CaptureSession>(
         "INSERT INTO capture_sessions (id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs)
          VALUES ($1, $2, $3, $4, COALESCE($5, now()), $6, $7)
-         RETURNING id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs, created_at"
-    ))
+         RETURNING id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs, created_at",
+    )
     .bind(&id)
     .bind(&input.parcel_id)
     .bind(&input.title)
