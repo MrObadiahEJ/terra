@@ -71,7 +71,7 @@ export default function StoriesPage() {
   }, [])
 
   const togglePoint = (idx: number) => {
-    setPicked((p) => (p.includes(idx) ? p.filter((x) => x !== idx) : [...p, idx].sort()))
+    setPicked((p) => (p.includes(idx) ? p.filter((x) => x !== idx) : [...p, idx].sort((a, b) => a - b)))
   }
 
   const saveJourney = async () => {
@@ -121,7 +121,7 @@ export default function StoriesPage() {
         const from: [number, number] = [prev.lon, prev.lat]
         const to: [number, number] = [p.lon, p.lat]
         return (
-          buildRoadRoute(roads, from, to, `leg-${i}`) ?? {
+          buildRoadRoute(roads, from, to, `leg-${i}`, { segments }) ?? {
             id: `leg-${i}`,
             method: 'great-circle' as const,
             coordinates: [from, to],

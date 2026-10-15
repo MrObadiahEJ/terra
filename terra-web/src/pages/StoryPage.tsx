@@ -88,6 +88,15 @@ export default function StoryPage() {
     }
   }, [storyId])
 
+  // Stop any in-flight export when the page unmounts or the story changes, so
+  // the recorder never keeps running against a torn-down viewer.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+      abortRef.current = null
+    }
+  }, [storyId])
+
   const initialTimeS = (() => {
     if (!story) return 0
     if (linkState.time !== undefined) return Math.min(linkState.time, story.duration_s)

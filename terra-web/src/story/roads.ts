@@ -235,7 +235,15 @@ export function routeOnRoads(
   const sFrom = snapToRoadNetwork(segments, from)
   const sTo = snapToRoadNetwork(segments, to)
   if (!sFrom || !sTo) return null
+  return routeOnSnapped(segments, sFrom, sTo)
+}
 
+/** Core router for two endpoints already snapped onto the network. */
+function routeOnSnapped(
+  segments: RoadSegment[],
+  sFrom: SnappedPoint,
+  sTo: SnappedPoint,
+): RoadRoute | null {
   const graph = buildRoadGraph(segments)
   const adj = new Map<string, GraphEdge[]>(graph.adj)
   const startKey = nodeKey(sFrom.segment.a[0], sFrom.segment.a[1])
@@ -355,6 +363,8 @@ function dedupeConsecutive(coords: [number, number][]): [number, number][] {
 export interface RoadRouteOptions {
   /** Reject when an endpoint is farther than this from any mapped road. */
   maxSnapM?: number
+  /** Pre-parsed segments, to avoid re-parsing the dataset for every leg. */
+  segments?: RoadSegment[]
 }
 
 /**
@@ -370,12 +380,12 @@ export function buildRoadRoute(
   opts: RoadRouteOptions = {},
 ): NavigationPath | null {
   const maxSnapM = opts.maxSnapM ?? 250
-  const segments = parseRoadSegments(roads)
+  const segments = opts.segments ?? parseRoadSegments(roads)
   const sFrom = snapToRoadNetwork(segments, from)
   const sTo = snapToRoadNetwork(segments, to)
   if (!sFrom || !sTo) return null
   if (sFrom.distanceM > maxSnapM || sTo.distanceM > maxSnapM) return null
-  const route = routeOnRoads(segments, from, to)
+  const route = routeOnSnapped(segments, sFrom, sTo)
   if (!route) return null
   return {
     id,

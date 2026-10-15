@@ -279,6 +279,18 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
         }
     }
 
+    // The player picks the active stop by walking the list and stopping at the
+    // first future one, so stops must be ordered by time.
+    let mut prev_stop_t = f64::NEG_INFINITY;
+    for (i, stop) in def.stops.iter().enumerate() {
+        if stop.time_s < prev_stop_t - 1e-6 {
+            return Err(AppError::bad_request(format!(
+                "stops must be ordered by non-decreasing time_s (index {i})"
+            )));
+        }
+        prev_stop_t = stop.time_s;
+    }
+
     let mut prev_t = f64::NEG_INFINITY;
     for (i, kf) in def.camera_track.keyframes.iter().enumerate() {
         if !kf.time_s.is_finite() || kf.time_s <= prev_t {
@@ -1015,6 +1027,14 @@ mod tests {
             evidence_manifest: None,
             geometry_hash: None,
         });
+        assert!(validate_definition(&d).is_err());
+    }
+
+    #[test]
+    fn rejects_unordered_stops() {
+        let mut d = minimal_journey();
+        d.stops[0].time_s = 8.0;
+        d.stops[1].time_s = 4.0; // earlier than the first stop
         assert!(validate_definition(&d).is_err());
     }
 
