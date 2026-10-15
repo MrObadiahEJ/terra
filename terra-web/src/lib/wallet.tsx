@@ -9,6 +9,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import type { AnchorWallet } from '@solana/wallet-adapter-react'
 import { ed25519 } from '@noble/curves/ed25519'
 import { TERRA_RPC_URL } from './constants'
+import { setStorySigner } from '../story/api'
 
 // The official @solana/wallet-adapter stack is used for all signing. The
 // WalletProvider auto-discovers any Wallet Standard-compatible wallet installed
@@ -122,6 +123,12 @@ function WalletViewBridge({ children }: { children: React.ReactNode }) {
     setActiveSigner(view.anchorWallet ?? null)
     return () => setActiveSigner(null)
   }, [view.anchorWallet])
+  // Story writes are signed with the wallet when connected, so they are
+  // attributed to it; otherwise the story client falls back to an ephemeral key.
+  useEffect(() => {
+    setStorySigner(view.signMessage, view.publicKey ? view.publicKey.toBase58() : null)
+    return () => setStorySigner(null, null)
+  }, [view.signMessage, view.publicKey])
   return <WalletViewContext.Provider value={view}>{children}</WalletViewContext.Provider>
 }
 
