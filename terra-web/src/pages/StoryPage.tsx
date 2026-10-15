@@ -21,8 +21,14 @@ import {
   SPATIAL_DIMENSION_KEYS,
   codeKey,
 } from '../lib/spatial'
-import { ArrowLeft, Download, Video } from 'lucide-react'
-import { exportStoryVideo, ASPECT_PRESETS, type ExportProgress } from '../story/export'
+import { ArrowLeft, Download, Video, Image as ImageIcon, X } from 'lucide-react'
+import {
+  exportStoryVideo,
+  exportStoryStill,
+  isExportCancelled,
+  ASPECT_PRESETS,
+  type ExportProgress,
+} from '../story/export'
 
 /** Compact a long hex/ref for display. */
 function shortRef(ref: string): string {
@@ -34,6 +40,7 @@ export default function StoryPage() {
   const [search] = useSearchParams()
   const { t } = useLocale()
   const playerRef = useRef<StoryPlayerHandle | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [story, setStory] = useState<StoryDefinition | null>(null)
   const [meta, setMeta] = useState<StoryWithDefinition | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -105,26 +112,42 @@ export default function StoryPage() {
     [],
   )
 
-  const startExport = async (aspect: keyof typeof ASPECT_PRESETS) => {
+  const runExport = async (kind: 'video' | 'still', aspect: keyof typeof ASPECT_PRESETS) => {
     const player = playerRef.current
     if (!player || !story) return
+    const controller = new AbortController()
+    abortRef.current = controller
     setExporting({ phase: 'rendering', progress: 0 })
     try {
-      await exportStoryVideo({
-        definition: story,
-        player,
-        aspect,
-        onProgress: (p) => setExporting(p),
-      })
-      setExporting({ phase: 'done', progress: 1 })
+      if (kind === 'still') {
+        await exportStoryStill({ definition: story, player, aspect, signal: controller.signal })
+        setExporting({ phase: 'done', progress: 1 })
+      } else {
+        await exportStoryVideo({
+          definition: story,
+          player,
+          aspect,
+          signal: controller.signal,
+          onProgress: (p) => setExporting(p),
+        })
+        setExporting({ phase: 'done', progress: 1 })
+      }
     } catch (e) {
-      setExporting({
-        phase: 'failed',
-        progress: 0,
-        error: e instanceof Error ? e.message : String(e),
-      })
+      if (isExportCancelled(e)) {
+        setExporting({ phase: 'cancelled', progress: 0 })
+      } else {
+        setExporting({
+          phase: 'failed',
+          progress: 0,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      }
+    } finally {
+      abortRef.current = null
     }
   }
+
+  const cancelExport = () => abortRef.current?.abort()
 
   if (loading) {
     return <div className="p-6 text-sm text-muted">{t('loadingEllipsis')}</div>
@@ -164,7 +187,7 @@ export default function StoryPage() {
             <button
               key={a}
               className="btn btn-secondary px-2 py-1 gap-1 text-[12px]"
-              onClick={() => startExport(a)}
+              onClick={() => runExport('video', a)}
               disabled={exporting?.phase === 'rendering'}
               title={t('storyExportStart')}
             >
@@ -172,13 +195,33 @@ export default function StoryPage() {
               {a}
             </button>
           ))}
+          <button
+            className="btn btn-ghost px-2 py-1 gap-1 text-[12px]"
+            onClick={() => runExport('still', '16:9')}
+            disabled={exporting?.phase === 'rendering'}
+            title={t('storyExportStillTitle')}
+          >
+            <ImageIcon size={13} />
+            PNG
+          </button>
+          {exporting?.phase === 'rendering' && (
+            <button
+              className="btn btn-ghost px-2 py-1 gap-1 text-[12px]"
+              onClick={cancelExport}
+              title={t('storyExportCancel')}
+            >
+              <X size={13} />
+            </button>
+          )}
           {exporting && (
             <span className="text-[11px] text-muted" data-testid="story-export-status">
               {exporting.phase === 'rendering'
                 ? `${t('storyExporting')} ${Math.round(exporting.progress * 100)}%`
                 : exporting.phase === 'done'
                   ? t('storyExportDone')
-                  : `${t('storyExportFail')}: ${exporting.error ?? ''}`}
+                  : exporting.phase === 'cancelled'
+                    ? t('storyExportCancelled')
+                    : `${t('storyExportFail')}: ${exporting.error ?? ''}`}
             </span>
           )}
         </div>
