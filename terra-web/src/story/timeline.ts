@@ -135,7 +135,7 @@ export function bearingDeg(a: [number, number], b: [number, number]): number {
   const y = Math.sin(dLon) * Math.cos(la2)
   const x =
     Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dLon)
-  return (Math.atan2(y, x) / toRad + 360) % 360 - 180
+  return ((Math.atan2(y, x) / toRad + 180) % 360) - 180
 }
 
 /**

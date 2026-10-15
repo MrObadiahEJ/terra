@@ -46,7 +46,7 @@ ci:
 	-@sqlx migrate run --source api/migrations || echo "note: sqlx migrate skipped locally (DB permissions) — CI runs it strictly"
 	cargo test -p terra-api
 	cargo build -p terra-api
-	cd ../terra-web && ./node_modules/.bin/tsc --noEmit
+	cd ../terra-web && ./node_modules/.bin/tsc -b && ./node_modules/.bin/vitest run
 
 # Auto-fix lint issues
 fix:

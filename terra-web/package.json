@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -39,6 +41,7 @@
     "globals": "^17.7.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^5.0.4"
   }
 }

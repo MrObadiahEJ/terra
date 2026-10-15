@@ -311,7 +311,8 @@ setup needed.
 ```bash
 cd terra-web
 pnpm install --frozen-lockfile
-pnpm exec tsc --noEmit
+pnpm exec tsc -b        # type check
+pnpm test               # story-engine unit tests (vitest)
 pnpm dev
 ```
 
