@@ -19,6 +19,7 @@ pub mod rights;
 pub mod spatial;
 pub mod spatial_accounts;
 pub mod staking;
+pub mod stories;
 pub mod subdivision;
 pub mod threshold_credentials;
 pub mod tx_prep;
@@ -43,6 +44,8 @@ pub fn router() -> Router<AppState> {
         .nest("/zk", zk_proofs::router())
         .nest("/spatial", spatial::router())
         .nest("/spatial-accounts", spatial_accounts::router())
+        // stories.rs owns absolute paths (/stories, /exports/{id}).
+        .merge(stories::router())
         .nest("/geo", geo::router())
         .nest("/fusion", fusion::router())
         .nest("/pilot-zones", pilot_zones::router())

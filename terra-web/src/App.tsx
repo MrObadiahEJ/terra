@@ -16,6 +16,8 @@ const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'))
 const ProtocolConsolePage = lazy(() => import('./pages/ProtocolConsolePage'))
+const StoriesPage = lazy(() => import('./pages/StoriesPage'))
+const StoryPage = lazy(() => import('./pages/StoryPage'))
 
 const TITLES: Record<string, TranslationKey> = {
   '/': 'titleHome',
@@ -28,6 +30,8 @@ const TITLES: Record<string, TranslationKey> = {
   '/network': 'titleNetwork',
   '/demo': 'titleDemo',
   '/console': 'titleConsole',
+  '/stories': 'titleStories',
+  '/story': 'titleStory',
 }
 
 function DocumentTitle() {
@@ -36,7 +40,8 @@ function DocumentTitle() {
   useEffect(() => {
     document.title =
       (pathname in TITLES ? t(TITLES[pathname]) : null) ??
-      (pathname.startsWith('/lab/land') ? t('titleLand') : t('titleDefault'))
+      (pathname.startsWith('/lab/land') ? t('titleLand') : null) ??
+      (pathname.startsWith('/story/') ? t('titleStory') : t('titleDefault'))
   }, [pathname, t])
   return null
 }
@@ -91,6 +96,8 @@ function App() {
               <Route path="/status" element={<StatusPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/console" element={<ProtocolConsolePage />} />
+              <Route path="/stories" element={<StoriesPage />} />
+              <Route path="/story/:storyId" element={<StoryPage />} />
               <Route path="*" element={<Navigate to="/welcome" replace />} />
             </Routes>
           </Suspense>
