@@ -6,7 +6,7 @@
 import { bearingDeg, haversineM, buildTrackFromStops, suggestLegSeconds } from './timeline'
 import { buildRoadRoute } from './roads'
 import { DEMO_ROADS } from '../lib/demoData'
-import type { NavigationPath, StoryDefinition, StoryStop } from './types'
+import type { CaptionCue, NavigationPath, StoryDefinition, StoryStop } from './types'
 
 const DEMO_AREA: [number, number] = [9.515, 47.141] // atlas demo focus
 
@@ -31,6 +31,32 @@ function stop(
     pitch_deg: -28,
     ...extra,
   }
+}
+
+/**
+ * A caption cue for each captioned stop, clipped so the window always stays
+ * inside the story duration (schema v1 rejects overrunning captions).
+ */
+function captionCues(
+  stops: StoryStop[],
+  duration_s: number,
+  lead: number,
+  want: number,
+): CaptionCue[] {
+  const cues: CaptionCue[] = []
+  for (const s of stops) {
+    if (!s.caption) continue
+    const time_s = s.time_s + lead
+    const room = duration_s - time_s
+    if (room < 0.1) continue
+    cues.push({
+      time_s: Number(time_s.toFixed(1)),
+      duration_s: Number(Math.min(want, room).toFixed(1)),
+      text: s.caption,
+      stop_id: s.id,
+    })
+  }
+  return cues
 }
 
 /** Journey: gate → aerial transition → second building arrival. */
@@ -158,9 +184,7 @@ export function demoHistory(): StoryDefinition {
     stops,
     camera_track: buildTrackFromStops(stops),
     routes: [],
-    captions: stops
-      .filter((s) => s.caption)
-      .map((s) => ({ time_s: s.time_s + 0.4, duration_s: 5, text: s.caption as string, stop_id: s.id })),
+    captions: captionCues(stops, 20, 0.4, 5),
     duration_s: 20,
   }
 }
@@ -218,6 +242,7 @@ export function demoRoadJourney(): StoryDefinition {
     buildRoadRoute(DEMO_ROADS, west, mid, 'rn1-leg-1') ?? greatCircleLeg('rn1-leg-1', west, mid),
     buildRoadRoute(DEMO_ROADS, mid, east, 'rn1-leg-2') ?? greatCircleLeg('rn1-leg-2', mid, east),
   ]
+  const duration_s = Number((clock2 + 3).toFixed(1))
 
   return {
     schema_version: 1,
@@ -229,10 +254,8 @@ export function demoRoadJourney(): StoryDefinition {
     stops,
     camera_track: buildTrackFromStops(stops),
     routes,
-    captions: stops
-      .filter((s) => s.caption)
-      .map((s) => ({ time_s: s.time_s + 0.4, duration_s: 4, text: s.caption as string, stop_id: s.id })),
-    duration_s: Number((clock2 + 3).toFixed(1)),
+    captions: captionCues(stops, duration_s, 0.4, 4),
+    duration_s,
   }
 }
 
