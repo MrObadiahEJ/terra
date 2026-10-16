@@ -125,10 +125,7 @@ pub fn register_3d_model(
     model_format_code: u8,
     geometry_version: u32,
 ) -> Result<()> {
-    require!(
-        is_nonzero_hash(&model_hash),
-        TerraError::EmptyGeometryHash
-    );
+    require!(is_nonzero_hash(&model_hash), TerraError::EmptyGeometryHash);
     require!(
         is_valid_storage_reference(&storage_reference),
         TerraError::EmptyStorageReference

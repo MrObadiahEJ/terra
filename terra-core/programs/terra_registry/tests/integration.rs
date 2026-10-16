@@ -30242,7 +30242,10 @@ async fn stage3_3d_model_lifecycle() {
     assert_eq!(meta.count, 2);
     let (_gm0, _) = geometry_version_pda(&asset_pk, 0);
     let g0: GeometryVersion = read_account(&ctx, _gm0).await;
-    assert_eq!(g0.version, 0, "registering models must not touch geometry history");
+    assert_eq!(
+        g0.version, 0,
+        "registering models must not touch geometry history"
+    );
 
     // --- verify: unregistered signer cannot flip the claim ----------------
     let res = process(
@@ -30255,17 +30258,25 @@ async fn stage3_3d_model_lifecycle() {
 
     let v1 = Keypair::new();
     phase7_init_validator(&mut ctx, &payer, &v1).await;
-    process(&mut ctx, &v1, stage3_verify_model_ix(&model0_pk, &v1.pubkey()))
-        .await
-        .expect("verify m0");
+    process(
+        &mut ctx,
+        &v1,
+        stage3_verify_model_ix(&model0_pk, &v1.pubkey()),
+    )
+    .await
+    .expect("verify m0");
     let m0: ThreeDModel = read_account(&ctx, model0_pk).await;
     assert!(m0.verified, "validator signature flips the claim to a fact");
     assert_eq!(m0.verified_by, v1.pubkey());
     assert!(m0.verified_at > 0);
 
     // double verify rejected (6244).
-    let res = process(&mut ctx, &v1, stage3_verify_model_ix(&model0_pk, &v1.pubkey()))
-        .await;
+    let res = process(
+        &mut ctx,
+        &v1,
+        stage3_verify_model_ix(&model0_pk, &v1.pubkey()),
+    )
+    .await;
     assert_custom_error(res, 6244, "double verify must fail");
 
     // m1 stays an unverified claim — models verify independently.
@@ -30319,7 +30330,8 @@ async fn stage3_spatial_snapshot_lifecycle() {
     assert_eq!(s0.elevation_max_mm, 1_200_000);
     assert_eq!(s0.label, "before any version");
     assert!(s0.created_at > 0);
-    let meta: SpatialSnapshotMeta = read_account(&ctx, spatial_snapshot_meta_pda(&asset_pk).0).await;
+    let meta: SpatialSnapshotMeta =
+        read_account(&ctx, spatial_snapshot_meta_pda(&asset_pk).0).await;
     assert_eq!(meta.count, 1);
 
     // Append v0 (D2 survey — no elevation provenance) + v1 (2.5D DEM).

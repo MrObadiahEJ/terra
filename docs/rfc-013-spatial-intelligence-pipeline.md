@@ -177,8 +177,14 @@ accounts are Phase E (see below).
    it.~~ **Resolved (Phase B):** `elevation_source` enum (NONE/SURVEY/DEM/
    LIDAR/PHOTOGRAMMETRY/MANUAL) with the provenance ⇔ dimension invariant;
    attestation is validator-quorum based (same flow as the fact itself).
-4. Canonicalization rule for `geometry_hash` (GeoJSON ring order, precision,
-   CRS — document the exact digest recipe next to the evidence-stack digest).
+4. ~~Canonicalization rule for `geometry_hash` (GeoJSON ring order, precision,
+   CRS — document the exact digest recipe next to the evidence-stack digest).~~
+   **Resolved (2026-10-16):** `terra-geom-v1` — SHA-256 over a version tag plus a
+   canonical GeoJSON document (fixed CRS/2D/`1e-7` quantization, ring
+   orientation + start-vertex normalization, sorted children). Recipe and
+   published vectors in
+   [`docs/canonical-geometry-digest.md`](canonical-geometry-digest.md); reference
+   implementation `terra-core/geo-engine/src/canonical.rs`.
 5. Snapshot semantics: does `SpatialSnapshot` copy indexes at time T, or is a
    version-range query enough?
 

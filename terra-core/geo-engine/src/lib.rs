@@ -1,10 +1,12 @@
 pub mod access;
+pub mod canonical;
 pub mod graph;
 pub mod osm;
 pub mod poi;
 pub mod reach;
 
 pub use access::{nearest_road_access, road_access_along_boundary, AccessPoint};
+pub use canonical::{canonicalize as canonicalize_geometry, geometry_digest, geometry_digest_hex};
 pub use graph::{build_graph, RoadGraph, RoadSegment};
 pub use osm::{read_osm_pbf, BuildingFootprint, OsmData, Poi, RoadWay};
 pub use poi::{pois_near, pois_within};

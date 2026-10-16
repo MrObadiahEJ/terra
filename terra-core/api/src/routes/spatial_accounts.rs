@@ -36,9 +36,7 @@ fn default_limit() -> i64 {
 
 /// Mirror keys are base58 pubkeys / hex hashes; reject obvious junk early.
 pub fn validate_pubkey(s: &str) -> Result<(), AppError> {
-    let ok = !s.is_empty()
-        && s.len() <= 64
-        && s.chars().all(|c| c.is_ascii_alphanumeric());
+    let ok = !s.is_empty() && s.len() <= 64 && s.chars().all(|c| c.is_ascii_alphanumeric());
     if ok {
         Ok(())
     } else {
@@ -55,7 +53,9 @@ pub fn validate_unix_at(at: i64) -> Result<(), AppError> {
     if (946_684_800..=4_102_444_800).contains(&at) {
         Ok(())
     } else {
-        Err(AppError::bad_request("at must be a unix timestamp between 2000 and 2100"))
+        Err(AppError::bad_request(
+            "at must be a unix timestamp between 2000 and 2100",
+        ))
     }
 }
 

@@ -187,13 +187,7 @@ pub fn is_strategic_class(task_class: u8) -> bool {
 ///   subsidy = min(bps, max_subsidy_bps)
 pub fn subsidy_bps_for(policy: &CoverageIncentive, task_class: u8, required_validators: u8) -> u16 {
     let mut bps = policy.demand_bps as u32 + policy.deficit_bps as u32;
-    let factor = if required_validators > DIFFICULTY_FACTOR_CAP {
-        DIFFICULTY_FACTOR_CAP
-    } else if required_validators == 0 {
-        1
-    } else {
-        required_validators
-    };
+    let factor = required_validators.clamp(1, DIFFICULTY_FACTOR_CAP);
     bps += policy.difficulty_bps as u32 * factor as u32;
     if is_strategic_class(task_class) {
         bps += policy.strategic_bps as u32;

@@ -2001,7 +2001,10 @@ pub mod terra_registry {
     /// Freeze a point-in-time copy of the asset's spatial indexes
     /// (RFC-012 §5 `SpatialSnapshot`, RFC-013 §8.5 — snapshots copy the
     /// cursor; later appends never mutate them).
-    pub fn create_spatial_snapshot(ctx: Context<CreateSpatialSnapshot>, label: String) -> Result<()> {
+    pub fn create_spatial_snapshot(
+        ctx: Context<CreateSpatialSnapshot>,
+        label: String,
+    ) -> Result<()> {
         spatial_snapshot::create_spatial_snapshot(ctx, label)
     }
 

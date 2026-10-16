@@ -120,7 +120,8 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                     tags.get("name").cloned(),
                     kind.clone(),
                     tags.get("height").and_then(|raw| parse_height_m(raw)),
-                    tags.get("building:levels").and_then(|raw| parse_levels(raw)),
+                    tags.get("building:levels")
+                        .and_then(|raw| parse_levels(raw)),
                     refs.clone(),
                 ));
             }

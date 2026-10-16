@@ -63,7 +63,8 @@ pub struct EvidenceListParams {
     pub content_hash: Option<String>,
 }
 
-const SELECT_UPLOAD: &str = "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
+const SELECT_UPLOAD: &str =
+    "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
      uploaded_by, parcel_id, created_at";
 
 /// Upload evidence file. Requires authenticated request (SignedRequest).
@@ -644,6 +645,10 @@ mod tests {
         // Crafted traversal ref must not escape the root.
         assert!(backend.load("../../etc/passwd").await.is_err());
         // A benign missing ref is simply None.
-        assert!(backend.load("2099/01/01/ghost.bin").await.unwrap().is_none());
+        assert!(backend
+            .load("2099/01/01/ghost.bin")
+            .await
+            .unwrap()
+            .is_none());
     }
 }

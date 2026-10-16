@@ -101,7 +101,7 @@ cargo test -p terra-registry --test rfc012_structure
 # Identity BPF integration tests (requires SBF build)
 cargo test -p terra-identity --test integration
 
-# Registry BPF integration tests (305 tests, ~7 min; requires a fresh
+# Registry BPF integration tests (307 tests, ~7 min; requires a fresh
 # `anchor build --skip-lint` — setup() refuses stale target/deploy/*.so)
 cargo test -p terra-registry --test integration -- --test-threads=1
 
@@ -180,7 +180,7 @@ terra-core/
 │   │   │   ├── world_registry.rs # Country allocation & genesis
 │   │   │   └── verification/   # Claims, sessions, challenges, …
 │   │   └── tests/
-│   │       ├── integration.rs  # 305 BPF integration tests
+│   │       ├── integration.rs  # 307 BPF integration tests
 │   │       └── rfc012_structure.rs # 21 structural tests
 │   └── terra_identity/         # Identity program
 │       ├── src/
@@ -238,20 +238,21 @@ Immutable audit entries for tracking system events.
 
 | Suite | Count | Notes |
 |-------|------:|-------|
-| terra-registry lib | 142 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, spatial/elevation quorum, … |
+| terra-registry lib | 153 | Guards, quorum, staking, subdivision, zk, tasks, observations, fraud governance, task economics, device identities, cross-border bindings, spatial/elevation quorum, … |
 | terra-identity lib | 6 | Unique-validator helpers |
 | rfc012_structure | 21 | RFC document structural checks |
 | terra-identity integration | 23 | BPF happy paths + guard rails |
-| terra-registry integration | 305 | Full instruction matrix (~7 min) |
-| terra-api | 68 | Route validation + storage helpers |
-| terra-geo | 4 | Graph reachability |
+| terra-registry integration | 307 | Full instruction matrix (~7 min) |
+| terra-api | 111 | Route validation + storage helpers |
+| terra-geo | 12 | Graph reachability + `terra-geom-v1` canonical digest (1 ignored vector-regen) |
 
-Verified on `dev` (2026-10-01): registry lib 142/142, identity lib 6/6, rfc012
-21/21, API 68/68, geo 4/4, registry BPF suite 305/305, identity BPF 23/23,
-`cargo fmt` + `clippy -D warnings` clean (all targets incl. tests), checked-in
-IDL matches source at **162/67/149/241**, `tsc --noEmit` clean, CI 4/4 green on
-`dev` and `main`. Pre-push gate: `make ci` (exact CI mirror); fast baseline:
-`make test-fast`; disk reclaim: `make prune`.
+Verified on `dev` (2026-10-16, RFC-013 Phase C + `terra-geom-v1`): registry lib
+153/153, identity lib 6/6, rfc012 21/21, API 111/111, geo 12/12 (+1 ignored),
+registry BPF suite 307/307, identity BPF 23/23, `cargo fmt` + `clippy -- -D
+warnings` clean (CI invocation), checked-in IDL matches source at
+**165/71/152/247**, frontend `tsc -b` + vitest (44) clean. Pre-push gate:
+`make ci` (exact CI mirror); fast baseline: `make test-fast`; disk reclaim:
+`make prune`.
 
 ## Current Status (as of 2026-09-30)
 
@@ -278,18 +279,18 @@ IDL matches source at **162/67/149/241**, `tsc --noEmit` clean, CI 4/4 green on
 - PostGIS mirror API (21 route modules, migrations `0001`…`0026`) + geo-engine + workspace CI green on `dev` and `main`.
 
 **Open / next (in priority order):**
-1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK membership circuit + trusted setup + external audit (RFC-006/011; Groth16 verifier live since P0-ZK-01). L-3 is cosmetic only. IDL regen chain through RFC-013 Phase B is current (**162/67/149/241**, re-synced 2026-10-01).
-2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of RFC-013 Phase B (162/67/149/241, 2026-10-01).
-3. Devnet deploy: `./deploy.sh devnet` (needs AVX-capable machine for `solana-test-validator`).
+1. Close remaining SECURITY.md items before mainnet: RFC-005 staking governance reconfirm, ZK membership circuit + trusted setup + external audit (RFC-006/011; Groth16 verifier live since P0-ZK-01). L-3 is cosmetic only. IDL regen chain through RFC-013 Phase C is current (**165/71/152/247**, re-synced 2026-10-13).
+2. Regenerate checked-in IDL: `make idl` (or `./build.sh`) after any program change; `terra-web/src/idl/terra_registry.json` matches source as of RFC-013 Phase C (165/71/152/247, 2026-10-13).
+3. Devnet deploy: `./deploy.sh devnet` (targets a remote RPC — no local validator needed; an AVX-capable `solana-test-validator` is only required for the local BPF integration suite).
 4. ZK membership circuit design + trusted setup + external audit (RFC-006/011) — on-chain Groth16/BN254 verifier is live (P0-ZK-01, 2026-10-01); the in-repo placeholder circuit only proves statement binding.
 5. Governance reconfirm on RFC-005 staking before mainnet (code exists; RFC originally cautioned against implementing without a decision).
-6. **Vision Stage 3 Phases C–E** — `SpatialSnapshot`/`ThreeDModel`, AI/GIS loop, API mirror (see [RFC-013](../../docs/rfc-013-spatial-intelligence-pipeline.md) §7); then Stage 5 (legal 3D/air-rights), Stage 6 (country config) — stage map in [`docs/VISION.md`](../../docs/VISION.md). RFC-012 Phases 0–10 complete ([§8.1](../../docs/rfc-012-global-physical-digital-trust-architecture.md)); Stage 3 Phases A (2026-09-28) + B (2026-10-01) shipped.
+6. **Vision Stage 3 Phases C–E** — `SpatialSnapshot`/`ThreeDModel`, AI/GIS loop, API mirror (see [RFC-013](../../docs/rfc-013-spatial-intelligence-pipeline.md) §7): Phase C (`register_3d_model`/`verify_3d_model`/`create_spatial_snapshot`), Phase D (provenance attribution + geometry-history UI + AI/GIS worker pipeline, migration `0031`) and Phase E core (mirror migration `0030` + REST `/spatial-accounts/*`) shipped 2026-10-13; remaining: devnet deployment. Then Stage 5 (legal 3D/air-rights), Stage 6 (country config) — stage map in [`docs/VISION.md`](../../docs/VISION.md). RFC-012 Phases 0–10 complete ([§8.1](../../docs/rfc-012-global-physical-digital-trust-architecture.md)).
 
 Anyone picking this up: start from [`docs/VISION.md`](../../docs/VISION.md) (north star), then root [README.md](../README.md) Status + Devnet checklist, then [SECURITY.md](SECURITY.md) Recommendations, then RFC-012 phase table. Do not invent counts — regenerate with `rg`/tests or `make idl`.
 
 ## Error Codes
 
-- **terra_registry:** 241 custom error codes (`TerraError` in `lib.rs`).
+- **terra_registry:** 247 custom error codes (`TerraError` in `lib.rs`).
 - **terra_identity:** 29 custom error codes (`IdentityError` in `errors.rs`, 6000+).
 
 ## License

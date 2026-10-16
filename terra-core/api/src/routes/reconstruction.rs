@@ -21,7 +21,10 @@ use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/sessions", get(list_capture_sessions).post(create_capture_session))
+        .route(
+            "/sessions",
+            get(list_capture_sessions).post(create_capture_session),
+        )
         .route("/jobs", post(create_reconstruction_job))
         .route("/jobs/lease", post(lease_reconstruction_job))
         .route("/jobs/{id}", get(get_reconstruction_job))
@@ -90,9 +93,12 @@ pub struct NewReconstructionJob {
     pub capture_session_id: String,
 }
 
-const SELECT_SESSION: &str = "SELECT id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs, created_at";
-const SELECT_JOB: &str = "SELECT id, capture_session_id, status, progress, error, artifact_uri, created_at, updated_at";
-const SELECT_MODEL: &str = "SELECT id, parcel_id, reconstruction_job_id, uri, format, content_hash, created_at";
+const SELECT_SESSION: &str =
+    "SELECT id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs, created_at";
+const SELECT_JOB: &str =
+    "SELECT id, capture_session_id, status, progress, error, artifact_uri, created_at, updated_at";
+const SELECT_MODEL: &str =
+    "SELECT id, parcel_id, reconstruction_job_id, uri, format, content_hash, created_at";
 
 // ---------------------------------------------------------------------------
 // Capture sessions
@@ -120,7 +126,11 @@ pub async fn create_capture_session(
     }
 
     let id = Uuid::new_v4().to_string();
-    let media_count = input.evidence_refs.as_ref().map(|r| r.len() as i32).unwrap_or(0);
+    let media_count = input
+        .evidence_refs
+        .as_ref()
+        .map(|r| r.len() as i32)
+        .unwrap_or(0);
 
     let row = sqlx::query_as::<_, CaptureSession>(
         "INSERT INTO capture_sessions (id, parcel_id, title, captured_by, captured_at, media_count, evidence_refs)
@@ -244,11 +254,13 @@ pub async fn get_three_d_model(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ThreeDModel>, AppError> {
-    let row = sqlx::query_as::<_, ThreeDModel>(&format!("{SELECT_MODEL} FROM three_d_models WHERE id = $1"))
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::not_found("3D model not found"))?;
+    let row = sqlx::query_as::<_, ThreeDModel>(&format!(
+        "{SELECT_MODEL} FROM three_d_models WHERE id = $1"
+    ))
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::not_found("3D model not found"))?;
     Ok(Json(row))
 }
 
@@ -347,8 +359,8 @@ pub struct AnchorAccounts {
 
 #[derive(Debug, Serialize)]
 pub struct AnchorArgs {
-    /// Hex SHA-256 of the draft's canonical geometry document (the same
-    /// bytes that were hashed into `geometry_hash`).
+    /// Hex `terra-geom-v1` digest of the draft's geometry (the same value
+    /// stored in `geometry_hash`; see `terra_geo::canonical`).
     pub geometry_hash: String,
     pub source: u8,
     pub dimension: u8,
@@ -480,9 +492,13 @@ async fn build_draft_geometry(
     }
 }
 
-fn canonical_geometry_hash(geojson: &str) -> String {
-    use sha2::Digest;
-    format!("{:x}", sha2::Sha256::digest(geojson.as_bytes()))
+/// Deterministic `terra-geom-v1` geometry digest (RFC-013 §9 Q4). Independent
+/// of JSON key order, whitespace, coordinate precision, ring start/orientation
+/// and multi-geometry ordering, so any implementation agrees on one hash for
+/// the same geometry. See `terra_geo::canonical`.
+fn canonical_geometry_hash(geojson: &str) -> Result<String, AppError> {
+    terra_geo::geometry_digest_hex(geojson)
+        .map_err(|e| AppError::bad_request(format!("invalid draft geometry: {e}")))
 }
 
 fn hex32_to_pubkey(hex: &str) -> Option<solana_sdk::pubkey::Pubkey> {
@@ -657,13 +673,9 @@ pub async fn job_complete(
         None => None,
     };
     let (parcel_geom, onchain_hex) = parcel.map(|(o, g)| (g, o)).unwrap_or_default();
-    let (geojson, method) = build_draft_geometry(
-        &state.pool,
-        &input.capture_points,
-        parcel_geom.as_deref(),
-    )
-    .await?;
-    let geometry_hash = canonical_geometry_hash(&geojson);
+    let (geojson, method) =
+        build_draft_geometry(&state.pool, &input.capture_points, parcel_geom.as_deref()).await?;
+    let geometry_hash = canonical_geometry_hash(&geojson)?;
     let storage_reference = format!("recon://{id}/draft.geojson");
     let draft_id = Uuid::new_v4().to_string();
 
@@ -891,14 +903,19 @@ mod tests {
     }
 
     #[test]
-    fn canonical_geometry_hash_is_sha256_of_exact_bytes() {
-        use sha2::Digest;
-        // The hash that will be anchored on-chain must be reproducible from
-        // the stored GeoJSON document alone — no re-serialization allowed.
-        let geo = r#"{"type":"Polygon","coordinates":[[[8.5,47.4],[8.6,47.4],[8.6,47.5],[8.5,47.4]]]}"#;
-        let expected = format!("{:x}", sha2::Sha256::digest(geo.as_bytes()));
-        assert_eq!(canonical_geometry_hash(geo), expected);
-        assert_ne!(canonical_geometry_hash(geo), canonical_geometry_hash(&geo.to_uppercase()));
+    fn canonical_geometry_hash_is_stable_across_encodings() {
+        // The hash anchored on-chain must be reproducible from the geometry
+        // alone: ring start, orientation and coordinate precision do not change
+        // it; a real geometry change does.
+        let base = r#"{"type":"Polygon","coordinates":[[[8.5,47.4],[8.6,47.4],[8.6,47.5],[8.5,47.5],[8.5,47.4]]]}"#;
+        let variant = r#"{"coordinates":[[[8.60000000,47.50000000],[8.50000000,47.50000000],[8.50000000,47.40000000],[8.60000000,47.40000000],[8.60000000,47.50000000]]],"type":"Polygon"}"#;
+        let shifted = r#"{"type":"Polygon","coordinates":[[[8.51,47.4],[8.61,47.4],[8.61,47.5],[8.51,47.5],[8.51,47.4]]]}"#;
+
+        let a = canonical_geometry_hash(base).unwrap();
+        assert_eq!(a.len(), 64);
+        assert_eq!(a, canonical_geometry_hash(variant).unwrap());
+        assert_ne!(a, canonical_geometry_hash(shifted).unwrap());
+        assert!(canonical_geometry_hash("not geojson").is_err());
     }
 
     #[test]
@@ -919,7 +936,10 @@ mod tests {
         // Anything else passes through as an opaque onchain_id text match.
         let (u, h) = parse_parcel_lookup("SpAtDemo1111111111111111111111111111111111");
         assert!(u.is_none());
-        assert_eq!(h.as_deref(), Some("SpAtDemo1111111111111111111111111111111111"));
+        assert_eq!(
+            h.as_deref(),
+            Some("SpAtDemo1111111111111111111111111111111111")
+        );
     }
 
     #[test]
@@ -963,7 +983,8 @@ mod tests {
 
         let parcel_pk = Pubkey::new_from_array([0x11; 32]);
         let program: Pubkey = REGISTRY_PROGRAM_ID.parse().unwrap();
-        let (asset, _) = Pubkey::find_program_address(&[b"spatial_asset", parcel_pk.as_ref()], &program);
+        let (asset, _) =
+            Pubkey::find_program_address(&[b"spatial_asset", parcel_pk.as_ref()], &program);
         assert_eq!(prep.accounts.asset, asset.to_string());
         let (gv, _) = Pubkey::find_program_address(
             &[b"geometry_version", asset.as_ref(), &3u32.to_le_bytes()],

@@ -1,0 +1,445 @@
+{
+  "version": "terra-geom-v1",
+  "crs": "EPSG:4326",
+  "note": "Reference vectors for the terra-geom-v1 canonical geometry digest. Vectors that describe the same geometry under different encodings (ring start, orientation, closure, precision, multi-geometry ordering) MUST share a digest. Generate with: cargo test -p terra-geo regenerate_vectors -- --ignored --nocapture",
+  "vectors": [
+    {
+      "name": "polygon-ccw-closed",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.4
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ],
+            [
+              8.5,
+              47.4
+            ]
+          ]
+        ]
+      },
+      "digest": "bec4be474f0cf0cf3ec82424494fad898c7f13467c88188357d0f3c9e505d1bd"
+    },
+    {
+      "name": "polygon-cw-rotated",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ],
+            [
+              8.5,
+              47.4
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ]
+          ]
+        ]
+      },
+      "digest": "bec4be474f0cf0cf3ec82424494fad898c7f13467c88188357d0f3c9e505d1bd"
+    },
+    {
+      "name": "polygon-unclosed-precision",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.40000001
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ]
+          ]
+        ]
+      },
+      "digest": "bec4be474f0cf0cf3ec82424494fad898c7f13467c88188357d0f3c9e505d1bd"
+    },
+    {
+      "name": "polygon-with-hole-a",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.4
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ],
+            [
+              8.5,
+              47.4
+            ]
+          ],
+          [
+            [
+              8.52,
+              47.42
+            ],
+            [
+              8.58,
+              47.42
+            ],
+            [
+              8.58,
+              47.48
+            ],
+            [
+              8.52,
+              47.48
+            ],
+            [
+              8.52,
+              47.42
+            ]
+          ]
+        ]
+      },
+      "digest": "a2eb8a70a3884d58e0e40b66c616c0c06f0c1a8a594c4d33b7edd2d1b6eca5b8"
+    },
+    {
+      "name": "polygon-with-hole-b",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.5
+            ],
+            [
+              8.5,
+              47.4
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ]
+          ],
+          [
+            [
+              8.52,
+              47.48
+            ],
+            [
+              8.58,
+              47.48
+            ],
+            [
+              8.58,
+              47.42
+            ],
+            [
+              8.52,
+              47.42
+            ],
+            [
+              8.52,
+              47.48
+            ]
+          ]
+        ]
+      },
+      "digest": "a2eb8a70a3884d58e0e40b66c616c0c06f0c1a8a594c4d33b7edd2d1b6eca5b8"
+    },
+    {
+      "name": "multipolygon-ab",
+      "geojson": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                8.5,
+                47.4
+              ],
+              [
+                8.6,
+                47.4
+              ],
+              [
+                8.6,
+                47.5
+              ],
+              [
+                8.5,
+                47.5
+              ],
+              [
+                8.5,
+                47.4
+              ]
+            ]
+          ],
+          [
+            [
+              [
+                8.7,
+                47.4
+              ],
+              [
+                8.8,
+                47.4
+              ],
+              [
+                8.8,
+                47.5
+              ],
+              [
+                8.7,
+                47.5
+              ],
+              [
+                8.7,
+                47.4
+              ]
+            ]
+          ]
+        ]
+      },
+      "digest": "8b853cf546b96f630257436e8f1f80ed65ce1280fbe83e77f383be6fd84e4d98"
+    },
+    {
+      "name": "multipolygon-ba",
+      "geojson": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                8.7,
+                47.4
+              ],
+              [
+                8.8,
+                47.4
+              ],
+              [
+                8.8,
+                47.5
+              ],
+              [
+                8.7,
+                47.5
+              ],
+              [
+                8.7,
+                47.4
+              ]
+            ]
+          ],
+          [
+            [
+              [
+                8.5,
+                47.4
+              ],
+              [
+                8.6,
+                47.4
+              ],
+              [
+                8.6,
+                47.5
+              ],
+              [
+                8.5,
+                47.5
+              ],
+              [
+                8.5,
+                47.4
+              ]
+            ]
+          ]
+        ]
+      },
+      "digest": "8b853cf546b96f630257436e8f1f80ed65ce1280fbe83e77f383be6fd84e4d98"
+    },
+    {
+      "name": "linestring-ab",
+      "geojson": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            8.5,
+            47.4
+          ],
+          [
+            8.6,
+            47.5
+          ]
+        ]
+      },
+      "digest": "98939dcfd3c152a3d62667d471a522fdd2e24a73417e7e6994650a7132e1ac42"
+    },
+    {
+      "name": "linestring-ba",
+      "geojson": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            8.6,
+            47.5
+          ],
+          [
+            8.5,
+            47.4
+          ]
+        ]
+      },
+      "digest": "98939dcfd3c152a3d62667d471a522fdd2e24a73417e7e6994650a7132e1ac42"
+    },
+    {
+      "name": "point",
+      "geojson": {
+        "type": "Point",
+        "coordinates": [
+          8.5,
+          47.4
+        ]
+      },
+      "digest": "4d3432252e80dfa1161a77479609f10afd278f447947dacd1365bbeb99c676c9"
+    },
+    {
+      "name": "polygon-shifted",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.51,
+              47.4
+            ],
+            [
+              8.61,
+              47.4
+            ],
+            [
+              8.61,
+              47.5
+            ],
+            [
+              8.51,
+              47.5
+            ],
+            [
+              8.51,
+              47.4
+            ]
+          ]
+        ]
+      },
+      "digest": "0c7a56600551410b7396113b32ff77bdc4bda87abe1f700c210d7be8c19bf23a"
+    },
+    {
+      "name": "polygon-hole-other",
+      "geojson": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.4
+            ],
+            [
+              8.6,
+              47.4
+            ],
+            [
+              8.6,
+              47.5
+            ],
+            [
+              8.5,
+              47.5
+            ],
+            [
+              8.5,
+              47.4
+            ]
+          ],
+          [
+            [
+              8.53,
+              47.42
+            ],
+            [
+              8.59,
+              47.42
+            ],
+            [
+              8.59,
+              47.48
+            ],
+            [
+              8.53,
+              47.48
+            ],
+            [
+              8.53,
+              47.42
+            ]
+          ]
+        ]
+      },
+      "digest": "93e809ed8ea0387c73e7c64ef4fa37e30627c7c7823b502c6fb42bacfb5c3acf"
+    }
+  ]
+}
