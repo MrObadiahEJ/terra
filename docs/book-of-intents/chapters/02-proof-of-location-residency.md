@@ -1,8 +1,12 @@
 # Chapter 2 — Proof of Location & Residency Tokens
 
-**Status:** `PROPOSED` — no code exists for this capability. The building
-blocks below are real and `IMPLEMENTED AND VERIFIED`; the residency semantics
-are not built. See [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-004 and
+**Status:** `SPECIFIED ONLY` — designed and acceptance-criteria'd; no code.
+The building blocks below are real and `IMPLEMENTED AND VERIFIED`; the residency
+semantics are not built.
+**Founder review flag:** ⚠ pending — Q-004 (which jurisdictions recognize the
+novel dual-signed attestation; tenant protections) is unresolved; no code is
+written until it is.
+See [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-004 and
 [REQUIREMENTS_TRACEABILITY.md](../REQUIREMENTS_TRACEABILITY.md) REQ-021.
 
 ---
@@ -34,6 +38,18 @@ attestation to a resident's key with expiry, revocation, and tenant
 protection — does not. Building it before Q-004 (which jurisdictions recognize
 such attestations; what tenant protections apply) would ship an unsafe
 capability, so it is research-gated.
+
+**Research recorded 2026-11-02** ([RESEARCH_REFERENCES](../RESEARCH_REFERENCES.md),
+Q-004): six jurisdictions surveyed — Portugal (Junta de Freguesia
+`Atestado de Residência`, Lei 7/2001), Queensland (AU), DC (US), New York
+(CUNY), Monaco (Sovereign Ordinance 8.566/8.372), Luxembourg (Act of
+19 Jun 2013). **Every** jurisdiction requires *two* independent proofs of
+address from distinct sources, plus a recency window (3–12 months) and a named
+attestor with a relationship to the subject. **None** issues a
+selective-disclosure credential — the resident always hands over the underlying
+document. A dual-signed residency attestation is therefore a *novel* instrument
+whose recognition cannot be assumed; it needs jurisdiction-specific legal review
+before any code is written.
 
 ## 2.4 Building blocks (all `IMPLEMENTED AND VERIFIED`)
 

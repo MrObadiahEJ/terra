@@ -1,7 +1,9 @@
 # INT-005 — Institutional participation without trusted central parties
 
-**Status:** `PROPOSED` — no code; research + founder authorization required
-before implementation (see [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-003)
+**Status:** `SPECIFIED ONLY` — designed and acceptance-criteria'd; no code.
+**Founder review flag:** ⚠ pending — Q-003 (bootstrap council composition) is a
+trust commitment requiring founder authorization before implementation (see
+[OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-003).
 **Chapter:** [8 — Institutional Identity](../chapters/08-institutional-identity.md)
 
 ## Desired outcome

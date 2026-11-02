@@ -40,6 +40,24 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 *Post-exit hardening (2026-11-02):* REQ-024 AI provenance on geometry drafts
   (migration 0034, R-014 resolved) — no stage criteria change.
 
+*Post-exit hardening (2026-11-02, sprint 012):* API security response headers
+  (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy`) via `api/src/main.rs` middleware — implemented and
+  verified (sprints/012); no stage criteria change.
+
+*Post-exit hardening (2026-11-02, sprint 013):* API request body-size limit
+  (`MAX_BODY_BYTES`, default 64 MiB → 413 via tower-http `limit`); implemented
+  and verified (sprints/013); no stage criteria change.
+
+*Post-exit hardening (2026-11-02, sprint 015):* API request timeout
+  (`REQUEST_TIMEOUT_SECS`, default 60 s → 408 via tower-http `TimeoutLayer`);
+  implemented and verified (sprints/015); no stage criteria change.
+
+*Post-exit hardening (2026-11-02, sprint 021):* API runtime defense-in-depth
+  (REQ-025: security headers + body-size limit + request timeout, delivered in
+  sprints 012/013/015); implemented and verified; REQ-025 traceability row added
+  in the same change set; no stage criteria change.
+
 ## Stage 2 — Devnet truth (entry: Stage 1 exit met; founder funds wallet)
 
 **Sequencing (founder directive 2026-11-02):** devnet funding is the **last**
@@ -61,6 +79,13 @@ Institutional identity (REQ-020) — after Q-003 research; Lien encumbrance
 Q-004 research + ZK paths complete (R-006).
 **Exit:** each spec = chapter + intent + REQ row with `SPECIFIED ONLY` status
 and founder review flag.
+
+**Met 2026-11-02 (sprint 023):** Q-003 and Q-004 research recorded in
+RESEARCH_REFERENCES (5 DNS-identity designs; 6 jurisdictions). Chapters 2, 6,
+and 8 moved `PROPOSED → SPECIFIED ONLY`, each carrying a ⚠ founder review flag;
+INT-005 updated likewise. Chapter 5 (REQ-023) stays `PROPOSED` — Q-005 is a
+hard securities-law gate and no specification can substitute for it.
+Remaining Stage 3 exit item: founder review of the three flags.
 
 ## Stage 4 — Research-gated features (entry: Stage 3 + research complete)
 

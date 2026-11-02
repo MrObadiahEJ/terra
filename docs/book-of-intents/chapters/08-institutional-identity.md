@@ -1,7 +1,9 @@
 # Chapter 8 — Institutional Identity
 
-**Status:** `PROPOSED` — no code. Anti-fraud foundations are
-`IMPLEMENTED AND VERIFIED`.
+**Status:** `SPECIFIED ONLY` — designed and acceptance-criteria'd; no code.
+Anti-fraud foundations are `IMPLEMENTED AND VERIFIED`.
+**Founder review flag:** ⚠ pending — Q-003 (bootstrap council composition) is a
+trust commitment requiring founder authorization before any implementation.
 **See:** [INT-005](../intents/INT-005-institutional-identity.md),
 [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-003,
 [REQUIREMENTS_TRACEABILITY.md](../REQUIREMENTS_TRACEABILITY.md) REQ-020.
@@ -64,6 +66,17 @@ authority for being real-world-recognized. Authority is:
   from day one?
 - **Reputation must not be purchasable** through staking — how is that
   guaranteed for institutional actors with large treasuries?
+
+**Research recorded 2026-11-02** ([RESEARCH_REFERENCES](../RESEARCH_REFERENCES.md),
+Q-003): DNS-TXT is a *discovery* layer, not a claims database — it publishes
+keys and points at attestations. Without DNSSEC the binding is repudiable by the
+zone owner. Trust-minimising designs (Open-Attestation DNS-TXT ADR; IETF
+Groundmark draft; Froglet attestation service; HAVID cross-endorsement; MetaMail
+DON) converge on four elements: (a) DNS as discovery only, (b) an external
+attestation service that re-verifies the evidence live rather than caching it,
+(c) N-of-M consensus among reputation-gated nodes, and (d) Sybil resistance via
+permissioning, not openness. **A pure DNS-TXT root is weaker than a council and
+must not be the sole gate** for `register_institutional_identity`.
 
 ## 8.7 Acceptance criteria (before status leaves `PROPOSED`)
 

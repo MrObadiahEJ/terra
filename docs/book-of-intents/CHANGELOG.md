@@ -2,6 +2,114 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-02 — Sprint 012: API security response headers
+
+- New `security_headers` middleware in `terra-core/api/src/main.rs`, applied to
+  the production router via `axum::middleware::from_fn` (outermost layer, after
+  CORS + Trace).
+- Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+  `Referrer-Policy: no-referrer`, `Permissions-Policy: camera=(), microphone=(),
+  geolocation=()`. JSON-only API surface (plus multipart ingest) → no CSP needed.
+- Rationale: defense-in-depth on the unauthenticated mirror (CORS locked; R-016
+  fail-closed privileged auth) so browsers cannot MIME-sniff, frame, or leak
+  referrer context from API responses.
+- Evidence: `CARGO_INCREMENTAL=0 cargo test -p terra-api` → **130/130** (was
+  **128**; +2 new tests in `main.rs`:
+  `tests::ok_response_carries_security_headers`, `tests::error_response_also_carries_security_headers`).
+- No SOL required.
+
+## 2026-11-02 — Sprint 013: API request body-size limit
+
+- New `MAX_BODY_BYTES` env config (bytes; default **64 MiB**) in
+  `terra-core/api/src/config.rs`, consumed by `RequestBodyLimitLayer`
+  (`tower-http` `limit` feature) applied to the production router in
+  `terra-core/api/src/main.rs`.
+- Oversized bodies → **413 Payload Too Large** (Content-Length pre-check).
+- Rationale: defense-in-depth on the unauthenticated mirror; caps request
+  flooding into handlers/storage before body reads. Default covers multipart
+  OSM ingest (PBF) and photo evidence uploads.
+- Evidence: `CARGO_INCREMENTAL=0 cargo test -p terra-api` → **132/132** (was
+  **130**; +2 new tests: `tests::oversized_content_length_rejected_with_413`,
+  `tests::within_limit_is_accepted`).
+- No SOL required.
+
+## 2026-11-02 — Sprint 014: Frontend logic unit tests (LOD + codec)
+
+- New frontend test suites: `terra-web/src/lib/lod.test.ts` (LOD level derivation
+  from height + leaflet zoom, clamping, level table) and `terra-web/src/lib/codec.test.ts`
+  (byte→hex, hex→bytes, UTF-8 encode).
+- Evidence: `pnpm exec vitest run` → **52/52** (was **44/44**; +8 new tests);
+  tsc/eslint/vite build/bundle-check all green.
+- No SOL required.
+
+## 2026-11-02 — Sprint 015: API request timeout
+
+- New `REQUEST_TIMEOUT_SECS` env config (default **60 s`) in
+  `terra-core/api/src/config.rs`, consumed by tower-http `TimeoutLayer` applied
+  to the production router (`api/src/main.rs`); default response **408 Request
+  Timeout**.
+- Rationale: defense-in-depth on the unauthenticated mirror — caps handler
+  execution time per request before compute/storage work runs unbounded.
+- Evidence: `CARGO_INCREMENTAL=0 cargo test -p terra-api` → **133/133** (was
+  **132**; +1 new test: `tests::slow_request_times_out_with_408`).
+- No SOL required.
+
+## 2026-11-02 — Sprint 022: Frontend logic unit tests — activity store + API GeoJSON parse
+
+- New frontend test suites: `terra-web/src/lib/activityStore.test.ts` (dedup by
+  run-scoped id, newest-first ordering, 200-item cap, source preservation) and
+  `terra-web/src/lib/api.test.ts` (`parseGeoJSON` null/valid/invalid handling).
+- Evidence: `pnpm exec vitest run` → **65/65** (was **56/56**; +9 new tests);
+  tsc/eslint/vite build/bundle-check all green.
+- No SOL required.
+
+## 2026-11-02 — Sprint 021: Book consistency catch-up + requirements traceability (REQ-025)
+
+- REQUIREMENTS_TRACEABILITY: added REQ-025 row — API runtime defense-in-depth
+  (security headers + body-size limit + request timeout); status 1
+  (IMPLEMENTED AND VERIFIED) with source paths, named tests, suite evidence
+  (API 133/133). Added in the same change set as the hardening sprints, per the
+  acceptance-criteria rule.
+- BOOK_OF_INTENTS.md / SUMMARY.md: work & sprints indexes extended with
+  sprints 018, 019, 020 (previously stale at sprint 017); SUMMARY REQ range
+  refreshed to REQ-001…REQ-025.
+- IMPLEMENTATION_STATUS.md: E4 evidence annotation updated (sprints 001–020).
+- Doc-only change; no gate required.
+
+## 2026-11-02 — Sprint 020: Frontend/UX polish — welcome offline badge
+
+- `WelcomePage.tsx`: render an offline badge (`t('apiOffline')`) in the hero when
+  the activity feed state is `offline`.
+- Evidence: frontend full gate green (tsc · eslint · vite build · vitest **56/56** ·
+  bundle PASS).
+
+## 2026-11-02 — Sprint 019: Frontend/UX polish — demo header source chip
+
+- DemoPage header: added catalogue-source chip (`scenarioChecking` / `apiCatalogue` /
+  `builtinCatalogue`) alongside the existing demo badge and engine-status link.
+- Evidence: frontend full gate green (tsc · eslint · vite build · vitest **56/56** ·
+  bundle PASS).
+
+## 2026-11-02 — Sprint 018: Book index consistency pass (part 2)
+
+- Central index (`BOOK_OF_INTENTS.md`) and `SUMMARY.md` work & sprints lists extended
+  with sprints 016 and 017; E4 evidence annotation updated (sprints 001–017).
+- Doc-only change; no gate required.
+
+## 2026-11-02 — Sprint 017: Frontend logic unit tests (protocol status)
+
+- New frontend test suite: `terra-web/src/lib/protocolStatus.test.ts` (status
+  levels/tracks, meta tables, `statusCounts` aggregation incl. custom modules).
+- Evidence: `pnpm exec vitest run` → **56/56** (was **52/52**; +4 new tests);
+  tsc/eslint/vite build/bundle-check green.
+- No SOL required.
+
+## 2026-11-02 — Sprint 016: Book index consistency pass
+
+- Central index (`BOOK_OF_INTENTS.md`) and `SUMMARY.md` "Work & sprints" sections
+  updated to list sprints 001–015 (previously stale at 001–002).
+- Doc-only change; no behavior change, no SOL required.
+
 ## 2026-10-31 — v0.1.0 (constitution established)
 
 - Repository audit at commit `775e20a` (dev): 100+ registry instructions
@@ -16,8 +124,6 @@ Format: date · version · what changed · evidence/why. Append-only.
   ARCHITECTURAL_DECISIONS (ADR-001…ADR-013), OPEN_QUESTIONS (Q-001…Q-012),
   RISK_REGISTER (R-001…R-015), RESEARCH_REFERENCES, ROADMAP (Stages 0–5),
   AGENT_GUIDE, CHANGELOG; root entry point `BOOK_OF_INTENTS.md`.
-## 2026-10-31 — v0.1.0 (constitution established)
-
 - Wrote Chapters 02–08 as evidence-grounded specifications (replacing planned
   dead links): Ch3/Ch4/Ch7 cite real code (`spatial_*`, `routing.rs`,
   `reach.rs`, `story/roads.ts`); Ch2/Ch5/Ch6/Ch8 are honest `PROPOSED` specs
@@ -92,7 +198,40 @@ Format: date · version · what changed · evidence/why. Append-only.
 - Book: ROADMAP item 4 partially met, IMPLEMENTATION_STATUS baselines + E1,
   RISK R-008 annotation, work/CURRENT.md, sprints/006.
 
-## 2026-10-31 — Security fix: verify Ed25519 signatures on privileged endpoints
+## 2026-11-02 — Research: institutional bootstrap (Q-003) and residency attestation (Q-004)
+
+- Consulted external sources and recorded them in RESEARCH_REFERENCES with
+  dates, claims, and fact-vs-interpretation separation (sprint 023).
+- **Q-003:** five DNS-anchored identity designs studied (Open-Attestation
+  DNS-TXT ADR; IETF Groundmark; Froglet attestation service; HAVID; MetaMail
+  DON). Trust-minimising designs converge on: DNS as discovery only + external
+  attestation service that re-verifies live + N-of-M consensus + reputation
+  gating. A pure DNS-TXT root is weaker than a council and must not be the sole
+  gate for `register_institutional_identity`.
+- **Q-004:** six jurisdictions surveyed (Portugal, Queensland AU, DC US, New
+  York US, Monaco, Luxembourg). Every one requires two independent proofs of
+  address from distinct sources and a recency window; **none** issues a
+  selective-disclosure credential. A dual-signed residency attestation is a
+  novel instrument whose recognition cannot be assumed.
+- Both questions moved `6 → 5 – PROPOSED` (research done, founder decision
+  pending). REQ-020 and REQ-021 remain `PROPOSED` with no source or test — no
+  code written, per the research gates.
+- Registers updated: RESEARCH_REFERENCES (2 entries), OPEN_QUESTIONS (Q-003,
+  Q-004), chapters/02 §2.3, chapters/08 §8.6, sprints/023.
+
+## 2026-11-02 — Stage 3: planned-capability specifications promoted to `SPECIFIED ONLY`
+
+- Chapters 2 (REQ-021), 6 (REQ-022), and 8 (REQ-020) moved
+  `PROPOSED → SPECIFIED ONLY`, each carrying a ⚠ founder review flag; INT-005
+  updated likewise. REQUIREMENTS_TRACEABILITY rows for REQ-020/021/022 moved to
+  `4 – SPECIFIED ONLY` with the spec paths cited (no source, no test — no code
+  written, per the research gates).
+- Chapter 5 (REQ-023) stays `PROPOSED` — Q-005 is a hard securities-law gate and
+  no specification can substitute for written legal research.
+- ROADMAP Stage 3 exit met except founder review of the three flags.
+- Doc-only; no gate required.
+
+## 2026-11-02 — Request authentication hardening (R-016/R-017)
 
 - **R-016 (H).** `complete_job`, `fail_job`, `invalidate_job` (`derived.rs`)
   and `create_reconstruction_job`, `lease_reconstruction_job`, `job_progress`,
@@ -109,7 +248,7 @@ Format: date · version · what changed · evidence/why. Append-only.
   `complete` → **401** (was 200); signed smoke → **16/16**; draft ledger →
   2 drafts / 1 row / 1 hash. `cargo test -p terra-api` → **117/117**. Behavior
   unchanged except the trust boundary.
-- Registers updated: RISK_REGISTER (R-016, R-017), work/CURRENT.md.
+- Registers updated: RISK_REGISTER (R-016, R-017), work/CURRENT.md, sprints/004.
 
 ## 2026-11-02 — CI green: SBF build + 307-test BPF suite wired (R-008 resolved, Stage 1 exit)
 

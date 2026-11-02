@@ -11,7 +11,7 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 
 | ID | Requirement | Priority | Status | Design | Source | Test |
 | --- | --- | --- | --- | --- | --- | --- |
-| REQ-001 | No state without the full evidence chain | P0 | 1 | RFC-012 | `observation_v2.rs`, `evidence_manifest.rs`, `verification/*`, `quorum.rs` | BPF stage3 evidence/quorum suites |
+| REQ-001 | No state without the full evidence chain | P0 | 1 | RFC-012 | `observation_v2.rs`, `evidence_manifest.rs`, `verification/*`, `quorum.rs` | BPF stage3 evidence/quorum suites; vitest activity-store + GeoJSON-parse suites (sprint 022) |
 | REQ-002 | No unilateral ownership conversion | P0 | 1 | RFC-012 | `transfer_parcel` owner guards; rights-as-PDA (migration 0025) | BPF transfer/rights suites |
 | REQ-003 | Country-agnostic operation | P0 | 1 | RFC-012 | `world_registry.rs` (249 ISO codes; genesis ≥3 countries) | BPF genesis suites |
 | REQ-004 | Verifiable spatial history (append-only versions) | P0 | 1 | RFC-013 | `spatial_asset.rs` `append_geometry_version`, `verify_geometry_version` | `stage3_spatial_asset_lifecycle`, `stage3_geometry_version_verification` |
@@ -30,19 +30,22 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 | REQ-017 | Client-side video export with receipts | P2 | 1 | RFC-014 Ph.03 | `story/export.ts`; export receipts table (0032) | vitest export-adjacent suites; manual CDP |
 | REQ-018 | External machine-readable replay (robotics/API consumers) | P2 | 1 | RFC-014 Ph.05 | `routes/stories.rs` `/replay`, `/replay.geojson`, `/schema/replay`; `terra.story-replay/v1` | API 121/121; live smoke (hash tracks edits; 404s) |
 | REQ-019 | Incremental derived compute (dedup jobs) | P2 | 1 | RFC-014 Ph.04 | `routes/derived.rs`; migration 0033 (UNIQUE processing_key); recursive-CTE invalidation | API 117/117 (7 derived tests); live smoke 16/16; 2 identical computations → 1 ledger row |
-| REQ-020 | Institutional identity with scoped authority | P1 | 5 – PROPOSED | directive §8 | — | — |
-| REQ-021 | Residency/proof-of-location credential | P2 | 5 – PROPOSED | directive §8 | building blocks REQ-012/A15 | — |
-| REQ-022 | Lien encumbrance lifecycle | P1 | 5 – PROPOSED | directive §3E | building blocks REQ-002, REQ-008 | — |
+| REQ-020 | Institutional identity with scoped authority | P1 | 4 – SPECIFIED ONLY | directive §8 | — (spec in `chapters/08-institutional-identity.md`, `intents/INT-005-institutional-identity.md`) | — |
+| REQ-021 | Residency/proof-of-location credential | P2 | 4 – SPECIFIED ONLY | directive §8 | — (spec in `chapters/02-proof-of-location-residency.md`; building blocks REQ-012/A15) | — |
+| REQ-022 | Lien encumbrance lifecycle | P1 | 4 – SPECIFIED ONLY | directive §3E | — (spec in `chapters/06-lien-encumbrance.md`; building blocks REQ-002, REQ-008) | — |
 | REQ-023 | Fractional participation with escrowed guarantees | P2 | 6 – RESEARCH REQUIRED | directive §10 | building block REQ-009 | legal research gate (Q-005) |
 | REQ-024 | AI outputs distinguishable from verified results | P1 | 1 | directive §11 | migration 0034: drafts record `provenance_kind` + model provider/name/version/confidence; API validation fail-closed | API 128/128 (7 provenance tests); live smoke 13/13; DB constraints enforced |
+| REQ-025 | API runtime defense-in-depth (headers + body limit + timeout) | P2 | 1 | — (operational hardening, sprints 012/013/015) | `api/src/main.rs` (`security_headers`, `RequestBodyLimitLayer`, `TimeoutLayer`), `api/src/config.rs` (`MAX_BODY_BYTES`, `REQUEST_TIMEOUT_SECS`) | API 133/133 (`tests::ok_response_carries_security_headers`, `tests::within_limit_is_accepted`, `tests::oversized_content_length_rejected_with_413`, `tests::slow_request_times_out_with_408`) |
 
 ## Orphan / drift checks (per directive §14)
 
 - **Implemented without a requirement:** settlement center UI (covered under
   REQ-008/009 as evidence surfaces — no orphan). `zk-membership` crate: verify
   its consumers before release (flagged Q-009).
-- **Requirements with no implementation:** REQ-020…REQ-023 (as marked) —
-  intentional; tracked in ROADMAP with research gates.
+- **Requirements with no implementation:** REQ-020…REQ-022 are `SPECIFIED ONLY`
+  (chapters + intents + acceptance criteria written; ⚠ founder review flags
+  pending on Q-003/Q-004). REQ-023 is `RESEARCH REQUIRED` (Q-005 hard gate).
+  All intentional; tracked in ROADMAP Stages 3–4.
 - **Vision elements at risk of drift:** AI provenance (REQ-024) is now
   recorded on drafts (R-014 resolved); future model outputs must use those
   fields, never free-text `method` alone.

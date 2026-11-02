@@ -15,6 +15,13 @@ pub struct Config {
     /// Ed25519 public key (base58) that may sign privileged requests.
     /// When absent, privileged endpoints reject all callers (fail-closed).
     pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
+    /// Maximum accepted request body size in bytes (tower-http limit).
+    /// Default 64 MiB: covers multipart OSM ingest (PBF extracts) and photo
+    /// evidence uploads; JSON API payloads are far smaller. Override via env.
+    pub max_body_bytes: usize,
+    /// Per-request timeout (seconds) applied by tower-http `TimeoutLayer`.
+    /// Default 60 s; slow handlers should be lifted via env for heavy ingest.
+    pub request_timeout_secs: u64,
 }
 
 impl Config {
@@ -44,6 +51,14 @@ impl Config {
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(8080),
             osm_pbf_path: std::env::var("OSM_PBF_PATH").ok().map(PathBuf::from),
+            max_body_bytes: std::env::var("MAX_BODY_BYTES")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(64 * 1024 * 1024),
+            request_timeout_secs: std::env::var("REQUEST_TIMEOUT_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(60),
             cors_allowed_origins: std::env::var("CORS_ALLOWED_ORIGINS")
                 .map(|v| {
                     v.split(',')

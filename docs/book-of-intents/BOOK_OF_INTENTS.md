@@ -6,9 +6,10 @@ maintained continuously and must stay sufficient context for a competent AI
 agent or human to continue the project without the founder repeating
 instructions.
 
-**Audit basis:** repository state at commit `775e20a` (dev branch),
-re-verified 2026-10-31 (vitest 44/44 executed; historical suite baselines
-recorded per their last verified runs — see IMPLEMENTATION_STATUS).
+**Audit basis:** repository state at commit `e9b2e7d` (dev branch),
+re-verified 2026-11-02 (API 133/133, vitest 65/65, eslint clean, build + bundle
+PASS; historical suite baselines recorded per their last verified runs — see
+IMPLEMENTATION_STATUS).
 
 ## Canonical trust principle
 
@@ -85,6 +86,27 @@ Never inflate a status. When evidence is unavailable, say so.
 - [work/CURRENT.md](work/CURRENT.md) — active execution state.
 - [sprints/001-story-engine.md](sprints/001-story-engine.md) — RFC-014 Phases 01–03 (committed).
 - [sprints/002-book-constitution.md](sprints/002-book-constitution.md) — audit + constitution build.
+- [sprints/003-derived-compute.md](sprints/003-derived-compute.md) — RFC-014 Phase 04 (incremental compute, REQ-019).
+- [sprints/004-request-auth.md](sprints/004-request-auth.md) — R-016/R-017 privileged-endpoint auth.
+- [sprints/005-external-replay.md](sprints/005-external-replay.md) — REQ-018 external replay.
+- [sprints/006-verification-refresh.md](sprints/006-verification-refresh.md) — full verification refresh.
+- [sprints/007-frontend-local-verification.md](sprints/007-frontend-local-verification.md) — local frontend verification (no SOL).
+- [sprints/008-ai-provenance.md](sprints/008-ai-provenance.md) — REQ-024/R-014 AI provenance.
+- [sprints/009-book-volume-10.md](sprints/009-book-volume-10.md) — Book volume 10.
+- [sprints/010-bundle-discipline.md](sprints/010-bundle-discipline.md) — R-012 bundle discipline gate.
+- [sprints/011-nonchain-wrapup.md](sprints/011-nonchain-wrapup.md) — non-chain work wrap-up.
+- [sprints/012-api-security-headers.md](sprints/012-api-security-headers.md) — API response security headers.
+- [sprints/013-api-body-limit.md](sprints/013-api-body-limit.md) — API request body-size limit.
+- [sprints/014-frontend-logic-tests.md](sprints/014-frontend-logic-tests.md) — frontend logic unit tests.
+- [sprints/015-api-request-timeout.md](sprints/015-api-request-timeout.md) — API request timeout.
+- [sprints/016-book-index-sync.md](sprints/016-book-index-sync.md) — Book index consistency pass.
+- [sprints/017-frontend-protocol-status-tests.md](sprints/017-frontend-protocol-status-tests.md) — frontend logic unit tests (protocol status).
+- [sprints/018-book-index-sync-2.md](sprints/018-book-index-sync-2.md) — Book index consistency pass (part 2).
+- [sprints/019-frontend-demo-polish.md](sprints/019-frontend-demo-polish.md) — Frontend/UX polish: demo header source chip.
+- [sprints/020-frontend-welcome-polish.md](sprints/020-frontend-welcome-polish.md) — Frontend/UX polish: welcome offline badge.
+- [sprints/021-book-consistency-traceability.md](sprints/021-book-consistency-traceability.md) — Book consistency catch-up + requirements traceability (REQ-025).
+- [sprints/022-frontend-activity-store-tests.md](sprints/022-frontend-activity-store-tests.md) — Frontend logic unit tests — activity store + API GeoJSON parse.
+- [sprints/023-research-q003-q004.md](sprints/023-research-q003-q004.md) — Research: institutional bootstrap (Q-003) and residency attestation (Q-004).
 
 ## Planned volumes (not yet written; see ROADMAP Stage 3)
 

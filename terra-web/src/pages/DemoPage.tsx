@@ -350,12 +350,14 @@ export default function DemoPage() {
         </div>
         <div className="land-badges">
           <span className="lab-badge lab-badge-warn">{t('demoState')}</span>
+          <span className={`lab-badge ${catalogueSource === 'local' ? 'lab-badge-warn' : 'lab-badge-info'}`}>
+            {catalogueSource === 'checking' ? t('scenarioChecking') : catalogueSource === 'api' ? t('apiCatalogue') : t('builtinCatalogue')}
+          </span>
           <Link className="btn btn-secondary px-2 py-1" to="/status">
             {t('engineStatus')} ↗
           </Link>
         </div>
       </header>
-
       {/* scenario picker */}
       <div className="dm-row">
         {catalogue.map((s) => (

@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-02 (working tree on top of `3ee842f`).
+Last reconciled: 2026-11-02 (working tree; sprints 012–022 delivered locally, uncommitted).
 
 ## Active intents
 
@@ -27,6 +27,19 @@ Last reconciled: 2026-11-02 (working tree on top of `3ee842f`).
 | R-014 — AI provenance on geometry drafts (REQ-024) | **done (2026-11-02)** | migration 0034: `provenance_kind` + model provider/name/version/confidence; fail-closed validation; API **128/128** (7 tests); live smoke **13/13**; DB constraints verified; sprints/008 |
 | Book volume 10 (derived compute, auth, AI provenance) | **done (2026-11-02)** | `chapters/10-derived-compute-and-provenance.md`; index/SUMMARY; E4 evidence; sprints/009 |
 | R-012 — bundle discipline gate | **done (2026-11-02)** | `terra-web/scripts/check-bundle.mjs` + `pnpm build:check`; CI frontend job now builds; entry **295 kB gz**, initial **301 kB**, Cesium **1098 kB lazy**; negative test exits 1; sprints/010 |
+| Sprint 012 — API security response headers (nosniff, frame-deny, referrer-policy, permissions-policy) | **done (2026-11-02)** | middleware in `api/src/main.rs`; 2 new tests; `cargo test -p terra-api` **130/130** (2026-11-02); uncommitted per founder commit directive — no SOL required |
+| Sprint 013 — API request body-size limit (`MAX_BODY_BYTES`, default 64 MiB → 413) | **done (2026-11-02)** | layer in `api/src/main.rs`; 2 new tests; `cargo test -p terra-api` **132/132** (2026-11-02); uncommitted per founder commit directive — no SOL required |
+| Sprint 014 — Frontend logic unit tests (LOD + codec helpers) | **done (2026-11-02)** | `src/lib/lod.test.ts` + `src/lib/codec.test.ts`; vitest **52/52** (2026-11-02); tsc/eslint/build/bundle-check green | Uncommitted per founder commit directive; no SOL required |
+| Sprint 015 — API request timeout (`REQUEST_TIMEOUT_SECS`, default 60 s → 408) | **done (2026-11-02)** | layer in `api/src/main.rs`; 1 new test; `cargo test -p terra-api` **133/133** (2026-11-02); uncommitted per founder commit directive — no SOL required |
+| Sprint 016 — Book index consistency pass | **done (2026-11-02)** | indexes synced (sprints 001–015); doc-only — no gate required | Uncommitted per founder commit directive — no SOL required |
+| Sprint 017 — Frontend logic unit tests (protocol status) | **done (2026-11-02)** | `src/lib/protocolStatus.test.ts`; vitest **56/56** (2026-11-02); tsc/eslint/build/bundle-check green | Uncommitted per founder commit directive; no SOL required |
+| Sprint 018 — Book index consistency pass (part 2) | **done (2026-11-02)** | indexes extended with sprints 016/017; doc-only — no gate required | Uncommitted per founder commit directive — no SOL required |
+| Sprint 019 — Frontend/UX polish: demo header source chip | **done (2026-11-02)** | demo header source chip; frontend full gate green | Uncommitted per founder commit directive — no SOL required |
+| Sprint 020 — Frontend/UX polish: welcome offline badge | **done (2026-11-02)** | welcome offline badge; frontend full gate green | Uncommitted per founder commit directive — no SOL required |
+| Sprint 021 — Book consistency catch-up + requirements traceability (REQ-025) | **done (2026-11-02)** | REQUIREMENTS_TRACEABILITY REQ-025 added; indexes extended with sprints 018/019/020; E4 → sprints 001–020; doc-only — no gate required | Uncommitted per founder commit directive — no SOL required |
+| Sprint 022 — Frontend logic unit tests — activity store + API GeoJSON parse | **done (2026-11-02)** | `src/lib/activityStore.test.ts` + `src/lib/api.test.ts`; vitest **65/65**; tsc/eslint/build/bundle-check green | Uncommitted per founder commit directive — no SOL required |
+| Sprint 023 — Research: Q-003 (institutional bootstrap) + Q-004 (residency attestation) | **done (2026-11-02)** | 5 DNS-identity designs + 6 jurisdictions surveyed; findings in RESEARCH_REFERENCES; Q-003/Q-004 → `5 – PROPOSED`; chapters/02 §2.3 + chapters/08 §8.6 updated | Doc-only — no gate required |
+| Stage 3 — Planned-capability specifications (REQ-020/021/022) | **done (2026-11-02)** | Chapters 2/6/8 → `SPECIFIED ONLY` with ⚠ founder review flags; INT-005 updated; ROADMAP Stage 3 exit met except founder review of the flags | Doc-only — no gate required |
 
 ## Known blockers
 
@@ -40,7 +53,7 @@ Last reconciled: 2026-11-02 (working tree on top of `3ee842f`).
 
 ## Next up (order)
 
-1. **Between phases** — all Stage 1 non-chain deliverables are complete (sprints 003–011). CI green (API 128/128, BPF 307/307, vitest 44/44, frontend typecheck + budget). No funding required. Registers current. Waiting on founder decision for Q-001 devnet funding (Stage 2) or research progress on Q-003/Q-005.
+1. **Between phases** — all Stage 1 non-chain deliverables are complete (sprints 003–022). CI green (API 133/133, BPF 307/307, vitest 65/65, frontend typecheck + budget). No funding required. Registers current. Waiting on founder decision for Q-001 devnet funding (Stage 2) or research progress on Q-003/Q-005.
 
 2. **Remaining non-chain work** — frontend/UX polish and small API hardening are captured as backlog items; larger requirements (REQ-020…REQ-023) stay research-gated (Q-003/Q-005). R-012 bundle gate is in place — future frontend work must pass `pnpm build:check` (sprints/010). See sprint 011 for wrap-up.
 

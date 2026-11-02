@@ -49,13 +49,16 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | B1 | REST mirror surface (~26 routers: parcels, identities, vaults, disputes, escrows, rights, cross-border, subdivision, staking, zk, spatial, spatial-accounts, geo, fusion, world-registry, recovery, credentials, evidence, reconstruction, derived, stories, tx, demo, activity…) | 1 | `routes/mod.rs`; migrations 0001–0033 | Mirror is a read model; chain is source of truth |
 | B2 | Story CRUD + export receipts + validation + external replay/GeoJSON/schema (REQ-018) | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; `terra.story-replay/v1`; API suite 128/128 (2026-11-02); live smoke (hash tracks edits) | Mutations wallet-signed (commit `11be94c`); replay is read-only presentation data, not proof |
 | B3 | Reconstruction worker: lease (SKIP LOCKED, 15-min), progress, complete→geometry draft→anchor_prep, drafts, anchor; drafts record AI provenance (REQ-024, migration 0034) | 2 | `routes/reconstruction.rs`; migrations 0031/0034; live smoke 22/22 + provenance 13/13 (2026-11-02) | anchor_prep produces a transaction; never executed on a live cluster (B6) |
-| B4 | Geo endpoints (`nearest-roads`, `pois`, `buildings`, `stats`) | 1 | `routes/geo.rs` L88–93 | No server-side `/geo/route` — routing runs client-side (D4) |
+| B4 | Geo endpoints (`nearest-roads`, `pois`, `buildings`, `stats`) | 1 | `routes/geo.rs` L88–93 | No server-side `/geo/route` — routing runs client-side (D4); Q-007 resolved 2026-11-02: client-side sufficient |
 | B5 | Signed multipart evidence upload | 1 | API `/evidence`; migrations 0023/0024 | — |
 | B6 | Devnet deployment | 2 – IMPLEMENTED, VERIFICATION INCOMPLETE | `deploy.sh devnet` verifies canonical keypairs vs `declare_id!` then `anchor deploy`; `.so` fresh | **Blocked: deployer wallet 0 SOL** (founder action; OPEN_QUESTIONS Q-001) |
 | B7 | IPFS registry mirror | 3 – PARTIALLY IMPLEMENTED | migration 0018_registry_ipfs_mirror | Independence from any single storage provider still a goal (RISK R-010) |
 | B8 | Incremental derived compute: `processing_key` UNIQUE dedup, atomic create-or-reuse, idempotent complete, guarded fail, recursive-CTE dependency invalidation; reconstruction-draft ledger; all mutations signature-verified (R-016) | 1 | `routes/derived.rs`; migration 0033; API **128/128** (7 derived tests; 2026-11-02); live smoke **16/16** signed checks (unsigned/wrong key → 401); 2 identical reconstruction computations → 2 drafts, 1 ledger row, equal hashes | Cache, not a fact: correctness = same key ⇒ same output. Nothing on-chain; not a consensus input |
 | B9 | Privileged-endpoint signature verification (R-016) | 1 – IMPLEMENTED AND VERIFIED | 8 handlers now `auth.verify(&key, …)?` (fail-closed); unsigned `complete` → 401 (was 200); signed suites still green (2026-11-02) | Client shipped: `api/examples/sign_request.rs` (R-017) |
 | B10 | AI provenance on geometry drafts (REQ-024, R-014): `provenance_kind` + model provider/name/version/confidence, fail-closed validation, DB constraints | 1 | migration 0034; `routes/reconstruction.rs`; API **128/128** (7 provenance tests); live smoke **13/13**; constraints verified via psql (2026-11-02) | Provenance is description, not verification — an AI draft is still a draft until anchored + reviewed |
+| B11 | API security response headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`) via `middleware::from_fn` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | middleware + 2 tests in `api/src/main.rs` (`tests::ok_response_carries_security_headers`, `tests::error_response_also_carries_security_headers`); `cargo test -p terra-api` **130/130** (2026-11-02) | Browser hardening only; privileged-endpoint auth unchanged (R-016 fail-closed) |
+| B12 | API request body-size limit: `MAX_BODY_BYTES` env (default 64 MiB) + `RequestBodyLimitLayer` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | layer + 2 tests in `api/src/main.rs` (`tests::oversized_content_length_rejected_with_413`, `tests::within_limit_is_accepted`); `cargo test -p terra-api` **132/132** (2026-11-02) | Multipart ingest (OSM PBF, photos) covered by default; tunables via env |
+| B13 | API request timeout: `REQUEST_TIMEOUT_SECS` env (default 60 s) + tower-http `TimeoutLayer` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | layer + 1 test in `api/src/main.rs` (`tests::slow_request_times_out_with_408`); `cargo test -p terra-api` **133/133** (2026-11-02) | Default response 408; tunable via env |
 
 ## C. Geo-engine & spatial compute (`terra-core/geo-engine`)
 
@@ -72,9 +75,14 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | D1 | Atlas/globe (Cesium), basemap/terrain/measure/draw/search/share, land lab, settlement center, demo scenarios | 1 | GlobePage/LabPage/SettlementCenter; CDP smokes (spatial 0 exceptions; settlement 33/33) | — |
 | D2 | Story engine: deterministic timeline, deep links (`?time=`/`?step=`), player, library, offline demos | 1 | `src/story/{timeline,url,demo}.ts`; vitest 44/44 (incl. timeline suite); commits `c9faf54`…`ae20af8` | — |
 | D3 | Story video export (MediaRecorder, aspect presets, caption burn-in, cancel, PNG still, receipts) | 1 | `story/export.ts`; commit `0f0cc2e` | Browser-dependent codecs; no server-side render |
-| D4 | Road-graph journey navigation (parse, snap, build graph, route, build route) | 1 | `story/roads.ts` + `roads.test.ts` (vitest); commit `54ad2bd` | Runs **client-side**; server `/geo/route` endpoint absent (OPEN_QUESTIONS Q-007) |
+| D4 | Road-graph journey navigation (parse, snap, build graph, route, build route) | 1 | `story/roads.ts` + `roads.test.ts` (vitest); commit `54ad2bd` | Runs **client-side**; server `/geo/route` absent — Q-007 resolved 2026-11-02: client-side routing sufficient |
 | D5 | i18n en/fr/ru/zh | 1 | `lib/locale.tsx`; fr/zh leak checks in settlement CDP smoke | — |
 | D6 | Bundle discipline (R-012): route-level lazy loading enforced by a build gate | 1 | `scripts/check-bundle.mjs`; `pnpm build:check`; CI frontend job | Ceilings: entry 340 kB gz, initial 360 kB, Cesium 1200 kB, total 1900 kB; raising one is a Book decision |
+| D7 | Frontend logic unit tests: LOD derivation + codec byte/hex helpers | 1 | `src/lib/lod.test.ts`, `src/lib/codec.test.ts`; vitest **52/52** (2026-11-02) | — |
+| D8 | Frontend logic unit tests: protocol-status module (`STATUS_*`, `statusCounts`) | 1 | `src/lib/protocolStatus.test.ts`; vitest **56/56** (2026-11-02) | — |
+| D9 | Frontend/UX polish: demo header source chip | 1 | `src/pages/DemoPage.tsx`; frontend full gate green (2026-11-02) | — |
+| D10 | Frontend/UX polish: welcome offline badge | 1 | `src/pages/WelcomePage.tsx`; frontend full gate green (2026-11-02) | — |
+| D11 | Frontend logic unit tests: activity store + API GeoJSON parse helpers | 1 | `src/lib/activityStore.test.ts` + `src/lib/api.test.ts`; vitest **65/65** (2026-11-02) | — |
 
 ## E. Repository & operations
 
@@ -83,7 +91,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | E1 | CI (typecheck `tsc -b` + vitest + build/bundle-budget on frontend job; Rust lib/rfc012/geo/API suites; SBF build + 307-test BPF integration suite) | 1 | `.github/workflows/ci.yml`; commit `b2ddf80`; R-012 bundle gate added 2026-11-02; CI run `41474466105` green (2026-11-02) | Solana toolchain pinned `v3.1.14` — bump together with `solana-program-test`; `stable` builds are rejected by the pinned runtime (R-008 resolved) |
 | E2 | License Apache-2.0 + TRADEMARKS.md | 1 | `LICENSE`, `TRADEMARKS.md`, workspace license field | — |
 | E3 | Deploy keypair hygiene | 1 | `deploy.sh` verifies canonical keypairs vs `declare_id!` (registry `GaEDbkt…Tbage`, identity `HyjpaHY…Vo6p`) | — |
-| E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprint 002; chapters 01–10 (09 replay, 10 derived compute/auth/provenance) | Remaining volumes depend on research-gated intents (Q-003/Q-005); registers are current |
+| E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprints 001–022; chapters 01–10 (09 replay, 10 derived compute/auth/provenance) | Remaining volumes depend on research-gated intents (Q-003/Q-005); registers are current |
 
 ## Verification baselines (last verified runs)
 
@@ -91,9 +99,9 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | --- | --- | --- | --- |
 | BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **307** | **2026-11-02 (executed; 295.9 s)** | before release |
 | Registry lib | **153** | **2026-11-02 (executed)** | before release |
-| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **128** | **2026-11-02 (executed)** | before release |
+| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **133** | **2026-11-02 (executed)** | before release |
 | Geo-engine | **12 (+1 ignored)** | **2026-11-02 (executed; suite grew from the 6 baseline)** | before release |
 | Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
-| Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-11-02 (executed)** | each story change |
+| Frontend vitest (`pnpm exec vitest run`) | **65/65** | **2026-11-02 (executed)** | each story change |
 | Frontend gates (`tsc -b` + eslint + build) | green | **2026-11-02 (executed)** | each story change |
 | Frontend bundle budget (`pnpm build:check`) | entry **295 kB gz** / initial **301 kB** / Cesium **1098 kB lazy** / total **1678 kB** | **2026-11-02 (executed)** | each frontend build |

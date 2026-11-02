@@ -1,7 +1,9 @@
 # Chapter 6 — Mortgage & Lien Encumbrance Tracking
 
-**Status:** `PROPOSED` — building blocks are `IMPLEMENTED AND VERIFIED`; the
-lien lifecycle is not.
+**Status:** `SPECIFIED ONLY` — designed and acceptance-criteria'd; no code.
+Building blocks are `IMPLEMENTED AND VERIFIED`; the lien lifecycle is not.
+**Founder review flag:** ⚠ pending — depends on Chapter 8 (`InstitutionalValidator`
+with a lien capability), which itself needs Q-003 founder authorization.
 **See:** [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md),
 [REQUIREMENTS_TRACEABILITY.md](../REQUIREMENTS_TRACEABILITY.md) REQ-022.
 

@@ -123,6 +123,9 @@ export default function WelcomePage() {
         <section className="welcome-hero">
           <div className="welcome-copy">
             <span className="welcome-eyebrow"><Sparkles size={13} /> {t('welcomeEyebrow')}</span>
+            {feedState === 'offline' && (
+              <span className="lab-badge lab-badge-warn">{t('apiOffline')}</span>
+            )}
             <h1>{t('welcomeTitleA')}<br /><span>{t('welcomeTitleB')}</span></h1>
             <p>{t('welcomeIntro')}</p>
             <div className="welcome-actions">

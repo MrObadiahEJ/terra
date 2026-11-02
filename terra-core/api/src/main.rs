@@ -13,10 +13,15 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use axum::extract::Request;
 use axum::http::{HeaderValue, Method};
+use axum::middleware::{self, Next};
+use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -81,6 +86,9 @@ async fn main() -> Result<()> {
         .nest("/api/v1", routes::router())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(security_headers))
+        .layer(RequestBodyLimitLayer::new(config.max_body_bytes))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(config.request_timeout_secs)))
         .with_state(AppState {
             pool,
             geo,
@@ -98,6 +106,34 @@ async fn main() -> Result<()> {
     )
     .await?;
     Ok(())
+}
+
+/// Security response headers applied to every API response (Sprint 012).
+///
+/// Defense-in-depth on the unauthenticated mirror: browsers must not be able to
+/// MIME-sniff API responses (`nosniff`), frame them (`DENY`), leak referrer
+/// context to third parties (`no-referrer`), or exercise browser capabilities
+/// the product does not use (`Permissions-Policy`). The API surface is JSON-only
+/// (plus multipart evidence/OSM ingest), so no Content-Security-Policy applies.
+async fn security_headers(
+    req: Request,
+    next: Next,
+) -> Response {
+    let mut response = next.run(req).await;
+    response
+        .headers_mut()
+        .insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    response
+        .headers_mut()
+        .insert("x-frame-options", HeaderValue::from_static("DENY"));
+    response
+        .headers_mut()
+        .insert("referrer-policy", HeaderValue::from_static("no-referrer"));
+    response.headers_mut().insert(
+        "permissions-policy",
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    response
 }
 
 async fn load_geo(path: Option<&Path>) -> Result<Option<Arc<GeoData>>> {
@@ -148,4 +184,150 @@ fn building_bounds(building: &terra_geo::BuildingFootprint) -> Option<geo::Rect<
         )
     });
     Some(geo::Rect::new(min, max))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::StatusCode;
+    use axum::routing::get;
+    use axum::Router;
+    use tower::ServiceExt;
+
+    use crate::auth::ApiAuthority;
+    use crate::routes::AppState;
+    use crate::storage::StorageBackend;
+
+    /// Minimal router with only the security-headers middleware applied.
+    /// Mirrors the production composition (sans CORS/Trace/DB-backed handlers).
+    fn test_router() -> Router {
+        let pool = sqlx::PgPool::connect_lazy("postgres://x:x@localhost/x").unwrap();
+        let state = AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local {
+                root: std::path::PathBuf::from("/tmp/terra-test"),
+            }),
+            zk: None,
+        };
+        Router::new()
+            .route("/__security_headers_probe", get(|| async { "ok" }))
+            .route(
+                "/__security_headers_slow",
+                get(|| async {
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    "ok"
+                }),
+            )
+            .layer(middleware::from_fn(security_headers))
+            .layer(RequestBodyLimitLayer::new(8))
+            .layer(TimeoutLayer::new(std::time::Duration::from_millis(1)))
+            .with_state(state)
+    }
+
+    async fn probe(path: &str) -> axum::response::Response {
+        test_router()
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn ok_response_carries_security_headers() {
+        let response = probe("/__security_headers_probe").await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        assert_eq!(
+            response
+                .headers()
+                .get("x-content-type-options")
+                .and_then(|v| v.to_str().ok()),
+            Some("nosniff")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("x-frame-options")
+                .and_then(|v| v.to_str().ok()),
+            Some("DENY")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("referrer-policy")
+                .and_then(|v| v.to_str().ok()),
+            Some("no-referrer")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("permissions-policy")
+                .and_then(|v| v.to_str().ok()),
+            Some("camera=(), microphone=(), geolocation=()")
+        );
+    }
+
+    #[tokio::test]
+    async fn error_response_also_carries_security_headers() {
+        let response = probe("/__security_headers_does_not_exist").await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response
+                .headers()
+                .get("x-content-type-options")
+                .and_then(|v| v.to_str().ok()),
+            Some("nosniff")
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_content_length_rejected_with_413() {
+        let response = test_router()
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/__security_headers_probe")
+                    .header("content-length", "9")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn within_limit_is_accepted() {
+        let response = test_router()
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/__security_headers_probe")
+                    .header("content-length", "2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn slow_request_times_out_with_408() {
+        let response = test_router()
+            .oneshot(
+                axum::http::Request::builder()
+                    .uri("/__security_headers_slow")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::REQUEST_TIMEOUT);
+    }
 }
