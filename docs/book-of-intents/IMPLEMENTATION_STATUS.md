@@ -79,7 +79,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 
 | # | Capability | Status | Evidence | Gap / note |
 | --- | --- | --- | --- | --- |
-| E1 | CI (typecheck `tsc -b` + vitest on frontend job) | 1 | `.github/workflows/ci.yml`; commit `d6772c4` | Rust job coverage: confirm before release (ROADMAP Stage 1) |
+| E1 | CI (typecheck `tsc -b` + vitest on frontend job; Rust lib/rfc012/geo/API suites) | 3 – PARTIALLY IMPLEMENTED | `.github/workflows/ci.yml`; commit `d6772c4` | Rust job **does not** run the 307-test registry BPF integration suite (needs `anchor build`; confirmed 2026-11-02, R-008) |
 | E2 | License Apache-2.0 + TRADEMARKS.md | 1 | `LICENSE`, `TRADEMARKS.md`, workspace license field | — |
 | E3 | Deploy keypair hygiene | 1 | `deploy.sh` verifies canonical keypairs vs `declare_id!` (registry `GaEDbkt…Tbage`, identity `HyjpaHY…Vo6p`) | — |
 | E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprint 002 | Volumes per ROADMAP still unwritten |
@@ -88,10 +88,10 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 
 | Suite | Baseline | Last verified | Re-verify due |
 | --- | --- | --- | --- |
-| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | 307 | 2026-10-13 era (count re-confirmed in source 2026-10-31) | before release |
-| Registry lib | 153 | 2026-10-13 | before release |
+| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **307** | **2026-11-02 (executed; 295.9 s)** | before release |
+| Registry lib | **153** | **2026-11-02 (executed)** | before release |
 | API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **121** | **2026-11-02 (executed)** | before release |
-| Geo-engine | 6 | 2026-10-13 | before release |
-| Identity BPF | 23 | 2026-10-13 | before release |
-| Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-10-31 (executed)** | each story change |
+| Geo-engine | **12 (+1 ignored)** | **2026-11-02 (executed; suite grew from the 6 baseline)** | before release |
+| Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
+| Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-11-02 (executed)** | each story change |
 | Frontend gates (`tsc -b` + eslint + build) | green | 2026-10-16 era (CI) | each story change |

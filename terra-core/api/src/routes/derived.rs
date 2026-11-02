@@ -206,18 +206,26 @@ pub async fn create_job(
     }
 
     let reused = !created && row.status == "done";
-    Ok((StatusCode::OK, Json(CreateJobResponse { job: row, reused, created })))
+    Ok((
+        StatusCode::OK,
+        Json(CreateJobResponse {
+            job: row,
+            reused,
+            created,
+        }),
+    ))
 }
 
 pub async fn get_job(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<DerivedJob>, AppError> {
-    let job = sqlx::query_as::<_, DerivedJob>(&format!("{SELECT_JOB} FROM derived_jobs WHERE id = $1"))
-        .bind(&id)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::not_found("derived job not found"))?;
+    let job =
+        sqlx::query_as::<_, DerivedJob>(&format!("{SELECT_JOB} FROM derived_jobs WHERE id = $1"))
+            .bind(&id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| AppError::not_found("derived job not found"))?;
     Ok(Json(job))
 }
 
@@ -306,12 +314,11 @@ pub async fn fail_job(
     match updated {
         Some(job) => Ok(Json(job)),
         None => {
-            let exists = sqlx::query_as::<_, (String,)>(
-                "SELECT id FROM derived_jobs WHERE id = $1",
-            )
-            .bind(&id)
-            .fetch_optional(&state.pool)
-            .await?;
+            let exists =
+                sqlx::query_as::<_, (String,)>("SELECT id FROM derived_jobs WHERE id = $1")
+                    .bind(&id)
+                    .fetch_optional(&state.pool)
+                    .await?;
             if exists.is_none() {
                 Err(AppError::not_found("derived job not found"))
             } else {
@@ -334,14 +341,16 @@ pub async fn invalidate_job(
     let key = state.api_authority.0.ok_or_else(|| {
         AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
     })?;
-    auth.verify(&key, "POST", &format!("/api/v1/derived/jobs/{id}/invalidate"))?;
-    let exists = sqlx::query_as::<_, (String,)>(
-        "SELECT id FROM derived_jobs WHERE id = $1",
-    )
-    .bind(&id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::not_found("derived job not found"))?;
+    auth.verify(
+        &key,
+        "POST",
+        &format!("/api/v1/derived/jobs/{id}/invalidate"),
+    )?;
+    let exists = sqlx::query_as::<_, (String,)>("SELECT id FROM derived_jobs WHERE id = $1")
+        .bind(&id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::not_found("derived job not found"))?;
 
     // Recursive CTE collects root + transitive dependents; the UPDATE marks
     // them stale in one statement (rows already stale are left alone and are
@@ -433,7 +442,10 @@ mod tests {
     fn processing_key_is_deterministic() {
         let ih = input_hash_hex("{\"a\":1}");
         assert_eq!(ih, input_hash_hex("{\"a\":1}"));
-        assert_eq!(processing_key_hex("route", &ih), processing_key_hex("route", &ih));
+        assert_eq!(
+            processing_key_hex("route", &ih),
+            processing_key_hex("route", &ih)
+        );
     }
 
     #[test]
@@ -449,7 +461,10 @@ mod tests {
     fn processing_key_differs_by_input() {
         let a = input_hash_hex("{\"a\":1}");
         let b = input_hash_hex("{\"a\":2}");
-        assert_ne!(processing_key_hex("route", &a), processing_key_hex("route", &b));
+        assert_ne!(
+            processing_key_hex("route", &a),
+            processing_key_hex("route", &b)
+        );
     }
 
     #[test]

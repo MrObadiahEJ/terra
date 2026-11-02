@@ -60,7 +60,9 @@ fn main() {
     let seed: [u8; 32] = match secret.len() {
         32 => secret.as_slice().try_into().expect("checked length"),
         64 => secret[..32].try_into().expect("checked length"),
-        n => fail(&format!("SIGNING_KEY must decode to 32 or 64 bytes, got {n}")),
+        n => fail(&format!(
+            "SIGNING_KEY must decode to 32 or 64 bytes, got {n}"
+        )),
     };
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed);
     let wallet = bs58::encode(signing_key.verifying_key().to_bytes()).into_string();

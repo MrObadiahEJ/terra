@@ -632,7 +632,11 @@ pub async fn job_progress(
     let key = state.api_authority.0.ok_or_else(|| {
         AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
     })?;
-    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/jobs/{id}/progress"))?;
+    auth.verify(
+        &key,
+        "POST",
+        &format!("/api/v1/reconstruction/jobs/{id}/progress"),
+    )?;
     if !(0.0..=1.0).contains(&input.progress) {
         return Err(AppError::bad_request("progress must be within 0.0..=1.0"));
     }
@@ -668,7 +672,11 @@ pub async fn job_complete(
     let key = state.api_authority.0.ok_or_else(|| {
         AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
     })?;
-    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/jobs/{id}/complete"))?;
+    auth.verify(
+        &key,
+        "POST",
+        &format!("/api/v1/reconstruction/jobs/{id}/complete"),
+    )?;
     let wallet = caller_wallet(headers);
 
     // Must hold the lease (running); queued → conflict, missing → 404.
@@ -857,7 +865,11 @@ pub async fn draft_anchor_confirmed(
     let key = state.api_authority.0.ok_or_else(|| {
         AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
     })?;
-    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/drafts/{id}/anchor"))?;
+    auth.verify(
+        &key,
+        "POST",
+        &format!("/api/v1/reconstruction/drafts/{id}/anchor"),
+    )?;
     if input.signature.trim().is_empty() {
         return Err(AppError::bad_request("signature must not be empty"));
     }

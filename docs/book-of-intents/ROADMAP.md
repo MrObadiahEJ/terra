@@ -31,6 +31,10 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 4. **Verification refresh** — re-run all cargo suites against `775e20a+`
    (baselines in IMPLEMENTATION_STATUS); confirm Rust CI jobs run full suites
    (R-008). *Exit:* updated baseline table with dates.
+   **Partially met 2026-11-02:** all suites re-executed — API 121, registry
+   lib 153, BPF 307, identity 23, geo 12 (+1 ignored), vitest 44/44; table
+   re-dated. CI depth confirmed insufficient: the Rust job does not run the
+   307-test BPF suite (R-008 open → remaining Stage 1 exit item).
 
 ## Stage 2 — Devnet truth (entry: Stage 1 exit + founder funds wallet)
 

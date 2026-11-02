@@ -1456,7 +1456,10 @@ mod tests {
         assert!(replay.read_only);
         assert_eq!(replay.definition_hash, hash);
         assert_eq!(replay.story_id, "test-journey-1");
-        assert_eq!(replay.coordinate_system, "WGS84 (EPSG:4326); heights in metres");
+        assert_eq!(
+            replay.coordinate_system,
+            "WGS84 (EPSG:4326); heights in metres"
+        );
     }
 
     #[test]
@@ -1508,7 +1511,10 @@ mod tests {
     fn replay_schema_is_pinned_and_linked() {
         let doc = replay_schema_doc();
         assert_eq!(doc["title"], REPLAY_SCHEMA);
-        assert_eq!(doc["$id"], "https://terra.example/schemas/story-replay-v1.json");
+        assert_eq!(
+            doc["$id"],
+            "https://terra.example/schemas/story-replay-v1.json"
+        );
         assert_eq!(doc["properties"]["read_only"]["const"], true);
         let links = doc["links"].as_array().unwrap();
         assert!(links.iter().any(|l| l["rel"] == "geojson"));

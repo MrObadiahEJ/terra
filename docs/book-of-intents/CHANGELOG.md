@@ -78,6 +78,20 @@ Format: date · version · what changed · evidence/why. Append-only.
   IMPLEMENTATION_STATUS B2 + API baseline 121, ROADMAP Stage 1 item 3 met,
   work/CURRENT.md, sprints/005.
 
+## 2026-11-02 — Verification refresh (Stage 1 item 4)
+
+- Re-executed every suite against current sources: API **121/121**, registry
+  lib **153/153**, registry BPF integration **307/307** (295.9 s, after
+  `anchor build --skip-lint` refreshed stale `.so` artifacts), identity
+  **23/23**, geo **12 passed + 1 ignored** (suite grew from the 6 baseline),
+  frontend vitest **44/44**. Baseline table re-dated.
+- R-008 confirmed: the CI job "On-chain Program Tests" runs lib/rfc012/geo
+  but not the 307-test BPF integration suite (it needs built `.so` artifacts
+  first). E1 → `PARTIALLY IMPLEMENTED`; this is the remaining Stage 1 exit
+  item.
+- Book: ROADMAP item 4 partially met, IMPLEMENTATION_STATUS baselines + E1,
+  RISK R-008 annotation, work/CURRENT.md, sprints/006.
+
 ## 2026-10-31 — Security fix: verify Ed25519 signatures on privileged endpoints
 
 - **R-016 (H).** `complete_job`, `fail_job`, `invalidate_job` (`derived.rs`)

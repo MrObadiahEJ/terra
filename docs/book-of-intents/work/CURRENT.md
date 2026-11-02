@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-02 (working tree on top of `ad5a069`).
+Last reconciled: 2026-11-02 (working tree on top of `393c305`).
 
 ## Active intents
 
@@ -21,8 +21,8 @@ Last reconciled: 2026-11-02 (working tree on top of `ad5a069`).
 | R-016 — verify signatures on privileged endpoints | **done (2026-11-02)** | 8 handlers now `auth.verify(…)` fail-closed (derived + reconstruction); live: unsigned 401, wrong key 401, authority key 200; sprints/004 |
 | R-017 — shipped request-signing client | **done (2026-11-02)** | `api/examples/sign_request.rs` (deps already present); contract in AGENT_GUIDE §6; drove the live smoke; sprints/004 |
 | RFC-014 Phase 05 — external replay/access (REQ-018) | **done (2026-11-02), commit pending** | `routes/stories.rs` `/replay` + `/replay.geojson` + `/schema/replay`; `terra.story-replay/v1`; API **121/121**; live smoke (hash tracks edits, 404s); chapters/09, sprints/005 |
-| Cargo suite re-run against `775e20a+` | pending | baselines dated 2026-10-13 in IMPLEMENTATION_STATUS |
-| CI Rust-job depth check (R-008) | pending | `.github/workflows/ci.yml` |
+| Verification refresh (all suites re-executed) | **done (2026-11-02)** | API 121/121; registry lib 153/153; BPF 307/307 (295.9 s); identity 23/23; geo 12 (+1 ignored); vitest 44/44; baselines re-dated; sprints/006 |
+| CI Rust-job depth (R-008) | **confirmed gap, open** | `.github/workflows/ci.yml` lib/rfc012/geo/API only — the 307-test BPF suite is not wired; remaining Stage 1 exit item |
 
 ## Known blockers
 
@@ -33,5 +33,5 @@ Last reconciled: 2026-11-02 (working tree on top of `ad5a069`).
 
 ## Next up (order)
 
-1. Verification refresh (cargo suites + CI depth) → Stage 1 exit.
+1. Wire the 307-test registry BPF suite into CI (R-008) → Stage 1 exit.
 2. Stage 2 prep: devnet deploy remains founder-blocked (Q-001).
