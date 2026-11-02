@@ -1,0 +1,311 @@
+{
+  "version": "terra-geom-v2",
+  "crs": "EPSG:4326",
+  "note": "Reference vectors for the terra-geom-v2 canonical 3D geometry digest. Vectors that describe the same geometry under different encodings (ring start, orientation, closure, precision padding, key order, multi-geometry ordering) MUST share a digest. Generate with: cargo test -p terra-geo -- --ignored regenerate_vectors_v2 --nocapture",
+  "vectors": [
+    {
+      "name": "point-3d",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "EGM2008",
+        "vertical_units": "m",
+        "precision": 3,
+        "type": "Point",
+        "coordinates": [
+          8.5,
+          47.4,
+          400
+        ]
+      },
+      "digest": "0e5ac8e42361d78feabaedf8aa9dbb5173285f879f40e9fb2cf93f2943146674"
+    },
+    {
+      "name": "point-3d-alt-format",
+      "geojson": {
+        "type": "Point",
+        "coordinates": [
+          8.50000004,
+          47.40000001,
+          400.0
+        ],
+        "precision": 3,
+        "vertical_units": "m",
+        "elevation_ref": "EGM2008",
+        "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"
+      },
+      "digest": "0e5ac8e42361d78feabaedf8aa9dbb5173285f879f40e9fb2cf93f2943146674"
+    },
+    {
+      "name": "polygon-3d-ccw-closed",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "EGM2008",
+        "vertical_units": "m",
+        "precision": 3,
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.5,
+              47.4,
+              400
+            ],
+            [
+              8.6,
+              47.4,
+              401
+            ],
+            [
+              8.6,
+              47.5,
+              402
+            ],
+            [
+              8.5,
+              47.5,
+              403
+            ],
+            [
+              8.5,
+              47.4,
+              400
+            ]
+          ]
+        ]
+      },
+      "digest": "80e3620755ef0690592fbf47935d6155e240e426d3933df51ce0d22d6e35099b"
+    },
+    {
+      "name": "polygon-3d-cw-rotated",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "EGM2008",
+        "vertical_units": "m",
+        "precision": 3,
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              8.6,
+              47.4,
+              401
+            ],
+            [
+              8.5,
+              47.4,
+              400
+            ],
+            [
+              8.5,
+              47.5,
+              403
+            ],
+            [
+              8.6,
+              47.5,
+              402
+            ],
+            [
+              8.6,
+              47.4,
+              401
+            ]
+          ]
+        ]
+      },
+      "digest": "80e3620755ef0690592fbf47935d6155e240e426d3933df51ce0d22d6e35099b"
+    },
+    {
+      "name": "building-shell-with-roof-collection",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "local",
+        "vertical_units": "m",
+        "precision": 2,
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  8.5,
+                  47.4,
+                  0
+                ],
+                [
+                  8.6,
+                  47.4,
+                  0
+                ],
+                [
+                  8.6,
+                  47.5,
+                  0
+                ],
+                [
+                  8.5,
+                  47.5,
+                  0
+                ],
+                [
+                  8.5,
+                  47.4,
+                  0
+                ]
+              ]
+            ]
+          },
+          {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  8.5,
+                  47.4,
+                  10
+                ],
+                [
+                  8.6,
+                  47.4,
+                  10
+                ],
+                [
+                  8.6,
+                  47.5,
+                  10
+                ],
+                [
+                  8.5,
+                  47.5,
+                  10
+                ],
+                [
+                  8.5,
+                  47.4,
+                  10
+                ]
+              ]
+            ]
+          }
+        ]
+      },
+      "digest": "42ad41d9edd83c93846a91bba8e158f94781555ad16ca94e7e0862dcabec9b74"
+    },
+    {
+      "name": "building-collection-reordered",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "local",
+        "vertical_units": "m",
+        "precision": 2,
+        "type": "GeometryCollection",
+        "geometries": [
+          {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  8.5,
+                  47.4,
+                  10
+                ],
+                [
+                  8.6,
+                  47.4,
+                  10
+                ],
+                [
+                  8.6,
+                  47.5,
+                  10
+                ],
+                [
+                  8.5,
+                  47.5,
+                  10
+                ],
+                [
+                  8.5,
+                  47.4,
+                  10
+                ]
+              ]
+            ]
+          },
+          {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  8.5,
+                  47.4,
+                  0
+                ],
+                [
+                  8.6,
+                  47.4,
+                  0
+                ],
+                [
+                  8.6,
+                  47.5,
+                  0
+                ],
+                [
+                  8.5,
+                  47.5,
+                  0
+                ],
+                [
+                  8.5,
+                  47.4,
+                  0
+                ]
+              ]
+            ]
+          }
+        ]
+      },
+      "digest": "42ad41d9edd83c93846a91bba8e158f94781555ad16ca94e7e0862dcabec9b74"
+    },
+    {
+      "name": "linestring-elevated-road",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "WGS84-ELLIPSOID",
+        "vertical_units": "m",
+        "precision": 5,
+        "type": "LineString",
+        "coordinates": [
+          [
+            8.5,
+            47.4,
+            400.12345
+          ],
+          [
+            8.6,
+            47.5,
+            405.98765
+          ]
+        ]
+      },
+      "digest": "55e4ac458fb17cb3bd42ee1578a933532877d02489601117c647138cb880b7c5"
+    },
+    {
+      "name": "point-2d-no-height",
+      "geojson": {
+        "crs": "EPSG:4326",
+        "elevation_ref": "unknown",
+        "vertical_units": "m",
+        "precision": 7,
+        "type": "Point",
+        "coordinates": [
+          8.5,
+          47.4
+        ]
+      },
+      "digest": "6fd54a92b1c60273379e14062aa43759aa566ab5fcc084dc28f3ec83537d3942"
+    }
+  ]
+}
