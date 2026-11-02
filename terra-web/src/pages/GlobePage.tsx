@@ -21,6 +21,13 @@ import {
   type RoadRow,
   type PoiRow,
 } from '../lib/api'
+import {
+  resolveSceneAtLod,
+  fetchComponentAsset,
+  type SceneWithNodes,
+  type SceneNodeRow,
+  runtimeLodFromHeight,
+} from '../lib/runtime'
 import { listModels, type ThreeDModel } from '../lib/reconstruction'
 import SpatialHistoryPanel from '../components/panels/SpatialHistoryPanel'
 import { listSpatialModels } from '../lib/spatial'
@@ -338,6 +345,19 @@ export default function GlobePage() {
     parcelId: string
     rows: ThreeDModel[]
   } | null>(null)
+  // Distributed runtime scene graph (REQ-027/REQ-028). Resolved on demand for a
+  // manifest id; nodes reference independently stored components that the
+  // runtime fetches with provider fallback.
+  const [sceneGraph, setSceneGraph] = useState<SceneWithNodes | null>(null)
+  const [sceneError, setSceneError] = useState<string | null>(null)
+  const [sceneResolving, setSceneResolving] = useState(false)
+  const [assetFetching, setAssetFetching] = useState<string | null>(null) // component_id in flight
+  const [fetchedAsset, setFetchedAsset] = useState<{
+    componentId: string
+    componentVersion: string
+    sizeBytes: number
+  } | null>(null)
+  const [manifestIdInput, setManifestIdInput] = useState('')
   // Explicit "open on globe" from a Phase C model claim (bypasses the tier
   // gate); bound to the parcel it was requested for, so a selection change
   // invalidates it by derivation — no setState-in-effect reset needed.
@@ -465,6 +485,49 @@ export default function GlobePage() {
   useEffect(() => {
     refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
   }, [refreshBuildings, resolvedTier, layers.buildings])
+
+  // ---- Distributed runtime scene graph (REQ-027 / REQ-028) ----
+  const resolveManifestScene = useCallback(async (manifestId: string) => {
+    setSceneResolving(true)
+    setSceneError(null)
+    try {
+      const lod = runtimeLodFromHeight(lastCamRef.current.height)
+      const graph = await resolveSceneAtLod(manifestId, lod)
+      setSceneGraph(graph)
+      setSceneError(null)
+    } catch (err) {
+      setSceneError(err instanceof Error ? err.message : String(err))
+      setSceneGraph(null)
+    } finally {
+      setSceneResolving(false)
+    }
+  }, [])
+
+  const fetchComponent = useCallback(
+    async (node: SceneNodeRow) => {
+      setAssetFetching(node.component_version_id)
+      try {
+        const data = await fetchComponentAsset(
+          node.object_id,
+          node.component_version_id,
+        )
+        setFetchedAsset({
+          componentId: node.object_id,
+          componentVersion: node.component_version_id,
+          sizeBytes: data.byteLength,
+        })
+      } catch (err) {
+        setSceneError(
+          err instanceof Error
+            ? err.message
+            : `failed to fetch ${node.object_id}`,
+        )
+      } finally {
+        setAssetFetching(null)
+      }
+    },
+    [],
+  )
   useEffect(() => {
     const timer = window.setTimeout(() => {
       refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
@@ -1079,6 +1142,92 @@ export default function GlobePage() {
 
         {/* progressive zoom ladder */}
         <LodLadder lod={lod} onSelect={jumpToLod} />
+
+        {/* Distributed runtime scene resolver (REQ-027 / REQ-028) */}
+        <div className="globe-runtime">
+          <div className="globe-runtime-head">
+            <span className="globe-chip-sep" aria-hidden="true" />
+            <span className="runtime-label">{t('runtimeSceneLabel')}</span>
+            <input
+              className="runtime-manifest-input"
+              placeholder="manifest id"
+              value={manifestIdInput}
+              onChange={(e) => setManifestIdInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void resolveManifestScene(manifestIdInput)
+              }}
+            />
+            <button
+              className={`btn btn-ghost px-2 py-1 ${
+                sceneResolving ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onClick={() =>
+                manifestIdInput.trim() && resolveManifestScene(manifestIdInput)
+              }
+              disabled={sceneResolving || !manifestIdInput.trim()}
+              title={t('resolveSceneTitle')}
+            >
+              {t('resolveAction')}
+            </button>
+            {sceneResolving && <span className="runtime-dots">…</span>}
+          </div>
+          {sceneError && (
+            <div className="runtime-error">
+              <span className="runtime-error-icon">⚠</span>
+              {sceneError}
+            </div>
+          )}
+          {sceneGraph && (
+            <div className="runtime-nodes">
+              <span className="runtime-nodes-label">
+                {t('sceneNodesLabel', {
+                  n: sceneGraph.nodes.length,
+                  lod: sceneGraph.scene.lod_level,
+                })}
+              </span>
+              <div className="runtime-node-list">
+                {sceneGraph.nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    className="runtime-node-row"
+                  >
+                    <span className="runtime-node-id">
+                      {node.object_id.slice(0, 12)}…
+                    </span>
+                    <span className="runtime-node-ver">
+                      {node.component_version_id.slice(0, 8)}…
+                    </span>
+                    <span className={`runtime-node-state runtime-state-${node.loading_state}`}>
+                      {node.loading_state}
+                    </span>
+                    <button
+                      className="btn btn-ghost px-1.5 py-0.5 text-[10px]"
+                      onClick={() => fetchComponent(node)}
+                      disabled={
+                        assetFetching === node.component_version_id ||
+                        node.loading_state !== 'pending'
+                      }
+                      title={t('fetchAssetTitle')}
+                    >
+                      {assetFetching === node.component_version_id
+                        ? '…'
+                        : t('fetchAction')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {fetchedAsset && (
+                <div className="runtime-fetched">
+                  {t('assetFetchedLabel', {
+                    id: fetchedAsset.componentId.slice(0, 12),
+                    ver: fetchedAsset.componentVersion.slice(0, 8),
+                    size: fetchedAsset.sizeBytes,
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="map-controls">
           {!sidenavOpen && (
