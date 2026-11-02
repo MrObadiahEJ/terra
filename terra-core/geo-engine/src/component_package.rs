@@ -15,7 +15,7 @@ use anyhow::{Result, bail, Context};
 use crate::canonical3d::{canonicalize_v2, geometry_digest_hex_v2};
 
 /// A Terra Spatial Component Package (RFC-015 §3).
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ComponentPackage {
     pub component_id: String,
     pub physical_entity_id: String,
@@ -56,7 +56,7 @@ pub struct ComponentPackage {
 }
 
 /// Axis-aligned bounding volume (RFC-015 §3).
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BoundingVolume {
     pub min: Vec<f64>,
     pub max: Vec<f64>,
@@ -397,5 +397,25 @@ mod tests {
             "coordinates": [9.9, 9.9, 999.0]
         }"#;
         assert!(validate_with_geometry(&pkg, Some(geom)).is_err());
+    }
+
+    #[test]
+    fn crs_aliases_accepted() {
+        for crs in ["CRS84", "urn:ogc:def:crs:OGC:1.3:CRS84", "urn:ogc:def:crs:epsg::4326"] {
+            let mut pkg = base_pkg();
+            pkg.crs = crs.to_string();
+            assert!(validate(&pkg).is_ok(), "crs={crs} should be accepted");
+        }
+    }
+
+    #[test]
+    fn bounding_volume_not_enclosing_rejected() {
+        let mut pkg = base_pkg();
+        // bounding_volume too small to contain spatial_extent (lon 8.5..8.6)
+        pkg.bounding_volume = BoundingVolume {
+            min: vec![9.0, 47.0, 300.0],
+            max: vec![9.1, 47.1, 400.0],
+        };
+        assert!(validate(&pkg).is_err());
     }
 }

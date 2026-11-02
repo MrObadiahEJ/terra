@@ -2,6 +2,7 @@ use axum::Router;
 
 pub mod activity;
 pub mod authority_registry;
+pub mod components;
 pub mod cross_border;
 pub mod demo_scenarios;
 pub mod derived;
@@ -35,6 +36,7 @@ pub fn router() -> Router<AppState> {
         .nest("/parcels", parcels::router())
         .nest("/identities", identities::router())
         .nest("/authority-registry", authority_registry::router())
+        .nest("/components", components::router())
         .nest("/vaults", vaults::router())
         .nest("/disputes", disputes::router())
         .nest("/escrows", escrows::router())
