@@ -332,6 +332,109 @@ export async function listManifests(
 }
 
 // ---------------------------------------------------------------------------
+// Worker API: /api/v1/workers (REQ-028 dependent)
+// Stage 5: Distributed providers — worker registration + job assignment.
+// ---------------------------------------------------------------------------
+
+export interface WorkerRow {
+  id: string
+  worker_id: string
+  wallet_address: string
+  capabilities: any
+  status: string
+  last_heartbeat_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RegisterWorkerInput {
+  worker_id: string
+  wallet_address: string
+  capabilities?: any
+}
+
+export interface UpdateWorkerInput {
+  capabilities?: any
+  status?: string
+}
+
+export interface ListWorkersParams {
+  status?: string
+  limit?: number
+}
+
+export interface AssignmentRow {
+  id: string
+  job_id: string
+  worker_id: string
+  assigned_at: string
+  completed_at: string | null
+  result_uri: string | null
+  resource_receipt: any | null
+}
+
+export interface CompleteAssignmentInput {
+  result_uri?: string
+  resource_receipt?: any
+}
+
+// ---------------------------------------------------------------------------
+// Worker API functions
+// ---------------------------------------------------------------------------
+
+export async function registerWorker(
+  input: RegisterWorkerInput,
+): Promise<WorkerRow> {
+  return request<WorkerRow>(`/workers`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function listWorkers(
+  params?: ListWorkersParams,
+): Promise<WorkerRow[]> {
+  const q = new URLSearchParams()
+  if (params?.status) q.set('status', params.status)
+  if (params?.limit) q.set('limit', String(params.limit))
+  return request<WorkerRow[]>(`/workers${q.size > 0 ? `?${q}` : ''}`)
+}
+
+export async function getWorker(id: string): Promise<WorkerRow> {
+  return request<WorkerRow>(`/workers/${encodeURIComponent(id)}`)
+}
+
+export async function updateWorker(
+  id: string,
+  input: UpdateWorkerInput,
+): Promise<WorkerRow> {
+  return request<WorkerRow>(`/workers/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function heartbeatWorker(id: string): Promise<WorkerRow> {
+  return request<WorkerRow>(`/workers/${encodeURIComponent(id)}/heartbeat`, {
+    method: 'POST',
+  })
+}
+
+export async function listWorkerAssignments(workerId: string): Promise<AssignmentRow[]> {
+  return request<AssignmentRow[]>(`/workers/${encodeURIComponent(workerId)}/assignments`)
+}
+
+export async function completeAssignment(
+  jobId: string,
+  input: CompleteAssignmentInput,
+): Promise<AssignmentRow> {
+  return request<AssignmentRow>(`/assignments/${encodeURIComponent(jobId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Progressive LOD selection
 // ---------------------------------------------------------------------------
 

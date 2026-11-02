@@ -16,6 +16,7 @@ const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'))
 const ProtocolConsolePage = lazy(() => import('./pages/ProtocolConsolePage'))
+const WorkerConsolePage = lazy(() => import('./pages/WorkerConsolePage'))
 const StoriesPage = lazy(() => import('./pages/StoriesPage'))
 const StoryPage = lazy(() => import('./pages/StoryPage'))
 
@@ -32,6 +33,7 @@ const TITLES: Record<string, TranslationKey> = {
   '/console': 'titleConsole',
   '/stories': 'titleStories',
   '/story': 'titleStory',
+  '/worker': 'titleWorker',
 }
 
 function DocumentTitle() {
@@ -96,6 +98,7 @@ function App() {
               <Route path="/status" element={<StatusPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/console" element={<ProtocolConsolePage />} />
+              <Route path="/worker" element={<WorkerConsolePage />} />
               <Route path="/stories" element={<StoriesPage />} />
               <Route path="/story/:storyId" element={<StoryPage />} />
               <Route path="*" element={<Navigate to="/welcome" replace />} />
