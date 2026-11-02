@@ -135,7 +135,30 @@ the anchor is confirmed on-chain and the normal review path accepts it.
 - CI runs the API and frontend jobs plus the 307-test BPF suite
   (run `41474466105`, green).
 
-## 10.7 Open edges
+## 10.7 Connection to distributed reconstruction
+
+Derived compute (Section 10.2) is a **dedup cache for a single deterministic
+function**. Distributed reconstruction (Chapter 11) is a different beast:
+multiple independent engines may produce overlapping components that must be
+registered, aligned, and assembled. The two systems connect as follows:
+
+- A reconstruction **task** is a higher-level unit than a derived job. A task
+  may spawn several derived jobs (one per component: roof, facade, terrain)
+  plus one assembly job.
+- Component packages (Chapter 11 §11.3) carry their own `geometry_digest`
+  plus provenance, accuracy, and dependency fields — a superset of the
+  derived-job `processing_key` concept.
+- Resource metering (Part VIII §37) applies to reconstruction tasks: CPU/GPU
+  time, memory, storage, bandwidth, and human labor are recorded per worker,
+  not just per cache hit.
+- Evidence lineage: every component package references its source evidence,
+  and every derived job that consumes a component records that dependency so
+  invalidation can propagate transitively (as derived jobs already do).
+
+Derived compute remains a cache — never a consensus input. Reconstruction
+outputs become facts only after validation and assembly acceptance.
+
+## 10.8 Open edges
 
 - Provenance is on `geometry_drafts`; if AI-generated **model artifacts**
   become common, `three_d_models` should carry the same fields.

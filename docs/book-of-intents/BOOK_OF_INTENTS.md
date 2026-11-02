@@ -63,15 +63,18 @@ Never inflate a status. When evidence is unavailable, say so.
 ### Volumes (chapters)
 
 - [chapters/01-core-identity-and-philosophy.md](chapters/01-core-identity-and-philosophy.md) — foundations
-- [chapters/02-proof-of-location-residency.md](chapters/02-proof-of-location-residency.md) — `PROPOSED`
-- [chapters/03-3d-spatial-intelligence.md](chapters/03-3d-spatial-intelligence.md) — verified / partial
+- [chapters/02-proof-of-location-residency.md](chapters/02-proof-of-location-residency.md) — `SPECIFIED ONLY` (founder review flag, Q-004)
+- [chapters/03-3d-spatial-intelligence.md](chapters/03-3d-spatial-intelligence.md) — verified / partial (on-chain verified; distributed reconstruction specified only)
 - [chapters/04-validator-routing.md](chapters/04-validator-routing.md) — verified (extension proposed)
-- [chapters/05-fractional-investment.md](chapters/05-fractional-investment.md) — `PROPOSED` (gated)
-- [chapters/06-lien-encumbrance.md](chapters/06-lien-encumbrance.md) — `PROPOSED`
+- [chapters/05-fractional-investment.md](chapters/05-fractional-investment.md) — `PROPOSED` (hard-gated, Q-005)
+- [chapters/06-lien-encumbrance.md](chapters/06-lien-encumbrance.md) — `SPECIFIED ONLY` (founder review flag; depends on Ch8/Q-003)
 - [chapters/07-postgis-geo-engine.md](chapters/07-postgis-geo-engine.md) — partial (gaps listed)
-- [chapters/08-institutional-identity.md](chapters/08-institutional-identity.md) — `PROPOSED`.
+- [chapters/08-institutional-identity.md](chapters/08-institutional-identity.md) — `SPECIFIED ONLY` (founder review flag, Q-003)
 - [chapters/09-external-replay.md](chapters/09-external-replay.md) — verified (REQ-018)
 - [chapters/10-derived-compute-and-provenance.md](chapters/10-derived-compute-and-provenance.md) — verified (REQ-019/024, R-016/R-017)
+- [chapters/11-distributed-spatial-reconstruction-and-assembly.md](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
+- [chapters/12-world-runtime-and-synchronized-rendering.md](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
+- [chapters/13-global-spatial-data-delivery-and-progressive-visualization.md](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
 
 ### Intents
 
@@ -108,9 +111,66 @@ Never inflate a status. When evidence is unavailable, say so.
 - [sprints/022-frontend-activity-store-tests.md](sprints/022-frontend-activity-store-tests.md) — Frontend logic unit tests — activity store + API GeoJSON parse.
 - [sprints/023-research-q003-q004.md](sprints/023-research-q003-q004.md) — Research: institutional bootstrap (Q-003) and residency attestation (Q-004).
 
-## Planned volumes (not yet written; see ROADMAP Stage 3)
+## Planned volumes (not yet written; see ROADMAP Stage 3–4)
 
 Transactions & Lineage · AI-Assisted Understanding · Developer Ecosystem ·
 Governance & Security Resilience · Land-Administration Research (Cameroon +
 comparative). Each becomes a chapter only when grounded in repository evidence
 or explicit research — never as filler.
+
+Architecture chapters now written (specified only, no code yet):
+
+- Chapter 11 — Distributed Spatial Reconstruction and Assembly.
+- Chapter 12 — World Runtime and Synchronized Spatial Rendering.
+- Chapter 13 — Global Spatial Data Delivery and Progressive Visualization.
+
+---
+
+## Executive summary
+
+**What does Terra already have?**
+- On-chain: parcel registry + transfer (RRR rights-as-PDA), vault shard protocol, escrow settlement, dispute lifecycle, staking/slashing, validator registry + profiles + reputation, verification sessions/claims/attestations, evidence manifests, ZK ownership proofs (Groth16, ceremony tooling absent), time-bound credentials, cross-border identity, world registry (249 ISO codes), spatial assets + versioned geometry + spatial snapshots, 3D model registration, subdivision/amalgamation/succession/forfeiture, identity program (bind/succession/guardianship). All `IMPLEMENTED AND VERIFIED` (A1–A21), 307 BPF tests, local-only (never on devnet).
+- Backend API: ~26 routers including reconstruction, derived compute, stories (replay/GeoJSON/schema), spatial, geo, evidence, ZK, tx. `IMPLEMENTED AND VERIFIED` (B1–B5, B8–B13), API 133/133. Derived compute dedup cache (`processing_key` UNIQUE, recursive-CTE invalidation) is a cache, not a fact. Privileged endpoints fail-closed on Ed25519 signature (R-016/R-017 fixed). AI provenance fields on geometry drafts (REQ-024/R-014).
+- Geo-engine: sealed-road reachability (Dijkstra), canonical 2D geometry digest `terra-geom-v1` (frozen), OSM road-graph structures (partial — no server-side route), nearest-roads/pois/buildings/stats. C1 verified, C2 verified, C3 partial.
+- Frontend: Cesium globe + Leaflet fallback, story engine (timeline/roads/demo/export), video export, road-graph navigation client-side, i18n, LOD_LEVELS (8 levels), terrain loading with retry, bundle discipline gate. D1–D11 verified, vitest 65/65.
+
+**What is currently missing?**
+- World Representation Manifest / central coordination object (REQ-027).
+- Spatial Component Package schema + conformance test (REQ-026).
+- Assembly system connecting independently produced components into one building (REQ-026).
+- Distributed runtime: spatial index, manifest resolver, provider discovery/fallback, scene graph, progressive streaming, cache invalidation (REQ-027/028).
+- Provider discovery and storage-node fallback (no central geometry repository).
+- 3D geometry digest `terra-geom-v2` (experimental only, on `terra-3d-spatial-pipeline` branch, not merged).
+- Reconstruction marketplace: task manifests, offers/bids, scheduling, escrow, settlement (task_economics applies to verification tasks only).
+- Coverage investment program, jurisdictional profiles.
+- On-chain institutional identity (`register_institutional_identity`), residency credential, lien encumbrance (all `SPECIFIED ONLY`, founder-gated).
+
+**What is incorrectly described or implemented?**
+- `terra-geom-v2`/`canonical3d.rs` exists only on the `terra-3d-spatial-pipeline` branch (based on pre-constitution `775e20a`) — it is **not** production; do not treat as merged or verified.
+- `ThreeDModel` registration ≠ verified physical object; `GeometryDraft` ≠ complete 3D representation; anchor_prep builds a transaction but never executed on devnet.
+- `task_economics.rs` reward/escrow applies to verification tasks, not reconstruction; it is not a reconstruction marketplace.
+- A registered model reference on-chain is not a reconstruction engine; a Cesium globe displaying a model is not a distributed synchronized rendering runtime.
+
+**How will independently stored spatial objects become one synchronized world representation?**
+Via the World Representation Manifest (Chapter 12): a logical, versioned reference structure storing object IDs, current component versions, assembly versions, spatial extents, dependencies, storage references, LODs, and validation states — references and relationships, not geometry. Components stay on independent storage providers; the runtime resolves versions, discovers providers, fetches only needed components, verifies digests, transforms coordinates, assembles a scene graph, and renders. Immutable versions + explicit manifest transitions keep clients on a consistent assembly until they safely transition.
+
+**How will runtime discovery, lazy loading and progressive visualization work?**
+The runtime queries a hierarchical spatial index (not local filtering) for visible partitions, resolves component versions via the manifest, discovers providers (latency, authorization, cost, reliability — not just proximity), checks local/shared caches, fetches missing components with range requests, verifies digests, applies local→global transforms, and assembles the scene graph. Loading is hierarchical: L0 globe → L1 region → L2 city → L3 parcel/building → L4 interior, driven by camera distance, screen-space error, visibility, LOD, network, and device capability. Rendering begins with parcel/terrain/footprint and replaces previews with higher-detail assets; every visual carries a status label (imported/observed/surveyed/reconstructed/inferred/validated/legally recognized).
+
+**How will reconstruction engines and workers communicate?**
+Workers are engine-agnostic: each produces a Spatial Component Package (RFC-015 schema) with component ID, physical entity ID, relationships, geometry artifact, format/digest algorithm version, CRS, elevation reference, transform, bounding volume, resolution/LOD, evidence refs, engine identity/version, provenance, accuracy/uncertainty, validation state, version lineage. Packages go to a component registry; an assembly system registers/aligns them (control points, shared anchors, overlap, feature correspondences, local↔global transforms, residual errors) and connects accepted components into assemblies. Workers do not share an engine or machine; Terra depends on none.
+
+**How will the financial system pay for work and encourage global spatial coverage?**
+Three distinct mechanisms, never conflated: (1) payment for completed reconstruction work (task escrow → acceptance → settlement; payment never guarantees verification); (2) coverage investment — optional contributions (money/compute/storage/bandwidth/capture) toward a geographic coverage objective, with attribution and bounded, revocable revenue allocation; (3) staking/collateral — provider locks funds as a performance guarantee, slashed on verified failure, never proof of reconstruction accuracy. Existing `task_economics.rs` primitives (FeePolicy, CoverageIncentive, ResourceQuote, TaskEscrow, RewardAllocation) are verification-task primitives; reconstruction needs new task types and accounting. No speculative Terra token; no hardcoded revenue splits; no automatic property rights from compute/funding (Principle 14). Securities/crowdfunding/custody/tax research (Q-005) required before any investment product.
+
+**What should be built first?**
+Stage 1 is complete (constitution, derived compute, external replay, verification refresh, auth fix, AI provenance, bundle gate). Stage 2 (devnet) is blocked only on Q-001 founder funding — all local work runs with zero SOL. Once funded: devnet smoke (register parcel → rights → geometry version → 3D model → snapshot → escrow → dispute → slash dry-run). Then Stage 4 implementation: institutional identity (REQ-020), residency credential (REQ-021), lien encumbrance (REQ-022), and the distributed reconstruction/runtime architecture (REQ-026/027/028) per Chapters 11–13 — after Q-003/Q-004/Q-005 resolve.
+
+**What should not be built yet?**
+- Fractional investment (REQ-023) — hard-gated on Q-005 securities research; no code before written legal research.
+- A speculative Terra token as a prerequisite.
+- Mainnet (Stage 5) — founder decision only (Q-006), after devnet soak, adversarial slashing simulation, external security review, mirror audit tooling.
+- Merging `terra-geom-v2` into production until an integrate-or-deprecate decision is recorded (ADR-016).
+- A reconstruction marketplace before task_economics primitives are extended to reconstruction task types.
+- Any feature that blurs protocol results with legal title/ownership (RISK R-005).
+

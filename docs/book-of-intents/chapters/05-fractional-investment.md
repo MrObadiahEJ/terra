@@ -1,7 +1,7 @@
-# Chapter 5 — Tokenized Fractional Investment
+# Chapter 5 — Fractional Investment and Coverage Economics
 
 **Status:** `PROPOSED` — **hard-gated on legal research.** No code may be
-written for this capability until Q-005 is resolved.
+written for fractional investment until Q-005 is resolved.
 **Gate:** [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md) Q-005 ·
 [REQUIREMENTS_TRACEABILITY.md](../REQUIREMENTS_TRACEABILITY.md) REQ-023
 (`RESEARCH REQUIRED`).
@@ -53,7 +53,41 @@ before implementation.
 - **Payouts never buy verification:** payments and rewards must be structurally
   unable to purchase a positive verification result (golden rule).
 
-## 5.6 Acceptance criteria (before status leaves `PROPOSED`)
+## 5.6 Reconstruction financing vs fractional ownership
+
+Spatial reconstruction financing and fractional ownership of physical property
+are **distinct mechanisms** and must not be confused:
+
+| Mechanism | What it pays for | What rights it confers |
+|---|---|---|
+| Paid reconstruction (Part VIII §35) | A completed spatial reconstruction/service task | Payment for accepted work; no property rights |
+| Coverage investment (Part VIII §38) | Capital/compute/storage toward a coverage objective in an underserved region | Attribution within the contribution program; bounded, revocable allocation of eligible future revenue |
+| Staking / collateral (Part VIII §39) | A performance guarantee locked by a provider | Release on fulfillment; slashing on verified failure |
+
+**No automatic property rights from compute or funding** (Principle 14).
+Reconstructing or financing a spatial object does **not** create ownership of
+the underlying land or building, rights over future owners or tenants, control
+over transactions, access to private data, rights over all future versions, or
+rights over all future revenue generated around the geographic area. Rights are
+limited to a defined contribution program and reviewed for applicable legal
+requirements.
+
+**Do not confuse fractional investment with reconstruction payment.** A worker
+paid to reconstruct a building has completed a service; they are not an
+investor in the property. A contributor financing reconstruction in an
+underserved region has supplied capital toward a coverage objective; they are
+not a partial owner of the reconstructed object.
+
+Keep service credits and SOL roles distinct according to the existing
+architecture. Do not introduce a speculative Terra token as a prerequisite.
+Keep large spatial assets off-chain. Do not hardcode proposed revenue
+percentages (e.g. 40/60 or 70/20/10) as final protocol rules; any example is
+illustrative and subject to simulation, governance, and legal review.
+
+Research securities, crowdfunding, custody, tax, and consumer-protection
+implications before recommending a real investment product.
+
+## 5.7 Acceptance criteria (before status leaves `PROPOSED`)
 
 - [ ] Written securities/custody research in RESEARCH_REFERENCES covering ≥2
       contrasting jurisdictions (Q-005).

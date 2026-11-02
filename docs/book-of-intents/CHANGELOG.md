@@ -2,6 +2,24 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-02 — Executive summary + Chapter 13 lazy-loading diagram + Chapter 3 traceability (sprint 024 follow-up)
+
+- Added `Executive summary` appendix to `BOOK_OF_INTENTS.md` answering the eight
+  master-instruction questions directly: what Terra has, what is missing, what
+  is incorrectly described/implemented, how independently stored objects become
+  one synchronized world representation, how runtime discovery/lazy loading/
+  progressive visualization work, how engines and workers communicate, how the
+  financial system pays for work and encourages coverage, what to build first,
+  what to not build yet.
+- Added `13.2.1 Diagram — global lazy loading levels` (mermaid flowchart,
+  L0–L4) to `chapters/13-global-spatial-data-delivery-and-progressive-visualization.md`.
+- Concretized `chapters/03-3d-spatial-intelligence.md` §3.9 acceptance criteria:
+  SpatialAsset/GeometryVersion anchor mapping for Chapter 11;
+  `lod.ts`/`cesiumTerrain.ts` → L0–L4 mapping for Chapter 13; `terra-geom-v2`
+  integrate-or-deprecate decision recorded in ADR-016.
+- Updated `IMPLEMENTATION_STATUS.md` E4 row to chapters 01–13.
+- Documentation only — no application code changed; no gate required.
+
 ## 2026-11-02 — Sprint 012: API security response headers
 
 - New `security_headers` middleware in `terra-core/api/src/main.rs`, applied to
@@ -312,3 +330,30 @@ Format: date · version · what changed · evidence/why. Append-only.
 - CI frontend job now runs `pnpm build:check` (it previously type-checked and
   unit-tested but never built the app). R-012 mitigated; D6 added; sprint 010.
   No SOL required.
+
+## 2026-11-02 — Architecture spec sprint 024: distributed reconstruction, world runtime, progressive delivery
+
+- New chapter `chapters/11-distributed-spatial-reconstruction-and-assembly.md` —
+  spatial component package (RFC-015 planned), multi-engine reconstruction
+  workflow, component registration/alignment/conflict handling, immutable
+  versioning and assembly (REQ-026, `SPECIFIED ONLY`).
+- New chapter `chapters/12-world-runtime-and-synchronized-rendering.md` —
+  control plane vs data plane, World Representation Manifest, spatial index,
+  scene graph, synchronized rendering runtime, provider discovery/fallback,
+  synchronization/consistency/failure behavior (REQ-027, `SPECIFIED ONLY`).
+- New chapter `chapters/13-global-spatial-data-delivery-and-progressive-visualization.md` —
+  hierarchical lazy loading levels, spatial request resolution, provider
+  discovery, progressive rendering, LOD/streaming formats, device-adaptive
+  rendering (REQ-028, `SPECIFIED ONLY`).
+- Deep update `chapters/03-3d-spatial-intelligence.md` — spatial object identity
+  and relationships, coordinate frames, geometry versioning, AI provenance,
+  acceptance criteria.
+- Update `chapters/05-fractional-investment.md` — reconstruction financing vs
+  fractional ownership; no automatic property rights from compute/funding.
+- Update `chapters/10-derived-compute-and-provenance.md` — connection to
+  distributed reconstruction, resource metering, evidence lineage.
+- Registers: BOOK_OF_INTENTS index, SUMMARY, REQUIREMENTS_TRACEABILITY (REQ-026
+  to REQ-028), ROADMAP Stage 3/4, ARCHITECTURAL_DECISIONS (ADR-014/015/016),
+  RISK_REGISTER (R-018 to R-021), OPEN_QUESTIONS (founder decisions), CHANGELOG.
+- New sprint record `sprints/024-architecture-spec.md`.
+- Documentation only — no application code changed; no gate required.

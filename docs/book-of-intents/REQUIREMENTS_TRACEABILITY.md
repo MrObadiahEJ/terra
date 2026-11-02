@@ -36,6 +36,9 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 | REQ-023 | Fractional participation with escrowed guarantees | P2 | 6 – RESEARCH REQUIRED | directive §10 | building block REQ-009 | legal research gate (Q-005) |
 | REQ-024 | AI outputs distinguishable from verified results | P1 | 1 | directive §11 | migration 0034: drafts record `provenance_kind` + model provider/name/version/confidence; API validation fail-closed | API 128/128 (7 provenance tests); live smoke 13/13; DB constraints enforced |
 | REQ-025 | API runtime defense-in-depth (headers + body limit + timeout) | P2 | 1 | — (operational hardening, sprints 012/013/015) | `api/src/main.rs` (`security_headers`, `RequestBodyLimitLayer`, `TimeoutLayer`), `api/src/config.rs` (`MAX_BODY_BYTES`, `REQUEST_TIMEOUT_SECS`) | API 133/133 (`tests::ok_response_carries_security_headers`, `tests::within_limit_is_accepted`, `tests::oversized_content_length_rejected_with_413`, `tests::slow_request_times_out_with_408`) |
+| REQ-026 | Distributed spatial component package & assembly | P1 | 4 – SPECIFIED ONLY | Chapter 11; RFC-015 (planned) | `chapters/11-distributed-spatial-reconstruction-and-assembly.md` | — |
+| REQ-027 | World Representation Manifest & central coordination | P1 | 4 – SPECIFIED ONLY | Chapter 12 | `chapters/12-world-runtime-and-synchronized-rendering.md` | — |
+| REQ-028 | Progressive delivery & runtime discovery | P1 | 4 – SPECIFIED ONLY | Chapter 13 | `chapters/13-global-spatial-data-delivery-and-progressive-visualization.md` | — |
 
 ## Orphan / drift checks (per directive §14)
 
@@ -45,7 +48,8 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 - **Requirements with no implementation:** REQ-020…REQ-022 are `SPECIFIED ONLY`
   (chapters + intents + acceptance criteria written; ⚠ founder review flags
   pending on Q-003/Q-004). REQ-023 is `RESEARCH REQUIRED` (Q-005 hard gate).
-  All intentional; tracked in ROADMAP Stages 3–4.
+  REQ-026…REQ-028 are `SPECIFIED ONLY` (architecture chapters 11–13 written;
+  no implementation code). All intentional; tracked in ROADMAP Stages 3–4.
 - **Vision elements at risk of drift:** AI provenance (REQ-024) is now
   recorded on drafts (R-014 resolved); future model outputs must use those
   fields, never free-text `method` alone.

@@ -87,6 +87,13 @@ INT-005 updated likewise. Chapter 5 (REQ-023) stays `PROPOSED` — Q-005 is a
 hard securities-law gate and no specification can substitute for it.
 Remaining Stage 3 exit item: founder review of the three flags.
 
+**Architecture spec (sprint 024):** Chapters 11 (distributed reconstruction &
+assembly), 12 (world runtime & synchronized rendering), and 13 (global spatial
+data delivery & progressive visualization) written as `SPECIFIED ONLY`,
+corresponding to new REQ-026/027/028 in REQUIREMENTS_TRACEABILITY. These are
+Stage 3/4 boundary specs: they define the distributed spatial infrastructure
+without implementation code.
+
 ## Stage 4 — Research-gated features (entry: Stage 3 + research complete)
 
 - Institutional identity implementation (REQ-020) — needs founder authorization
@@ -95,6 +102,10 @@ Remaining Stage 3 exit item: founder review of the three flags.
   (Q-005). No code before written legal research.
 - Transaction lineage/redemption (A26) — after replay/double-spend design
   review.
+- Distributed reconstruction & assembly (REQ-026) — after founder review of
+  Chapter 11 / manifest architecture (Chapter 12).
+- Progressive delivery & runtime discovery (REQ-028) — after founder review of
+  Chapter 13 / runtime contracts.
 
 ## Stage 5 — Mainnet gate (entry: founder decision only)
 

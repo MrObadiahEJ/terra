@@ -131,3 +131,56 @@ evidence links, append-only decisions.
 **Alternatives:** static README (rejected: rots); wiki (rejected: unversioned).
 **Consequences:** every code change updates statuses + CHANGELOG (AGENT_GUIDE).
 **Evidence:** this directory; sprint 002.
+
+## ADR-014 — Control plane vs data plane; World Representation Manifest
+**Date:** 2026-11-02 · **Status:** Accepted (spec only)
+**Context:** Terra must coordinate independently stored spatial objects without
+centralizing every mesh, texture, and point cloud.
+**Decision:** Split the system into a control plane (object identity, spatial
+registry, World Representation Manifest, spatial indexing, version references,
+assembly relationships, access authorization) and a data plane (geometry files,
+meshes, textures, point clouds, terrain tiles, model packages). A versioned
+World Representation Manifest coordinates the world — it stores references and
+relationships, not every model's geometry.
+**Alternatives:** monolithic central geometry store (rejected: single point of
+failure, storage cost, provider lock-in); fully decentralized registry with no
+logical root (rejected: discovery/consistency burden). Hierarchical regional
+manifests vs distributed registry with logical global root remains open (founder
+decision — see Chapter 12 §12.2).
+**Consequences:** runtime must discover, verify, and fetch components from
+multiple providers; control plane must not become a per-vertex bottleneck.
+**Evidence:** Chapter 12; Chapter 13.
+
+## ADR-015 — Spatial Component Package schema & conformance (RFC-015 planned)
+**Date:** 2026-11-02 · **Status:** Accepted (spec only)
+**Context:** Independently produced reconstruction components must be
+interoperable across engines and workers.
+**Decision:** Every component ships a versioned Spatial Component Package
+(component ID, physical entity ID, relationships, geometry artifact, format,
+digest algorithm version, CRS, elevation reference, transform, bounding volume,
+resolution/LOD, evidence refs, engine identity/version, provenance,
+accuracy/uncertainty, validation state, version lineage). An engine is
+Terra-compatible only if it satisfies the schema and passes the conformance
+test — not merely because it exports GLB/GeoJSON.
+**Alternatives:** ad-hoc per-engine formats (rejected: no interoperability);
+forcing one engine (rejected: violates engine-independence principle).
+**Consequences:** new conformance test and submission interface required
+(Chapter 11 §11.3).
+**Evidence:** Chapter 11.
+
+## ADR-016 — `terra-geom-v2` is experimental; `terra-geom-v1` stays frozen
+**Date:** 2026-11-02 · **Status:** Accepted
+**Context:** The `terra-3d-spatial-pipeline` branch adds `canonical3d.rs`
+(`terra-geom-v2`, 3D digest with elevation reference / vertical units /
+precision), but it is based on pre-constitution commit `775e20a` and lacks all
+post-constitution work.
+**Decision:** `terra-geom-v1` remains frozen for existing parcel hashes.
+`terra-geom-v2` is treated as **experimental** — not merged, not used for
+production parcel hashes, pending integration review and RFC-013 §14 process.
+**Alternatives:** merge immediately (rejected: branch is behind on all
+constitution/auth/derived work); adopt v2 as the only digest (rejected: breaks
+existing hashes).
+**Consequences:** any v2 integration must be backward-compatible and
+version-gated. **Evidence:** `terra-3d-spatial-pipeline` branch
+`bf346f4`/`bd2cf24`; Chapter 3 §3.3; Chapter 14 (decision record pending).
+

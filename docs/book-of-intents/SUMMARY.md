@@ -21,7 +21,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 
 - [Chapter 1 — Core Identity & Philosophy](chapters/01-core-identity-and-philosophy.md) — `IMPLEMENTED AND VERIFIED` narrative
 - [Chapter 2 — Proof of Location & Residency Tokens](chapters/02-proof-of-location-residency.md) — `SPECIFIED ONLY` (founder review flag, Q-004)
-- [Chapter 3 — Multi-Layer 3D Spatial Intelligence](chapters/03-3d-spatial-intelligence.md) — `IMPLEMENTED AND VERIFIED` / `PARTIALLY IMPLEMENTED` (worker anchor)
+- [Chapter 3 — Multi-Layer 3D Spatial Intelligence](chapters/03-3d-spatial-intelligence.md) — `IMPLEMENTED AND VERIFIED` (on-chain) / `PARTIALLY IMPLEMENTED` (worker anchor) / `SPECIFIED ONLY` (distributed reconstruction, Ch11–13)
 - [Chapter 4 — Validator Routing](chapters/04-validator-routing.md) — `IMPLEMENTED AND VERIFIED` (category-guarantee extension `PROPOSED`)
 - [Chapter 5 — Tokenized Fractional Investment](chapters/05-fractional-investment.md) — `PROPOSED` (hard-gated, Q-005)
 - [Chapter 6 — Mortgage & Lien Encumbrance](chapters/06-lien-encumbrance.md) — `SPECIFIED ONLY` (founder review flag; depends on Ch8/Q-003)
@@ -29,6 +29,9 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [Chapter 8 — Institutional Identity](chapters/08-institutional-identity.md) — `SPECIFIED ONLY` (founder review flag, Q-003)
 - [Chapter 9 — External Read-Only Story Replay](chapters/09-external-replay.md) — `IMPLEMENTED AND VERIFIED` (REQ-018)
 - [Chapter 10 — Derived Compute, Request Authenticity, AI Provenance](chapters/10-derived-compute-and-provenance.md) — `IMPLEMENTED AND VERIFIED` (REQ-019/024, R-016/R-017)
+- [Chapter 11 — Distributed Spatial Reconstruction and Assembly](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
+- [Chapter 12 — World Runtime and Synchronized Spatial Rendering](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
+- [Chapter 13 — Global Spatial Data Delivery and Progressive Visualization](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
 
 Further volumes (Transactions & Lineage · AI-Assisted Understanding · Developer
 Ecosystem · Governance & Resilience · Land-Administration Research) are written
@@ -41,7 +44,7 @@ Stage 3.
 - [INT-002 evidence pipeline](intents/INT-002-evidence-pipeline.md) — `IMPLEMENTED AND VERIFIED`
 - [INT-003 anti-fraud validators](intents/INT-003-anti-fraud-validators.md) — `IMPLEMENTED AND VERIFIED`
 - [INT-004 GIS bridge](intents/INT-004-gis-bridge.md) — `PARTIALLY IMPLEMENTED`
-- [INT-005 institutional identity](intents/INT-005-institutional-identity.md) — `PROPOSED`
+- [INT-005 institutional identity](intents/INT-005-institutional-identity.md) — `SPECIFIED ONLY` (founder review flag, Q-003)
 
 ## Work & sprints
 
@@ -69,3 +72,4 @@ Stage 3.
 - [sprints/021-book-consistency-traceability.md](sprints/021-book-consistency-traceability.md) — Book consistency catch-up + requirements traceability (REQ-025)
 - [sprints/022-frontend-activity-store-tests.md](sprints/022-frontend-activity-store-tests.md) — Frontend logic unit tests — activity store + API GeoJSON parse
 - [sprints/023-research-q003-q004.md](sprints/023-research-q003-q004.md) — Research: institutional bootstrap (Q-003) and residency attestation (Q-004)
+- [sprints/024-architecture-spec.md](sprints/024-architecture-spec.md) — Architecture spec: distributed reconstruction, world runtime, progressive delivery (Chapters 11–13)
