@@ -267,6 +267,7 @@ pub mod observation_v2;
 pub mod quorum;
 pub mod recovery;
 pub mod routing;
+pub mod security;
 pub mod spatial_asset;
 pub mod spatial_snapshot;
 pub mod staking;
@@ -7915,6 +7916,36 @@ pub enum TerraError {
     SpatialSnapshotsFull,
     #[msg("Snapshot label is too long")]
     InvalidSnapshotLabel,
+
+    // RFC-016 — Protocol Security, Decentralization, Privacy & Censorship
+    #[msg("Request description is too long")]
+    InvalidRequestDescription,
+    #[msg("Invalid remedy type")]
+    InvalidRemedyType,
+    #[msg("Invalid restriction type")]
+    InvalidRestrictionType,
+    #[msg("Request is not open")]
+    RequestNotOpen,
+    #[msg("Request has expired")]
+    RequestExpired,
+    #[msg("Invalid review vote")]
+    InvalidReviewVote,
+    #[msg("Already voted on this case")]
+    AlreadyVoted,
+    #[msg("Case is already decided")]
+    CaseAlreadyDecided,
+    #[msg("Reviewer has insufficient reputation")]
+    ReviewerInsufficientReputation,
+    #[msg("Security quorum not reached")]
+    SecurityQuorumNotReached,
+    #[msg("Decision is not appealable")]
+    DecisionNotAppealable,
+    #[msg("Reason is too long")]
+    ReasonTooLong,
+    #[msg("Appeal is already decided")]
+    AppealAlreadyDecided,
+    #[msg("Emergency protection is already active")]
+    ProtectionAlreadyActive,
 }
 
 #[cfg(test)]
