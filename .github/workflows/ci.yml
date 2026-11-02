@@ -49,6 +49,25 @@ jobs:
         run: cargo test -p terra-geo
         working-directory: terra-core
 
+      # R-008: the integration suites load prebuilt `.so` artifacts and refuse
+      # to run against a stale build. Build them in CI, then run the full BPF
+      # suite (307 tests) — the same gate used locally.
+      - name: Install Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Build program artifacts (SBF)
+        run: |
+          mkdir -p target/deploy
+          cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml --sbf-out-dir "$PWD/target/deploy"
+          cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml --sbf-out-dir "$PWD/target/deploy"
+        working-directory: terra-core
+
+      - name: BPF integration tests
+        run: cargo test -p terra-registry --test integration -- --test-threads=1
+        working-directory: terra-core
+
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
