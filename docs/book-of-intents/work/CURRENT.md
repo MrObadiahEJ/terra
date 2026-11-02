@@ -40,13 +40,8 @@ Last reconciled: 2026-11-02 (working tree on top of `3ee842f`).
 
 ## Next up (order)
 
-1. Local product work on `dev` — frontend/UX + API; no funding needed.
-   Verified 2026-11-02: `/welcome`, `/stories`, `/demo`, `/story/demo-road-journey`
-   all render against the local API (sprints/007).
-2. Remaining non-chain work: frontend/UX polish and small API hardening;
-   larger requirements (REQ-020…REQ-023) stay research-gated (Q-003/Q-005).
-   R-012 bundle gate is in place — future frontend work must pass `pnpm
-   build:check` (sprints/010).
-3. **Last:** fund the devnet deployer wallet (`CCng7wFcSKCh1RadwcFEN36E4tRrPy1D64fwsQDrsy4m`)
-   — founder action, Q-001 — then `./deploy.sh devnet` + Stage 2 on-chain smoke
-   (A1/B6 cluster-verified).
+1. **Between phases** — all Stage 1 non-chain deliverables are complete (sprints 003–011). CI green (API 128/128, BPF 307/307, vitest 44/44, frontend typecheck + budget). No funding required. Registers current. Waiting on founder decision for Q-001 devnet funding (Stage 2) or research progress on Q-003/Q-005.
+
+2. **Remaining non-chain work** — frontend/UX polish and small API hardening are captured as backlog items; larger requirements (REQ-020…REQ-023) stay research-gated (Q-003/Q-005). R-012 bundle gate is in place — future frontend work must pass `pnpm build:check` (sprints/010). See sprint 011 for wrap-up.
+
+3. **Last**: fund the devnet deployer wallet (`CCng7wFcSKCh1RadwcFEN36E4tRrPy1D64fwsQDrsy4m`) — founder action, Q-001 — then `./deploy.sh devnet` + Stage 2 on-chain smoke (A1/B6 cluster-verified).

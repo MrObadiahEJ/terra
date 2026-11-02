@@ -177,9 +177,9 @@ export default function StoriesPage() {
             const Icon = TYPE_ICONS[d.story_type] ?? Film
             return (
               <Link key={d.id} to={`/story/${d.id}`} className="story-card">
-                <div className="flex items-center gap-2">
-                  <Icon size={15} />
-                  <span className="font-medium truncate">{d.title}</span>
+                <div className="flex items-start gap-2">
+                  <Icon size={15} className="shrink-0 mt-0.5" />
+                  <span className="font-medium story-card-title">{d.title}</span>
                 </div>
                 <div className="story-card-meta">
                   {t(TYPE_KEYS[d.story_type] ?? 'storyTypeJourney')} · {d.stops.length}{' '}

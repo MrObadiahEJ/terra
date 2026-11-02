@@ -1278,6 +1278,12 @@ header .wallet-adapter-button {
   transition: border-color 0.15s ease;
 }
 .story-card:hover { border-color: var(--accent, #38bdf8); }
+.story-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .story-card-meta { color: var(--muted); font-size: 12px; }
 .story-create {
   display: flex;
