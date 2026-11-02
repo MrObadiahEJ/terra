@@ -20,6 +20,8 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 2. **RFC-014 Phase 04 — incremental compute** (REQ-019): derived-jobs cache,
    processing-key dedup, dependency invalidation. *Exit:* new API tests +
    migration with UNIQUE dedup keys; suites stay green.
+   **Met 2026-10-31:** migration 0033 + `routes/derived.rs`; API 117/117;
+   live smoke 16/16; 2 identical computations → 1 ledger row (sprints/003).
 3. **RFC-014 Phase 05 — external access** (REQ-018): read-only story replay
    endpoint + stable schema export for robotics/API consumers; GeoJSON export.
    *Exit:* endpoint tests + schema documented in the Book.

@@ -46,13 +46,16 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 
 | # | Capability | Status | Evidence | Gap / note |
 | --- | --- | --- | --- | --- |
-| B1 | REST mirror surface (~25 routers: parcels, identities, vaults, disputes, escrows, rights, cross-border, subdivision, staking, zk, spatial, spatial-accounts, geo, fusion, world-registry, recovery, credentials, evidence, reconstruction, tx, demo, activity…) | 1 | `routes/mod.rs` L34–59; migrations 0001–0032 | Mirror is a read model; chain is source of truth |
-| B2 | Story CRUD + export receipts + validation | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; API suite (108 @ last verified run) | Mutations wallet-signed (commit `11be94c`) |
+| B1 | REST mirror surface (~26 routers: parcels, identities, vaults, disputes, escrows, rights, cross-border, subdivision, staking, zk, spatial, spatial-accounts, geo, fusion, world-registry, recovery, credentials, evidence, reconstruction, derived, stories, tx, demo, activity…) | 1 | `routes/mod.rs`; migrations 0001–0033 | Mirror is a read model; chain is source of truth |
+| B2 | Story CRUD + export receipts + validation | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; API suite 117/117 (2026-10-31) | Mutations wallet-signed (commit `11be94c`) |
 | B3 | Reconstruction worker: lease (SKIP LOCKED, 15-min), progress, complete→geometry draft→anchor_prep, drafts, anchor | 2 | `routes/reconstruction.rs`; migration 0031; live smoke 22/22 (2026-10-13) | anchor_prep produces a transaction; never executed on a live cluster (B6) |
 | B4 | Geo endpoints (`nearest-roads`, `pois`, `buildings`, `stats`) | 1 | `routes/geo.rs` L88–93 | No server-side `/geo/route` — routing runs client-side (D4) |
 | B5 | Signed multipart evidence upload | 1 | API `/evidence`; migrations 0023/0024 | — |
 | B6 | Devnet deployment | 2 – IMPLEMENTED, VERIFICATION INCOMPLETE | `deploy.sh devnet` verifies canonical keypairs vs `declare_id!` then `anchor deploy`; `.so` fresh | **Blocked: deployer wallet 0 SOL** (founder action; OPEN_QUESTIONS Q-001) |
 | B7 | IPFS registry mirror | 3 – PARTIALLY IMPLEMENTED | migration 0018_registry_ipfs_mirror | Independence from any single storage provider still a goal (RISK R-010) |
+| B8 | Incremental derived compute: `processing_key` UNIQUE dedup, atomic create-or-reuse, idempotent complete, guarded fail, recursive-CTE dependency invalidation; reconstruction-draft ledger; all mutations signature-verified (R-016) | 1 | `routes/derived.rs`; migration 0033; API **117/117** (7 derived tests); live smoke **16/16** signed checks (unsigned/wrong key → 401); 2 identical reconstruction computations → 2 drafts, 1 ledger row, equal hashes (2026-10-31/11-02) | Cache, not a fact: correctness = same key ⇒ same output. Nothing on-chain; not a consensus input |
+| B8 | RFC-014 Phase 04 — incremental derived compute (REQ-019) | 1 – IMPLEMENTED AND VERIFIED | `routes/derived.rs` + migration 0033; `cargo test -p terra-api` **117/117**; live smoke **16/16** Ed25519-signed; draft-ledger 2 drafts / 1 row / 1 hash (2026-10-31) | — |
+| B9 | Privileged-endpoint signature verification (R-016) | 1 – IMPLEMENTED AND VERIFIED | 8 handlers now `auth.verify(&key, …)?` (fail-closed); unsigned `complete` → 401 (was 200); signed suites still green (2026-10-31) | No shipped request-signing client yet (R-017) |
 
 ## C. Geo-engine & spatial compute (`terra-core/geo-engine`)
 
@@ -87,7 +90,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | --- | --- | --- | --- |
 | BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | 307 | 2026-10-13 era (count re-confirmed in source 2026-10-31) | before release |
 | Registry lib | 153 | 2026-10-13 | before release |
-| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | 108 | 2026-10-13 | before release |
+| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **117** | **2026-10-31 (executed)** | before release |
 | Geo-engine | 6 | 2026-10-13 | before release |
 | Identity BPF | 23 | 2026-10-13 | before release |
 | Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-10-31 (executed)** | each story change |

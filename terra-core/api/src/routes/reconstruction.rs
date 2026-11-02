@@ -180,9 +180,14 @@ pub async fn list_capture_sessions(
 
 pub async fn create_reconstruction_job(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     Json(input): Json<NewReconstructionJob>,
 ) -> Result<(StatusCode, Json<ReconstructionJob>), AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", "/api/v1/reconstruction/jobs")?;
     // Session must exist (foreign key would also catch this, but a clear 404
     // beats a database error surface).
     let exists: Option<String> =
@@ -558,10 +563,18 @@ fn build_anchor_prep(
 /// Atomically claim the oldest queued job (or reclaim an expired lease).
 pub async fn lease_reconstruction_job(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     headers: axum::http::HeaderMap,
 ) -> Result<Json<LeasedJob>, AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", "/api/v1/reconstruction/jobs/lease")?;
     let claimed_by = caller_wallet(headers);
+    if let Some(ref wallet) = claimed_by {
+        auth.verify_wallet(wallet, "POST", "/api/v1/reconstruction/jobs/lease")?;
+    }
 
     // Reclaim expired leases first so a crashed worker does not strand jobs.
     sqlx::query(
@@ -611,10 +624,15 @@ pub async fn lease_reconstruction_job(
 
 pub async fn job_progress(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     Path(id): Path<String>,
     Json(input): Json<ProgressInput>,
 ) -> Result<Json<ReconstructionJob>, AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/jobs/{id}/progress"))?;
     if !(0.0..=1.0).contains(&input.progress) {
         return Err(AppError::bad_request("progress must be within 0.0..=1.0"));
     }
@@ -641,11 +659,16 @@ pub async fn job_progress(
 
 pub async fn job_complete(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     headers: axum::http::HeaderMap,
     Path(id): Path<String>,
     Json(input): Json<CompleteInput>,
 ) -> Result<(StatusCode, Json<CompleteResponse>), AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/jobs/{id}/complete"))?;
     let wallet = caller_wallet(headers);
 
     // Must hold the lease (running); queued → conflict, missing → 404.
@@ -706,6 +729,19 @@ pub async fn job_complete(
     ))
     .bind(&draft_id)
     .fetch_one(&state.pool)
+    .await?;
+
+    // --- derived-compute ledger (RFC-014 Phase 04) -------------------------
+    // Identical (parcel, capture points) recomputations collapse onto one
+    // processing key, so a retry does not count as new work. The draft row
+    // above stays per-job; only the *computation* is de-duplicated here.
+    let (_derived_id, _reused) = crate::routes::derived::record_reconstruction_draft(
+        &state.pool,
+        &draft_id,
+        session.parcel_id.as_deref(),
+        &input.capture_points,
+        &geometry_hash,
+    )
     .await?;
 
     // --- pipeline product (model row), when the worker produced one ------
@@ -813,10 +849,15 @@ pub async fn get_job_draft(
 /// draft becomes an anchored claim (fact once verified by validators).
 pub async fn draft_anchor_confirmed(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     Path(id): Path<String>,
     Json(input): Json<AnchorConfirmedInput>,
 ) -> Result<Json<GeometryDraft>, AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/api/v1/reconstruction/drafts/{id}/anchor"))?;
     if input.signature.trim().is_empty() {
         return Err(AppError::bad_request("signature must not be empty"));
     }

@@ -4,6 +4,7 @@ pub mod activity;
 pub mod authority_registry;
 pub mod cross_border;
 pub mod demo_scenarios;
+pub mod derived;
 pub mod disputes;
 pub mod escrows;
 pub mod evidence;
@@ -54,6 +55,7 @@ pub fn router() -> Router<AppState> {
         .nest("/credentials", threshold_credentials::router())
         .nest("/evidence", evidence::router())
         .nest("/reconstruction", reconstruction::router())
+        .nest("/derived", derived::router())
         .nest("/tx", tx_prep::router())
         .nest("/demo", demo_scenarios::router())
         .nest("/activity", activity::router())

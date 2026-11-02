@@ -103,6 +103,33 @@ Local machine constraints (this dev box): ~1.6 GB free disk, 8 GB RAM, load
 heavy builds in parallel. Vite :5173 and terra-api :8080 are the dev servers;
 Postgres via `PGPASSWORD=terra psql -h localhost -U terra -d terra_dev`.
 
+### Signed requests (privileged endpoints)
+
+The API verifies Ed25519 signatures on privileged mutations (R-016 —
+fail-closed when `API_AUTHORITY_PUBKEY` is unset). Signed payload:
+
+```text
+{METHOD}\n{PATH}\n{BODY_SHA256_HEX}\n{TIMESTAMP_EPOCH_SECS}
+```
+
+Headers: `Authorization: Signature <base64>`, `x-timestamp`, `x-body-hash`,
+and optionally `x-wallet` (base58 public key, bound by `verify_wallet`).
+Replay window: ±60 s.
+
+Do not hand-roll crypto in smoke scripts — emit headers with the shipped
+client (R-017) and pipe them to `curl`:
+
+```bash
+cd terra-core
+SIGNING_KEY=<base58 32-byte seed> \
+  cargo run -q -p terra-api --example sign_request -- \
+  POST /api/v1/derived/jobs '{"kind":"route","input_document":"{}"}'
+# -> x-body-hash / x-timestamp / Authorization / x-wallet lines
+```
+
+Local dev: launch the API with `API_AUTHORITY_PUBKEY=<base58 pubkey>` to
+enable privileged endpoints; without it they return 401 by design.
+
 ## 7. Commit discipline
 
 - Work on `dev`; sprints open one `dev → main` checkpoint (Animus model).
