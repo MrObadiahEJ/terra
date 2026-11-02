@@ -1,6 +1,7 @@
 pub mod access;
 pub mod canonical;
 pub mod canonical3d;
+pub mod component_package;
 pub mod graph;
 pub mod osm;
 pub mod poi;
@@ -12,6 +13,7 @@ pub use canonical3d::{
     canonicalize_v2 as canonicalize_geometry_v2, geometry_digest_hex_v2, geometry_digest_v2,
     GEOMETRY_DIGEST_VERSION_V2,
 };
+pub use component_package::{validate, validate_with_geometry, ComponentPackage, ConformanceError};
 pub use graph::{build_graph, RoadGraph, RoadSegment};
 pub use osm::{read_osm_pbf, BuildingFootprint, OsmData, Poi, RoadWay};
 pub use poi::{pois_near, pois_within};
