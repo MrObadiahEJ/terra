@@ -119,6 +119,8 @@ pub struct AssetRetrieval {
     pub storage_reference: String,
     pub latency_ms: Option<i32>,
     pub reliability_score: f64,
+    pub global_transform: Option<serde_json::Value>,
+    pub crs: Option<String>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -130,6 +132,8 @@ pub struct AssetRetrievalRow {
     pub storage_reference: String,
     pub latency_ms: Option<i32>,
     pub reliability_score: f64,
+    pub global_transform: Option<serde_json::Value>,
+    pub crs: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -292,9 +296,13 @@ pub async fn retrieve_asset(
         r#"
         SELECT pr.component_id, pr.component_version, sp.id as provider_id, \
                sp.name as provider_name, pr.storage_reference, \
-               pr.latency_ms, sp.reliability_score
+               pr.latency_ms, sp.reliability_score,
+               cp.global_transform, cp.crs
         FROM provider_replicas pr
         JOIN storage_providers sp ON sp.id = pr.provider_id
+        LEFT JOIN component_packages cp
+          ON cp.component_id = pr.component_id
+         AND cp.component_version = pr.component_version
         WHERE pr.component_id = $1 AND pr.component_version = $2 \
           AND pr.is_available = true AND sp.is_active = true
         ORDER BY sp.reliability_score DESC, pr.latency_ms ASC NULLS LAST
@@ -319,6 +327,8 @@ pub async fn retrieve_asset(
         storage_reference: row.storage_reference,
         latency_ms: row.latency_ms,
         reliability_score: row.reliability_score,
+        global_transform: row.global_transform,
+        crs: row.crs,
     }))
 }
 

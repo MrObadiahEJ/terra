@@ -24,6 +24,8 @@ describe('rankProviders', () => {
     storage_reference: 'https://storage.example.com/a.glb',
     latency_ms: 100,
     reliability_score: 0.9,
+    global_transform: null,
+    crs: null,
   }
 
   it('sorts by highest reliability first', () => {
@@ -207,6 +209,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://best.example.com/c1.glb',
         latency_ms: 10,
         reliability_score: 0.99,
+        global_transform: null,
+        crs: null,
       },
       {
         component_id: 'c1',
@@ -216,6 +220,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://worst.example.com/c1.glb',
         latency_ms: 900,
         reliability_score: 0.1,
+        global_transform: null,
+        crs: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)
@@ -233,6 +239,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://fail.example.com/c1.glb',
         latency_ms: 10,
         reliability_score: 0.99,
+        global_transform: null,
+        crs: null,
       },
       {
         component_id: 'c1',
@@ -242,6 +250,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://best.example.com/c1.glb',
         latency_ms: 500,
         reliability_score: 0.5,
+        global_transform: null,
+        crs: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)
@@ -262,6 +272,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://fail.example.com/c1.glb',
         latency_ms: 10,
         reliability_score: 0.99,
+        global_transform: null,
+        crs: null,
       },
       {
         component_id: 'c1',
@@ -271,6 +283,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://unavailable.example.com/c1.glb',
         latency_ms: 10,
         reliability_score: 0.5,
+        global_transform: null,
+        crs: null,
       },
     ]
     await expect(fetchAssetWithFallback(retrievals)).rejects.toThrow()
@@ -286,6 +300,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://fail.example.com/c1.glb',
         latency_ms: 10,
         reliability_score: 0.1,
+        global_transform: null,
+        crs: null,
       },
       {
         component_id: 'c1',
@@ -295,6 +311,8 @@ describe('fetchAssetWithFallback', () => {
         storage_reference: 'https://best.example.com/c1.glb',
         latency_ms: 100,
         reliability_score: 0.99,
+        global_transform: null,
+        crs: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)

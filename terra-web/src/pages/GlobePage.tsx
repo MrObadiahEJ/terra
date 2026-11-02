@@ -360,11 +360,15 @@ export default function GlobePage() {
     componentVersion: string
     sizeBytes: number
     data: ArrayBuffer
+    transform: any | null
+    crs: string | null
   } | null>(null)
   // All fetched component assets, keyed by component ID, for rendering on the globe.
-  const [fetchedAssets, setFetchedAssets] = useState<Map<string, ArrayBuffer>>(
-    new Map()
-  )
+  const [fetchedAssets, setFetchedAssets] = useState<Map<string, {
+    data: ArrayBuffer
+    transform: any | null
+    crs: string | null
+  }>>(new Map())
   const [fetchedNodeIds, setFetchedNodeIds] = useState<string[]>([])
   // Distributed runtime: current manifest for the camera's region
   const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
@@ -580,7 +584,7 @@ export default function GlobePage() {
     async (node: SceneNodeRow) => {
       setAssetFetching(node.component_version_id)
       try {
-        const data = await fetchComponentAsset(
+      const { data, retrieval } = await fetchComponentAsset(
           node.object_id,
           node.component_version_id,
         )
@@ -589,10 +593,16 @@ export default function GlobePage() {
           componentVersion: node.component_version_id,
           sizeBytes: data.byteLength,
           data,
+          transform: retrieval.global_transform,
+          crs: retrieval.crs,
         })
         setFetchedAssets((prev) => {
           const next = new Map(prev)
-          next.set(node.object_id, data)
+          next.set(node.object_id, {
+            data,
+            transform: retrieval.global_transform,
+            crs: retrieval.crs,
+          })
           return next
         })
         setFetchedNodeIds((prev) => (prev.includes(node.object_id) ? prev : [...prev, node.object_id]))

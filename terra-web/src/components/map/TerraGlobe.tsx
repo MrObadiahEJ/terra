@@ -88,11 +88,16 @@ interface TerraGlobeProps {
   /** Runtime scene graph nodes (REQ-027/REQ-028): independently stored
    *  components fetched with provider fallback. Rendered as clamped
    *  footprint polygons; fetched nodes render as extruded volumes. */
+  /** Runtime scene graph nodes (REQ-027/REQ-028). */
   runtimeNodes?: SceneNodeRow[]
   /** IDs of nodes whose component assets have been fetched (render as volumes). */
   fetchedNodeIds?: string[]
-  /** Fetched component asset bytes, keyed by component ID, for 3D model rendering. */
-  fetchedAssets?: Map<string, ArrayBuffer>
+  /** Fetched component asset bytes + transform, keyed by component ID. */
+  fetchedAssets?: Map<string, {
+    data: ArrayBuffer
+    transform: any | null
+    crs: string | null
+  }>
   /** One-shot camera commands (reset view, north-up, tilt). */
   viewCommand?: ViewCommand | null
 }
@@ -159,7 +164,11 @@ export default function TerraGlobe({
   tilesetUrl = null,
   runtimeNodes = [],
   fetchedNodeIds = [],
-  fetchedAssets = new Map<string, ArrayBuffer>(),
+  fetchedAssets = new Map<string, {
+    data: ArrayBuffer
+    transform: any | null
+    crs: string | null
+  }>(),
   onFetchComponent,
   viewCommand = null,
 }: TerraGlobeProps) {
@@ -801,26 +810,45 @@ export default function TerraGlobe({
       const ring = extent.coordinates?.[0]
       if (!ring || ring.length < 4) continue
 
-      // Centroid of the footprint as model placement
-      const lons = ring.map(([lon]: [number, number]) => lon)
-      const lats = ring.map(([, lat]: [number, number]) => lat)
-      const centroidLon = lons.reduce((a: number, b: number) => a + b, 0) / lons.length
-      const centroidLat = lats.reduce((a: number, b: number) => a + b, 0) / lats.length
-
       const data = fetchedAssets.get(node.object_id)
       if (!data) continue
 
+      // Use the component package's global_transform for placement if
+      // available; otherwise fall back to the footprint centroid.
+      const transform = data.transform
+      let modelMatrix: Cesium.Matrix4 | undefined
+      if (transform && Array.isArray(transform) && transform.length === 16) {
+        modelMatrix = new Cesium.Matrix4(
+          transform[0], transform[1], transform[2], transform[3],
+          transform[4], transform[5], transform[6], transform[7],
+          transform[8], transform[9], transform[10], transform[11],
+          transform[12], transform[13], transform[14], transform[15],
+        )
+      } else {
+        // Fall back to centroid of the footprint
+        const hierarchy = ring.map(([lon, lat]: [number, number]) =>
+          Cesium.Cartesian3.fromDegrees(lon, lat)
+        )
+        const lons = hierarchy.map((p: Cesium.Cartesian3) => p.x)
+        const lats = hierarchy.map((p: Cesium.Cartesian3) => p.y)
+        modelMatrix = Cesium.Transforms.headingPitchRollToFixedFrame(
+          Cesium.Cartesian3.fromDegrees(
+            lons.reduce((a: number, b: number) => a + b, 0) / lons.length,
+            lats.reduce((a: number, b: number) => a + b, 0) / lats.length,
+            0
+          ),
+          new Cesium.HeadingPitchRoll(0, 0, 0),
+        )
+      }
+
       // Create a blob URL from the GLB bytes so Cesium.Model.fromGltf can load it
-      const blob = new Blob([data], { type: 'model/gltf-binary' })
+      const blob = new Blob([data.data], { type: 'model/gltf-binary' })
       const url = URL.createObjectURL(blob)
       modelBlobUrlRef.current.set(node.object_id, url)
 
       Cesium.Model.fromGltfAsync({
         url,
-        modelMatrix: Cesium.Transforms.headingPitchRollToFixedFrame(
-          Cesium.Cartesian3.fromDegrees(centroidLon, centroidLat, 0),
-          new Cesium.HeadingPitchRoll(0, 0, 0),
-        ),
+        modelMatrix,
         minimumPixelSize: 1,
       })
         .then((model: Cesium.Model) => {

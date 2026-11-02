@@ -85,6 +85,37 @@ pub struct CompleteAssignmentRequest {
     pub resource_receipt: Option<serde_json::Value>,
 }
 
+// Validate a resource usage receipt: must be a JSON object with numeric,
+// non-negative values for cpu_seconds, gpu_seconds, storage_mb, bandwidth_mb.
+fn validate_resource_receipt(receipt: &serde_json::Value) -> Result<(), AppError> {
+    let obj = receipt.as_object().ok_or_else(|| {
+        AppError::bad_request("resource_receipt must be a JSON object")
+    })?;
+    let allowed_keys = [
+        "cpu_seconds",
+        "gpu_seconds",
+        "storage_mb",
+        "bandwidth_mb",
+        "energy_wh",
+    ];
+    for (key, value) in obj {
+        if !allowed_keys.contains(&key.as_str()) {
+            return Err(AppError::bad_request(format!(
+                "resource_receipt contains unknown key: {key}"
+            )));
+        }
+        let num = value.as_f64().ok_or_else(|| {
+            AppError::bad_request(format!("resource_receipt.{key} must be a number"))
+        })?;
+        if num < 0.0 {
+            return Err(AppError::bad_request(format!(
+                "resource_receipt.{key} must be non-negative"
+            )));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // POST /workers
 // ---------------------------------------------------------------------------
@@ -292,6 +323,11 @@ pub async fn complete_assignment(
     Path(job_id): Path<String>,
     Json(req): Json<CompleteAssignmentRequest>,
 ) -> Result<Json<AssignmentRow>, AppError> {
+    // Validate the resource receipt if one was provided, before writing.
+    if let Some(ref receipt) = req.resource_receipt {
+        validate_resource_receipt(receipt)?;
+    }
+
     let row = sqlx::query_as::<_, AssignmentRow>(
         r#"
         UPDATE job_assignments

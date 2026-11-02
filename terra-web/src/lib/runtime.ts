@@ -49,6 +49,8 @@ export interface AssetRetrieval {
   storage_reference: string
   latency_ms: number | null
   reliability_score: number
+  global_transform: any | null
+  crs: string | null
 }
 
 export interface LodLevel {
@@ -257,9 +259,12 @@ export async function fetchAssetWithFallback(
 export async function fetchComponentAsset(
   componentId: string,
   componentVersion: string,
-): Promise<ArrayBuffer> {
+): Promise<{ data: ArrayBuffer; retrieval: AssetRetrieval }> {
   const cached = getCachedAsset(componentId, componentVersion)
-  if (cached) return cached
+  if (cached) {
+    // Return cached data with an empty retrieval (transform not cached)
+    return { data: cached, retrieval: { component_id: componentId, component_version: componentVersion, provider_id: '', provider_name: '', storage_reference: '', latency_ms: null, reliability_score: 0, global_transform: null, crs: null } }
+  }
 
   const retrieval = await request<AssetRetrieval>(
     `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
@@ -269,7 +274,7 @@ export async function fetchComponentAsset(
 
   const data = await fetchAssetWithFallback([retrieval])
   setCachedAsset(componentId, componentVersion, data)
-  return data
+  return { data, retrieval }
 }
 
 // ---------------------------------------------------------------------------
