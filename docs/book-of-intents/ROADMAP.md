@@ -107,13 +107,52 @@ without implementation code.
 - Progressive delivery & runtime discovery (REQ-028) — after founder review of
   Chapter 13 / runtime contracts.
 
+## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
+research complete; founder-gated)
+
+Implement RFC-016 in dependency order:
+
+- Phase 0 — Threat model + architecture (inventory centralization points, map
+  sensitive data paths, model censorship/malicious-request scenarios).
+- Phase 1 — Protocol security specification (request data structures, quorum
+  rules, emergency protection, appeals, privacy-state transitions, incentives,
+  slashing conditions, audit events; tests for all state transitions).
+- Phase 2 — On-chain core (request registration, scope validation, reviewer
+  assignment, quorum attestations, decision finalization, emergency-protection
+  expiry, appeal registration/review, privacy-state transitions, jurisdictional
+  scope/expiry, reward/escrow integration, due-process slashing, replay
+  protection).
+- Phase 3 — Off-chain privacy enforcement (authorized retrieval only,
+  public/private separation, component-level access control, redaction,
+  search-index removal, cache invalidation, storage-provider notifications,
+  privacy-state version checking, independent provider compatibility).
+- Phase 4 — Incentives + independent participation (security task rewards,
+  reviewer compensation, security reporting rewards, proportionate collateral,
+  due-process slashing, independent validator discovery, reviewer rotation,
+  multiple storage providers, data export/recovery).
+- Phase 5 — Censorship + recovery testing (disable frontend/API/storage/RPC;
+  remove validator group; malicious privacy/false jurisdictional requests;
+  identity exposure through public events; restricted-evidence retrieval via
+  alt API; stale cache after restriction; expired emergency replay; single-admin
+  multi-jurisdiction restriction; reviewer-selection manipulation; bribery/
+  coordination; privacy-as-censorship of fraud evidence).
+
+**Exit:** RFC-016 acceptance criteria proven (RFC-016 §11): no single shutdown
+authority; no mandatory central marketplace/frontend/API/storage; no raw private
+evidence on-chain; no public identity disclosure to request privacy; no single
+validator deciding high-impact privacy; no local restriction auto-disabling
+unrelated jurisdictions; no permanent emergency restriction without review;
+privacy mechanism does not erase legitimate fraud evidence; no automatic
+slashing for good-faith minority decisions.
+
 ## Stage 5 — Mainnet gate (entry: founder decision only)
 
 Proposed criteria (not yet ratified — Q-006): devnet soak ≥ N weeks with smoke
 transcripts; adversarial slashing simulation (R-003); external security review;
-mirror audit tooling live (R-004); storage independence (Q-008); all
-disclaimers reviewed by counsel. Mainnet deployment is founder-authorized only
-(directive §15).
+mirror audit tooling live (R-004); storage independence (Q-008); RFC-016
+censorship/recovery tests passed; all disclaimers reviewed by counsel. Mainnet
+deployment is founder-authorized only (directive §15).
+
 
 ## Maintenance loop (continuous, every sprint)
 
@@ -129,14 +168,16 @@ flowchart LR
     S2[Stage 2 — Devnet truth<br>Q-001 funding (founder)<br>→ deploy + on-chain smoke]
     S3[Stage 3 — Specifications<br>REQ-020/021/022 → SPECIFIED ONLY<br>REQ-026/027/028 → SPECIFIED ONLY]
     S4[Stage 4 — Research-gated<br>institutional identity,<br>residency, liens,<br>distributed reconstruction<br>& runtime]
+    S45[Stage 4.5 — Security & privacy<br>RFC-016: threat model,<br>spec, on-chain core,<br>off-chain enforcement,<br>incentives, censorship<br>+ recovery tests]
     S5[Stage 5 — Mainnet gate<br>founder decision only]
     
-    S0 --> S1 --> S2 --> S3 --> S4 --> S5
+    S0 --> S1 --> S2 --> S3 --> S4 --> S45 --> S5
     
     style S0 fill:#e1f5e1
     style S1 fill:#e1f5e1
     style S2 fill:#fff3cd
     style S3 fill:#d4e6f1
     style S4 fill:#fff3cd
+    style S45 fill:#d4e6f1
     style S5 fill:#f8d7da
 ```

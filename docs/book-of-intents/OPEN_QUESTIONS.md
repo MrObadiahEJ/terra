@@ -18,6 +18,12 @@ Agents must check this register before asking the founder anything
 | Q-010 | RFC-014 Phases 04–05 (incremental compute, external replay) — proceed next after book? | Planning | 5 | Agents + Founder confirm | In ROADMAP Stage 1. |
 | Q-011 | Privacy vs public ledger: erasure-request handling (GDPR-style) for mirrored personal data? | Research | 6 | Agents | RISK R-006; VISION §5.4. |
 | Q-012 | Book maintenance cadence: who triggers re-audits; per-sprint or calendar? | Process | 5 | Founder (lightweight) | Default proposed: per sprint close (AGENT_GUIDE). |
+| Q-013 | Privacy request on-chain data structures: exact PDA seeds, scope fields, remedy enum, privacy-state transitions — which existing accounts (fraud_governance ReviewCase/CapabilityRestriction) can be reused vs new accounts needed? | Research | 5 | Agents | Gate for RFC-016 Phase 2 on-chain core; reuse audit pending |
+| Q-014 | Privacy reviewer selection: quorum thresholds for emergency vs standard vs high-impact requests; randomization source (blockhash vs VRF); local+global review split? | Research | 6 | Agents | Gate for RFC-016 Phase 1/2; RFC-012 routing randomization (hashv) is a candidate but needs privacy-specific threat modelling |
+| Q-015 | Jurisdictional restriction authentication: how are government/court assertions verified on-chain? Which authority credentials are accepted, and who rotates them? | Research | 6 | Agents + Founder | Gate for RFC-016 §5; cross_border.rs Jurisdiction authority is a starting point |
+| Q-016 | API privacy enforcement: which existing routes return privacy-sensitive data; where does middleware check PrivacyState before serving? How are cached copies invalidated? | Research | 6 | Agents | Gate for RFC-016 Phase 3 off-chain enforcement |
+| Q-017 | Slashing for privacy violations: deliberate disclosure of protected info, unauthorized use of private evidence — what collateral/slashing tiers, and is due process (notice/response/appeal) required before slashing? | Research | 6 | Agents | Extends staking.rs slashing (equivocation/liveness/collusion only today) |
+| Q-018 | Storage provider privacy enforcement: how do independent providers receive and honor privacy-state revocation/revocation of access? What happens when a provider refuses? | Research | 6 | Agents | Gate for RFC-016 §7 (storage independence) |
 
 Rules:
 - Agents resolve `5/6` questions autonomously where evidence allows, recording

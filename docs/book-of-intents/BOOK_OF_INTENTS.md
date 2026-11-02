@@ -88,6 +88,7 @@ Never inflate a status. When evidence is unavailable, say so.
 ### RFCs
 
 - [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, `SPECIFIED ONLY`)
+- [rfc-016-protocol-security-decentralization-privacy.md](../rfc-016-protocol-security-decentralization-privacy.md) — Protocol security, decentralization, privacy & censorship resilience (RFC-016, `SPECIFIED ONLY`)
 
 ### Work & sprints
 

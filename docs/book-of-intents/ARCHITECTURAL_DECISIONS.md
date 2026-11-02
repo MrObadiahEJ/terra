@@ -184,3 +184,62 @@ existing hashes).
 version-gated. **Evidence:** `terra-3d-spatial-pipeline` branch
 `bf346f4`/`bd2cf24`; Chapter 3 §3.3; Chapter 14 (decision record pending).
 
+## ADR-017 — On-chain enforces decision process; off-chain implements enforcement
+**Date:** 2026-11-02 · **Status:** Accepted (spec only)
+**Context:** RFC-016 separates protocol-level security/privacy decisions (which
+require shared, independently verifiable state) from off-chain enforcement
+(which actual storage providers, APIs and frontends carry out).
+**Decision:** On-chain: request creation, scope/lifecycle state, requester
+authorization, reviewer eligibility, reviewer assignment/commitment,
+conflict-of-interest declarations, quorum thresholds, reviewer attestations,
+decision finalization, emergency-protection expiry, appeal creation/assignment,
+privacy-state transitions, jurisdictional restriction scope/expiry, collateral,
+reward distribution, slashing after due process, audit events, versioning,
+authorization, replay protection. Off-chain: raw documents/photos, sensitive
+identity evidence, encrypted evidence storage, private review material, large
+spatial models, detailed personal data, search indexes, data replication,
+encryption/key management, content redaction, rendering/visualization,
+storage-provider communication, notifications, UIs, jurisdiction-specific legal
+interpretation, advanced fraud analysis, AI-assisted sensitivity detection,
+external legal-document verification.
+**Alternatives:** putting everything on-chain (rejected: privacy violation,
+cost, immutability of sensitive data); putting everything off-chain (rejected:
+no shared verifiable state, single points of control).
+**Consequences:** on-chain data is minimal and privacy-preserving (no raw
+private evidence on-chain); off-chain services follow protocol authorization
+and privacy-state rules and cannot create protocol decisions by themselves;
+interoperable interfaces required so independent services implement the same
+rules. **Evidence:** RFC-016 §8.
+## ADR-018 — Privacy-state semantics & versioning
+**Date:** 2026-11-02 · **Status:** Accepted (spec only)
+**Context:** Protected data needs versioned access states so public consumers
+can tell available/restricted/superseded without receiving protected content.
+**Decision:** Privacy states: `PUBLIC` / `RESTRICTED` / `PRIVATE` /
+`REDACTED` / `TEMPORARILY_PROTECTED` / `UNDER_REVIEW` /
+`WITHDRAWN_FROM_PUBLIC_ACCESS` / `TOMBSTONED` / `RESTORED`. States are
+versioned; transitions are on-chain; a tombstone must not reveal the protected
+content. Remedies: restrict access, remove public indexing, redact, replace
+public representation, encrypt, revoke access, stop replication, crypto-erase,
+tombstone reference, correct classification, reject request.
+**Alternatives:** binary public/private (rejected: insufficient granularity);
+per-item custom states (rejected: interoperability burden).
+**Consequences:** API/storage implementations must respect finalized
+privacy-state changes; no API may invent an unauthorized privacy decision
+(except a clearly defined temporary local safety measure that is recorded and
+expires). **Evidence:** RFC-016 §4.7.
+## ADR-019 — Jurisdictional boundaries (scoped restrictions)
+**Date:** 2026-11-02 · **Status:** Accepted (spec only)
+**Context:** Terra supports local legal requirements without allowing one
+jurisdiction to control the global protocol.
+**Decision:** Jurisdictional restrictions are authenticated, scoped
+(geographic + data scope + effective date + expiry/review date + appeal
+mechanism), and recorded as external authority claims — not automatically
+globally valid. Local restrictions do not automatically become global
+restrictions; legal recognition remains distinct from Terra's technical
+verification; disputed/overbroad/expired orders are challengeable.
+**Alternatives:** one jurisdiction controls global state (rejected: violates
+decentralization); no jurisdiction support (rejected: unworkable legally).
+**Consequences:** challenge process for disputed orders; public vs private
+separation preserved per jurisdiction. **Evidence:** RFC-016 §5.
+
+

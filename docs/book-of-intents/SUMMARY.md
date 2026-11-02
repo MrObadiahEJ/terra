@@ -8,10 +8,10 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md) — central index & vocabulary
 - [TERRA_VISION.md](TERRA_VISION.md) — authoritative vision
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — evidence register
-- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-028
-- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…016
-- [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…012
-- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…021
+- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-040
+- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…019
+- [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…018
+- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…026
 - [RESEARCH_REFERENCES.md](RESEARCH_REFERENCES.md) — sources & dates
 - [ROADMAP.md](ROADMAP.md) — Stages 0–5
 - [CHANGELOG.md](CHANGELOG.md) — Book history
@@ -20,6 +20,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 ## RFCs
 
 - [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, SPECIFIED ONLY)
+- [rfc-016-protocol-security-decentralization-privacy.md](../rfc-016-protocol-security-decentralization-privacy.md) — Protocol security, decentralization, privacy & censorship resilience (REQ-029…REQ-040, SPECIFIED ONLY)
 
 
 ## Volumes

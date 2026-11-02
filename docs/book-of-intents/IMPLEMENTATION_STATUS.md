@@ -41,6 +41,9 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | A24 | Mortgage/liens encumbrance lifecycle | 5 – PROPOSED | Closest: A3 (RRR restrictions), A7 (freeze) | No lien spec in repo |
 | A25 | Tokenized fractional investment + escrowed collateral guarantees | 5 – PROPOSED | Closest: A6 (pairwise escrow) | Securities-law research required first (OPEN_QUESTIONS Q-005) |
 | A26 | Transaction lineage / redemption (Alice→Bob→Francky→Roger→Marc) | 5 – PROPOSED | — | Double-replay, transfer auth unresolved |
+| A27 | Security & privacy request registry (`SecurityRequest`, `PrivacyRequest`, `JurisdictionalRestrictionRequest`, `SecurityReviewCase`, `PrivacyState`, `SecurityDecision`, `SecurityAppeal`, `SecurityAuditEvent`) | 4 – SPECIFIED ONLY | `docs/rfc-016-protocol-security-decentralization-privacy.md` (full lifecycle, quorum, appeals, remedies); no PDAs/instructions implemented yet | Directive Part II/III — separate review domain from fraud governance (A29 extends it) |
+| A28 | Privacy state versioning (`PUBLIC`/`RESTRICTED`/`PRIVATE`/`REDACTED`/`TEMPORARILY_PROTECTED`/`UNDER_REVIEW`/`WITHDRAWN_FROM_PUBLIC_ACCESS`/`TOMBSTONED`/`RESTORED`) | 4 – SPECIFIED ONLY | RFC-016 §4.7 | No on-chain PDA or API enforcement yet |
+| A29 | Distributed validator review for privacy/security (random committee, quorum, local+global review, anti-collusion) | 4 – SPECIFIED ONLY | Reuses fraud_governance committee machinery (A12/A17 pattern) but is a separate review domain; NOT yet implemented for privacy requests | Extension of fraud_governance.rs, not a copy |
 
 ## B. Backend API (`terra-core/api/`)
 
@@ -59,6 +62,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | B11 | API security response headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`) via `middleware::from_fn` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | middleware + 2 tests in `api/src/main.rs` (`tests::ok_response_carries_security_headers`, `tests::error_response_also_carries_security_headers`); `cargo test -p terra-api` **130/130** (2026-11-02) | Browser hardening only; privileged-endpoint auth unchanged (R-016 fail-closed) |
 | B12 | API request body-size limit: `MAX_BODY_BYTES` env (default 64 MiB) + `RequestBodyLimitLayer` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | layer + 2 tests in `api/src/main.rs` (`tests::oversized_content_length_rejected_with_413`, `tests::within_limit_is_accepted`); `cargo test -p terra-api` **132/132** (2026-11-02) | Multipart ingest (OSM PBF, photos) covered by default; tunables via env |
 | B13 | API request timeout: `REQUEST_TIMEOUT_SECS` env (default 60 s) + tower-http `TimeoutLayer` in `api/src/main.rs` | 1 – IMPLEMENTED AND VERIFIED | layer + 1 test in `api/src/main.rs` (`tests::slow_request_times_out_with_408`); `cargo test -p terra-api` **133/133** (2026-11-02) | Default response 408; tunable via env |
+| B14 | API privacy-state enforcement (component-level access control, redaction, cache invalidation, storage-provider notifications) | 4 – SPECIFIED ONLY | RFC-016 §8.3/§19.3 | No API middleware enforces privacy-state changes yet; API routes return stored data without privacy-state gating |
 
 ## C. Geo-engine & spatial compute (`terra-core/geo-engine`)
 
@@ -92,6 +96,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | E2 | License Apache-2.0 + TRADEMARKS.md | 1 | `LICENSE`, `TRADEMARKS.md`, workspace license field | — |
 | E3 | Deploy keypair hygiene | 1 | `deploy.sh` verifies canonical keypairs vs `declare_id!` (registry `GaEDbkt…Tbage`, identity `HyjpaHY…Vo6p`) | — |
 | E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprints 001–024; chapters 01–13 | Chapters 11 (distributed reconstruction & assembly), 12 (world runtime & synchronized rendering), 13 (global spatial data delivery & progressive visualization) are `SPECIFIED ONLY` — no implementation code yet; gated on founder review of Q-003/Q-004 and Stage 4 boundary |
+| E5 | Security threat model + gap analysis (RFC-016) | 4 – SPECIFIED ONLY | `docs/rfc-016-protocol-security-decentralization-privacy.md`; code audit of fraud_governance.rs, routing.rs, validator_registry.rs, staking.rs, evidence_manifest.rs, cross_border.rs, recovery.rs, SECURITY.md | No security PDAs/instructions implemented yet; threat model documents gaps vs existing mechanisms |
 
 ## Verification baselines (last verified runs)
 

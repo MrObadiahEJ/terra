@@ -2,6 +2,40 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-02 — RFC-016 Protocol Security, Decentralization, Privacy & Censorship Resilience
+
+- New `docs/rfc-016-protocol-security-decentralization-privacy.md` — full security
+  directive: no-single-point-of-control principles; measurable decentralization
+  model (12 categories); on-chain security registry (SecurityRequest,
+  PrivacyRequest, JurisdictionalRestrictionRequest, SecurityReviewCase,
+  PrivacyState, SecurityDecision, SecurityAppeal, SecurityAuditEvent); distributed
+  validator review (local+global, verifiable randomization, anti-collusion);
+  privacy request lifecycle (authentication → scope → classification → emergency
+  check → distributed review → quorum → appeal → finalized); privacy remedies
+  and state versioning; scoped jurisdictional restrictions; security incentives
+  (rewards, collateral, slashing with due process, reporting, anti-collusion);
+  storage independence and censorship resilience; on-chain vs off-chain
+  responsibility split; abuse prevention (privacy-as-censorship, proportionality,
+  public-interest evidence preservation); audit rule (inspect actual code before
+  designing); implementation phases 0–5; acceptance criteria (RFC-016 §11);
+  18 non-negotiable design rules.
+- Code-grounded gap analysis vs existing mechanisms:
+  fraud_governance.rs (random committee, no jail, appeals — fraud-specific only),
+  routing.rs (multi-factor + random winner), staking.rs (slashing/appeal/collateral),
+  validator_registry.rs (admin bootstrap + `paused` = central points — R-022),
+  evidence_manifest.rs (evidence-specific), cross_border.rs (treaty-binding,
+  not per-data restriction), recovery.rs (validator injection, not privacy
+  protection).
+- Registers: IMPLEMENTATION_STATUS (A27/A28/A29 security+privacy specs; B14 API
+  privacy enforcement; E5 threat model + gap analysis); RISK_REGISTER (R-022
+  centralized governance, R-023 privacy-as-censorship, R-024 jurisdictional
+  overreach, R-025 storage unavailability/censorship, R-026 reviewer collusion);
+  OPEN_QUESTIONS (Q-013..Q-018); ARCHITECTURAL_DECISIONS (ADR-017 on-chain vs
+  off-chain, ADR-018 privacy-state semantics, ADR-019 jurisdictional boundaries);
+  ROADMAP Stage 4.5 + verification gates; BOOK_OF_INTENTS index + navigation;
+  SUMMARY; AGENT_GUIDE permanent requirements.
+- Documentation only — no application code changed; no gate required.
+
 ## 2026-11-02 — Chapter 14 Implementation Preparation Plan (REQ-020…REQ-028 code-area mapping)
 
 - New `chapters/14-implementation-preparation.md` — dependency-ordered code-area

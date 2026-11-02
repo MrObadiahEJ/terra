@@ -147,3 +147,50 @@ enable privileged endpoints; without it they return 401 by design.
 3. REQUIREMENTS_TRACEABILITY row updated (or new REQ ID minted).
 4. CHANGELOG entry. 5. Sprint record updated. 6. Honest labels (method,
    provenance, demo-vs-saved) everywhere user- or integrator-facing (ADR-010).
+
+## 9. Permanent security & privacy requirements (RFC-016)
+
+These apply to every agent session, forever — they are not optional and they
+are not waived by a sprint deadline.
+
+- **Never expose private information.** Do not log, print, commit, or return in
+  an API response any identity document, private photograph, personal address,
+  sensitive evidence, or protected spatial component. Raw private evidence never
+  goes on-chain (RFC-016 ADR-018 / design rule 3).
+- **Never bypass a finalized privacy decision.** An API or storage
+  implementation must not serve restricted/private content, must not invent a
+  privacy decision the protocol has not authorized (except a clearly defined
+  temporary local safety measure that is recorded and expires), and must respect
+  finalized PrivacyState transitions (RFC-016 ADR-018 / design rule 13).
+- **Never claim decentralization without evidence.** Do not describe a service
+  as decentralized merely because multiple accounts/servers exist. Assess
+  genuine independence (organization, infrastructure, government, administrator)
+  and record concentration-risk indicators (RFC-016 §2 / design rules 1, 2).
+- **No single point of control.** Do not introduce a global shutdown switch, a
+  mandatory central marketplace/frontend/API/storage provider, or an authority
+  that can unilaterally disable unrelated jurisdictions or rewrite protocol
+  history (RFC-016 §1 / design rules 1, 6, 7).
+- **No public identity disclosure merely to request privacy.** Privacy
+  requests must support privacy-preserving proof of standing (wallet signature,
+  existing Terra identity credential, selective disclosure, ZK proof) without
+  publishing identity documents (RFC-016 §4.2 / design rule 4).
+- **No single validator deciding a high-impact privacy request.** Privacy and
+  security decisions use distributed reviewer selection with verifiable
+  randomness, quorum, local+global review, and independent appeals
+  (RFC-016 §3.2 / design rule 5).
+- **Privacy protection is not a censorship tool.** Do not use privacy/restriction
+  mechanisms to erase legitimate fraud evidence, hide ownership disputes, or
+  suppress public records; apply proportionality (least restrictive remedy) and
+  component-level protection (RFC-016 §9 / design rule 9).
+- **Governance capture requires authorization.** Do not make irreversible
+  economic or governance commitments (upgrade authority, emergency pause, global
+  restriction) without founder authorization (RFC-016 design rule 16).
+- **Audit before designing.** When adding a security or privacy mechanism,
+  inspect the actual code and tests first (fraud_governance.rs, routing.rs,
+  validator_registry.rs, staking.rs, evidence_manifest.rs, cross_border.rs,
+  recovery.rs, SECURITY.md). Reuse or extend existing mechanisms where safer;
+  do not duplicate unnecessarily (RFC-016 Part IX / design rule 17).
+- **Document the on-chain/off-chain boundary.** On-chain enforces the decision
+  process; off-chain services implement enforcement and follow protocol
+  authorization and privacy-state rules. Off-chain services cannot create
+  protocol decisions by themselves (RFC-016 ADR-017 / design rule 18).
