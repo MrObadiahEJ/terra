@@ -37,6 +37,9 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
    `v3.1.14`) and runs the 307-test BPF suite; run `41474466105` green
    (R-008 resolved, E1 → status 1). **Stage 1 exit met 2026-11-02.**
 
+*Post-exit hardening (2026-11-02):* REQ-024 AI provenance on geometry drafts
+  (migration 0034, R-014 resolved) — no stage criteria change.
+
 ## Stage 2 — Devnet truth (entry: Stage 1 exit met; founder funds wallet)
 
 **Sequencing (founder directive 2026-11-02):** devnet funding is the **last**

@@ -34,17 +34,18 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 | REQ-021 | Residency/proof-of-location credential | P2 | 5 – PROPOSED | directive §8 | building blocks REQ-012/A15 | — |
 | REQ-022 | Lien encumbrance lifecycle | P1 | 5 – PROPOSED | directive §3E | building blocks REQ-002, REQ-008 | — |
 | REQ-023 | Fractional participation with escrowed guarantees | P2 | 6 – RESEARCH REQUIRED | directive §10 | building block REQ-009 | legal research gate (Q-005) |
-| REQ-024 | AI outputs distinguishable from verified results | P1 | 3 | directive §11 | worker pipeline (migration 0031) labels drafts; model-provenance fields partial | worker smoke 22/22; AI-inference provenance not fully recorded |
+| REQ-024 | AI outputs distinguishable from verified results | P1 | 1 | directive §11 | migration 0034: drafts record `provenance_kind` + model provider/name/version/confidence; API validation fail-closed | API 128/128 (7 provenance tests); live smoke 13/13; DB constraints enforced |
 
 ## Orphan / drift checks (per directive §14)
 
 - **Implemented without a requirement:** settlement center UI (covered under
   REQ-008/009 as evidence surfaces — no orphan). `zk-membership` crate: verify
   its consumers before release (flagged Q-009).
-- **Requirements with no implementation:** REQ-020…REQ-024 (as marked) —
+- **Requirements with no implementation:** REQ-020…REQ-023 (as marked) —
   intentional; tracked in ROADMAP with research gates.
-- **Vision elements at risk of drift:** AI provenance (REQ-024) currently
-  partial — recorded as RISK R-014.
+- **Vision elements at risk of drift:** AI provenance (REQ-024) is now
+  recorded on drafts (R-014 resolved); future model outputs must use those
+  fields, never free-text `method` alone.
 
 ## Acceptance-criteria rule
 

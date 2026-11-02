@@ -47,15 +47,15 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | # | Capability | Status | Evidence | Gap / note |
 | --- | --- | --- | --- | --- |
 | B1 | REST mirror surface (~26 routers: parcels, identities, vaults, disputes, escrows, rights, cross-border, subdivision, staking, zk, spatial, spatial-accounts, geo, fusion, world-registry, recovery, credentials, evidence, reconstruction, derived, stories, tx, demo, activity…) | 1 | `routes/mod.rs`; migrations 0001–0033 | Mirror is a read model; chain is source of truth |
-| B2 | Story CRUD + export receipts + validation + external replay/GeoJSON/schema (REQ-018) | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; `terra.story-replay/v1`; API suite 121/121 (2026-11-02); live smoke (hash tracks edits) | Mutations wallet-signed (commit `11be94c`); replay is read-only presentation data, not proof |
-| B3 | Reconstruction worker: lease (SKIP LOCKED, 15-min), progress, complete→geometry draft→anchor_prep, drafts, anchor | 2 | `routes/reconstruction.rs`; migration 0031; live smoke 22/22 (2026-10-13) | anchor_prep produces a transaction; never executed on a live cluster (B6) |
+| B2 | Story CRUD + export receipts + validation + external replay/GeoJSON/schema (REQ-018) | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; `terra.story-replay/v1`; API suite 128/128 (2026-11-02); live smoke (hash tracks edits) | Mutations wallet-signed (commit `11be94c`); replay is read-only presentation data, not proof |
+| B3 | Reconstruction worker: lease (SKIP LOCKED, 15-min), progress, complete→geometry draft→anchor_prep, drafts, anchor; drafts record AI provenance (REQ-024, migration 0034) | 2 | `routes/reconstruction.rs`; migrations 0031/0034; live smoke 22/22 + provenance 13/13 (2026-11-02) | anchor_prep produces a transaction; never executed on a live cluster (B6) |
 | B4 | Geo endpoints (`nearest-roads`, `pois`, `buildings`, `stats`) | 1 | `routes/geo.rs` L88–93 | No server-side `/geo/route` — routing runs client-side (D4) |
 | B5 | Signed multipart evidence upload | 1 | API `/evidence`; migrations 0023/0024 | — |
 | B6 | Devnet deployment | 2 – IMPLEMENTED, VERIFICATION INCOMPLETE | `deploy.sh devnet` verifies canonical keypairs vs `declare_id!` then `anchor deploy`; `.so` fresh | **Blocked: deployer wallet 0 SOL** (founder action; OPEN_QUESTIONS Q-001) |
 | B7 | IPFS registry mirror | 3 – PARTIALLY IMPLEMENTED | migration 0018_registry_ipfs_mirror | Independence from any single storage provider still a goal (RISK R-010) |
-| B8 | Incremental derived compute: `processing_key` UNIQUE dedup, atomic create-or-reuse, idempotent complete, guarded fail, recursive-CTE dependency invalidation; reconstruction-draft ledger; all mutations signature-verified (R-016) | 1 | `routes/derived.rs`; migration 0033; API **117/117** (7 derived tests); live smoke **16/16** signed checks (unsigned/wrong key → 401); 2 identical reconstruction computations → 2 drafts, 1 ledger row, equal hashes (2026-10-31/11-02) | Cache, not a fact: correctness = same key ⇒ same output. Nothing on-chain; not a consensus input |
-| B8 | RFC-014 Phase 04 — incremental derived compute (REQ-019) | 1 – IMPLEMENTED AND VERIFIED | `routes/derived.rs` + migration 0033; `cargo test -p terra-api` **117/117**; live smoke **16/16** Ed25519-signed; draft-ledger 2 drafts / 1 row / 1 hash (2026-10-31) | — |
-| B9 | Privileged-endpoint signature verification (R-016) | 1 – IMPLEMENTED AND VERIFIED | 8 handlers now `auth.verify(&key, …)?` (fail-closed); unsigned `complete` → 401 (was 200); signed suites still green (2026-10-31) | No shipped request-signing client yet (R-017) |
+| B8 | Incremental derived compute: `processing_key` UNIQUE dedup, atomic create-or-reuse, idempotent complete, guarded fail, recursive-CTE dependency invalidation; reconstruction-draft ledger; all mutations signature-verified (R-016) | 1 | `routes/derived.rs`; migration 0033; API **128/128** (7 derived tests; 2026-11-02); live smoke **16/16** signed checks (unsigned/wrong key → 401); 2 identical reconstruction computations → 2 drafts, 1 ledger row, equal hashes | Cache, not a fact: correctness = same key ⇒ same output. Nothing on-chain; not a consensus input |
+| B9 | Privileged-endpoint signature verification (R-016) | 1 – IMPLEMENTED AND VERIFIED | 8 handlers now `auth.verify(&key, …)?` (fail-closed); unsigned `complete` → 401 (was 200); signed suites still green (2026-11-02) | Client shipped: `api/examples/sign_request.rs` (R-017) |
+| B10 | AI provenance on geometry drafts (REQ-024, R-014): `provenance_kind` + model provider/name/version/confidence, fail-closed validation, DB constraints | 1 | migration 0034; `routes/reconstruction.rs`; API **128/128** (7 provenance tests); live smoke **13/13**; constraints verified via psql (2026-11-02) | Provenance is description, not verification — an AI draft is still a draft until anchored + reviewed |
 
 ## C. Geo-engine & spatial compute (`terra-core/geo-engine`)
 
@@ -90,7 +90,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | --- | --- | --- | --- |
 | BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **307** | **2026-11-02 (executed; 295.9 s)** | before release |
 | Registry lib | **153** | **2026-11-02 (executed)** | before release |
-| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **121** | **2026-11-02 (executed)** | before release |
+| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **128** | **2026-11-02 (executed)** | before release |
 | Geo-engine | **12 (+1 ignored)** | **2026-11-02 (executed; suite grew from the 6 baseline)** | before release |
 | Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
 | Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-11-02 (executed)** | each story change |

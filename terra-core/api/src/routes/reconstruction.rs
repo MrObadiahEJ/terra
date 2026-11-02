@@ -279,7 +279,7 @@ const REGISTRY_PROGRAM_ID: &str = "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"
 /// How long a worker keeps its lease on a job before others may reclaim it.
 const LEASE_TTL_SECS: i64 = 15 * 60;
 
-const SELECT_DRAFT: &str = "SELECT id, reconstruction_job_id, parcel_id, method, geometry_geojson, geometry_hash, storage_reference, source, dimension, elevation_min_mm, elevation_max_mm, elevation_source, anchor_status, anchor_signature, created_at";
+const SELECT_DRAFT: &str = "SELECT id, reconstruction_job_id, parcel_id, method, geometry_geojson, geometry_hash, storage_reference, source, dimension, elevation_min_mm, elevation_max_mm, elevation_source, anchor_status, anchor_signature, provenance_kind, model_provider, model_name, model_version, model_confidence, created_at";
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct GeometryDraft {
@@ -297,6 +297,14 @@ pub struct GeometryDraft {
     pub elevation_source: i16,
     pub anchor_status: String,
     pub anchor_signature: Option<String>,
+    /// What produced the draft: `deterministic`, `ai-inference`, `ai-assisted`.
+    /// Description only — an AI draft is still a draft until verified.
+    pub provenance_kind: String,
+    pub model_provider: Option<String>,
+    pub model_name: Option<String>,
+    pub model_version: Option<String>,
+    /// Model-reported confidence (0.0–1.0), not a protocol truth score.
+    pub model_confidence: Option<f64>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -333,6 +341,17 @@ pub struct CompleteInput {
     pub source: Option<i16>,
     /// spatial_dimension code for the draft (default D2_5=1).
     pub dimension: Option<i16>,
+    /// What produced the draft: `deterministic` (default), `ai-inference`,
+    /// or `ai-assisted`. Recorded as provenance, never as verification.
+    pub provenance_kind: Option<String>,
+    /// Model vendor, e.g. "acme-vision". Optional.
+    pub model_provider: Option<String>,
+    /// Model identifier — required for AI kinds.
+    pub model_name: Option<String>,
+    /// Model version/checkpoint — required for AI kinds.
+    pub model_version: Option<String>,
+    /// Model-reported confidence in 0.0..=1.0. Not a protocol truth score.
+    pub model_confidence: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -661,6 +680,63 @@ pub async fn job_progress(
     Ok(Json(job))
 }
 
+const PROVENANCE_KINDS: [&str; 3] = ["deterministic", "ai-inference", "ai-assisted"];
+const MAX_PROVENANCE_LEN: usize = 120;
+
+/// Validate draft provenance (REQ-024 / R-014). Fail-closed: model details
+/// without an AI provenance kind, or an AI kind without model name/version,
+/// are rejected rather than silently recorded as deterministic.
+fn validate_provenance(input: &CompleteInput) -> Result<(), AppError> {
+    let kind = input
+        .provenance_kind
+        .as_deref()
+        .unwrap_or("deterministic")
+        .trim();
+    if !PROVENANCE_KINDS.contains(&kind) {
+        return Err(AppError::bad_request(
+            "provenance_kind must be deterministic, ai-inference or ai-assisted",
+        ));
+    }
+    for (label, value) in [
+        ("model_provider", input.model_provider.as_deref()),
+        ("model_name", input.model_name.as_deref()),
+        ("model_version", input.model_version.as_deref()),
+    ] {
+        if let Some(v) = value {
+            if v.trim().is_empty() || v.trim().len() > MAX_PROVENANCE_LEN {
+                return Err(AppError::bad_request(format!(
+                    "{label} must be 1..={MAX_PROVENANCE_LEN} characters when present"
+                )));
+            }
+        }
+    }
+    let has_model_fields = input.model_provider.is_some()
+        || input.model_name.is_some()
+        || input.model_version.is_some()
+        || input.model_confidence.is_some();
+    if kind == "deterministic" {
+        if has_model_fields {
+            return Err(AppError::bad_request(
+                "model provenance requires provenance_kind ai-inference or ai-assisted",
+            ));
+        }
+        return Ok(());
+    }
+    if input.model_name.is_none() || input.model_version.is_none() {
+        return Err(AppError::bad_request(
+            "AI provenance requires model_name and model_version",
+        ));
+    }
+    if let Some(c) = input.model_confidence {
+        if !c.is_finite() || !(0.0..=1.0).contains(&c) {
+            return Err(AppError::bad_request(
+                "model_confidence must be within 0.0..=1.0",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub async fn job_complete(
     State(state): State<AppState>,
     auth: SignedRequest,
@@ -677,6 +753,7 @@ pub async fn job_complete(
         "POST",
         &format!("/api/v1/reconstruction/jobs/{id}/complete"),
     )?;
+    validate_provenance(&input)?;
     let wallet = caller_wallet(headers);
 
     // Must hold the lease (running); queued → conflict, missing → 404.
@@ -714,8 +791,10 @@ pub async fn job_complete(
         "INSERT INTO geometry_drafts (
              id, reconstruction_job_id, parcel_id, method, geometry_geojson,
              geometry_hash, storage_reference, source, dimension,
-             elevation_min_mm, elevation_max_mm, elevation_source
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+             elevation_min_mm, elevation_max_mm, elevation_source,
+             provenance_kind, model_provider, model_name, model_version,
+             model_confidence
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
     )
     .bind(&draft_id)
     .bind(&id)
@@ -729,6 +808,17 @@ pub async fn job_complete(
     .bind(input.elevation_min_mm.unwrap_or(0))
     .bind(input.elevation_max_mm.unwrap_or(0))
     .bind(input.elevation_source.unwrap_or(0))
+    .bind(
+        input
+            .provenance_kind
+            .as_deref()
+            .unwrap_or("deterministic")
+            .trim(),
+    )
+    .bind(&input.model_provider)
+    .bind(&input.model_name)
+    .bind(&input.model_version)
+    .bind(input.model_confidence)
     .execute(&state.pool)
     .await?;
 
@@ -904,6 +994,102 @@ pub async fn draft_anchor_confirmed(
 mod tests {
     use super::*;
 
+    fn complete_input() -> CompleteInput {
+        CompleteInput {
+            artifact_uri: None,
+            content_hash: None,
+            format: None,
+            capture_points: None,
+            elevation_min_mm: None,
+            elevation_max_mm: None,
+            elevation_source: None,
+            source: None,
+            dimension: None,
+            provenance_kind: None,
+            model_provider: None,
+            model_name: None,
+            model_version: None,
+            model_confidence: None,
+        }
+    }
+
+    // --- REQ-024 / R-014: AI provenance is explicit, never inferred ---------
+
+    #[test]
+    fn provenance_defaults_to_deterministic() {
+        assert!(validate_provenance(&complete_input()).is_ok());
+    }
+
+    #[test]
+    fn ai_provenance_accepts_full_model_metadata() {
+        let mut input = complete_input();
+        input.provenance_kind = Some("ai-inference".into());
+        input.model_provider = Some("acme-vision".into());
+        input.model_name = Some("parcel-segmenter".into());
+        input.model_version = Some("2026.10-ckpt3".into());
+        input.model_confidence = Some(0.82);
+        assert!(validate_provenance(&input).is_ok());
+    }
+
+    #[test]
+    fn ai_provenance_requires_name_and_version() {
+        let mut input = complete_input();
+        input.provenance_kind = Some("ai-assisted".into());
+        input.model_name = Some("parcel-segmenter".into());
+        assert!(validate_provenance(&input).is_err(), "version missing");
+
+        input.model_version = Some("v3".into());
+        assert!(validate_provenance(&input).is_ok());
+    }
+
+    #[test]
+    fn model_metadata_rejected_without_ai_kind() {
+        let mut input = complete_input();
+        input.model_name = Some("parcel-segmenter".into());
+        input.model_version = Some("v3".into());
+        input.model_confidence = Some(0.9);
+        assert!(
+            validate_provenance(&input).is_err(),
+            "deterministic drafts cannot carry model metadata"
+        );
+    }
+
+    #[test]
+    fn model_confidence_must_be_a_probability() {
+        let mut input = complete_input();
+        input.provenance_kind = Some("ai-inference".into());
+        input.model_name = Some("m".into());
+        input.model_version = Some("v1".into());
+        for bad in [-0.1, 1.1, f64::NAN, f64::INFINITY] {
+            input.model_confidence = Some(bad);
+            assert!(validate_provenance(&input).is_err(), "confidence {bad}");
+        }
+        input.model_confidence = Some(0.0);
+        assert!(validate_provenance(&input).is_ok());
+        input.model_confidence = Some(1.0);
+        assert!(validate_provenance(&input).is_ok());
+    }
+
+    #[test]
+    fn unknown_provenance_kind_rejected() {
+        let mut input = complete_input();
+        input.provenance_kind = Some("probably-ai".into());
+        assert!(validate_provenance(&input).is_err());
+    }
+
+    #[test]
+    fn provenance_strings_are_bounded() {
+        let mut input = complete_input();
+        input.provenance_kind = Some("ai-inference".into());
+        input.model_name = Some("m".into());
+        input.model_version = Some("v1".into());
+        input.model_provider = Some("x".repeat(MAX_PROVENANCE_LEN + 1));
+        assert!(validate_provenance(&input).is_err());
+
+        input.model_provider = Some("   ".into());
+        assert!(validate_provenance(&input).is_err());
+    }
+
     #[test]
     fn session_row_serializes() {
         let row = CaptureSession {
@@ -1025,6 +1211,11 @@ mod tests {
             elevation_source: 0,
             anchor_status: "pending_anchor".into(),
             anchor_signature: None,
+            provenance_kind: "deterministic".into(),
+            model_provider: None,
+            model_name: None,
+            model_version: None,
+            model_confidence: None,
             created_at: chrono::Utc::now(),
         };
         let prep = build_anchor_prep(Some(&parcel_hex), 3, &draft, "Wallet111")

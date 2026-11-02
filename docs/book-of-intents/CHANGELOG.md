@@ -138,3 +138,17 @@ Format: date · version · what changed · evidence/why. Append-only.
   reordered to local product work first, funding last. Q-001 itself is
   unchanged (founder decision).
 - Evidence: sprints/007.
+
+## 2026-11-02 — AI provenance on geometry drafts (REQ-024, R-014 resolved)
+
+- Migration 0034 adds `provenance_kind` (`deterministic` / `ai-inference` /
+  `ai-assisted`) and model provider/name/version/confidence to
+  `geometry_drafts`; existing rows default to `deterministic`.
+- `POST /reconstruction/jobs/{id}/complete` validates provenance fail-closed:
+  model fields require an AI kind, AI kinds require model name + version,
+  confidence must be finite in `[0,1]`. DB constraints mirror the invariants.
+- Evidence: API **128/128** (7 new tests); live smoke **13/13** (AI metadata
+  persisted + returned by `GET …/draft`; four ambiguous payloads → 400;
+  deterministic default clean); psql constraint checks reject bypasses.
+- Book: REQ-024 → status 1, R-014 resolved, IMPLEMENTATION_STATUS B3/B10 +
+  API baseline 128, ROADMAP post-exit note, sprint 008. No SOL required.
