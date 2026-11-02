@@ -6,6 +6,7 @@ pub mod authority_registry;
 pub mod components;
 pub mod manifests;
 pub mod providers;
+pub mod runtime;
 pub mod cross_border;
 pub mod demo_scenarios;
 pub mod derived;
@@ -43,6 +44,7 @@ pub fn router() -> Router<AppState> {
         .nest("/components", components::router())
         .nest("/manifests", manifests::router())
         .nest("/providers", providers::router())
+        .nest("/runtime", runtime::router())
         .nest("/vaults", vaults::router())
         .nest("/disputes", disputes::router())
         .nest("/escrows", escrows::router())
