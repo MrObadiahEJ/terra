@@ -39,6 +39,11 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 
 ## Stage 2 — Devnet truth (entry: Stage 1 exit met; founder funds wallet)
 
+**Sequencing (founder directive 2026-11-02):** devnet funding is the **last**
+step, not the next one. It gates only Stage 2; frontend, API, offline demo
+stories, and all local test suites run with zero SOL. Work continues on `dev`
+against the local stack until the founder chooses to fund the wallet.
+
 - Fund deployer (Q-001, founder). Run `./deploy.sh devnet`. Execute on-chain
   smoke: register parcel → rights → geometry version → 3D model → snapshot →
   escrow → dispute → slash dry-run.

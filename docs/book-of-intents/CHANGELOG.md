@@ -125,3 +125,16 @@ Format: date · version · what changed · evidence/why. Append-only.
   API Tests 3m6s, On-chain Program Tests 5m18s including BPF integration.
 - R-008 resolved; E1 → `IMPLEMENTED AND VERIFIED`; ROADMAP Stage 1 exit met.
   Stage 2 (devnet truth) is now blocked only on founder funding (Q-001).
+
+## 2026-11-02 — Frontend local verification; funding deferred to last (founder directive)
+
+- Verified the product surface locally with **zero SOL**: `/welcome`,
+  `/stories` (3 offline demos + 1 saved story), `/demo` (verification
+  scenario reaches `VERIFIED`, 12 events / 9938 ms, 3-reviewer replay),
+  `/story/demo-road-journey` (Cesium route + 31 s timeline). Headless Chrome
+  screenshots; no console errors or failed requests.
+- **Founder directive:** devnet funding (Q-001) is the last step, not the
+  next. ROADMAP Stage 2 carries a sequencing note; CURRENT.md next-up is
+  reordered to local product work first, funding last. Q-001 itself is
+  unchanged (founder decision).
+- Evidence: sprints/007.
