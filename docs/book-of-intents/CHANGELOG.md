@@ -152,3 +152,12 @@ Format: date · version · what changed · evidence/why. Append-only.
   deterministic default clean); psql constraint checks reject bypasses.
 - Book: REQ-024 → status 1, R-014 resolved, IMPLEMENTATION_STATUS B3/B10 +
   API baseline 128, ROADMAP post-exit note, sprint 008. No SOL required.
+
+## 2026-11-02 — Book volume 10 (derived compute, request auth, AI provenance)
+
+- New chapter documenting the three boundaries kept separate this session:
+  cache dedup (same key ⇒ same output, not truth), Ed25519 request
+  authenticity (authority, not identity), and AI provenance (description,
+  not verification). Includes failure-mode table and acceptance evidence.
+- Index/SUMMARY updated; E4 evidence now lists chapters 01–10; sprint 009.
+  Documentation only — no behavior change.

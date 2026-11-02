@@ -82,7 +82,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | E1 | CI (typecheck `tsc -b` + vitest on frontend job; Rust lib/rfc012/geo/API suites; SBF build + 307-test BPF integration suite) | 1 | `.github/workflows/ci.yml`; commit `b2ddf80`; CI run `41474466105` green (2026-11-02) | Solana toolchain pinned `v3.1.14` — bump together with `solana-program-test`; `stable` builds are rejected by the pinned runtime (R-008 resolved) |
 | E2 | License Apache-2.0 + TRADEMARKS.md | 1 | `LICENSE`, `TRADEMARKS.md`, workspace license field | — |
 | E3 | Deploy keypair hygiene | 1 | `deploy.sh` verifies canonical keypairs vs `declare_id!` (registry `GaEDbkt…Tbage`, identity `HyjpaHY…Vo6p`) | — |
-| E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprint 002 | Volumes per ROADMAP still unwritten |
+| E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprint 002; chapters 01–10 (09 replay, 10 derived compute/auth/provenance) | Remaining volumes depend on research-gated intents (Q-003/Q-005); registers are current |
 
 ## Verification baselines (last verified runs)
 

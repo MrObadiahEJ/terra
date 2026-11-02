@@ -28,6 +28,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [Chapter 7 — PostGIS Mirror & Geo-Engine](chapters/07-postgis-geo-engine.md) — `PARTIALLY IMPLEMENTED` (gaps listed)
 - [Chapter 8 — Institutional Identity](chapters/08-institutional-identity.md) — `PROPOSED` (founder decision Q-003)
 - [Chapter 9 — External Read-Only Story Replay](chapters/09-external-replay.md) — `IMPLEMENTED AND VERIFIED` (REQ-018)
+- [Chapter 10 — Derived Compute, Request Authenticity, AI Provenance](chapters/10-derived-compute-and-provenance.md) — `IMPLEMENTED AND VERIFIED` (REQ-019/024, R-016/R-017)
 
 Further volumes (Transactions & Lineage · AI-Assisted Understanding · Developer
 Ecosystem · Governance & Resilience · Land-Administration Research) are written

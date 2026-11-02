@@ -70,6 +70,7 @@ Never inflate a status. When evidence is unavailable, say so.
 - [chapters/07-postgis-geo-engine.md](chapters/07-postgis-geo-engine.md) — partial (gaps listed)
 - [chapters/08-institutional-identity.md](chapters/08-institutional-identity.md) — `PROPOSED`.
 - [chapters/09-external-replay.md](chapters/09-external-replay.md) — verified (REQ-018)
+- [chapters/10-derived-compute-and-provenance.md](chapters/10-derived-compute-and-provenance.md) — verified (REQ-019/024, R-016/R-017)
 
 ### Intents
 
