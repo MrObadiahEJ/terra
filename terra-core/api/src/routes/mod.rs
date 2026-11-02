@@ -7,6 +7,7 @@ pub mod components;
 pub mod manifests;
 pub mod providers;
 pub mod runtime;
+pub mod workers;
 pub mod cross_border;
 pub mod demo_scenarios;
 pub mod derived;
@@ -65,6 +66,7 @@ pub fn router() -> Router<AppState> {
         .nest("/credentials", threshold_credentials::router())
         .nest("/evidence", evidence::router())
         .nest("/reconstruction", reconstruction::router())
+        .nest("/workers", workers::router())
         .nest("/derived", derived::router())
         .nest("/tx", tx_prep::router())
         .nest("/demo", demo_scenarios::router())

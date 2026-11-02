@@ -631,6 +631,21 @@ pub async fn lease_reconstruction_job(
     .fetch_one(&state.pool)
     .await?;
 
+    // Record the assignment so the worker's completed work can be tracked.
+    if let Some(ref wallet) = claimed_by {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO job_assignments (job_id, worker_id)
+            VALUES ($1, $2)
+            ON CONFLICT (job_id, worker_id) DO NOTHING
+            "#,
+        )
+        .bind(&job_id)
+        .bind(wallet)
+        .execute(&state.pool)
+        .await;
+    }
+
     let session = sqlx::query_as::<_, CaptureSession>(&format!(
         "{SELECT_SESSION} FROM capture_sessions WHERE id = $1"
     ))
