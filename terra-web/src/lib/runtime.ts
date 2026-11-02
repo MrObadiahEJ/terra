@@ -77,6 +77,28 @@ export interface CacheRow {
   access_count: number
 }
 
+// ---- Manifest creation (World Representation Manifest, REQ-027) ----
+
+export interface CreateManifestRequest {
+  region_id: string
+  region_name: string
+  parent_manifest_id?: string
+  neighbor_manifest_ids?: string[]
+  description?: string
+}
+
+export interface ManifestRow {
+  id: string
+  region_id: string
+  region_name: string
+  version: number
+  parent_manifest_id: string | null
+  neighbor_manifest_ids: string[]
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ---------------------------------------------------------------------------
 // Internal fetch helper (mirrors api.ts requestUrl)
 // ---------------------------------------------------------------------------
@@ -278,6 +300,29 @@ export async function recordCache(input: RecordCacheInput): Promise<CacheRow> {
     method: 'POST',
     body: JSON.stringify(input),
   })
+}
+
+// ---------------------------------------------------------------------------
+// World Representation Manifest (REQ-027)
+// ---------------------------------------------------------------------------
+
+export async function createManifest(
+  input: CreateManifestRequest,
+): Promise<ManifestRow> {
+  return request<ManifestRow>(`/manifests`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function listManifests(
+  regionId?: string,
+  maxLevel?: number,
+): Promise<ManifestRow[]> {
+  const q = new URLSearchParams()
+  if (regionId) q.set('region_id', regionId)
+  if (maxLevel != null) q.set('limit', String(maxLevel))
+  return request<ManifestRow[]>(`/manifests${q.size > 0 ? `?${q}` : ''}`)
 }
 
 // ---------------------------------------------------------------------------

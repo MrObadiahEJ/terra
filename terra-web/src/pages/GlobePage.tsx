@@ -24,8 +24,11 @@ import {
 import {
   resolveSceneAtLod,
   fetchComponentAsset,
+  createManifest,
+  listManifests,
   type SceneWithNodes,
   type SceneNodeRow,
+  type ManifestRow,
   runtimeLodFromHeight,
 } from '../lib/runtime'
 import { listModels, type ThreeDModel } from '../lib/reconstruction'
@@ -357,7 +360,10 @@ export default function GlobePage() {
     componentVersion: string
     sizeBytes: number
   } | null>(null)
-  const [manifestIdInput, setManifestIdInput] = useState('')
+  // Distributed runtime: current manifest for the camera's region
+  const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
+  const [currentRegion, setCurrentRegion] = useState<string | null>(null)
+  const manifestRev = useRef(0)
   // Explicit "open on globe" from a Phase C model claim (bypasses the tier
   // gate); bound to the parcel it was requested for, so a selection change
   // invalidates it by derivation — no setState-in-effect reset needed.
@@ -486,23 +492,84 @@ export default function GlobePage() {
     refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
   }, [refreshBuildings, resolvedTier, layers.buildings])
 
-  // ---- Distributed runtime scene graph (REQ-027 / REQ-028) ----
-  const resolveManifestScene = useCallback(async (manifestId: string) => {
+  // Auto-create/resolve manifest when camera enters a new region (grid cell).
+  // Resolves scene graph at current LOD whenever manifest or LOD changes.
+  useEffect(() => {
+    const cam = lastCamRef.current
+    const regionId = `region-${Math.round(cam.longitude)}-${Math.round(cam.latitude)}`
+    if (currentRegion === regionId && currentManifest) {
+      // Already have a manifest for this region; just ensure scene graph matches LOD
+      const lod = runtimeLodFromHeight(cam.height)
+      if (sceneGraph && sceneGraph.scene.lod_level !== lod) {
+        resolveSceneAtLod(currentManifest.id, lod)
+          .then((graph) => setSceneGraph(graph))
+          .catch((err) => setSceneError(err instanceof Error ? err.message : String(err)))
+      }
+      return
+    }
+    // New region: create or find manifest, then resolve scene graph
     setSceneResolving(true)
     setSceneError(null)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const existing = await listManifests(regionId)
+        const manifest =
+          existing[0] ??
+          (await createManifest({
+            region_id: regionId,
+            region_name: `${cam.latitude.toFixed(2)}°N, ${cam.longitude.toFixed(2)}°E`,
+            description: 'Auto-created manifest for camera region',
+          }))
+        if (cancelled) return
+        setCurrentManifest(manifest)
+        setCurrentRegion(regionId)
+        manifestRev.current += 1
+        const lod = runtimeLodFromHeight(cam.height)
+        const graph = await resolveSceneAtLod(manifest.id, lod)
+        if (cancelled) return
+        setSceneGraph(graph)
+        setSceneError(null)
+      } catch (err) {
+        if (cancelled) return
+        setSceneError(err instanceof Error ? err.message : String(err))
+      } finally {
+        if (cancelled) return
+        setSceneResolving(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [camMoveTick, listManifests, createManifest, runtimeLodFromHeight, currentRegion, currentManifest, sceneGraph])
+
+  // Manual trigger: create/resolve manifest for current camera region
+  const createManifestForRegion = useCallback(async () => {
+    const cam = lastCamRef.current
+    const regionId = `region-${Math.round(cam.longitude)}-${Math.round(cam.latitude)}`
+    const regionName = `${cam.latitude.toFixed(2)}°N, ${cam.longitude.toFixed(2)}°E`
     try {
-      const lod = runtimeLodFromHeight(lastCamRef.current.height)
-      const graph = await resolveSceneAtLod(manifestId, lod)
+      const existing = await listManifests(regionId)
+      const manifest =
+        existing[0] ??
+        (await createManifest({
+          region_id: regionId,
+          region_name: regionName,
+          description: 'Manually created manifest for camera region',
+        }))
+      setCurrentManifest(manifest)
+      setCurrentRegion(regionId)
+      manifestRev.current += 1
+      const lod = runtimeLodFromHeight(cam.height)
+      const graph = await resolveSceneAtLod(manifest.id, lod)
       setSceneGraph(graph)
       setSceneError(null)
     } catch (err) {
       setSceneError(err instanceof Error ? err.message : String(err))
-      setSceneGraph(null)
-    } finally {
-      setSceneResolving(false)
     }
-  }, [])
+  }, [listManifests, createManifest, runtimeLodFromHeight, t])
 
+  // ---- Distributed runtime scene graph (REQ-027 / REQ-028) ----
   const fetchComponent = useCallback(
     async (node: SceneNodeRow) => {
       setAssetFetching(node.component_version_id)
@@ -1148,27 +1215,30 @@ export default function GlobePage() {
           <div className="globe-runtime-head">
             <span className="globe-chip-sep" aria-hidden="true" />
             <span className="runtime-label">{t('runtimeSceneLabel')}</span>
-            <input
-              className="runtime-manifest-input"
-              placeholder="manifest id"
-              value={manifestIdInput}
-              onChange={(e) => setManifestIdInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void resolveManifestScene(manifestIdInput)
-              }}
-            />
-            <button
-              className={`btn btn-ghost px-2 py-1 ${
-                sceneResolving ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-              onClick={() =>
-                manifestIdInput.trim() && resolveManifestScene(manifestIdInput)
-              }
-              disabled={sceneResolving || !manifestIdInput.trim()}
-              title={t('resolveSceneTitle')}
-            >
-              {t('resolveAction')}
-            </button>
+            {currentManifest ? (
+              <>
+                <span className="runtime-manifest-badge">
+                  {currentManifest.region_name} v{currentManifest.version}
+                </span>
+                <span className="runtime-region">{currentRegion}</span>
+                <button
+                  className="btn btn-ghost px-2 py-1 text-[10px]"
+                  onClick={() => setCurrentManifest(null)}
+                  title={t('clearSceneTitle')}
+                >
+                  ✕
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn btn-ghost px-2 py-1 text-[10px]"
+                onClick={createManifestForRegion}
+                title={t('createManifestTitle')}
+                disabled={sceneResolving}
+              >
+                {t('createManifestAction')}
+              </button>
+            )}
             {sceneResolving && <span className="runtime-dots">…</span>}
           </div>
           {sceneError && (
