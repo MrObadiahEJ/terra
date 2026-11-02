@@ -43,9 +43,9 @@ export default function WorkerConsolePage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ResultState>(null)
 
-  // ---- Worker listing state ----
+  // ---- Workers listing state ----
   const [workers, setWorkers] = useState<WorkerRow[]>([])
-  const [workersLoading, setWorkersLoading] = useState(false)
+  const [jobsLoading, setJobsLoading] = useState(false)
 
   // ---- Assignment state ----
   const [assignments, setAssignments] = useState<AssignmentRow[]>([])
@@ -59,7 +59,7 @@ export default function WorkerConsolePage() {
   )
 
   const loadWorkers = useCallback(async () => {
-    setWorkersLoading(true)
+    setJobsLoading(true)
     setError(null)
     try {
       const rows = await listWorkers()
@@ -67,7 +67,7 @@ export default function WorkerConsolePage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('backendRequestFailed'))
     } finally {
-      setWorkersLoading(false)
+      setJobsLoading(false)
     }
   }, [])
 
@@ -168,7 +168,7 @@ export default function WorkerConsolePage() {
       {error && <div className="worker-error"><AlertTriangle size={14} /> {error}</div>}
 
       <div className="worker-console-grid">
-        {/* Worker registration panel */}
+        {/* Worker registration */}
         <section className="worker-panel">
           <div className="worker-panel-head">
             <span className="worker-panel-label"><Users size={12} /> {t('workerRegisterTitle')}</span>
@@ -203,13 +203,13 @@ export default function WorkerConsolePage() {
         <section className="worker-panel">
           <div className="worker-panel-head">
             <span className="worker-panel-label"><Database size={12} /> {t('workersTitle')}</span>
-            <button className="btn btn-ghost btn-small" onClick={loadWorkers} disabled={workersLoading}>
+            <button className="btn btn-ghost btn-small" onClick={loadWorkers} disabled={jobsLoading}>
               <RefreshCw size={12} /> {t('consoleRefresh')}
             </button>
           </div>
-          {workersLoading && <p className="worker-loading">{t('consoleLoading')}</p>}
-          {!workersLoading && workers.length === 0 && <p className="worker-empty">{t('workerNoWorkers')}</p>}
-          {!workersLoading && workers.length > 0 && (
+          {jobsLoading && <p className="worker-loading">{t('consoleLoading')}</p>}
+          {!jobsLoading && workers.length === 0 && <p className="worker-empty">{t('workerNoWorkers')}</p>}
+          {!jobsLoading && workers.length > 0 && (
             <table className="worker-table">
               <thead>
                 <tr>
@@ -288,7 +288,7 @@ export default function WorkerConsolePage() {
                 </label>
                 <label className="worker-field">
                   <span>{t('resultUri')}</span>
-                  <input className="text-input" value={completeResultUri} onChange={(e) => setCompleteResultUri(e.target.value)} placeholder="https://storage.example.com/result.glb" />
+                  <input className="text-input" value={completeResultUri} onChange={(e) => setCompleteResultUri(e.target.value)} placeholder="64 hex chars" />
                 </label>
                 <label className="worker-field">
                   <span>{t('resourceReceipt')}</span>
