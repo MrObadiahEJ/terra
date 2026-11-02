@@ -39,18 +39,18 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 | REQ-026 | Distributed spatial component package & assembly | P1 | 4 – SPECIFIED ONLY | Chapter 11; RFC-015 (planned) | `chapters/11-distributed-spatial-reconstruction-and-assembly.md` | — |
 | REQ-027 | World Representation Manifest & central coordination | P1 | 4 – SPECIFIED ONLY | Chapter 12 | `chapters/12-world-runtime-and-synchronized-rendering.md` | — |
 | REQ-028 | Progressive delivery & runtime discovery | P1 | 4 – SPECIFIED ONLY | Chapter 13 | `chapters/13-global-spatial-data-delivery-and-progressive-visualization.md` | — |
-| REQ-029 | No single point of control — no mandatory central operator for protocol operation | P0 | 4 – SPECIFIED ONLY | RFC-016 §1.1 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-030 | Protocol/application separation — applications/marketplaces acquire no protocol-level authority | P0 | 4 – SPECIFIED ONLY | RFC-016 §1.2 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-031 | No universal shutdown mechanism — emergency controls narrowly scoped, time-limited, auditable | P0 | 4 – SPECIFIED ONLY | RFC-016 §1.3 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-032 | Measurable decentralization — 12 categories with concentration-risk indicators | P0 | 4 – SPECIFIED ONLY | RFC-016 §2 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-033 | Distributed validator review for privacy/security — local+global, verifiable randomization, anti-collusion | P0 | 4 – SPECIFIED ONLY | RFC-016 §3.2 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-034 | Privacy request lifecycle — authentication → scope → classification → emergency → distributed review → quorum → appeal → finalized | P0 | 4 – SPECIFIED ONLY | RFC-016 §4 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-035 | Privacy state versioning + remedies — `PUBLIC`…`RESTORED`; restrict/redact/encrypt/revoke/tombstone/correct/reject | P0 | 4 – SPECIFIED ONLY | RFC-016 §4.7 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-036 | Scoped jurisdictional restrictions — authenticated, scoped, expiry/review, challengeable, not auto-global | P0 | 4 – SPECIFIED ONLY | RFC-016 §5 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-037 | Security incentives & slashing with due process — rewards not outcome-dependent; slashing requires provable violation | P0 | 4 – SPECIFIED ONLY | RFC-016 §6 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-038 | Storage independence & censorship resilience — multi-provider, replication, fallback, recovery | P0 | 4 – SPECIFIED ONLY | RFC-016 §7 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-039 | On-chain enforces decision process; off-chain implements enforcement; AI must not decide privacy disputes | P0 | 4 – SPECIFIED ONLY | RFC-016 §8 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
-| REQ-040 | Abuse prevention — proportionality, public-interest evidence preservation, appeals/restoration, privacy-not-censorship | P0 | 4 – SPECIFIED ONLY | RFC-016 §9 | `docs/rfc-016-protocol-security-decentralization-privacy.md` | — |
+| REQ-029 | No single point of control — no mandatory central operator for protocol operation | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §1.1 | `src/security.rs` (SecurityRequest PDAs + instructions); `docs/rfc-016-protocol-security-decentralization-privacy.md` | `security.rs` compiles; no BPF tests yet |
+| REQ-030 | Protocol/application separation — applications/marketplaces acquire no protocol-level authority | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §1.2 | `src/security.rs` (on-chain enforces process; off-chain implements enforcement) | `security.rs` compiles; no BPF tests yet |
+| REQ-031 | No universal shutdown mechanism — emergency controls narrowly scoped, time-limited, auditable | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §1.3 | `src/security.rs` (EmergencyProtection PDA + `emergency_protect` instruction with expires_at) | `security.rs` compiles; no BPF tests yet |
+| REQ-032 | Measurable decentralization — 12 categories with concentration-risk indicators | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §2 | `src/security.rs` (random reviewer assignment, reputation-gated); `validator_registry.rs` (ValidatorRelationshipEdge) | `security.rs` compiles; no BPF tests yet |
+| REQ-033 | Distributed validator review for privacy/security — local+global, verifiable randomization, anti-collusion | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §3.2 | `src/security.rs` (SecurityReviewCase, SecurityReviewAssignment PDAs + instructions); reuses `validator_profile.rs` reputation gating | `security.rs` compiles; no BPF tests yet |
+| REQ-034 | Privacy request lifecycle — authentication → scope → classification → emergency → distributed review → quorum → appeal → finalized | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §4 | `src/security.rs` (PrivacyRequest PDA + full lifecycle instructions) | `security.rs` compiles; no BPF tests yet |
+| REQ-035 | Privacy state versioning + remedies — `PUBLIC`…`RESTORED`; restrict/redact/encrypt/revoke/tombstone/correct/reject | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §4.7 | `src/security.rs` (PrivacyState PDA + remedy_type enum) | `security.rs` compiles; no BPF tests yet |
+| REQ-036 | Scoped jurisdictional restrictions — authenticated, scoped, expiry/review, challengeable, not auto-global | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §5 | `src/security.rs` (JurisdictionalRestrictionRequest PDA + `submit_jurisdictional_restriction` instruction) | `security.rs` compiles; no BPF tests yet |
+| REQ-037 | Security incentives & slashing with due process — rewards not outcome-dependent; slashing requires provable violation | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §6 | Reuses `task_economics.rs` escrow/reward + `staking.rs` slashing infrastructure | `staking.rs`/`task_economics.rs` compile; BPF staking suites exist |
+| REQ-038 | Storage independence & censorship resilience — multi-provider, replication, fallback, recovery | P1 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §7 | `src/routes/providers.rs` (multi-provider storage, fallback, replication) | API 133/133; provider tests |
+| REQ-039 | On-chain enforces decision process; off-chain implements enforcement; AI must not decide privacy disputes | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §8 | `src/security.rs` (on-chain decision finalization); `src/routes/reconstruction.rs` (AI provenance fields, fail-closed validation) | API 128/128 (7 provenance tests); `security.rs` compiles |
+| REQ-040 | Abuse prevention — proportionality, public-interest evidence preservation, appeals/restoration, privacy-not-censorship | P0 | 2 – IMPLEMENTED, NOT FULLY VERIFIED | RFC-016 §9 | `src/security.rs` (appeal mechanism, proportional remedy selection) | `security.rs` compiles; no BPF tests yet |
 
 ## Orphan / drift checks (per directive §14)
 
@@ -61,10 +61,9 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
   (chapters + intents + acceptance criteria written; ⚠ founder review flags
   pending on Q-003/Q-004). REQ-023 is `RESEARCH REQUIRED` (Q-005 hard gate).
   REQ-026…REQ-028 are `SPECIFIED ONLY` (architecture chapters 11–13 written;
-  no implementation code). REQ-029…REQ-040 (security directive) are `SPECIFIED
-  ONLY` (RFC-016 written; threat model + gap analysis in Chapter 14/E5; no
-  security PDAs/instructions implemented yet). All intentional; tracked in
-  ROADMAP Stages 3–4.5.
+  no implementation code). REQ-029…REQ-040 are `IMPLEMENTED, NOT FULLY VERIFIED`
+  (on-chain PDAs + instructions in `src/security.rs`; no BPF tests yet, not
+  deployed to devnet). All intentional; tracked in ROADMAP Stages 3–4.5.
 - **Vision elements at risk of drift:** AI provenance (REQ-024) is now
   recorded on drafts (R-014 resolved); future model outputs must use those
   fields, never free-text `method` alone.
