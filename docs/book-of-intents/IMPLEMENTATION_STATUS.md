@@ -74,12 +74,13 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | D3 | Story video export (MediaRecorder, aspect presets, caption burn-in, cancel, PNG still, receipts) | 1 | `story/export.ts`; commit `0f0cc2e` | Browser-dependent codecs; no server-side render |
 | D4 | Road-graph journey navigation (parse, snap, build graph, route, build route) | 1 | `story/roads.ts` + `roads.test.ts` (vitest); commit `54ad2bd` | Runs **client-side**; server `/geo/route` endpoint absent (OPEN_QUESTIONS Q-007) |
 | D5 | i18n en/fr/ru/zh | 1 | `lib/locale.tsx`; fr/zh leak checks in settlement CDP smoke | — |
+| D6 | Bundle discipline (R-012): route-level lazy loading enforced by a build gate | 1 | `scripts/check-bundle.mjs`; `pnpm build:check`; CI frontend job | Ceilings: entry 340 kB gz, initial 360 kB, Cesium 1200 kB, total 1900 kB; raising one is a Book decision |
 
 ## E. Repository & operations
 
 | # | Capability | Status | Evidence | Gap / note |
 | --- | --- | --- | --- | --- |
-| E1 | CI (typecheck `tsc -b` + vitest on frontend job; Rust lib/rfc012/geo/API suites; SBF build + 307-test BPF integration suite) | 1 | `.github/workflows/ci.yml`; commit `b2ddf80`; CI run `41474466105` green (2026-11-02) | Solana toolchain pinned `v3.1.14` — bump together with `solana-program-test`; `stable` builds are rejected by the pinned runtime (R-008 resolved) |
+| E1 | CI (typecheck `tsc -b` + vitest + build/bundle-budget on frontend job; Rust lib/rfc012/geo/API suites; SBF build + 307-test BPF integration suite) | 1 | `.github/workflows/ci.yml`; commit `b2ddf80`; R-012 bundle gate added 2026-11-02; CI run `41474466105` green (2026-11-02) | Solana toolchain pinned `v3.1.14` — bump together with `solana-program-test`; `stable` builds are rejected by the pinned runtime (R-008 resolved) |
 | E2 | License Apache-2.0 + TRADEMARKS.md | 1 | `LICENSE`, `TRADEMARKS.md`, workspace license field | — |
 | E3 | Deploy keypair hygiene | 1 | `deploy.sh` verifies canonical keypairs vs `declare_id!` (registry `GaEDbkt…Tbage`, identity `HyjpaHY…Vo6p`) | — |
 | E4 | Book of Intents (this document set) | 3 – PARTIALLY IMPLEMENTED | this directory; sprint 002; chapters 01–10 (09 replay, 10 derived compute/auth/provenance) | Remaining volumes depend on research-gated intents (Q-003/Q-005); registers are current |
@@ -95,3 +96,4 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
 | Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-11-02 (executed)** | each story change |
 | Frontend gates (`tsc -b` + eslint + build) | green | **2026-11-02 (executed)** | each story change |
+| Frontend bundle budget (`pnpm build:check`) | entry **295 kB gz** / initial **301 kB** / Cesium **1098 kB lazy** / total **1678 kB** | **2026-11-02 (executed)** | each frontend build |

@@ -158,3 +158,9 @@ jobs:
 
       - name: Unit tests
         run: pnpm exec vitest run
+
+      # R-012: build the app and enforce the bundle budget. Cesium (~1.1 MB
+      # gzip) must stay behind a lazy route import; the initial graph and the
+      # total shipped JS have ceilings.
+      - name: Build + bundle budget
+        run: pnpm build:check

@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-02 (working tree on top of `d5ffdd1`).
+Last reconciled: 2026-11-02 (working tree on top of `3ee842f`).
 
 ## Active intents
 
@@ -26,6 +26,7 @@ Last reconciled: 2026-11-02 (working tree on top of `d5ffdd1`).
 | Frontend local verification (no funding) | **done (2026-11-02)** | dev server + local API; `/welcome`, `/stories`, `/demo` (VERIFIED, 12 events / 9938 ms), `/story/demo-road-journey` all render; sprints/007 |
 | R-014 — AI provenance on geometry drafts (REQ-024) | **done (2026-11-02)** | migration 0034: `provenance_kind` + model provider/name/version/confidence; fail-closed validation; API **128/128** (7 tests); live smoke **13/13**; DB constraints verified; sprints/008 |
 | Book volume 10 (derived compute, auth, AI provenance) | **done (2026-11-02)** | `chapters/10-derived-compute-and-provenance.md`; index/SUMMARY; E4 evidence; sprints/009 |
+| R-012 — bundle discipline gate | **done (2026-11-02)** | `terra-web/scripts/check-bundle.mjs` + `pnpm build:check`; CI frontend job now builds; entry **295 kB gz**, initial **301 kB**, Cesium **1098 kB lazy**; negative test exits 1; sprints/010 |
 
 ## Known blockers
 
@@ -44,6 +45,8 @@ Last reconciled: 2026-11-02 (working tree on top of `d5ffdd1`).
    all render against the local API (sprints/007).
 2. Remaining non-chain work: frontend/UX polish and small API hardening;
    larger requirements (REQ-020…REQ-023) stay research-gated (Q-003/Q-005).
+   R-012 bundle gate is in place — future frontend work must pass `pnpm
+   build:check` (sprints/010).
 3. **Last:** fund the devnet deployer wallet (`CCng7wFcSKCh1RadwcFEN36E4tRrPy1D64fwsQDrsy4m`)
    — founder action, Q-001 — then `./deploy.sh devnet` + Stage 2 on-chain smoke
    (A1/B6 cluster-verified).

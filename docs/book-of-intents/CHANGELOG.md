@@ -161,3 +161,15 @@ Format: date · version · what changed · evidence/why. Append-only.
   not verification). Includes failure-mode table and acceptance evidence.
 - Index/SUMMARY updated; E4 evidence now lists chapters 01–10; sprint 009.
   Documentation only — no behavior change.
+
+## 2026-11-02 — Bundle discipline gate (R-012)
+
+- `terra-web/scripts/check-bundle.mjs` enforces route-level lazy loading after
+  `vite build`: no Cesium in the initial graph, and gzip ceilings for the
+  entry chunk (340 kB), initial graph (360 kB), Cesium chunk (1200 kB) and
+  total JS (1900 kB).
+- Measured: entry **295 kB gz**, initial **301 kB**, Cesium **1098 kB** (lazy),
+  total **1678 kB**. A lowered-budget copy exits 1, so the failure path works.
+- CI frontend job now runs `pnpm build:check` (it previously type-checked and
+  unit-tested but never built the app). R-012 mitigated; D6 added; sprint 010.
+  No SOL required.
