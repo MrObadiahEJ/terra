@@ -84,6 +84,10 @@ Never inflate a status. When evidence is unavailable, say so.
 - [INT-004 GIS bridge](intents/INT-004-gis-bridge.md) — `PARTIALLY IMPLEMENTED`
 - [INT-005 institutional identity](intents/INT-005-institutional-identity.md) — `PROPOSED`
 
+### RFCs
+
+- [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, `SPECIFIED ONLY`)
+
 ### Work & sprints
 
 - [work/CURRENT.md](work/CURRENT.md) — active execution state.
@@ -173,4 +177,48 @@ Stage 1 is complete (constitution, derived compute, external replay, verificatio
 - Merging `terra-geom-v2` into production until an integrate-or-deprecate decision is recorded (ADR-016).
 - A reconstruction marketplace before task_economics primitives are extended to reconstruction task types.
 - Any feature that blurs protocol results with legal title/ownership (RISK R-005).
+
+---
+
+## Non-negotiable design principles
+
+The following principles guide every proposed architecture and implementation:
+
+1. **One world, many independent components.** Terra makes independently produced
+   and stored spatial objects interoperable.
+2. **Central coordination does not mean centralized geometry storage.** A logical
+   global structure may coordinate the world while the underlying assets remain
+   independently stored.
+3. **One coherent experience, distributed execution.** Users experience a
+   connected spatial representation even when its components are retrieved from
+   different providers.
+4. **Progressive availability.** Useful representations are visible before the
+   highest-detail reconstruction is complete.
+5. **Incremental updates.** Updating one roof, facade, parcel boundary, or terrain
+   component does not require rebuilding the entire region.
+6. **Engine independence.** Terra does not depend on one reconstruction engine,
+   one AI model, one vendor, or one GPU architecture.
+7. **Hardware inclusivity.** Workers participate according to their capabilities,
+   with optional high-performance processing rather than mandatory high-end
+   hardware.
+8. **Versioned truth claims.** A model is a representation supported by evidence,
+   not automatically the physical truth.
+9. **Independent validation.** Financial incentives, provider reputation, staking,
+   and model confidence do not determine whether a physical-world claim is true.
+10. **Global interoperability with local adaptation.** Local requirements are
+    supported without fragmenting global identity and data structures.
+11. **Privacy by component.** Public spatial information does not expose private
+    information by association.
+12. **Open interfaces.** Third-party engines, storage providers, visualization
+    applications, and institutions integrate without requiring permission from one
+    proprietary platform, subject to security and compliance requirements.
+13. **Economic transparency.** Every funded task has defined deliverables,
+    resource accounting, acceptance criteria, and settlement conditions.
+14. **No automatic property rights from compute or funding.** Reconstructing or
+    financing a spatial object does not create ownership of the underlying land
+    or building.
+15. **Build foundations before global scale.** A small working system with correct
+    identity, packaging, assembly, runtime, and retrieval is more valuable than a
+    large collection of disconnected features.
+
 

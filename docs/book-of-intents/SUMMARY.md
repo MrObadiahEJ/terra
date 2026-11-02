@@ -8,14 +8,19 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md) — central index & vocabulary
 - [TERRA_VISION.md](TERRA_VISION.md) — authoritative vision
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — evidence register
-- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-025
-- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…013
+- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-028
+- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…016
 - [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…012
-- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…017
+- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…021
 - [RESEARCH_REFERENCES.md](RESEARCH_REFERENCES.md) — sources & dates
 - [ROADMAP.md](ROADMAP.md) — Stages 0–5
 - [CHANGELOG.md](CHANGELOG.md) — Book history
 - [AGENT_GUIDE.md](AGENT_GUIDE.md) — operating manual
+
+## RFCs
+
+- [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, SPECIFIED ONLY)
+
 
 ## Volumes
 

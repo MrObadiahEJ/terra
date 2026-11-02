@@ -2,6 +2,22 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-02 — RFC-015 Spatial Component Package + remaining Part XIV diagrams + Part XVI principles
+
+- New `rfc-015-spatial-component-package.md` — Spatial Component Package schema
+  (component ID, physical entity ID, relationships, geometry artifact, format,
+  digest algorithm version, CRS, elevation reference, transform, bounding volume,
+  resolution/LOD, evidence refs, engine identity/version, provenance,
+  accuracy/uncertainty, validation state, version lineage) + 8 conformance rules
+  (REQ-026, `SPECIFIED ONLY`).
+- Added Diagram 3 — central coordination & decentralized storage (Chapter 12 §12.2.1).
+- Added Diagram 6 — component update lifecycle (Chapter 12 §12.9.1).
+- Added Diagram 7 — financial lifecycle (Chapter 5 §5.6.1).
+- Completed Diagram 8 — dependency roadmap (ROADMAP.md).
+- Added Part XVI — 15 non-negotiable design principles to `BOOK_OF_INTENTS.md`.
+- All 8 Part XIV technical diagrams now present across Chapters 11, 12, 13, 5 and ROADMAP.
+- Documentation only — no application code changed; no gate required.
+
 ## 2026-11-02 — Executive summary + Chapter 13 lazy-loading diagram + Chapter 3 traceability (sprint 024 follow-up)
 
 - Added `Executive summary` appendix to `BOOK_OF_INTENTS.md` answering the eight

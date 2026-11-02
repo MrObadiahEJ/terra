@@ -49,6 +49,52 @@ hierarchical regional manifests, or a distributed registry with a logical global
 root. Evaluate scalability and consistency implications before choosing
 (see Part XII, Founder decisions).
 
+## 12.2.1 Diagram — central coordination & decentralized storage
+
+```mermaid
+flowchart TB
+    subgraph WM[World Representation Manifest<br>logical, versioned, references only]
+        WM1[Region manifests]
+        WM2[Object IDs + versions]
+        WM3[Assembly relationships]
+        WM4[Storage references]
+        WM5[LODs + validation states]
+    end
+
+    subgraph REG[Spatial object registry<br>control plane]
+        R1[Object identity]
+        R2[Spatial index]
+        R3[Version references]
+        R4[Access authorization]
+    end
+
+    subgraph SP["Independent storage providers<br>(data plane — geometry, meshes, textures, point clouds)"]
+        P1[Provider A: object storage]
+        P2[Provider B: CDN]
+        P3[Provider C: IPFS / distributed]
+        P4[Provider D: commercial cloud]
+    end
+
+    subgraph RT[Runtime retrieval<br>client-side]
+        RT1[Discover providers]
+        RT2[Fetch components]
+        RT3[Verify digests]
+        RT4[Assemble scene graph]
+    end
+
+    WM --> REG
+    WM --> SP
+    REG --> RT
+    SP --> RT
+    RT --> WM[read manifest versions]
+    
+    style WM fill:#e1f5e1
+    style RT fill:#d4e6f1
+    style P1 fill:#fff3cd
+    style P2 fill:#fff3cd
+    style P3 fill:#fff3cd
+    style P4 fill:#fff3cd
+
 ---
 
 ## 12.3 Control plane vs data plane
@@ -73,6 +119,87 @@ data can be retrieved. The data plane supplies the actual content.
 **Constraint:** The control plane must not become a bottleneck for every
 rendered vertex or texture request. The data plane must support independent
 storage, replication, caching, and retrieval.
+
+## 12.3.1 Diagram — complete Terra architecture
+
+```mermaid
+flowchart TB
+    subgraph Observation["Layer 1 — Physical Observation & Evidence"]
+        O1[Smartphones / Cameras / Drones]
+        O2[Satellite / LiDAR / GNSS]
+        O3[Survey instruments / CAD / BIM]
+        O4[GIS / government datasets]
+    end
+
+    subgraph Identity["Layer 2 — Spatial Identity & Structure"]
+        I1[Stable object IDs]
+        I2[Relationship graph]
+        I3[Version lineage]
+    end
+
+    subgraph Reconstruction["Layer 3 — Spatial Processing & Reconstruction"]
+        R1[Photogrammetry / SfM / LiDAR]
+        R2[AI-assisted reconstruction]
+        R3[GIS / CAD-BIM conversion]
+    end
+
+    subgraph Storage["Layer 4 — Spatial Component Storage (independent)"]
+        S1[Provider A: object storage]
+        S2[Provider B: CDN]
+        S3[Provider C: IPFS / distributed]
+    end
+
+    subgraph Coordination["Layer 5 — Spatial Registry & Coordination"]
+        C1[World Representation Manifest]
+        C2[Spatial index]
+        C3[Assembly relationships]
+    end
+
+    subgraph Assembly["Layer 6 — Spatial Assembly & World Organization"]
+        A1[Component registration + alignment]
+        A2[Conflict detection]
+        A3[Incremental assembly]
+    end
+
+    subgraph Runtime["Layer 7 — Distributed Runtime & Synchronization"]
+        RT1[Spatial discovery]
+        RT2[Manifest resolver]
+        RT3[Asset retrieval]
+        RT4[Scene graph + LOD manager]
+    end
+
+    subgraph Visualization["Layer 8 — Visualization & Interaction"]
+        V1[Cesium globe / Leaflet]
+        V2[Progressive LOD rendering]
+    end
+
+    subgraph Validation["Layer 9 — Validation & Trust"]
+        VAL1[Technical verification]
+        VAL2[Domain validation]
+        VAL3[Reputation / collateral]
+    end
+
+    subgraph Economics["Layer 10 — Economic Coordination"]
+        EC1[Task escrow + settlement]
+        EC2[Coverage investment]
+        EC3[Staking / collateral]
+    end
+
+    Observation --> Identity
+    Identity --> Reconstruction
+    Reconstruction --> Storage
+    Storage --> Coordination
+    Coordination --> Assembly
+    Assembly --> Runtime
+    Runtime --> Visualization
+    Validation -.-> Reconstruction
+    Validation -.-> Assembly
+    Economics -.-> Reconstruction
+    Economics -.-> Runtime
+
+    style C1 fill:#e1f5e1
+    style RT1 fill:#d4e6f1
+    style V1 fill:#d4e6f1
 
 ---
 
@@ -214,11 +341,33 @@ newer version is being prepared.
 Do not assume every spatial update must be globally synchronized at the same
 instant.
 
+## 12.9.1 Diagram — component update lifecycle
+
+```mermaid
+flowchart TD
+    R1[Roof component changed<br>new version candidate]
+    R2[Validate component candidate<br>digest, CRS, conformance]
+    R3[Identify affected<br>assembly dependencies]
+    R4[Create new assembly candidate]
+    R5[Recompute only affected<br>relationships / derived outputs]
+    R6[Publish new manifest version]
+    R7[Notify connected clients]
+    R8[Client transitions safely<br>to new version]
+    R9[Old clients keep rendering<br>previous consistent assembly]
+    
+    R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8
+    R6 --> R9
+    
+    style R1 fill:#e1f5e1
+    style R6 fill:#d4e6f1
+    style R8 fill:#fff3cd
+    style R9 fill:#fff3cd
+
+---
+
 For collaborative annotations and metadata, consider CRDTs only where their
 conflict-resolution properties are appropriate. Do not use CRDTs as a
 substitute for validating physical geometry.
-
----
 
 ## 12.10 Runtime failure behavior
 

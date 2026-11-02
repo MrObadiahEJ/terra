@@ -87,6 +87,34 @@ illustrative and subject to simulation, governance, and legal review.
 Research securities, crowdfunding, custody, tax, and consumer-protection
 implications before recommending a real investment product.
 
+## 5.6.1 Diagram — financial lifecycle
+
+```mermaid
+flowchart TB
+    REQ[Requester<br>creates Task Manifest]
+    VAL[Terra validates<br>task specification]
+    PROV[Eligible providers<br>discovered]
+    BID[Offers / bids<br>collected]
+    SCH[Scheduler selects<br>providers]
+    ESC[Funds reserved<br>in escrow]
+    WK[Work assigned<br>executed]
+    REC[Resource usage<br>receipts reported]
+    SUB[Outputs submitted<br>as component packages]
+    TECH[Automated technical<br>checks]
+    VAL2[Independent validation<br>when required]
+    ACC[Accepted work settled]
+    REJ[Rejected work: dispute /<br>retry / refund rules]
+    
+    REQ --> VAL --> PROV --> BID --> SCH --> ESC --> WK --> REC --> SUB --> TECH --> VAL2 --> ACC
+    VAL2 -.-> REJ
+    
+    style REQ fill:#e1f5e1
+    style ESC fill:#d4e6f1
+    style ACC fill:#e1f5e1
+    style REJ fill:#f8d7da
+
+---
+
 ## 5.7 Acceptance criteria (before status leaves `PROPOSED`)
 
 - [ ] Written securities/custody research in RESEARCH_REFERENCES covering ≥2

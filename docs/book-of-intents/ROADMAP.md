@@ -119,3 +119,24 @@ disclaimers reviewed by counsel. Mainnet deployment is founder-authorized only
 
 Update statuses with evidence → CHANGELOG entry → traceability matrix → risk/
 question registers → this roadmap. Chapters update only where affected.
+
+## Roadmap diagram — dependency-ordered stages
+
+```mermaid
+flowchart LR
+    S0[Stage 0 — Foundations<br>complete<br>(parcel, rights, escrow,<br>staking, spatial assets)]
+    S1[Stage 1 — Complete<br>(constitution, derived compute,<br>external replay, auth fix,<br>AI provenance, bundle gate)]
+    S2[Stage 2 — Devnet truth<br>Q-001 funding (founder)<br>→ deploy + on-chain smoke]
+    S3[Stage 3 — Specifications<br>REQ-020/021/022 → SPECIFIED ONLY<br>REQ-026/027/028 → SPECIFIED ONLY]
+    S4[Stage 4 — Research-gated<br>institutional identity,<br>residency, liens,<br>distributed reconstruction<br>& runtime]
+    S5[Stage 5 — Mainnet gate<br>founder decision only]
+    
+    S0 --> S1 --> S2 --> S3 --> S4 --> S5
+    
+    style S0 fill:#e1f5e1
+    style S1 fill:#e1f5e1
+    style S2 fill:#fff3cd
+    style S3 fill:#d4e6f1
+    style S4 fill:#fff3cd
+    style S5 fill:#f8d7da
+```
