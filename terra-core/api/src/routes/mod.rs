@@ -1,6 +1,7 @@
 use axum::Router;
 
 pub mod activity;
+pub mod assemblies;
 pub mod authority_registry;
 pub mod components;
 pub mod manifests;
@@ -37,6 +38,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .nest("/parcels", parcels::router())
         .nest("/identities", identities::router())
+        .nest("/assemblies", assemblies::router())
         .nest("/authority-registry", authority_registry::router())
         .nest("/components", components::router())
         .nest("/manifests", manifests::router())
