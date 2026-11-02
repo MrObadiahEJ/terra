@@ -12,6 +12,7 @@ import {
 import { buildingHeightM, roadStyle, type PlannedRoad } from '../../lib/atlasLayers'
 import { FpsWatchdog, TIER_SETTINGS, type GraphicsTier } from '../../lib/perfTier'
 import { resolveTerrain, type TerrainStatus } from '../../lib/cesiumTerrain'
+import { type SceneNodeRow } from '../../lib/runtime'
 import LeafletMap from './LeafletMap'
 
 // Ion stays off by default: world terrain and 3D tiles are an explicit,
@@ -56,6 +57,8 @@ interface TerraGlobeProps {
   onDrawFinish: () => void
   onParcelClick: (id: string) => void
   onBuildingClick?: (osmId: number) => void
+  /** Fetch an unfetched runtime scene node's component asset. */
+  onFetchComponent?: (node: SceneNodeRow) => void
   viewMode: '2d' | '3d'
   focus?: FocusTarget | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
@@ -82,6 +85,12 @@ interface TerraGlobeProps {
   onTerrainStatus?: (status: TerrainStatus) => void
   /** Optional 3D Tiles tileset (photogrammetry model, RFC-013 Ph.C). */
   tilesetUrl?: string | null
+  /** Runtime scene graph nodes (REQ-027/REQ-028): independently stored
+   *  components fetched with provider fallback. Rendered as clamped
+   *  footprint polygons; fetched nodes render as extruded volumes. */
+  runtimeNodes?: SceneNodeRow[]
+  /** IDs of nodes whose component assets have been fetched (render as volumes). */
+  fetchedNodeIds?: string[]
   /** One-shot camera commands (reset view, north-up, tilt). */
   viewCommand?: ViewCommand | null
 }
@@ -146,6 +155,9 @@ export default function TerraGlobe({
   onTierCapped,
   onTerrainStatus,
   tilesetUrl = null,
+  runtimeNodes = [],
+  fetchedNodeIds = [],
+  onFetchComponent,
   viewCommand = null,
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -460,6 +472,12 @@ export default function TerraGlobe({
         }
         const bldId: number | undefined = props?.bldId?.getValue(undefined)
         if (bldId !== undefined && bldId !== null) onBuildingClick?.(Number(bldId))
+        const rtNodeId: string | undefined = props?.rtNodeId?.getValue(undefined)
+        if (rtNodeId !== undefined) {
+          const node = runtimeNodes.find((n) => n.id === rtNodeId)
+          if (node) onFetchComponent?.(node)
+          return
+        }
       }
     }
 
@@ -467,7 +485,7 @@ export default function TerraGlobe({
     return () => {
       handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK)
     }
-  }, [onDrawVertexAdd, onParcelClick, onBuildingClick])
+  }, [onDrawVertexAdd, onParcelClick, onBuildingClick, runtimeNodes, onFetchComponent])
 
   // ---- double-click: finish the ring while drawing (keep Cesium default) ---
   useEffect(() => {
@@ -693,7 +711,73 @@ export default function TerraGlobe({
     }
   }, [tilesetUrl])
 
-  // ---- active drawing overlay (vertices + rubber-band line) ----------------
+  // ---- runtime scene graph nodes (REQ-027/REQ-028) -------------------------
+  // Render each independently stored component as a clamped footprint polygon.
+  // Nodes that have been fetched (asset bytes in cache) render as extruded
+  // volumes; unfetched nodes render as outlines with a "pending" badge, and
+  // can be fetched on click via the page's fetchComponent callback.
+  const fetchedNodesRef = useRef<Set<string>>(new Set())
+  // Sync fetched node IDs from props into the ref for render decisions.
+  fetchedNodeIds.forEach((id) => fetchedNodesRef.current.add(id))
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    removeEntitiesByIdPrefix(viewer, ['rt-'])
+
+    for (const node of runtimeNodes) {
+      const extent = node.spatial_extent
+      if (!extent || extent.type !== 'Polygon') continue
+      const ring = extent.coordinates?.[0]
+      if (!ring || ring.length < 4) continue
+      const hierarchy = ring.map(([lon, lat]: [number, number]) => Cesium.Cartesian3.fromDegrees(lon, lat))
+      const isFetched = fetchedNodesRef.current.has(node.object_id)
+      viewer.entities.add({
+        id: `rt-${node.id}`,
+        name: node.object_id,
+        polygon: {
+          hierarchy: new Cesium.PolygonHierarchy(hierarchy),
+          height: 0,
+          extrudedHeight: isFetched ? 12 : undefined,
+          ...(isFetched
+            ? {
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+                extrudedHeightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              }
+            : {}),
+          material: isFetched
+            ? Cesium.Color.CYAN.withAlpha(0.5)
+            : Cesium.Color.ORANGE.withAlpha(0.25),
+          outline: true,
+          outlineColor: isFetched
+            ? Cesium.Color.CYAN
+            : Cesium.Color.ORANGE,
+          classificationType: Cesium.ClassificationType.TERRAIN,
+        },
+        properties: {
+          rtNodeId: node.id,
+          rtObjectId: node.object_id,
+          rtComponentVersion: node.component_version_id,
+          rtLoaded: isFetched,
+        },
+        label:
+          showLabels
+            ? {
+                text: node.object_id.slice(0, 10),
+                font: '10px sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                pixelOffset: new Cesium.Cartesian2(0, -14),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                showBackground: true,
+                backgroundColor: isFetched
+                  ? Cesium.Color.CYAN.withAlpha(0.7)
+                  : Cesium.Color.ORANGE.withAlpha(0.7),
+              }
+            : undefined,
+      })
+    }
+    viewer.scene.requestRender()
+  }, [runtimeNodes, fetchedNodeIds, showLabels, graphicsTier])
+
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return

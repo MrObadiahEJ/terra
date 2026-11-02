@@ -166,6 +166,7 @@ struct ManifestObjectForScene {
     pub storage_reference: String,
     pub validation_state: String,
     pub available_lods: Vec<i32>,
+    pub spatial_extent: serde_json::Value,
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +175,7 @@ struct ManifestObjectForScene {
 
 const MANIFEST_OBJECTS_FOR_SCENE: &str = "SELECT id, manifest_id, object_id, \
     component_version_id, storage_reference, validation_state, \
-    available_lods FROM manifest_objects WHERE manifest_id = $1 ORDER BY object_id";
+    available_lods, spatial_extent FROM manifest_objects WHERE manifest_id = $1 ORDER BY object_id";
 
 const INSERT_SCENE_GRAPH: &str = "INSERT INTO scene_graphs (manifest_id, region_id, \
     lod_level, node_count, status) VALUES ($1, $2, $3, $4, $5) RETURNING id";

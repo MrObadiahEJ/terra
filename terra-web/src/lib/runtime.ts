@@ -33,6 +33,7 @@ export interface SceneNodeRow {
   visibility: string
   loading_state: string
   created_at: string
+  spatial_extent: any
 }
 
 export interface SceneWithNodes {

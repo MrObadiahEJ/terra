@@ -360,6 +360,7 @@ export default function GlobePage() {
     componentVersion: string
     sizeBytes: number
   } | null>(null)
+  const [fetchedNodeIds, setFetchedNodeIds] = useState<string[]>([])
   // Distributed runtime: current manifest for the camera's region
   const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
   const [currentRegion, setCurrentRegion] = useState<string | null>(null)
@@ -583,6 +584,7 @@ export default function GlobePage() {
           componentVersion: node.component_version_id,
           sizeBytes: data.byteLength,
         })
+        setFetchedNodeIds((prev) => (prev.includes(node.object_id) ? prev : [...prev, node.object_id]))
       } catch (err) {
         setSceneError(
           err instanceof Error
@@ -964,6 +966,9 @@ export default function GlobePage() {
           onTierCapped={onTierCapped}
           onTerrainStatus={setTerrainStatus}
           tilesetUrl={tilesetUrl}
+          runtimeNodes={sceneGraph?.nodes ?? []}
+          fetchedNodeIds={fetchedNodeIds}
+          onFetchComponent={fetchComponent}
           viewCommand={viewCommand}
         />
 
