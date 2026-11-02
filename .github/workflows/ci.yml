@@ -52,9 +52,13 @@ jobs:
       # R-008: the integration suites load prebuilt `.so` artifacts and refuse
       # to run against a stale build. Build them in CI, then run the full BPF
       # suite (307 tests) — the same gate used locally.
+      # Pin the toolchain to the 3.1.x line that matches `solana-program-test`
+      # in Cargo.lock: artifacts built by a newer (SBPF v3) toolchain are
+      # rejected by the pinned runtime ("Unsupported program id"). Bump both
+      # together.
       - name: Install Solana toolchain
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.14/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
       - name: Build program artifacts (SBF)
