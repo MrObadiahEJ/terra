@@ -94,8 +94,11 @@ builds only, `CARGO_INCREMENTAL=0` for cargo):
 cd terra-web && pnpm exec tsc -b --noEmit && pnpm exec eslint . && pnpm build && pnpm exec vitest run
 CARGO_INCREMENTAL=0 cargo test -p terra-api
 cargo test -p terra-registry --lib
+anchor build --skip-lint            # BPF suites load target/deploy/*.so and
+                                    # fail loudly on a stale/missing build
 cargo test -p terra-registry --test integration -- --test-threads=1   # 307 baseline
-cargo test -p terra-geo-engine
+cargo test -p terra-identity --test integration                       # 23 baseline
+cargo test -p terra-geo             # 12 + 1 ignored (2026-11-02)
 ```
 
 Local machine constraints (this dev box): ~1.6 GB free disk, 8 GB RAM, load

@@ -94,4 +94,4 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | Geo-engine | **12 (+1 ignored)** | **2026-11-02 (executed; suite grew from the 6 baseline)** | before release |
 | Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
 | Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-11-02 (executed)** | each story change |
-| Frontend gates (`tsc -b` + eslint + build) | green | 2026-10-16 era (CI) | each story change |
+| Frontend gates (`tsc -b` + eslint + build) | green | **2026-11-02 (executed)** | each story change |
