@@ -69,6 +69,7 @@ Never inflate a status. When evidence is unavailable, say so.
 - [chapters/06-lien-encumbrance.md](chapters/06-lien-encumbrance.md) — `PROPOSED`
 - [chapters/07-postgis-geo-engine.md](chapters/07-postgis-geo-engine.md) — partial (gaps listed)
 - [chapters/08-institutional-identity.md](chapters/08-institutional-identity.md) — `PROPOSED`.
+- [chapters/09-external-replay.md](chapters/09-external-replay.md) — verified (REQ-018)
 
 ### Intents
 

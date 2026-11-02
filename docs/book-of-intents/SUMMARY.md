@@ -11,7 +11,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…024
 - [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…013
 - [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…012
-- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…015
+- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…017
 - [RESEARCH_REFERENCES.md](RESEARCH_REFERENCES.md) — sources & dates
 - [ROADMAP.md](ROADMAP.md) — Stages 0–5
 - [CHANGELOG.md](CHANGELOG.md) — Book history
@@ -27,6 +27,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [Chapter 6 — Mortgage & Lien Encumbrance](chapters/06-lien-encumbrance.md) — `PROPOSED` (building blocks verified)
 - [Chapter 7 — PostGIS Mirror & Geo-Engine](chapters/07-postgis-geo-engine.md) — `PARTIALLY IMPLEMENTED` (gaps listed)
 - [Chapter 8 — Institutional Identity](chapters/08-institutional-identity.md) — `PROPOSED` (founder decision Q-003)
+- [Chapter 9 — External Read-Only Story Replay](chapters/09-external-replay.md) — `IMPLEMENTED AND VERIFIED` (REQ-018)
 
 Further volumes (Transactions & Lineage · AI-Assisted Understanding · Developer
 Ecosystem · Governance & Resilience · Land-Administration Research) are written

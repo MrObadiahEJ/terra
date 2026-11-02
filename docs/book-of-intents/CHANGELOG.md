@@ -62,6 +62,22 @@ Format: date · version · what changed · evidence/why. Append-only.
 - Evidence: API **117/117**; unsigned → 401, wrong key → 401, authority key →
   200; Phase 04 smoke re-run **16/16** under verification (sprints/004).
 
+## 2026-11-02 — RFC-014 Phase 05 (external read-only replay, REQ-018)
+
+- `routes/stories.rs`: `GET /stories/{id}/replay` (versioned replay document,
+  `terra.story-replay/v1`, `read_only: true`, `definition_hash`),
+  `GET /stories/{id}/replay.geojson` (`application/geo+json`: stops as Point,
+  routes as LineString), `GET /stories/schema/replay` (JSON Schema 2020-12
+  pinned by `$id`). All read-only and unauthenticated — presentation data,
+  never proof.
+- Stability policy: v1 additive-only; breaking change mints v2 at a new path.
+- Evidence: API suite **121/121** (4 new replay tests); live smoke — replay
+  fields verified, GeoJSON content-type, schema pinned, editing the story
+  changed `definition_hash`, missing ids → 404.
+- Book: Chapter 09 (+ SUMMARY/BOOK index), REQ-018/REQ-019 → status 1,
+  IMPLEMENTATION_STATUS B2 + API baseline 121, ROADMAP Stage 1 item 3 met,
+  work/CURRENT.md, sprints/005.
+
 ## 2026-10-31 — Security fix: verify Ed25519 signatures on privileged endpoints
 
 - **R-016 (H).** `complete_job`, `fail_job`, `invalidate_job` (`derived.rs`)

@@ -25,6 +25,9 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 3. **RFC-014 Phase 05 — external access** (REQ-018): read-only story replay
    endpoint + stable schema export for robotics/API consumers; GeoJSON export.
    *Exit:* endpoint tests + schema documented in the Book.
+   **Met 2026-11-02:** `/stories/{id}/replay`, `/replay.geojson`,
+   `/schema/replay`; `terra.story-replay/v1`; API 121/121; live smoke
+   (chapters/09, sprints/005).
 4. **Verification refresh** — re-run all cargo suites against `775e20a+`
    (baselines in IMPLEMENTATION_STATUS); confirm Rust CI jobs run full suites
    (R-008). *Exit:* updated baseline table with dates.

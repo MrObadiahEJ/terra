@@ -11,10 +11,13 @@
 //! receipt ledger, not a server renderer.
 
 use axum::extract::{Path, Query, State};
+use axum::http::header;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::auth::SignedRequest;
@@ -33,6 +36,10 @@ pub fn router() -> Router<AppState> {
             get(list_exports).post(create_export),
         )
         .route("/exports/{id}", put(update_export))
+        // RFC-014 Phase 05 — external read-only replay (REQ-018).
+        .route("/stories/{id}/replay", get(story_replay))
+        .route("/stories/{id}/replay.geojson", get(story_replay_geojson))
+        .route("/stories/schema/replay", get(replay_schema))
 }
 
 // ---------------------------------------------------------------------------
@@ -572,6 +579,355 @@ pub async fn get_story(
     Ok(Json(story_row(&state.pool, &id).await?))
 }
 
+// ---------------------------------------------------------------------------
+// RFC-014 Phase 05 — external read-only replay (REQ-018)
+// ---------------------------------------------------------------------------
+//
+// Robotics/API consumers cannot use the interactive player. These endpoints
+// expose the same deterministic story as (a) a versioned JSON replay document,
+// (b) GeoJSON for GIS stacks, and (c) a JSON Schema for the replay document.
+// All three are read-only and unauthenticated: a story is presentation data,
+// never chain state — nothing here proves a parcel, right, or geometry.
+// Stability policy: v1 gains fields only; a breaking change mints v2 at a
+// new path and keeps v1 serving.
+
+/// Replay schema identifier. Bump the suffix only for breaking changes.
+pub const REPLAY_SCHEMA: &str = "terra.story-replay/v1";
+
+/// WGS84 position with metres above the ellipsoid — the same frame the story
+/// player and the geo endpoints use.
+#[derive(Debug, Clone, Serialize)]
+pub struct Position {
+    pub lon: f64,
+    pub lat: f64,
+    pub height_m: f64,
+}
+
+/// One timeline entry. Mirrors `StoryStop` but flattens the position into an
+/// explicit object so consumers do not need to know the story dialect.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReplayStop {
+    /// Index in the stored definition (stable across replays of that version).
+    pub index: usize,
+    pub id: String,
+    pub kind: String,
+    pub label: String,
+    pub time_s: f64,
+    pub position: Position,
+    pub heading_deg: Option<f64>,
+    pub pitch_deg: Option<f64>,
+    pub parcel_id: Option<String>,
+    pub asset_pubkey: Option<String>,
+    pub geometry_version: Option<u32>,
+    pub caption: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StoryReplay {
+    pub schema: &'static str,
+    /// Always true: replay never writes state.
+    pub read_only: bool,
+    pub story_id: String,
+    pub story_type: String,
+    pub title: String,
+    pub description: Option<String>,
+    /// Story document version (independent of the replay schema version).
+    pub schema_version: u32,
+    pub duration_s: f64,
+    pub coordinate_system: &'static str,
+    /// SHA-256 of the stored definition JSON — lets a consumer detect a
+    /// changed story under a stable id.
+    pub definition_hash: String,
+    pub stop_count: usize,
+    /// Stops ordered by `time_s` (definition order is preserved by `index`).
+    pub timeline: Vec<ReplayStop>,
+    pub camera_track: CameraTrack,
+    pub routes: Vec<NavigationPath>,
+    pub captions: Vec<CaptionCue>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum GeoGeometry {
+    Point { coordinates: [f64; 3] },
+    LineString { coordinates: Vec<[f64; 2]> },
+}
+
+#[derive(Debug, Serialize)]
+pub struct GeoFeature {
+    #[serde(rename = "type")]
+    pub feature_type: &'static str,
+    pub geometry: GeoGeometry,
+    pub properties: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GeoFeatureCollection {
+    #[serde(rename = "type")]
+    pub collection_type: &'static str,
+    pub schema: &'static str,
+    pub story_id: String,
+    pub features: Vec<GeoFeature>,
+}
+
+/// Assemble the replay document from a stored story. Pure (no I/O) so the
+/// shape is unit-testable; the caller supplies the definition hash.
+pub fn build_replay(story: &Story, def: &StoryDefinition, definition_hash: String) -> StoryReplay {
+    let mut ordered: Vec<(usize, &StoryStop)> = def.stops.iter().enumerate().collect();
+    ordered.sort_by(|a, b| {
+        a.1.time_s
+            .partial_cmp(&b.1.time_s)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let timeline: Vec<ReplayStop> = ordered
+        .into_iter()
+        .map(|(index, s)| ReplayStop {
+            index,
+            id: s.id.clone(),
+            kind: s.kind.clone(),
+            label: s.label.clone(),
+            time_s: s.time_s,
+            position: Position {
+                lon: s.lon,
+                lat: s.lat,
+                height_m: s.height_m,
+            },
+            heading_deg: s.heading_deg,
+            pitch_deg: s.pitch_deg,
+            parcel_id: s.parcel_id.clone(),
+            asset_pubkey: s.asset_pubkey.clone(),
+            geometry_version: s.geometry_version,
+            caption: s.caption.clone(),
+        })
+        .collect();
+    StoryReplay {
+        schema: REPLAY_SCHEMA,
+        read_only: true,
+        story_id: story.id.clone(),
+        story_type: story.story_type.clone(),
+        title: story.title.clone(),
+        description: story.description.clone(),
+        schema_version: def.schema_version,
+        duration_s: story.duration_s,
+        coordinate_system: "WGS84 (EPSG:4326); heights in metres",
+        definition_hash,
+        stop_count: timeline.len(),
+        timeline,
+        camera_track: def.camera_track.clone(),
+        routes: def.routes.clone(),
+        captions: def.captions.clone(),
+    }
+}
+
+/// Stops → Point features; routes → LineString features. Heights ride in the
+/// third coordinate slot; GeoJSON allows mixed dimension per feature.
+pub fn build_geojson(story: &Story, def: &StoryDefinition) -> GeoFeatureCollection {
+    let mut features = Vec::with_capacity(def.stops.len() + def.routes.len());
+    for s in &def.stops {
+        features.push(GeoFeature {
+            feature_type: "Feature",
+            geometry: GeoGeometry::Point {
+                coordinates: [s.lon, s.lat, s.height_m],
+            },
+            properties: serde_json::json!({
+                "kind": "stop",
+                "stop_id": s.id,
+                "stop_kind": s.kind,
+                "label": s.label,
+                "time_s": s.time_s,
+                "heading_deg": s.heading_deg,
+                "pitch_deg": s.pitch_deg,
+                "parcel_id": s.parcel_id,
+                "asset_pubkey": s.asset_pubkey,
+                "geometry_version": s.geometry_version,
+            }),
+        });
+    }
+    for r in &def.routes {
+        features.push(GeoFeature {
+            feature_type: "Feature",
+            geometry: GeoGeometry::LineString {
+                coordinates: r.coordinates.clone(),
+            },
+            properties: serde_json::json!({
+                "kind": "route",
+                "route_id": r.id,
+                "method": r.method,
+                "length_m": r.length_m,
+                "label": r.label,
+            }),
+        });
+    }
+    GeoFeatureCollection {
+        collection_type: "FeatureCollection",
+        schema: REPLAY_SCHEMA,
+        story_id: story.id.clone(),
+        features,
+    }
+}
+
+/// Load a story plus the SHA-256 of its stored definition.
+async fn story_for_replay(
+    pool: &sqlx::PgPool,
+    id: &str,
+) -> Result<(Story, StoryDefinition, String), AppError> {
+    let row = sqlx::query_as::<_, StoryDbRow>(&format!(
+        "{SELECT_STORY}, definition FROM stories WHERE id = $1"
+    ))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::not_found("story not found"))?;
+    // serde_json's default map ordering is deterministic, so the hash is
+    // stable for unchanged definitions and changes when the story changes.
+    let canonical = serde_json::to_string(&row.definition)
+        .map_err(|e| AppError::internal(format!("serialize stored definition: {e}")))?;
+    let definition_hash = hex::encode(Sha256::digest(canonical.as_bytes()));
+    let (story, definition) = row.into_parts()?;
+    Ok((story, definition, definition_hash))
+}
+
+pub async fn story_replay(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<StoryReplay>, AppError> {
+    let (story, definition, hash) = story_for_replay(&state.pool, &id).await?;
+    Ok(Json(build_replay(&story, &definition, hash)))
+}
+
+pub async fn story_replay_geojson(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Response, AppError> {
+    let (story, definition, _) = story_for_replay(&state.pool, &id).await?;
+    let body = serde_json::to_vec(&build_geojson(&story, &definition))
+        .map_err(|e| AppError::internal(format!("serialize geojson: {e}")))?;
+    Ok(([(header::CONTENT_TYPE, "application/geo+json")], body).into_response())
+}
+
+fn replay_schema_doc() -> serde_json::Value {
+    serde_json::json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://terra.example/schemas/story-replay-v1.json",
+        "title": REPLAY_SCHEMA,
+        "description": "Read-only story replay for robotics/API consumers. v1 is additive-only; a breaking change mints v2 at a new path.",
+        "type": "object",
+        "required": ["schema", "read_only", "story_id", "story_type", "title",
+                     "schema_version", "duration_s", "coordinate_system",
+                     "definition_hash", "timeline"],
+        "properties": {
+            "schema": { "const": REPLAY_SCHEMA },
+            "read_only": { "const": true },
+            "story_id": { "type": "string" },
+            "story_type": { "enum": ["journey", "history", "discovery"] },
+            "title": { "type": "string" },
+            "description": { "type": ["string", "null"] },
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+            "coordinate_system": { "const": "WGS84 (EPSG:4326); heights in metres" },
+            "definition_hash": {
+                "type": "string", "pattern": "^[0-9a-f]{64}$",
+                "description": "SHA-256 of the stored story definition JSON"
+            },
+            "stop_count": { "type": "integer", "minimum": 0 },
+            "timeline": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/stop" }
+            },
+            "camera_track": {
+                "type": "object",
+                "properties": {
+                    "keyframes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["time_s", "lon", "lat", "height_m", "heading_deg", "pitch_deg"],
+                            "properties": {
+                                "time_s": { "type": "number", "minimum": 0 },
+                                "lon": { "type": "number" },
+                                "lat": { "type": "number" },
+                                "height_m": { "type": "number" },
+                                "heading_deg": { "type": "number" },
+                                "pitch_deg": { "type": "number" },
+                                "roll_deg": { "type": "number" }
+                            }
+                        }
+                    }
+                }
+            },
+            "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+            "captions": { "type": "array", "items": { "$ref": "#/$defs/caption" } }
+        },
+        "$defs": {
+            "position": {
+                "type": "object",
+                "required": ["lon", "lat", "height_m"],
+                "properties": {
+                    "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+                    "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+                    "height_m": { "type": "number" }
+                }
+            },
+            "stop": {
+                "type": "object",
+                "required": ["index", "id", "kind", "label", "time_s", "position"],
+                "properties": {
+                    "index": { "type": "integer", "minimum": 0 },
+                    "id": { "type": "string" },
+                    "kind": { "enum": ["start", "waypoint", "arrival", "version"] },
+                    "label": { "type": "string" },
+                    "time_s": { "type": "number", "minimum": 0 },
+                    "position": { "$ref": "#/$defs/position" },
+                    "heading_deg": { "type": ["number", "null"] },
+                    "pitch_deg": { "type": ["number", "null"] },
+                    "parcel_id": { "type": ["string", "null"] },
+                    "asset_pubkey": { "type": ["string", "null"] },
+                    "geometry_version": { "type": ["integer", "null"] },
+                    "caption": { "type": ["string", "null"] }
+                }
+            },
+            "route": {
+                "type": "object",
+                "required": ["id", "method", "coordinates", "length_m"],
+                "properties": {
+                    "id": { "type": "string" },
+                    "method": { "enum": ["road-graph", "great-circle", "drawn"] },
+                    "coordinates": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {
+                            "type": "array", "minItems": 2, "maxItems": 2,
+                            "items": { "type": "number" }
+                        }
+                    },
+                    "length_m": { "type": "number", "minimum": 0 },
+                    "label": { "type": ["string", "null"] }
+                }
+            },
+            "caption": {
+                "type": "object",
+                "required": ["time_s", "duration_s", "text"],
+                "properties": {
+                    "time_s": { "type": "number", "minimum": 0 },
+                    "duration_s": { "type": "number", "exclusiveMinimum": 0 },
+                    "text": { "type": "string" },
+                    "stop_id": { "type": ["string", "null"] }
+                }
+            }
+        },
+        "links": [
+            { "rel": "geojson", "href": "/api/v1/stories/{story_id}/replay.geojson" },
+            { "rel": "replay", "href": "/api/v1/stories/{story_id}/replay" }
+        ]
+    })
+}
+
+/// Stable schema export (no story id required). Consumers pin this document;
+/// its `$id` changes only when a new replay version is published.
+pub async fn replay_schema() -> Json<serde_json::Value> {
+    Json(replay_schema_doc())
+}
+
 fn check_author(
     story_author: &Option<String>,
     headers: &axum::http::HeaderMap,
@@ -1072,5 +1428,94 @@ mod tests {
         };
         let json = serde_json::to_string(&row).unwrap();
         assert!(json.contains("\"story_type\":\"journey\""));
+    }
+
+    // --- RFC-014 Phase 05: external replay (REQ-018) ---------------------
+
+    fn story_fixture() -> Story {
+        Story {
+            id: "test-journey-1".into(),
+            schema_version: 1,
+            story_type: "journey".into(),
+            title: "Basel courtyard walk".into(),
+            description: None,
+            author_wallet: None,
+            duration_s: 12.0,
+            stop_count: 2,
+            entity_refs: vec![],
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn replay_is_read_only_and_versioned() {
+        let hash = "a".repeat(64);
+        let replay = build_replay(&story_fixture(), &minimal_journey(), hash.clone());
+        assert_eq!(replay.schema, REPLAY_SCHEMA);
+        assert!(replay.read_only);
+        assert_eq!(replay.definition_hash, hash);
+        assert_eq!(replay.story_id, "test-journey-1");
+        assert_eq!(replay.coordinate_system, "WGS84 (EPSG:4326); heights in metres");
+    }
+
+    #[test]
+    fn replay_timeline_is_time_ordered_with_definition_index() {
+        let mut def = minimal_journey();
+        def.stops[0].time_s = 10.0; // later than the second stop
+        def.stops[1].time_s = 2.0;
+        let replay = build_replay(&story_fixture(), &def, "0".repeat(64));
+        assert_eq!(replay.timeline.len(), 2);
+        assert_eq!(replay.timeline[0].id, "s1");
+        assert_eq!(replay.timeline[0].index, 1); // definition index preserved
+        assert_eq!(replay.timeline[1].id, "s0");
+        assert_eq!(replay.timeline[0].position.lon, 7.595);
+    }
+
+    #[test]
+    fn geojson_has_stop_points_and_route_lines() {
+        let mut def = minimal_journey();
+        def.routes.push(NavigationPath {
+            id: "r0".into(),
+            method: "road-graph".into(),
+            coordinates: vec![[7.59, 47.55], [7.595, 47.555]],
+            length_m: 120.0,
+            label: None,
+        });
+        let fc = build_geojson(&story_fixture(), &def);
+        assert_eq!(fc.collection_type, "FeatureCollection");
+        assert_eq!(fc.features.len(), def.stops.len() + 1);
+        let stops: Vec<_> = fc
+            .features
+            .iter()
+            .filter(|f| f.properties["kind"] == "stop")
+            .collect();
+        assert_eq!(stops.len(), 2);
+        let point = serde_json::to_value(&stops[0].geometry).unwrap();
+        assert_eq!(point["type"], "Point");
+        assert_eq!(point["coordinates"].as_array().unwrap().len(), 3);
+        let line = fc
+            .features
+            .iter()
+            .find(|f| f.properties["kind"] == "route")
+            .expect("route feature");
+        let geom = serde_json::to_value(&line.geometry).unwrap();
+        assert_eq!(geom["type"], "LineString");
+        assert_eq!(geom["coordinates"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn replay_schema_is_pinned_and_linked() {
+        let doc = replay_schema_doc();
+        assert_eq!(doc["title"], REPLAY_SCHEMA);
+        assert_eq!(doc["$id"], "https://terra.example/schemas/story-replay-v1.json");
+        assert_eq!(doc["properties"]["read_only"]["const"], true);
+        let links = doc["links"].as_array().unwrap();
+        assert!(links.iter().any(|l| l["rel"] == "geojson"));
+        assert!(doc["$defs"]["stop"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r == "position"));
     }
 }

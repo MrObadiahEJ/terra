@@ -47,7 +47,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | # | Capability | Status | Evidence | Gap / note |
 | --- | --- | --- | --- | --- |
 | B1 | REST mirror surface (~26 routers: parcels, identities, vaults, disputes, escrows, rights, cross-border, subdivision, staking, zk, spatial, spatial-accounts, geo, fusion, world-registry, recovery, credentials, evidence, reconstruction, derived, stories, tx, demo, activity…) | 1 | `routes/mod.rs`; migrations 0001–0033 | Mirror is a read model; chain is source of truth |
-| B2 | Story CRUD + export receipts + validation | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; API suite 117/117 (2026-10-31) | Mutations wallet-signed (commit `11be94c`) |
+| B2 | Story CRUD + export receipts + validation + external replay/GeoJSON/schema (REQ-018) | 1 | `routes/stories.rs` (registered via `.merge`, absolute paths); migration 0032; `terra.story-replay/v1`; API suite 121/121 (2026-11-02); live smoke (hash tracks edits) | Mutations wallet-signed (commit `11be94c`); replay is read-only presentation data, not proof |
 | B3 | Reconstruction worker: lease (SKIP LOCKED, 15-min), progress, complete→geometry draft→anchor_prep, drafts, anchor | 2 | `routes/reconstruction.rs`; migration 0031; live smoke 22/22 (2026-10-13) | anchor_prep produces a transaction; never executed on a live cluster (B6) |
 | B4 | Geo endpoints (`nearest-roads`, `pois`, `buildings`, `stats`) | 1 | `routes/geo.rs` L88–93 | No server-side `/geo/route` — routing runs client-side (D4) |
 | B5 | Signed multipart evidence upload | 1 | API `/evidence`; migrations 0023/0024 | — |
@@ -90,7 +90,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | --- | --- | --- | --- |
 | BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | 307 | 2026-10-13 era (count re-confirmed in source 2026-10-31) | before release |
 | Registry lib | 153 | 2026-10-13 | before release |
-| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **117** | **2026-10-31 (executed)** | before release |
+| API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **121** | **2026-11-02 (executed)** | before release |
 | Geo-engine | 6 | 2026-10-13 | before release |
 | Identity BPF | 23 | 2026-10-13 | before release |
 | Frontend vitest (`pnpm exec vitest run`) | **44/44** | **2026-10-31 (executed)** | each story change |
