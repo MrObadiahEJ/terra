@@ -23,6 +23,7 @@ pub fn router() -> Router<AppState> {
         .route("/", post(register_worker).get(list_workers))
         .route("/{id}", get(get_worker).put(update_worker))
         .route("/{id}/heartbeat", post(heartbeat_worker))
+        .route("/workers/reap-stale", post(reap_stale_workers))
         .route("/{id}/assignments", get(list_worker_assignments))
         .route("/assignments/{job_id}/complete", post(complete_assignment))
 }
@@ -228,6 +229,37 @@ pub async fn heartbeat_worker(
     .ok_or_else(|| AppError::not_found(format!("worker {id} not found")))?;
 
     Ok(Json(row))
+}
+
+/// Mark workers as inactive if they have not heartbeated within the staleness
+/// window (default 30 minutes). Called from the lease path so that stale
+/// workers do not keep being considered for new jobs.
+pub async fn reap_stale_workers(
+    State(state): State<AppState>,
+    Query(params): Query<StaleWorkerParams>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let stale_minutes: i64 = params.minutes.unwrap_or(30);
+    let result = sqlx::query(
+        r#"
+        UPDATE worker_registrations
+        SET status = 'inactive', updated_at = now()
+        WHERE status = 'active'
+          AND last_heartbeat_at < now() - make_interval(secs => $1::double precision)
+        "#,
+    )
+    .bind(stale_minutes as f64)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("reap stale workers failed: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "marked_inactive": result.rows_affected()
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StaleWorkerParams {
+    pub minutes: Option<i64>,
 }
 
 // ---------------------------------------------------------------------------
