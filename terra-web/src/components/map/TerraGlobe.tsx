@@ -91,6 +91,8 @@ interface TerraGlobeProps {
   runtimeNodes?: SceneNodeRow[]
   /** IDs of nodes whose component assets have been fetched (render as volumes). */
   fetchedNodeIds?: string[]
+  /** Fetched component asset bytes, keyed by component ID, for 3D model rendering. */
+  fetchedAssets?: Map<string, ArrayBuffer>
   /** One-shot camera commands (reset view, north-up, tilt). */
   viewCommand?: ViewCommand | null
 }
@@ -157,6 +159,7 @@ export default function TerraGlobe({
   tilesetUrl = null,
   runtimeNodes = [],
   fetchedNodeIds = [],
+  fetchedAssets = new Map<string, ArrayBuffer>(),
   onFetchComponent,
   viewCommand = null,
 }: TerraGlobeProps) {
@@ -777,6 +780,82 @@ export default function TerraGlobe({
     }
     viewer.scene.requestRender()
   }, [runtimeNodes, fetchedNodeIds, showLabels, graphicsTier])
+
+  // ---- render fetched 3D model assets as Cesium models -----------------------
+  // Each fetched component asset (GLB bytes) is rendered as a Cesium Model at
+  // the node's spatial extent centroid, implementing synchronized world
+  // rendering (REQ-027/REQ-028).
+  const renderedModelRef = useRef<Set<string>>(new Set())
+  const modelBlobUrlRef = useRef<Map<string, string>>(new Map())
+  const modelPrimitiveRef = useRef<Map<string, Cesium.Model>>(new Map())
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+
+    for (const node of runtimeNodes) {
+      if (!fetchedAssets.has(node.object_id)) continue
+      if (renderedModelRef.current.has(node.object_id)) continue
+
+      const extent = node.spatial_extent
+      if (!extent || extent.type !== 'Polygon') continue
+      const ring = extent.coordinates?.[0]
+      if (!ring || ring.length < 4) continue
+
+      // Centroid of the footprint as model placement
+      const lons = ring.map(([lon]: [number, number]) => lon)
+      const lats = ring.map(([, lat]: [number, number]) => lat)
+      const centroidLon = lons.reduce((a: number, b: number) => a + b, 0) / lons.length
+      const centroidLat = lats.reduce((a: number, b: number) => a + b, 0) / lats.length
+
+      const data = fetchedAssets.get(node.object_id)
+      if (!data) continue
+
+      // Create a blob URL from the GLB bytes so Cesium.Model.fromGltf can load it
+      const blob = new Blob([data], { type: 'model/gltf-binary' })
+      const url = URL.createObjectURL(blob)
+      modelBlobUrlRef.current.set(node.object_id, url)
+
+      Cesium.Model.fromGltfAsync({
+        url,
+        modelMatrix: Cesium.Transforms.headingPitchRollToFixedFrame(
+          Cesium.Cartesian3.fromDegrees(centroidLon, centroidLat, 0),
+          new Cesium.HeadingPitchRoll(0, 0, 0),
+        ),
+        minimumPixelSize: 1,
+      })
+        .then((model: Cesium.Model) => {
+          if (renderedModelRef.current.has(node.object_id)) {
+            model.destroy()
+            return
+          }
+          viewer.scene.primitives.add(model)
+          model.id = node.object_id
+          modelPrimitiveRef.current.set(node.object_id, model)
+          viewer.scene.requestRender()
+        })
+        .catch((err: unknown) => {
+          console.warn(`Failed to load 3D model for ${node.object_id}:`, err)
+          URL.revokeObjectURL(url)
+        })
+
+      renderedModelRef.current.add(node.object_id)
+    }
+    viewer.scene.requestRender()
+
+    return () => {
+      // Destroy rendered models and revoke blob URLs on unmount
+      modelPrimitiveRef.current.forEach((model, nodeId) => {
+        model.destroy()
+        const url = modelBlobUrlRef.current.get(nodeId)
+        if (url) URL.revokeObjectURL(url)
+        modelBlobUrlRef.current.delete(nodeId)
+      })
+      renderedModelRef.current.clear()
+      modelPrimitiveRef.current.clear()
+      modelBlobUrlRef.current.clear()
+    }
+  }, [runtimeNodes, fetchedAssets, showLabels])
+
 
   useEffect(() => {
     const viewer = viewerRef.current

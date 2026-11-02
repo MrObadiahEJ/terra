@@ -359,7 +359,12 @@ export default function GlobePage() {
     componentId: string
     componentVersion: string
     sizeBytes: number
+    data: ArrayBuffer
   } | null>(null)
+  // All fetched component assets, keyed by component ID, for rendering on the globe.
+  const [fetchedAssets, setFetchedAssets] = useState<Map<string, ArrayBuffer>>(
+    new Map()
+  )
   const [fetchedNodeIds, setFetchedNodeIds] = useState<string[]>([])
   // Distributed runtime: current manifest for the camera's region
   const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
@@ -583,6 +588,12 @@ export default function GlobePage() {
           componentId: node.object_id,
           componentVersion: node.component_version_id,
           sizeBytes: data.byteLength,
+          data,
+        })
+        setFetchedAssets((prev) => {
+          const next = new Map(prev)
+          next.set(node.object_id, data)
+          return next
         })
         setFetchedNodeIds((prev) => (prev.includes(node.object_id) ? prev : [...prev, node.object_id]))
       } catch (err) {
@@ -968,6 +979,7 @@ export default function GlobePage() {
           tilesetUrl={tilesetUrl}
           runtimeNodes={sceneGraph?.nodes ?? []}
           fetchedNodeIds={fetchedNodeIds}
+          fetchedAssets={fetchedAssets}
           onFetchComponent={fetchComponent}
           viewCommand={viewCommand}
         />
