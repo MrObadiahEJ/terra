@@ -110,3 +110,18 @@ Format: date · version · what changed · evidence/why. Append-only.
   2 drafts / 1 row / 1 hash. `cargo test -p terra-api` → **117/117**. Behavior
   unchanged except the trust boundary.
 - Registers updated: RISK_REGISTER (R-016, R-017), work/CURRENT.md.
+
+## 2026-11-02 — CI green: SBF build + 307-test BPF suite wired (R-008 resolved, Stage 1 exit)
+
+- `.github/workflows/ci.yml`: the "On-chain Program Tests" job now installs
+  Solana `v3.1.14` (pinned to the `solana-program-test` 3.1.x line in
+  Cargo.lock), builds both program artifacts with `cargo build-sbf`, and runs
+  the 307-test registry BPF integration suite single-threaded.
+- First attempt used release `stable`; its SBF output was rejected by the
+  pinned runtime ("Program is not deployed / Unsupported program id"),
+  failing all tests. Pin `v3.1.14` and bump it together with
+  `solana-program-test`.
+- Evidence: CI run `41474466105` green — Frontend 32s, API Build Check 39s,
+  API Tests 3m6s, On-chain Program Tests 5m18s including BPF integration.
+- R-008 resolved; E1 → `IMPLEMENTED AND VERIFIED`; ROADMAP Stage 1 exit met.
+  Stage 2 (devnet truth) is now blocked only on founder funding (Q-001).

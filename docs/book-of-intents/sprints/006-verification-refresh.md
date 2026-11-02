@@ -41,6 +41,10 @@ artifacts. R-008 confirmed; E1 downgraded to `PARTIALLY IMPLEMENTED`.
 
 ## Loop
 
-- Remaining Stage 1 exit item: wire the BPF integration suite into CI
-  (R-008). Everything else in the refresh is done and dated.
+- **Resolved 2026-11-02:** the BPF integration suite is wired into CI
+  (Solana `v3.1.14` pinned to the `solana-program-test` 3.1.x runtime; SBF
+  artifacts built in-job). CI run `41474466105` green — On-chain Program
+  Tests 5m18s including the 307-test suite. R-008 closed; E1 →
+  `IMPLEMENTED AND VERIFIED`; Stage 1 exit met.
 - Devnet deploy remains founder-blocked (Q-001); no on-chain status changes.
+  Stage 2 begins when the deployer wallet is funded.

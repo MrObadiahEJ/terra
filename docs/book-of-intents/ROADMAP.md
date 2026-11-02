@@ -13,7 +13,7 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 **Evidence:** IMPLEMENTATION_STATUS A1–A21, B1–B5, C1–C2, D1–D5; commits through
 `775e20a`; BPF 307; vitest 44/44 (2026-10-31).
 
-## Stage 1 — Current (entry: Stage 0 evidence; in progress)
+## Stage 1 — Complete (entry: Stage 0 evidence; exit met 2026-11-02)
 
 1. **Book of Intents constitution** — this directory (E4): registers, guides,
    audit trail. *Exit:* all 12 deliverables present; statuses evidence-linked.
@@ -31,12 +31,13 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
 4. **Verification refresh** — re-run all cargo suites against `775e20a+`
    (baselines in IMPLEMENTATION_STATUS); confirm Rust CI jobs run full suites
    (R-008). *Exit:* updated baseline table with dates.
-   **Partially met 2026-11-02:** all suites re-executed — API 121, registry
-   lib 153, BPF 307, identity 23, geo 12 (+1 ignored), vitest 44/44; table
-   re-dated. CI depth confirmed insufficient: the Rust job does not run the
-   307-test BPF suite (R-008 open → remaining Stage 1 exit item).
+   **Met 2026-11-02:** all suites re-executed — API 121, registry lib 153,
+   BPF 307, identity 23, geo 12 (+1 ignored), vitest 44/44; table re-dated.
+   CI depth completed: the Rust job now builds SBF artifacts (Solana
+   `v3.1.14`) and runs the 307-test BPF suite; run `41474466105` green
+   (R-008 resolved, E1 → status 1). **Stage 1 exit met 2026-11-02.**
 
-## Stage 2 — Devnet truth (entry: Stage 1 exit + founder funds wallet)
+## Stage 2 — Devnet truth (entry: Stage 1 exit met; founder funds wallet)
 
 - Fund deployer (Q-001, founder). Run `./deploy.sh devnet`. Execute on-chain
   smoke: register parcel → rights → geometry version → 3D model → snapshot →
