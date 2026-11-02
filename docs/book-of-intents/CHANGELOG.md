@@ -2,6 +2,24 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-02 — Chapter 14 Implementation Preparation Plan (REQ-020…REQ-028 code-area mapping)
+
+- New `chapters/14-implementation-preparation.md` — dependency-ordered code-area
+  mapping for every missing requirement: foundational changes (component package
+  migration + router, manifest migration + router, provider migration + router),
+  dependent changes (assembly resolver, scene graph, LOD manager, asset
+  retrieval), founder-gated changes (institutional identity, residency, liens),
+  and a code-area inventory of what exists to build on (SpatialAsset,
+  ThreeDModel, Reconstruction API, Derived compute, Task economics, Routing,
+  Geo-engine, Frontend LOD/terrain, API routers, Migrations).
+- Dependency order: founder decisions (Q-003/Q-004) → component package → 3D
+  digest (terra-geom-v2 integrate-or-deprecate) → manifest → providers →
+  assembly → runtime → frontend streaming.
+- Explicit "what must NOT be built yet" list (marketplace, speculative token,
+  mainnet, terra-geom-v2 in production, fractional investment, institutional
+  identity/residency/liens implementation).
+- Documentation only — no application code changed; no gate required.
+
 ## 2026-11-02 — RFC-015 Spatial Component Package + remaining Part XIV diagrams + Part XVI principles
 
 - New `rfc-015-spatial-component-package.md` — Spatial Component Package schema

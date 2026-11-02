@@ -75,6 +75,7 @@ Never inflate a status. When evidence is unavailable, say so.
 - [chapters/11-distributed-spatial-reconstruction-and-assembly.md](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
 - [chapters/12-world-runtime-and-synchronized-rendering.md](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
 - [chapters/13-global-spatial-data-delivery-and-progressive-visualization.md](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
+- [chapters/14-implementation-preparation.md](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`SPECIFIED ONLY`)
 
 ### Intents
 

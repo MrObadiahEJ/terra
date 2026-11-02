@@ -37,6 +37,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [Chapter 11 — Distributed Spatial Reconstruction and Assembly](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
 - [Chapter 12 — World Runtime and Synchronized Spatial Rendering](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
 - [Chapter 13 — Global Spatial Data Delivery and Progressive Visualization](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
+- [Chapter 14 — Implementation Preparation](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`SPECIFIED ONLY`)
 
 Further volumes (Transactions & Lineage · AI-Assisted Understanding · Developer
 Ecosystem · Governance & Resilience · Land-Administration Research) are written
