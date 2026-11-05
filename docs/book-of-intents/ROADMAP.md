@@ -94,6 +94,16 @@ corresponding to new REQ-026/027/028 in REQUIREMENTS_TRACEABILITY. These are
 Stage 3/4 boundary specs: they define the distributed spatial infrastructure
 without implementation code.
 
+**Architecture spec implemented (sprint 025, 2026-11-02/03):** Chapters 11/12/13
+and `rfc-015` moved `SPECIFIED ONLY → IMPLEMENTED, NOT FULLY VERIFIED`. Code:
+`geo-engine/src/component_package.rs` (RFC-015 conformance validator) +
+`canonical3d.rs` (`terra-geom-v2`); migrations 0035–0043; `components`/`assemblies`/
+`manifests`/`providers`/`runtime`/`workers` routers; frontend `runtime.ts` +
+`runtime.test.ts` + `WorkerConsolePage.tsx`. All pass local suites (API 133/133,
+geo-engine 33 (+2 ignored), vitest 83/83, tsc clean, build:check PASS). **Only
+live-cluster verification remains** — that is a Stage 2 (B6 devnet funding)
+concern, not a Stage 4 blocker.
+
 ## Stage 4 — Research-gated features (entry: Stage 3 + research complete)
 
 - Institutional identity implementation (REQ-020) — needs founder authorization
@@ -102,10 +112,13 @@ without implementation code.
   (Q-005). No code before written legal research.
 - Transaction lineage/redemption (A26) — after replay/double-spend design
   review.
-- Distributed reconstruction & assembly (REQ-026) — after founder review of
-  Chapter 11 / manifest architecture (Chapter 12).
-- Progressive delivery & runtime discovery (REQ-028) — after founder review of
-  Chapter 13 / runtime contracts.
+- ~~Distributed reconstruction & assembly (REQ-026)~~ — **implemented** (sprint
+  025, 2026-11-02). Remaining: route reconstruction jobs through component
+  packages; live-cluster verification (B6).
+- ~~Progressive delivery & runtime discovery (REQ-028)~~ — **implemented** (sprint
+  025, 2026-11-02/03). Remaining: spatial tiling / 3D Tiles pipeline, frustum +
+  occlusion culling, screen-space error LOD, content-addressed retrieval + signed
+  manifests; live-cluster verification (B6).
 
 ## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
 research complete; founder-gated)
@@ -113,29 +126,37 @@ research complete; founder-gated)
 Implement RFC-016 in dependency order:
 
 - Phase 0 — Threat model + architecture (inventory centralization points, map
-  sensitive data paths, model censorship/malicious-request scenarios).
+  sensitive data paths, model censorship/malicious-request scenarios). **Done**
+  (`docs/rfc-016-protocol-security-decentralization-privacy.md`, 2026-11-02).
 - Phase 1 — Protocol security specification (request data structures, quorum
   rules, emergency protection, appeals, privacy-state transitions, incentives,
-  slashing conditions, audit events; tests for all state transitions).
+  slashing conditions, audit events; tests for all state transitions). **Done**
+  (RFC-016 spec, 2026-11-02).
 - Phase 2 — On-chain core (request registration, scope validation, reviewer
   assignment, quorum attestations, decision finalization, emergency-protection
   expiry, appeal registration/review, privacy-state transitions, jurisdictional
   scope/expiry, reward/escrow integration, due-process slashing, replay
-  protection).
+  protection). **Implemented, not fully verified** (sprint 026, 2026-11-02/03):
+  `src/security.rs` (1070 lines) — 11 PDAs + 11 instructions + 13 `TerraError`
+  codes, registered in `lib.rs`; compiles clean; **no BPF tests yet, not deployed
+  to devnet** (B6 blocks both).
 - Phase 3 — Off-chain privacy enforcement (authorized retrieval only,
   public/private separation, component-level access control, redaction,
   search-index removal, cache invalidation, storage-provider notifications,
-  privacy-state version checking, independent provider compatibility).
+  privacy-state version checking, independent provider compatibility). **Not
+  started** (A35/A36 remain `SPECIFIED ONLY`).
 - Phase 4 — Incentives + independent participation (security task rewards,
   reviewer compensation, security reporting rewards, proportionate collateral,
   due-process slashing, independent validator discovery, reviewer rotation,
-  multiple storage providers, data export/recovery).
+  multiple storage providers, data export/recovery). **Partial** — storage
+  providers + fallback implemented (REQ-038, `routes/providers.rs`); security
+  task rewards/reviewer compensation not yet designed.
 - Phase 5 — Censorship + recovery testing (disable frontend/API/storage/RPC;
   remove validator group; malicious privacy/false jurisdictional requests;
   identity exposure through public events; restricted-evidence retrieval via
   alt API; stale cache after restriction; expired emergency replay; single-admin
   multi-jurisdiction restriction; reviewer-selection manipulation; bribery/
-  coordination; privacy-as-censorship of fraud evidence).
+  coordination; privacy-as-censorship of fraud evidence). **Not started.**
 
 **Exit:** RFC-016 acceptance criteria proven (RFC-016 §11): no single shutdown
 authority; no mandatory central marketplace/frontend/API/storage; no raw private
@@ -166,9 +187,9 @@ flowchart LR
     S0[Stage 0 — Foundations<br>complete<br>(parcel, rights, escrow,<br>staking, spatial assets)]
     S1[Stage 1 — Complete<br>(constitution, derived compute,<br>external replay, auth fix,<br>AI provenance, bundle gate)]
     S2[Stage 2 — Devnet truth<br>Q-001 funding (founder)<br>→ deploy + on-chain smoke]
-    S3[Stage 3 — Specifications<br>REQ-020/021/022 → SPECIFIED ONLY<br>REQ-026/027/028 → SPECIFIED ONLY]
-    S4[Stage 4 — Research-gated<br>institutional identity,<br>residency, liens,<br>distributed reconstruction<br>& runtime]
-    S45[Stage 4.5 — Security & privacy<br>RFC-016: threat model,<br>spec, on-chain core,<br>off-chain enforcement,<br>incentives, censorship<br>+ recovery tests]
+    S3[Stage 3 — Specifications<br>REQ-020/021/022 → SPECIFIED ONLY<br>REQ-026/027/028 →<br>IMPLEMENTED, NOT FULLY VERIFIED]
+    S4[Stage 4 — Research-gated<br>institutional identity,<br>residency, liens<br>(REQ-020/021/022)]
+    S45[Stage 4.5 — Security & privacy<br>RFC-016: threat model,<br>spec done,<br>on-chain core done,<br>off-chain enforcement +<br>incentives + recovery tests<br>pending]
     S5[Stage 5 — Mainnet gate<br>founder decision only]
     
     S0 --> S1 --> S2 --> S3 --> S4 --> S45 --> S5

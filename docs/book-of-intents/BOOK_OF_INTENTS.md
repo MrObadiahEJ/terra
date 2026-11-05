@@ -147,7 +147,10 @@ Architecture chapters now written (specified only, no code yet):
 - Assembly system connecting independently produced components into one building (REQ-026).
 - Distributed runtime: spatial index, manifest resolver, provider discovery/fallback, scene graph, progressive streaming, cache invalidation (REQ-027/028).
 - Provider discovery and storage-node fallback (no central geometry repository).
-- 3D geometry digest `terra-geom-v2` (experimental only, on `terra-3d-spatial-pipeline` branch, not merged).
+- 3D geometry digest `terra-geom-v2` — **integrated** (Sprint 025, 2026-11-02,
+  ADR-016 resolved): `geo-engine/src/canonical3d.rs`, consumed by the RFC-015
+  conformance validator. `terra-geom-v1` stays frozen for existing 2D parcel
+  hashes.
 - Reconstruction marketplace: task manifests, offers/bids, scheduling, escrow, settlement (task_economics applies to verification tasks only).
 - Coverage investment program, jurisdictional profiles.
 - On-chain institutional identity (`register_institutional_identity`), residency credential, lien encumbrance (all `SPECIFIED ONLY`, founder-gated).
@@ -177,7 +180,10 @@ Stage 1 is complete (constitution, derived compute, external replay, verificatio
 - Fractional investment (REQ-023) — hard-gated on Q-005 securities research; no code before written legal research.
 - A speculative Terra token as a prerequisite.
 - Mainnet (Stage 5) — founder decision only (Q-006), after devnet soak, adversarial slashing simulation, external security review, mirror audit tooling.
-- Merging `terra-geom-v2` into production until an integrate-or-deprecate decision is recorded (ADR-016).
+- `terra-geom-v2` — **integrated** (ADR-016 resolved, Sprint 025, 2026-11-02):
+  production 3D digest path in `geo-engine/src/canonical3d.rs`, consumed by the
+  RFC-015 conformance validator. `terra-geom-v1` stays frozen for existing 2D
+  parcel hashes.
 - A reconstruction marketplace before task_economics primitives are extended to reconstruction task types.
 - Any feature that blurs protocol results with legal title/ownership (RISK R-005).
 

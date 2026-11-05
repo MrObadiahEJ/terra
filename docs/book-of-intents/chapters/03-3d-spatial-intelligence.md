@@ -2,16 +2,18 @@
 
 **Status:** `IMPLEMENTED AND VERIFIED` for on-chain 3D model registration,
 versioned geometry, elevation rules, canonical 2D geometry digest, and
-spatial-account mirror; `PARTIALLY IMPLEMENTED` for the off-chain reconstruction
-worker pipeline (anchor execution has never run on a public cluster); `SPECIFIED
-ONLY` for distributed multi-engine reconstruction, component packaging,
-assembly, synchronized runtime, and progressive visualization (see Chapters 11,
-12, 13).
+spatial-account mirror; `IMPLEMENTED, NOT FULLY VERIFIED` for the off-chain
+reconstruction worker pipeline, distributed multi-engine reconstruction,
+component packaging, assembly, synchronized runtime, and progressive
+visualization (Chapters 11, 12, 13 — implemented Sprint 025, 2026-11-02/03;
+live-cluster verification pending on B6 devnet funding); `SPECIFIED ONLY`
+for institutional identity / residency / liens (Chapters 2, 6, 8).
 
 **Evidence:** RFC-013 Phases C/D/E; `spatial_asset.rs`, `three_d_model.rs`,
-`spatial_snapshot.rs`; migrations 0029–0034; stage3 BPF suites; commit
-`775e20a` (`terra-geom-v1` digest); `terra-3d-spatial-pipeline` branch
-(`canonical3d.rs` / `terra-geom-v2`, experimental — not merged).
+`spatial_snapshot.rs`; migrations 0029–0043; stage3 BPF suites; commit
+`775e20a` (`terra-geom-v1` digest, 2D, frozen); `geo-engine/src/canonical3d.rs`
+(`terra-geom-v2` digest, 3D, **integrated** Sprint 025 per ADR-016); the
+RFC-015 conformance validator in `geo-engine/src/component_package.rs`.
 
 **See:** Chapter 11 (Distributed Spatial Reconstruction and Assembly), Chapter
 12 (World Runtime and Synchronized Spatial Rendering), Chapter 13 (Global
@@ -62,11 +64,12 @@ boundary is correct — that remains a verification-consensus question (Chapter 
 §1.3).
 
 **3D digest status:** `terra-geom-v1` is frozen and 2D-only (rejects third
-ordinates). The `terra-3d-spatial-pipeline` branch adds `canonical3d.rs`
-(`terra-geom-v2`, 3D, requires `elevation_ref`, `vertical_units`, `precision`),
-which is **experimental and not merged**. Do not use `terra-geom-v2` for
-production parcel hashes until it is integrated and promoted through RFC-013
-§14 process (Chapter 14).
+ordinates) — it remains the digest for all existing parcel hashes. `terra-geom-v2`
+(`geo-engine/src/canonical3d.rs`, 3D, requires `elevation_ref`, `vertical_units`,
+`precision`) was **integrated into production** in Sprint 025 (2026-11-02) per
+ADR-016 and is the digest consumed by the RFC-015 conformance validator
+(`geo-engine/src/component_package.rs`). It is additive, not a replacement:
+v1 parcel hashes are unaffected.
 
 ---
 

@@ -168,21 +168,25 @@ forcing one engine (rejected: violates engine-independence principle).
 (Chapter 11 §11.3).
 **Evidence:** Chapter 11.
 
-## ADR-016 — `terra-geom-v2` is experimental; `terra-geom-v1` stays frozen
-**Date:** 2026-11-02 · **Status:** Accepted
+## ADR-016 — `terra-geom-v2` integrated; `terra-geom-v1` stays frozen for existing hashes
+**Date:** 2026-11-02 · **Status:** Accepted (integrated 2026-11-02, Sprint 025)
 **Context:** The `terra-3d-spatial-pipeline` branch adds `canonical3d.rs`
 (`terra-geom-v2`, 3D digest with elevation reference / vertical units /
-precision), but it is based on pre-constitution commit `775e20a` and lacks all
-post-constitution work.
-**Decision:** `terra-geom-v1` remains frozen for existing parcel hashes.
-`terra-geom-v2` is treated as **experimental** — not merged, not used for
-production parcel hashes, pending integration review and RFC-013 §14 process.
-**Alternatives:** merge immediately (rejected: branch is behind on all
-constitution/auth/derived work); adopt v2 as the only digest (rejected: breaks
+precision), but it was based on pre-constitution commit `775e20a` and lacked all
+post-constitution work. Sprint 024 recorded it as experimental pending an
+integrate-or-deprecate decision.
+**Decision (Sprint 025):** integrate `terra-geom-v2` into `terra-core/geo-engine`
+(`geo-engine/src/canonical3d.rs`) rather than deprecate it. It is the production
+3D digest path, consumed by the RFC-015 conformance validator
+(`geo-engine/src/component_package.rs`). `terra-geom-v1` remains frozen for all
+existing 2D parcel hashes — v2 is additive, not a replacement.
+**Alternatives:** merge immediately (rejected at Sprint 024: branch was behind on
+all constitution/auth/derived work); adopt v2 as the only digest (rejected: breaks
 existing hashes).
-**Consequences:** any v2 integration must be backward-compatible and
-version-gated. **Evidence:** `terra-3d-spatial-pipeline` branch
-`bf346f4`/`bd2cf24`; Chapter 3 §3.3; Chapter 14 (decision record pending).
+**Consequences:** v2 is backward-compatible and version-gated; any future v2
+change must not invalidate existing v1 parcel digests. **Evidence:**
+`geo-engine/src/canonical3d.rs`, `geo-engine/src/component_package.rs`; Chapter 3
+§3.3; Chapter 14 §1/§6; ADR-016 decision recorded in CHANGELOG 2026-11-05.
 
 ## ADR-017 — On-chain enforces decision process; off-chain implements enforcement
 **Date:** 2026-11-02 · **Status:** Accepted (spec only)

@@ -194,6 +194,6 @@ items are:
 | Reconstruction marketplace (offers/bids/settlement for reconstruction tasks) | `task_economics` applies to verification tasks only; new task types needed first |
 | Speculative Terra token | Explicitly not a prerequisite (directive §41) |
 | Mainnet deployment | Founder decision only (Q-006), after devnet soak + adversarial slashing simulation + external security review |
-| `terra-geom-v2` in production | Integrate-or-deprecate decision pending (ADR-016); experimental branch-only |
+| `terra-geom-v2` in production | **Resolved 2026-11-02** — integrated (not deprecated): `geo-engine/src/canonical3d.rs` is the production 3D digest path, used by the RFC-015 conformance validator in `component_package.rs`; ADR-016 integrate-or-deprecate decision recorded |
 | Fractional investment (REQ-023) | Hard-gated on Q-005 securities research |
 | Institutional identity / residency / liens implementation | Founder review flags pending (Q-003/Q-004) |
