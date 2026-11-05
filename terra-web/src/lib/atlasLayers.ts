@@ -15,7 +15,7 @@ export type AtlasLayerKey = keyof AtlasLayers
 export const DEFAULT_ATLAS_LAYERS: AtlasLayers = {
   parcels: true,
   roads: false,
-  buildings: false,
+  buildings: true,
   pois: false,
   labels: true,
 }

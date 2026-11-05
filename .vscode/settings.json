@@ -60,6 +60,11 @@
         "git commit": true,
         "git push": true,
         "git ls-remote": true,
-        "gh": true
+        "gh": true,
+        "anchor": true,
+        "pnpm": true,
+        "rustfmt": true,
+        "exit": true,
+        "npm test": true
     }
 }

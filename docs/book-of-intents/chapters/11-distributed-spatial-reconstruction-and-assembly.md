@@ -1,12 +1,12 @@
 # Chapter 11 — Distributed Spatial Reconstruction and Assembly
 
-**Status:** `SPECIFIED ONLY` — no implementation code yet. This chapter defines the
-interfaces, component schema, and assembly rules that a Terra-compatible
-reconstruction worker must satisfy. It does not authorize any production
-deployment.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the specification (this chapter)
+was written first (Sprint 024, commit `d293b0e`); the code followed immediately
+after (2026-11-02/03). All interfaces and assembly rules below are now backed by
+real routes, migrations, and a conformance validator. **Not yet exercised against
+a live cluster** — B6 devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
 
-**See:** RFC-013 (`docs/rfc-013-spatial-intelligence-pipeline.md`), RFC-014,
-`RFC-015` (Spatial Component Package — not yet written), `docs/canonical-geometry-digest.md`,
+**See:** RFC-013, RFC-014, RFC-015, `docs/canonical-geometry-digest.md`,
 Chapter 3, Chapter 12, Chapter 13.
 
 ---
@@ -201,12 +201,15 @@ flowchart TD
 
 | Existing capability | Reused by this chapter | Gap |
 |---|---|---|
-| `SpatialAsset` / `GeometryVersion` (on-chain, append-only versions, quorum verify) | Provides on-chain version anchors for component packages | No component package submission or conformance check yet |
-| `ThreeDModel` (register + verify, off-chain URI) | Model artifact reference pattern | No component schema, no engine identity, no accuracy/uncertainty fields |
-| Reconstruction API (`jobs`, `lease`, `complete`, `draft`, `anchor`) | Single-worker reconstruction flow | No multi-worker submission, no worker registration, no engine negotiation |
-| `task_economics.rs` (`FeePolicy`, `CoverageIncentive`, `TaskEscrow`, `RewardAllocation`) | Payment/subsidy primitives | Applies to verification tasks, not reconstruction tasks; needs new task types |
+| `SpatialAsset` / `GeometryVersion` (on-chain, append-only versions, quorum verify) | Provides on-chain version anchors for component packages | Component versions now anchor via migration 0041 (`component_version`) + `components` router; live-cluster anchoring still pending (B6) |
+| `ThreeDModel` (register + verify, off-chain URI) | Model artifact reference pattern | Component packages carry `geometry_artifact` + `format`/`format_version` per RFC-015 schema |
+| Reconstruction API (`jobs`, `lease`, `complete`, `draft`, `anchor`) | Single-worker reconstruction flow | Multi-worker submission now supported via `POST /components`; worker registration + assignment via `routes/workers.rs` (Stage 5) |
+| `task_economics.rs` (`FeePolicy`, `CoverageIncentive`, `TaskEscrow`, `RewardAllocation`) | Payment/subsidy primitives | Applies to verification tasks; reconstruction task types still not implemented (founder decision pending) |
 | `routing.rs` (nine-factor, seeded randomness) | Provider selection primitives | Needs reconstruction-task routing and capability gating |
-| `canonical.rs` (`terra-geom-v1`, 2D digest) | 2D geometry digest baseline | Rejects 3D ordinates; no 3D digest canonicalization in production code |
-| `canonical3d.rs` / `terra-geom-v2` (terra-3d branch only, experimental) | Candidate 3D digest | Not merged; treat as experimental (ADR-016; Chapter 3 §3.3). |
+| `canonical.rs` (`terra-geom-v1`, 2D digest) | 2D geometry digest baseline | 3D digest now implemented: `geo-engine/src/canonical3d.rs` (`terra-geom-v2`); ADR-016 integrate-or-deprecate decision recorded |
+| `component_package.rs` (`validate`, `ComponentPackage`, RFC-015 conformance test) | **New (2026-11-02)** — RFC-015 conformance validator | — |
+| `api/src/routes/components.rs` (`POST /components`, `GET /components/{id}`, `GET /components`) | **New (2026-11-02)** — component submission + conformance-validation middleware | — |
+| `api/src/routes/assemblies.rs` (`POST /assemblies`, `GET /assemblies/{id}`, conflict detection) | **New (2026-11-02)** — assembly registration + alignment | — |
 
-No code changes are made in this task. The deliverable is the specification.
+The specification is implemented. Remaining work is live-cluster verification
+(B6 devnet funding) and the reconstruction-task economic model (founder decision).

@@ -20,13 +20,16 @@ import {
   type AssignmentRow,
   type RegisterWorkerInput,
   type CompleteAssignmentInput,
+  listDerivedJobs,
+  leaseDerivedJob,
+  type DerivedJob,
 } from '../lib/runtime'
 import { useLocale } from '../lib/locale'
 
 type ResultState = { operation: string; value: unknown; at: number } | null
 
 export default function WorkerConsolePage() {
-  const { publicKey } = useWallet()
+  const { publicKey, signMessage } = useWallet()
   const { t } = useLocale()
 
   // ---- Worker registration state ----
@@ -49,6 +52,7 @@ export default function WorkerConsolePage() {
 
   // ---- Assignment state ----
   const [assignments, setAssignments] = useState<AssignmentRow[]>([])
+  const [derivedJobs, setDerivedJobs] = useState<DerivedJob[]>([])
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null)
 
   // ---- Assignment completion state ----
@@ -107,6 +111,32 @@ export default function WorkerConsolePage() {
     }
   }
 
+  const loadDerivedJobs = useCallback(async () => {
+    try {
+      setDerivedJobs(await listDerivedJobs())
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('backendRequestFailed'))
+    }
+  }, [])
+
+  const leaseDerived = async () => {
+    if (!publicKey || !signMessage) {
+      setError(t('connectWallet'))
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const leased = await leaseDerivedJob(publicKey.toBase58(), signMessage)
+      setResult({ operation: 'POST /derived/jobs/lease', value: leased, at: Date.now() })
+      await loadDerivedJobs()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t('backendRequestFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const completeJob = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
@@ -145,7 +175,8 @@ export default function WorkerConsolePage() {
 
   useEffect(() => {
     loadWorkers()
-  }, [loadWorkers])
+    loadDerivedJobs()
+  }, [loadWorkers, loadDerivedJobs])
 
   const capabilitiesError = (() => {
     try { JSON.parse(capabilities); return null } catch { return t('invalidJson') }
@@ -237,6 +268,40 @@ export default function WorkerConsolePage() {
                         <ArrowUpRight size={12} /> {t('workerViewAssignments')}
                       </button>
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* Derived compute queue */}
+        <section className="worker-panel">
+          <div className="worker-panel-head">
+            <span className="worker-panel-label"><Terminal size={12} /> {t('derivedJobsTitle')}</span>
+            <button className="btn btn-primary btn-small" onClick={leaseDerived} disabled={busy || !publicKey || !signMessage}>
+              <Play size={12} /> {t('derivedJobsLease')}
+            </button>
+          </div>
+          {derivedJobs.length === 0 ? (
+            <p className="worker-empty">{t('derivedJobsEmpty')}</p>
+          ) : (
+            <table className="worker-table">
+              <thead>
+                <tr>
+                  <th>{t('jobId')}</th>
+                  <th>{t('derivedJobsKind')}</th>
+                  <th>{t('status')}</th>
+                  <th>{t('createdAt')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {derivedJobs.map((job) => (
+                  <tr key={job.id}>
+                    <td className="worker-id-cell">{job.id}</td>
+                    <td>{job.kind}</td>
+                    <td><span className={`worker-status-badge worker-status-${job.status}`}>{job.status}</span></td>
+                    <td>{new Date(job.created_at).toLocaleTimeString()}</td>
                   </tr>
                 ))}
               </tbody>

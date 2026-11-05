@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Box, X } from 'lucide-react'
+import { Box, Eye, Footprints, X } from 'lucide-react'
 import type { OsmBuildingFootprint } from '../../lib/api'
 import { polygonAreaM2, polygonCentroid } from '../../lib/geo'
 import { buildingRing } from '../../lib/atlasLayers'
@@ -8,10 +8,20 @@ import { useLocale } from '../../lib/locale'
 interface Props {
   footprint: OsmBuildingFootprint
   onView3D: () => void
+  /** Close frontal observation of the building footprint. */
+  onFrontView?: () => void
+  /** Street-level observation of the building footprint. */
+  onStreetView?: () => void
   onClose: () => void
 }
 
-export default function BuildingPanel({ footprint, onView3D, onClose }: Props) {
+export default function BuildingPanel({
+  footprint,
+  onView3D,
+  onFrontView,
+  onStreetView,
+  onClose,
+}: Props) {
   const { t } = useLocale()
   const ring = useMemo(() => buildingRing(footprint), [footprint])
   const metrics = useMemo(() => {
@@ -71,6 +81,29 @@ export default function BuildingPanel({ footprint, onView3D, onClose }: Props) {
         <Box size={14} /> {t('viewIn3D')}
       </button>
       <p className="text-[10px] text-muted">{t('view3dFootnote')}</p>
+      {(onFrontView || onStreetView) && (
+        <div className="flex gap-2">
+          {onFrontView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onFrontView}
+              title={t('frontViewHint')}
+            >
+              <Eye size={14} /> {t('frontViewAction')}
+            </button>
+          )}
+          {onStreetView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onStreetView}
+            >
+              <Footprints size={14} /> {t('streetViewAction')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

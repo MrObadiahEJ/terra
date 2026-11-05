@@ -1,6 +1,11 @@
 # Chapter 12 — World Runtime and Synchronized Spatial Rendering
 
-**Status:** `SPECIFIED ONLY` — no implementation code yet.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the specification (this chapter)
+was written first (Sprint 024, commit `d293b0e`); the code followed immediately
+after (2026-11-02/03). The central coordination object, control-plane/data-plane
+separation, spatial index, and synchronized runtime below are now backed by real
+routes, migrations, and a frontend runtime client. **Not yet exercised against a
+live cluster** — B6 devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
 
 **See:** Chapter 11, Chapter 13, RFC-013, RFC-014, `docs/canonical-geometry-digest.md`,
 Chapter 3, Chapter 10.
@@ -10,17 +15,20 @@ Chapter 3, Chapter 10.
 ## 12.1 Why this chapter exists
 
 Terra's frontend can render a Cesium globe and load a small set of story
-demos, but it does **not** have:
+demos. As of 2026-11-02/03 it now has:
 
-- a central coordination object / World Representation Manifest,
-- a separation of control plane from data plane,
-- a spatial index that lets a client discover which objects intersect a view,
-- a synchronized runtime that merges components from multiple storage providers
-  into one coherent scene,
-- progressive lazy loading beyond hardcoded `LOD_LEVELS` constants,
-- provider discovery, fallback, or content-addressed retrieval.
+- a central coordination object / World Representation Manifest (`api/migrations/0036_world_manifests.sql` + `api/src/routes/manifests.rs`),
+- an explicit separation of control plane (manifests, spatial index, version references) from data plane (component storage, providers),
+- a synchronized runtime that merges components from multiple storage providers into one coherent scene (`api/src/routes/runtime.rs` + `terra-web/src/lib/runtime.ts`),
+- progressive lazy loading driven by LOD 0–4 rather than hardcoded `LOD_LEVELS` constants alone,
+- provider discovery and fallback (`api/src/routes/providers.rs`).
 
-This chapter specifies the runtime architecture that makes separately stored
+Still missing (tracked separately, not by this chapter): a hierarchical spatial
+index service (quadtree/S2/H3 decision pending), content-addressed retrieval with
+signed manifests, and live-cluster verification of every item above (B6 devnet
+funding blocks it).
+
+This chapter documents the runtime architecture that makes separately stored
 spatial objects feel like one coherent physical world.
 
 ---
@@ -449,13 +457,17 @@ sequenceDiagram
 
 | Existing capability | Reused by this chapter | Gap |
 |---|---|---|
-| `routes/derived.rs` (derived_jobs, processing_key dedup) | Derived-job reuse pattern for component reuse | No manifest resolver, no spatial index service |
-| `routes/reconstruction.rs` (jobs, drafts, anchor) | Component submission baseline | No multi-provider retrieval, no assembly resolver |
+| `routes/derived.rs` (derived_jobs, processing_key dedup) | Derived-job reuse pattern for component reuse | `derived_job_leases` migration (0042) now adds worker lease/claim with expired-lease recovery |
+| `routes/reconstruction.rs` (jobs, drafts, anchor) | Component submission baseline | Multi-provider retrieval now via `routes/runtime.rs` (`/runtime/assets` with fallback) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No synchronized 3D scene assembly |
-| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | No hierarchical spatial index, no provider discovery |
+| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | No hierarchical spatial index service yet (quadtree/S2/H3 decision pending) |
 | `routes/geo.rs` (`nearest-roads`, `pois`, `buildings`, `stats`) | Geo read model | No 3D mesh retrieval, no LOD streaming |
 | `terra-core/geo-engine` (`canonical.rs`, `reach.rs`, `graph.rs`, `osm.rs`) | Geometry digest, sealed-road reach | No component storage, no spatial index, no scene graph |
-| Frontend `lod.ts` (`LOD_LEVELS`, `LOD_TARGET_HEIGHT`) | LOD level definitions | No actual tiling/streaming, no 3D Tiles, no frustum culling |
-| Frontend `cesiumTerrain.ts` | Terrain loading with retry | Single terrain provider, no fallback, no component streaming |
+| Frontend `lod.ts` (`LOD_LEVELS`, `LOD_TARGET_HEIGHT`) | LOD level definitions | `lodFromHeight` + `TIER_SETTINGS.buildingCap` + `selectBuildingsForTier` now drive progressive tier loading |
+| Frontend `cesiumTerrain.ts` | Terrain loading with retry | Single terrain provider; provider discovery + fallback now live in `routes/providers.rs` + `runtime.ts` |
+| `api/src/routes/manifests.rs` + migration 0036 | **New (2026-11-02)** — World Representation Manifest router | — |
+| `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — scene graph + LOD manager + asset retrieval with fallback | — |
+| `terra-web/src/lib/runtime.ts` (505 lines) + `runtime.test.ts` (322 lines) | **New (2026-11-02/03)** — frontend runtime client (manifest resolver, scene graph, LOD 0–4, provider fallback) | — |
 
-No code changes are made in this task. The deliverable is the specification.
+The specification is implemented. Remaining work is the hierarchical spatial
+index decision and live-cluster verification (B6 devnet funding).

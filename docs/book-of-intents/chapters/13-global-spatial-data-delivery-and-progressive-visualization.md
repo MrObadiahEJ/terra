@@ -1,6 +1,11 @@
 # Chapter 13 — Global Spatial Data Delivery and Progressive Visualization
 
-**Status:** `SPECIFIED ONLY` — no implementation code yet.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the specification (this chapter)
+was written first (Sprint 024, commit `d293b0e`); the code followed immediately
+after (2026-11-02/03). Progressive lazy loading by LOD 0–4, provider discovery +
+fallback, and the runtime scene graph below are now backed by real routes,
+migrations, and a frontend runtime client. **Not yet exercised against a live
+cluster** — B6 devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
 
 **See:** Chapter 12, RFC-013, RFC-014, Chapter 3, Chapter 10.
 
@@ -8,17 +13,23 @@
 
 ## 13.1 Why this chapter exists
 
-Terra's frontend renders a Cesium globe and defines `LOD_LEVELS` / `LOD_TARGET_HEIGHT`
-constants, but it has **no**:
+Terra's frontend renders a Cesium globe and defines `LOD_LEVELS` /
+`LOD_TARGET_HEIGHT` constants. As of 2026-11-02/03 it now has:
 
-- spatial tiling scheme,
-- 3D Tiles or glTF streaming pipeline,
-- provider discovery or fallback,
-- progressive lazy loading driven by camera distance / screen-space error,
-- frustum or occlusion culling,
-- low-bandwidth or mobile fallback beyond a hardcoded height break.
+- progressive lazy loading driven by LOD 0–4 (`api/src/routes/runtime.rs` `/runtime/lod`,
+  `/runtime/scene/{id}/{lod}` + `terra-web/src/lib/runtime.ts` `lodFromHeight`),
+- provider discovery and fallback (`api/src/routes/providers.rs` + `runtime.ts`
+  asset retrieval with provider fallback),
+- a runtime scene graph with loading-state and validation-state tracking
+  (`migrations 0039_runtime_scene_graphs`, `0043_scene_node_validation_state`),
+- tier-based building selection (`TIER_SETTINGS.buildingCap`,
+  `selectBuildingsForTier`, `distanceDisplayCondition` in `lod.ts` / `perfTier.ts`).
 
-This chapter specifies how Terra retrieves only the data needed for the current
+Still missing (tracked separately, not by this chapter): a spatial tiling scheme,
+3D Tiles or glTF streaming pipeline, frustum/occlusion culling, and live-cluster
+verification of every item above (B6 devnet funding blocks it).
+
+This chapter documents how Terra retrieves only the data needed for the current
 view, progressively, from anywhere in the world.
 
 ---
@@ -200,11 +211,16 @@ The data model must remain consistent even when rendering quality differs.
 
 | Existing capability | Reused by this chapter | Gap |
 |---|---|---|
-| Frontend `LOD_LEVELS` / `LOD_TARGET_HEIGHT` (8 levels, height breaks) | LOD level definitions | No tiling/streaming implementation, no frustum culling |
-| `cesiumTerrain.ts` (single terrain provider + retry) | Terrain loading pattern | Single provider, no fallback, no component streaming |
+| Frontend `LOD_LEVELS` / `LOD_TARGET_HEIGHT` (8 levels, height breaks) | LOD level definitions | `lodFromHeight` + `TIER_SETTINGS.buildingCap` + `selectBuildingsForTier` now drive progressive tier loading; still no spatial tiling, 3D Tiles, or frustum/occlusion culling |
+| `cesiumTerrain.ts` (single terrain provider + retry) | Terrain loading pattern | Provider discovery + fallback now live via `routes/providers.rs` + `runtime.ts`; single terrain provider remains |
 | `story/roads.ts` (`buildRoadRoute`, `snapToRoadNetwork`) | Client-side routing baseline | Server-side `/geo/route` absent (Q-007 closed as sufficient) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No progressive 3D streaming |
 | `routes/spatial.rs` (`/parcels/near`) | Spatial query baseline | No hierarchical tiles, no object streaming |
 | `routes/geo.rs` (nearest-roads, pois, buildings, stats) | Geo read model | No 3D mesh retrieval, no LOD streaming |
+| `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — `/runtime/scene/{id}/{lod}`, `/runtime/assets/{id}` (provider fallback), `/runtime/lod` (LOD 0–4), `/runtime/cache` | — |
+| `api/src/routes/providers.rs` + migration 0037 | **New (2026-11-02)** — provider discovery + fallback + replication | — |
+| `terra-web/src/lib/runtime.ts` + `runtime.test.ts` | **New (2026-11-02/03)** — frontend runtime client: LOD 0–4, provider fallback, asset retrieval, validation-state tracking | — |
 
-No code changes are made in this task. The deliverable is the specification.
+The specification is implemented. Remaining work is the spatial tiling / 3D Tiles
+pipeline, frustum/occlusion culling, and live-cluster verification (B6 devnet
+funding).

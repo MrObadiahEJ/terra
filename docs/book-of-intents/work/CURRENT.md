@@ -1,7 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-02 (committed d293b0e; sprints 012–024 delivered).
+Last reconciled: 2026-11-05 (committed `244ed7e`; sprints 001–025 delivered; atlas
+fix sprint + doc reconciliation in flight).
 
 ## Active intents
 
@@ -41,7 +42,11 @@ Last reconciled: 2026-11-02 (committed d293b0e; sprints 012–024 delivered).
 | Sprint 023 — Research: Q-003 (institutional bootstrap) + Q-004 (residency attestation) | **done & committed (2026-11-02)** | 5 DNS-identity designs + 6 jurisdictions surveyed; findings in RESEARCH_REFERENCES; Q-003/Q-004 → `5 – PROPOSED`; chapters/02 §2.3 + chapters/08 §8.6 updated; doc-only — no gate required |
 | Stage 3 — Planned-capability specifications (REQ-020/021/022) | **done & committed (2026-11-02)** | Chapters 2/6/8 → `SPECIFIED ONLY` with ⚠ founder review flags; INT-005 updated; ROADMAP Stage 3 exit met except founder review of the flags; doc-only — no gate required |
 | Sprint 024 — Architecture spec: distributed reconstruction & assembly (Ch11), world runtime & synchronized rendering (Ch12), global spatial data delivery & progressive visualization (Ch13) | **done & committed (2026-11-02)** | Chapters 11/12/13 written `SPECIFIED ONLY`; REQ-026/027/028 added to REQUIREMENTS_TRACEABILITY; BOOK_OF_INTENTS/SUMMARY/ROADMAP updated; doc-only — no gate required |
+| Sprint 025 — REQ-026/027/028 implementation (RFC-015 component package + manifest + runtime + providers + workers) | **done & committed (2026-11-02/03)** | `geo-engine/src/component_package.rs` (RFC-015 conformance validator) + `canonical3d.rs` (`terra-geom-v2`); migrations 0035–0043; `components.rs`/`assemblies.rs`/`manifests.rs`/`providers.rs`/`runtime.rs`/`workers.rs` routers; frontend `runtime.ts` + `runtime.test.ts` + `WorkerConsolePage.tsx`; API 133/133; geo-engine 33 (+2 ignored); vitest 83/83; tsc clean; build:check PASS |
+| Sprint 026 — RFC-016 on-chain security/privacy governance core (REQ-029–040) | **done & committed (2026-11-02/03)** | `src/security.rs` (1070 lines): 11 PDAs + 11 instructions + 13 `TerraError` codes; registered in `lib.rs`; registers updated in IMPLEMENTATION_STATUS + REQUIREMENTS_TRACEABILITY; compiles clean; **no BPF tests yet, not deployed to devnet** |
 | Chapter 3 → Ch11/12/13 traceability (acceptance criteria concretized) | **done (2026-11-02)** | Ch3 §3.9 now lists concrete targets: SpatialAsset/GeometryVersion anchor mapping for Ch11; `lod.ts`/`cesiumTerrain.ts` → L0–L4 mapping for Ch13; `terra-geom-v2` integrate-or-deprecate decision recorded in ADR-016; E4 row updated to chapters 01–13 | Doc-only — no gate required |
+| Sprint 027 — Atlas 16-point requirement audit (frontend fixes) | **done (2026-11-05, uncommitted)** | `ThreeAtlasFallback.tsx` restored missing `return <div ref={hostRef}>` host (was returning `void`); `TerraGlobe.tsx` typed `ring.map` destructuring + typed runtime accessor for `moveWest/East/South/North/Up/Down` + WASD; `GlobePage.tsx` `failedRegionsRef` dedupes `sceneError` banner retries + manual "Create manifest" retry clears failure; removed 3 empty files (`ThreeNavOverlay.tsx`, `TerraFlightPad.tsx`, `__write-probe.ts`); tsc clean; vitest 83/83; `vite build` PASS (GlobePage 82.4 kB gz, TerraGlobe 874.2 kB gz) |
+| Sprint 028 — Doc reconciliation (all `.md` layer-focused) | **done (2026-11-05, uncommitted)** | IMPLEMENTATION_STATUS.md audit basis → `244ed7e`/2026-11-05, vitest 83/83, bundle entry 305.1/Cesium 1098.5/total 1864.3 kB gz, geo-engine 33 (+2 ignored); added A37–A40 (RFC-016), B15–B19 (REQ-026/027/028 + workers), D12–D18 (runtime, 3D models, atlas verification, tier loading, front-view/single sidebar, backend-down degradation, worker console); REQUIREMENTS_TRACEABILITY REQ-026/027/028 → `IMPLEMENTED, NOT FULLY VERIFIED`; chapters 11/12/13/14 → `IMPLEMENTED, NOT FULLY VERIFIED` with "why this chapter exists" updated to reflect implemented code; work/CURRENT.md reconciled to 2026-11-05 | Doc-only — no gate required |
 
 ## Known blockers
 
@@ -58,13 +63,21 @@ Last reconciled: 2026-11-02 (committed d293b0e; sprints 012–024 delivered).
 
 ## Next up (order)
 
-1. **Founder review** of Stage 3 flags (Q-003/Q-004) and Stage 4 boundary
-   (REQ-026/027/028 manifest + runtime architecture). No funding required.
+1. **Founder review** of remaining Stage 3/4 flags: Q-003 (bootstrap council),
+   Q-004 (residency recognition), Q-005 (securities research). These gate
+   REQ-020/021/022 implementation but do not block doc-only work.
+   REQ-026/027/028 are implemented (Sprint 025) and only need live-cluster
+   verification, which is blocked on funding.
 2. **Stage 2 (devnet)** — blocked on Q-001 devnet funding (founder). Once
    funded: `./deploy.sh devnet` + on-chain smoke (register parcel → rights →
-   geometry version → 3D model → snapshot → escrow → dispute → slash dry-run).
+   geometry version → 3D model → snapshot → escrow → dispute → slash dry-run),
+   then live-cluster verification of REQ-026/027/028 (component submission,
+   manifest version transition, multi-provider retrieval, worker heartbeat).
 3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
    institutional identity (REQ-020), residency credential (REQ-021), lien
-   encumbrance (REQ-022), and the distributed reconstruction/runtime
-   architecture (REQ-026/027/028) per Chapters 11–13.
+   encumbrance (REQ-022).
+4. **Spatial index decision** (quadtree/S2/H3) and content-addressed retrieval +
+   signed manifests — specified in Chapters 12/13, not yet coded.
+5. **Frustum/occlusion culling + screen-space error LOD** — specified in
+   Chapter 13, not yet coded.
 

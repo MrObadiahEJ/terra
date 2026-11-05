@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import * as L from 'leaflet'
 import {
   MapContainer,
@@ -156,6 +156,17 @@ function ZoomReporter({ onZoom }: { onZoom?: (zoom: number) => void }) {
   return null
 }
 
+function MapZoomState({ onZoom }: { onZoom: (zoom: number) => void }) {
+  const map = useMap()
+  useMapEvents({
+    zoomend: () => onZoom(map.getZoom()),
+  })
+  useEffect(() => {
+    onZoom(map.getZoom())
+  }, [map, onZoom])
+  return null
+}
+
 type Ring = [number, number][]
 
 function parcelRing(parcel: OffChainParcel): Ring | null {
@@ -186,6 +197,10 @@ export default function LeafletMap({
 }: LeafletMapProps) {
   const tiles = TILE_STYLES[basemap]
   const suppressUntilRef = useRef(0)
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+  const initialZoom = focus
+    ? Math.max(12, Math.min(20, Math.round(20 - Math.log2(focus.height / 60))))
+    : DEFAULT_ZOOM
 
   const parcels = offChainParcels
     .map((p) => ({ parcel: p, ring: parcelRing(p) }))
@@ -197,8 +212,8 @@ export default function LeafletMap({
   return (
     <MapContainer
       {...{
-        center: CENTER,
-        zoom: DEFAULT_ZOOM,
+        center: focus ? [focus.latitude, focus.longitude] : CENTER,
+        zoom: initialZoom,
         zoomControl: false,
         className: 'leaflet-container',
         style: { width: '100%', height: '100%' },
@@ -225,9 +240,10 @@ export default function LeafletMap({
       />
       <FocusController focus={focus} />
       <ZoomReporter onZoom={onZoom} />
+      <MapZoomState onZoom={setMapZoom} />
       <ResizeInvalidator resizeKey={resizeKey} />
 
-      {roads.map((road) => {
+      {mapZoom >= 13 && roads.map((road) => {
         const poly = parseGeoJSON<{ type: string; coordinates: number[][] }>(road.geometry)
         if (!poly || poly.type !== 'LineString') return null
         const style = roadStyle(road.highway)
@@ -240,10 +256,11 @@ export default function LeafletMap({
         )
       })}
 
-      {buildings.map((building) => {
+      {mapZoom >= 16 && buildings.map((building) => {
         const ring = building.geometry?.coordinates?.[0]
         if (!ring || ring.length < 4) return null
         return (
+          <Fragment key={`bld-${building.osm_id}`}>
           <Polygon
             key={`bld-${building.osm_id}`}
             positions={ring.map(([lon, lat]) => [lat, lon] as [number, number])}
@@ -263,10 +280,11 @@ export default function LeafletMap({
           >
             {showLabels && building.name ? <Tooltip>{building.name}</Tooltip> : null}
           </Polygon>
+          </Fragment>
         )
       })}
 
-      {pois.map((poi) => {
+      {mapZoom >= 14 && pois.map((poi) => {
         const poly = parseGeoJSON<{ type: string; coordinates: number[] }>(poi.geometry)
         if (!poly || poly.type !== 'Point') return null
         const [lon, lat] = poly.coordinates
@@ -298,7 +316,7 @@ export default function LeafletMap({
         />
       ))}
 
-      {parcels.map(({ parcel, ring }) => (
+      {mapZoom >= 15 && parcels.map(({ parcel, ring }) => (
         <Polygon
           key={parcel.id}
           positions={ring}

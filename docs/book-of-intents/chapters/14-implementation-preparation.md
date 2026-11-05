@@ -1,11 +1,9 @@
 # Implementation Preparation Plan
 
-**Status:** `SPECIFIED ONLY` — code-area mapping, no implementation code.
-**Purpose:** For each missing requirement, identify the likely code areas that will
-need work (smart contracts, DB migrations, backend services, API routes, worker
-processes, spatial engine modules, frontend components, runtime modules,
-storage interfaces, tests, documentation), and which changes are foundational
-vs dependent on earlier work.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the code-area mapping below was
+written first (Sprint 024, commit `1ebb6f5`); the foundational items for
+REQ-026/027/028 were implemented immediately after (2026-11-02/03, commits
+`fa5e939`…`244ed7e`). Items still `SPECIFIED ONLY` are called out per-section.
 
 **See:** REQUIREMENTS_TRACEABILITY.md (REQ-020…REQ-028), Chapter 11, Chapter 12,
 Chapter 13, RFC-015.
@@ -14,29 +12,31 @@ Chapter 13, RFC-015.
 
 ## 1. REQ-026 — Distributed spatial component package & assembly
 
-**Status:** `SPECIFIED ONLY`. No code exists for the component package schema,
-conformance test, component registry, or assembly system.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED`. The component package schema,
+conformance test, component registry, and assembly system all exist and pass
+local suites; not yet exercised against a live cluster (B6 devnet funding).
 
-### Foundational changes (must come first)
+### Implemented (2026-11-02)
 
-| Code area | Change | Depends on |
+| Code area | Change | Evidence |
 |---|---|---|
-| `docs/rfc-015-spatial-component-package.md` | Schema already specified; needs conformance validator implementation | — |
-| `terra-core/geo-engine/src/` | Add `terra-geom-v2` digest canonicalization (3D + elevation ref + vertical units) — integrate-or-deprecate decision first (ADR-016) | REQ-026 |
-| `terra-core/programs/terra_registry/src/spatial_asset.rs` | Extend `GeometryVersion` / add `ComponentVersion` PDA with `component_id`, `physical_entity_id`, `relationships`, `storage_reference`, `digest_algorithm_version` | RFC-015 schema |
-| `terra-core/api/migrations/` | New migration: `component_packages` table + `component_dependencies` + `component_versions` | SpatialAsset change |
-| `terra-core/api/src/routes/` | New `components` router: `POST /components` (submit package), `GET /components/{id}` (retrieve), conformance check middleware | Migration + RFC-015 |
+| `docs/rfc-015-spatial-component-package.md` | Schema already specified | — |
+| `terra-core/geo-engine/src/component_package.rs` | RFC-015 conformance validator (`validate`, `ComponentPackage`) + `terra-geom-v2` 3D digest | geo-engine 33 (+2 ignored) |
+| `terra-core/api/migrations/0035_component_packages.sql` | `component_packages` table | — |
+| `terra-core/api/migrations/0041_component_version.sql` | `component_version` table (anchors to SpatialAsset/GeometryVersion) | — |
+| `terra-core/api/src/routes/components.rs` | `POST /components` (submit + conformance-validate), `GET /components/{id}`, `GET /components` (list) | API 133/133 |
+| `terra-core/api/src/routes/assemblies.rs` | `POST /assemblies`, `GET /assemblies/{id}` (objects + conflicts), `GET /assemblies` (list), `POST /assemblies/{id}/objects`, `POST /assemblies/{id}/conflicts`, `PUT /assemblies/{id}/status` | API 133/133 |
 
-### Dependent changes (come after foundational)
+### Still to do
 
-| Code area | Change | Depends on |
-|---|---|---|
-| `terra-core/api/src/routes/reconstruction.rs` | Route reconstruction jobs through component packages; `complete_job` writes a component package instead of a bare draft | Components router |
-| `terra-core/api/src/routes/derived.rs` | Reuse `processing_key` dedup for identical component packages | Components router |
-| `terra-web/src/lib/` | Frontend component-package client (submit, retrieve, validate digest) | Components router |
-| `docs/book-of-intents/chapters/11-*.md` | Assembly spec already written; needs implementation ticket | Components router + assembly |
+- Route reconstruction jobs through component packages (`complete_job` writes a
+  component package instead of a bare draft) — depends on components router.
+- Reuse `processing_key` dedup for identical component packages.
+- Frontend component-package client (submit, retrieve, validate digest).
+- Live-cluster component submission + anchoring (B6).
 
-### Acceptance evidence (when implemented)
+### Acceptance evidence (when implemented on a live cluster)
+
 - Two different workers submit valid component packages with different internal engines
 - Packages pass the conformance validator
 - Component versions anchor to `SpatialAsset`/`GeometryVersion` on-chain
@@ -45,26 +45,27 @@ conformance test, component registry, or assembly system.
 
 ## 2. REQ-027 — World Representation Manifest & central coordination
 
-**Status:** `SPECIFIED ONLY`. No manifest resolver, spatial index service, or manifest storage exists.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED`. The manifest router, migrations,
+and frontend runtime client all exist and pass local suites; not yet exercised
+against a live cluster (B6).
 
-### Foundational changes
+### Implemented (2026-11-02)
 
-| Code area | Change | Depends on |
+| Code area | Change | Evidence |
 |---|---|---|
-| `docs/book-of-intents/chapters/12-*.md` | Manifest architecture already specified; founder decision on one-root vs distributed registry needed first | — |
-| `terra-core/api/migrations/` | New migration: `world_manifests` table + `manifest_versions` + `manifest_objects` | Founder decision |
-| `terra-core/api/src/routes/world-registry/` | Extend existing `world_registry` router or add `manifests` router: `GET /manifests/{region}`, `PUT /manifests/{region}` | Migration |
-| `terra-core/api/src/routes/spatial.rs` | Spatial index service: hierarchical spatial index (quadtree/S2/H3 decision needed) for partition queries | Migration |
+| `terra-core/api/migrations/0036_world_manifests.sql` | `world_manifests` (region, version, parent/neighbor manifests) + `manifest_objects` (object_id, component version, assembly version, storage reference, LODs, validation state, access rules) | — |
+| `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert) | API 133/133 |
+| `terra-web/src/lib/runtime.ts` | Manifest resolver + scene graph manager + LOD 0–4 + provider fallback | vitest 83/83 |
 
-### Dependent changes
+### Still to do
 
-| Code area | Change | Depends on |
-|---|---|---|
-| `terra-core/api/src/routes/reconstruction.rs` | Assembly resolver: resolve component versions + dependencies for an assembly | Manifest router |
-| `terra-web/src/lib/` | Runtime: manifest resolver, component resolver, scene graph manager, LOD manager | Manifest router + spatial index |
-| `terra-core/api/src/routes/derived.rs` | Cache invalidation propagation on manifest version change | Manifest router |
+- Spatial index service: hierarchical spatial index (quadtree/S2/H3 decision
+  still pending) for partition queries.
+- Cache invalidation propagation on manifest version change.
+- Live-cluster manifest version transition (B6).
 
 ### Acceptance evidence
+
 - Client discovers a building's components via manifest without downloading all geometry
 - Manifest version transition keeps old clients on consistent assembly
 
@@ -72,27 +73,35 @@ conformance test, component registry, or assembly system.
 
 ## 3. REQ-028 — Progressive delivery & runtime discovery
 
-**Status:** `SPECIFIED ONLY`. No provider discovery, fallback, tiling/streaming, or progressive LOD exists beyond frontend `LOD_LEVELS` constants.
+**Status:** `IMPLEMENTED, NOT FULLY VERIFIED`. Provider discovery, fallback,
+runtime scene graphs, worker registration, and the frontend runtime client all
+exist and pass local suites; not yet exercised against a live cluster (B6).
 
-### Foundational changes
+### Implemented (2026-11-02/03)
 
-| Code area | Change | Depends on |
+| Code area | Change | Evidence |
 |---|---|---|
-| `terra-web/src/lib/lod.ts` | `LOD_LEVELS` already defined; needs integration with actual tile streaming | — |
-| `terra-web/src/lib/cesiumTerrain.ts` | Single terrain provider; needs provider discovery + fallback | — |
-| `terra-core/api/migrations/` | New migration: `storage_providers` table + `provider_replicas` + `provider_capabilities` | — |
-| `terra-core/api/src/routes/` | New `storage-providers` router: `GET /providers`, `GET /providers/{id}/replicas` | Migration |
+| `terra-web/src/lib/lod.ts` | `LOD_LEVELS` + `lodFromHeight` + `TIER_SETTINGS.buildingCap` + `selectBuildingsForTier` + `distanceDisplayCondition` | vitest 83/83 |
+| `terra-web/src/lib/cesiumTerrain.ts` | Single terrain provider + retry (unchanged; provider discovery now in backend) | — |
+| `terra-core/api/migrations/0037_storage_providers.sql` | `storage_providers` + `provider_replicas` + `provider_capabilities` | — |
+| `terra-core/api/migrations/0039_runtime_scene_graphs.sql` | `scene_graphs` + `scene_nodes` + `asset_cache` | — |
+| `terra-core/api/migrations/0040_worker_registration.sql` | Worker registration with capabilities | — |
+| `terra-core/api/migrations/0042_derived_job_leases.sql` | Derived-job lease/claim with expired-lease recovery | — |
+| `terra-core/api/migrations/0043_scene_node_validation_state.sql` | Scene node validation state (`missing`/`preliminary`/`independently_valid`) | — |
+| `terra-core/api/src/routes/providers.rs` | `GET /providers`, `GET /providers/{id}/replicas`; multi-provider storage, fallback, replication | API 133/133 |
+| `terra-core/api/src/routes/runtime.rs` | `GET /runtime/scene/{manifest_id}`, `GET /runtime/scene/{manifest_id}/{lod}`, `GET /runtime/assets/{component_id}` (provider fallback), `GET /runtime/lod`, `POST /runtime/cache` | API 133/133 |
+| `terra-core/api/src/routes/workers.rs` | Worker registration + heartbeat staleness detection + job assignment | API 133/133 |
+| `terra-web/src/lib/runtime.ts` + `runtime.test.ts` | Asset retrieval (range requests, cache prioritization, cancellation/retry), provider selection, LOD 0–4 | vitest 83/83 |
+| `terra-web/src/pages/WorkerConsolePage.tsx` | Worker registration UI + signed derived-job claim controls | tsc clean, build OK |
 
-### Dependent changes
+### Still to do
 
-| Code area | Change | Depends on |
-|---|---|---|
-| `terra-web/src/lib/` | Asset retrieval service: range requests, cache prioritization, prefetching, cancellation/retry | Providers router |
-| `terra-web/src/lib/` | Provider selection: exact-version availability, authorization, latency, cost, reliability | Asset retrieval |
-| `terra-core/api/src/routes/` | Content-addressed retrieval + signed manifests | Providers router |
-| `terra-web/src/` | Frustum culling, occlusion culling, screen-space error LOD | Asset retrieval |
+- Content-addressed retrieval + signed manifests.
+- Frustum culling, occlusion culling, screen-space error LOD.
+- Live-cluster multi-provider retrieval + provider failover (B6).
 
 ### Acceptance evidence
+
 - Runtime retrieves components from separate storage providers
 - Runtime does not download unrelated geographic data
 - Viewer displays low-detail data before high-detail finishes loading
@@ -122,20 +131,36 @@ conformance test, component registry, or assembly system.
 
 Per ROADMAP Stage 3–4 and Chapter 47:
 
-1. **Founder decisions first:** Q-003 (bootstrap council), Q-004 (residency recognition) — unblock REQ-020/021/022 specs.
-2. **Component package:** RFC-015 conformance validator + `component_packages` migration + `components` router (REQ-026 foundational).
-3. **3D digest:** Integrate-or-deprecate `terra-geom-v2` (ADR-016 decision) — needed for 3D component digests.
-4. **Manifest:** `world_manifests` migration + manifest router + spatial index (REQ-027 foundational).
-5. **Providers:** `storage_providers` migration + providers router + provider discovery (REQ-028 foundational).
-6. **Assembly:** assembly resolver + conflict detection + incremental assembly (REQ-026 dependent).
-7. **Runtime:** scene graph + LOD manager + asset retrieval + progressive streaming (REQ-028 dependent).
-8. **Frontend:** integrate `LOD_LEVELS`/`cesiumTerrain.ts` with actual tile streaming (REQ-028 dependent).
+1. **Founder decisions first:** Q-003 (bootstrap council), Q-004 (residency
+   recognition) — unblock REQ-020/021/022 specs.
+2. **Component package:** RFC-015 conformance validator + `component_packages` +
+   `component_version` migrations + `components` router — **done** (2026-11-02).
+3. **3D digest:** Integrate-or-deprecate `terra-geom-v2` (ADR-016 decision) —
+   **done** (`geo-engine/src/canonical3d.rs`).
+4. **Manifest:** `world_manifests` migration + `manifests` router + frontend
+   runtime client — **done** (2026-11-02).
+5. **Providers:** `storage_providers` migration + `providers` router + provider
+   discovery — **done** (2026-11-02).
+6. **Assembly:** assembly resolver + conflict detection + incremental assembly —
+   **done** (`assemblies.rs`, 2026-11-02).
+7. **Runtime:** scene graph + LOD manager + asset retrieval + progressive
+   streaming — **done** (`runtime.rs` + `runtime.ts`, 2026-11-02/03).
+8. **Frontend:** integrate `LOD_LEVELS`/`cesiumTerrain.ts` with progressive
+   tier loading + provider fallback — **done** (`lod.ts`, `perfTier.ts`,
+   `runtime.ts`, `GlobePage.tsx`, 2026-11-03).
+9. **Workers:** worker registration + heartbeat + derived-job lease/claim —
+   **done** (`workers.rs` + `WorkerConsolePage.tsx`, 2026-11-03).
 
 ### No-funding work available now
-All of the above is documentation/specification except items that require code. The workable non-funding items are:
-- RFC-015 conformance validator (could be written as a standalone Rust/TS validator)
-- Spatial index design decision (quadtree/S2/H3) — documented, not coded
-- Manifest architecture founder decision — documented, pending
+
+All of the above is implemented and passes local suites. The remaining non-funding
+items are:
+
+- Spatial index design decision (quadtree/S2/H3) — documented, not coded.
+- Manifest architecture founder decision — documented, pending.
+- Content-addressed retrieval + signed manifests — specified, not coded.
+- Frustum/occlusion culling + screen-space error LOD — specified, not coded.
+- Reconstruction-task economic model — founder decision pending.
 
 ---
 
@@ -143,16 +168,22 @@ All of the above is documentation/specification except items that require code. 
 
 | Area | Existing | Status | Can build on? |
 |---|---|---|---|
-| SpatialAsset / GeometryVersion | `spatial_asset.rs` (on-chain, append-only, quorum verify) | IMPLEMENTED AND VERIFIED | Yes — component version anchors |
-| ThreeDModel | `three_d_model.rs` (register + verify, off-chain URI) | IMPLEMENTED AND VERIFIED | Partial — model reference pattern only |
-| Reconstruction API | `routes/reconstruction.rs` (jobs, lease, complete, draft, anchor) | PARTIALLY IMPLEMENTED | Yes — component submission baseline |
-| Derived compute | `routes/derived.rs` (processing_key dedup, recursive-CTE invalidation) | IMPLEMENTED AND VERIFIED | Yes — dedup pattern for component packages |
+| SpatialAsset / GeometryVersion | `spatial_asset.rs` (on-chain, append-only, quorum verify) | IMPLEMENTED AND VERIFIED | Yes — component version anchors via migration 0041 |
+| ThreeDModel | `three_d_model.rs` (register + verify, off-chain URI) | IMPLEMENTED AND VERIFIED | Yes — model artifact reference pattern |
+| Component Package | `geo-engine/src/component_package.rs` (RFC-015 validator) + `components.rs` router + migrations 0035/0041 | IMPLEMENTED, NOT FULLY VERIFIED | Yes — submission + conformance + retrieval |
+| World Manifest | `manifests.rs` router + migration 0036 + `runtime.ts` manifest resolver | IMPLEMENTED, NOT FULLY VERIFIED | Yes — manifest CRUD + object upsert |
+| Storage Providers | `providers.rs` router + migration 0037 | IMPLEMENTED, NOT FULLY VERIFIED | Yes — discovery + fallback + replicas |
+| Assembly | `assemblies.rs` router + migration 0038 | IMPLEMENTED, NOT FULLY VERIFIED | Yes — create + objects + conflicts + status |
+| Runtime Scene Graph | `runtime.rs` router + migrations 0039/0043 + `runtime.ts` client | IMPLEMENTED, NOT FULLY VERIFIED | Yes — scene resolution + LOD + asset retrieval |
+| Workers | `workers.rs` router + migrations 0040/0042 + `WorkerConsolePage.tsx` | IMPLEMENTED, NOT FULLY VERIFIED | Yes — registration + assignment + lease/claim |
+| Reconstruction API | `routes/reconstruction.rs` (jobs, lease, complete, draft, anchor) | PARTIALLY IMPLEMENTED | Yes — component submission baseline; needs component-package routing |
+| Derived compute | `routes/derived.rs` (processing_key dedup, recursive-CTE invalidation) | IMPLEMENTED AND VERIFIED | Yes — dedup pattern for component packages; now with lease/claim (0042) |
 | Task economics | `task_economics.rs` (FeePolicy, CoverageIncentive, TaskEscrow, RewardAllocation) | IMPLEMENTED AND VERIFIED | Partial — verification tasks only; needs reconstruction task types |
 | Routing | `routing.rs` (nine-factor, seeded randomness) | IMPLEMENTED AND VERIFIED | Partial — needs reconstruction-task routing |
-| Geo-engine | `canonical.rs` (terra-geom-v1, 2D), `reach.rs`, `graph.rs`, `osm.rs` | IMPLEMENTED / PARTIAL | Yes — 2D digest baseline; needs 3D (terra-geom-v2) |
-| Frontend | `lod.ts` (LOD_LEVELS), `cesiumTerrain.ts` (terrain + retry), story engine | IMPLEMENTED AND VERIFIED | Partial — LOD defined but no streaming/tiling |
-| API routers | ~26 routers in `routes/mod.rs` | IMPLEMENTED AND VERIFIED | Yes — add components/manifests/providers routers |
-| Migrations | 0001–0034 chain | IMPLEMENTED AND VERIFIED | Yes — add component/manifest/provider migrations |
+| Geo-engine | `canonical.rs` (terra-geom-v1, 2D), `canonical3d.rs` (terra-geom-v2, 3D), `reach.rs`, `graph.rs`, `osm.rs`, `component_package.rs` | IMPLEMENTED / PARTIAL | Yes — 2D + 3D digest baseline; component package validator |
+| Frontend | `lod.ts` (LOD_LEVELS, lodFromHeight, TIER_SETTINGS, selectBuildingsForTier), `cesiumTerrain.ts`, `runtime.ts` (manifest resolver, scene graph, LOD 0–4, provider fallback), story engine | IMPLEMENTED AND VERIFIED | Partial — LOD defined + progressive tier loading implemented; no spatial tiling/3D Tiles/frustum culling |
+| API routers | 37 routers in `routes/mod.rs` | IMPLEMENTED AND VERIFIED | Yes — add new routers as needed |
+| Migrations | 0001–0043 chain | IMPLEMENTED AND VERIFIED | Yes — add component/manifest/provider/runtime/worker migrations |
 
 ---
 

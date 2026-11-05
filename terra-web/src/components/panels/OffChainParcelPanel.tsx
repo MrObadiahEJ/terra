@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import type { OffChainParcel } from '../../lib/api'
 import type { LonLat } from '../../lib/geo'
 import { polygonAreaM2, polygonBbox, polygonCentroid, polygonPerimeterM, ringDigest } from '../../lib/geo'
-import { Box, MapPin, Loader2 } from 'lucide-react'
+import { Box, Eye, Footprints, MapPin, Loader2 } from 'lucide-react'
 import { useLocale } from '../../lib/locale'
 
 interface Props {
   parcel: OffChainParcel
   onView3D?: () => void
+  /** Close frontal observation of the parcel geometry. */
+  onFrontView?: () => void
+  /** Street-level observation of the parcel geometry. */
+  onStreetView?: () => void
 }
 
 function parseRing(geometry: string | null): LonLat[] | null {
@@ -23,7 +27,12 @@ function parseRing(geometry: string | null): LonLat[] | null {
 
 /** Detail view for parcels that have geometry but no on-chain account
  *  (demo seed data, local demo registrations, API-only records). */
-export default function OffChainParcelPanel({ parcel, onView3D }: Props) {
+export default function OffChainParcelPanel({
+  parcel,
+  onView3D,
+  onFrontView,
+  onStreetView,
+}: Props) {
   const { t } = useLocale()
   const ring = useMemo(() => parseRing(parcel.geometry), [parcel.geometry])
   const metrics = useMemo(() => {
@@ -125,6 +134,29 @@ export default function OffChainParcelPanel({ parcel, onView3D }: Props) {
         <button className="btn btn-secondary w-full justify-center" onClick={onView3D}>
           <Box size={14} /> {t('viewIn3D')}
         </button>
+      )}
+      {(onFrontView || onStreetView) && ring && ring.length >= 3 && (
+        <div className="flex gap-2">
+          {onFrontView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onFrontView}
+              title={t('frontViewHint')}
+            >
+              <Eye size={14} /> {t('frontViewAction')}
+            </button>
+          )}
+          {onStreetView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onStreetView}
+            >
+              <Footprints size={14} /> {t('streetViewAction')}
+            </button>
+          )}
+        </div>
       )}
 
       <p className="font-mono text-[10px] text-muted break-all">holder: {parcel.holder}</p>

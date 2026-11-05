@@ -3,7 +3,7 @@
 // to show on any device, fully offline. Shapes sit in the pilot region around
 // DEFAULT_FOCUS (Soa / Yaoundé, Cameroon).
 
-import type { OffChainParcel, RoadRow, PoiRow, GeoStats, FusionStats } from './api'
+import type { OffChainParcel, OsmBuildingFootprint, RoadRow, PoiRow, GeoStats, FusionStats } from './api'
 import type { LonLat } from './geo'
 import { polygonAreaM2, lineLengthM } from './geo'
 
@@ -53,6 +53,37 @@ export const DEMO_PARCELS: OffChainParcel[] = DEMO_LOT_SEEDS.map((lot, index) =>
     [west, south],
   ]
   return parcel(lot.id, lot.name, ['registered', 'verified', 'pending'][index % 3], ring)
+})
+
+// Guaranteed 3D map content for presentations and offline demos. These are
+// derived from the sample parcel envelopes, not cadastral or OSM claims.
+export const DEMO_BUILDINGS: OsmBuildingFootprint[] = DEMO_PARCELS.map((lot, index) => {
+  const geometry = JSON.parse(lot.geometry ?? '{}') as { coordinates?: LonLat[][] }
+  const ring = geometry.coordinates?.[0] ?? []
+  const west = ring[0][0]
+  const south = ring[0][1]
+  const east = Math.max(...ring.map(([lon]) => lon))
+  const north = Math.max(...ring.map(([, lat]) => lat))
+  const insetX = (east - west) * 0.18
+  const insetY = (north - south) * 0.18
+
+  return {
+    osm_id: -1000 - index,
+    name: `${lot.name.replace('Sample Lot', 'Presentation Building')}`,
+    building: ['apartments', 'office', 'commercial'][index % 3],
+    height_m: 8 + ((index * 7) % 38),
+    levels: 2 + (index % 6),
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[
+        [west + insetX, south + insetY],
+        [east - insetX, south + insetY],
+        [east - insetX, north - insetY],
+        [west + insetX, north - insetY],
+        [west + insetX, south + insetY],
+      ]],
+    },
+  }
 })
 
 function road(

@@ -24,7 +24,7 @@ export const TIER_SETTINGS: Record<GraphicsTier, TierSettings> = {
     buildingCap: 0,
   },
   medium: {
-    terrain: true,
+    terrain: false,
     imageryMaxLevel: 19,
     requestRenderMode: true,
     resolutionScale: 1,
@@ -34,7 +34,7 @@ export const TIER_SETTINGS: Record<GraphicsTier, TierSettings> = {
     buildingCap: 600,
   },
   high: {
-    terrain: true,
+    terrain: false,
     imageryMaxLevel: 20,
     requestRenderMode: false,
     resolutionScale: 1,
@@ -44,7 +44,7 @@ export const TIER_SETTINGS: Record<GraphicsTier, TierSettings> = {
     buildingCap: 1200,
   },
   ultra: {
-    terrain: true,
+    terrain: false,
     imageryMaxLevel: 20,
     requestRenderMode: false,
     resolutionScale: 1.5,

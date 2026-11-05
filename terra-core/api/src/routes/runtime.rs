@@ -17,6 +17,8 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::components::enforce_component_access;
+use crate::auth::OptionalSignedRequest;
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -24,7 +26,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/scene/{manifest_id}", get(resolve_scene))
         .route("/scene/{manifest_id}/{lod}", get(resolve_scene_at_lod))
-        .route("/assets/{component_id}", get(retrieve_asset))
+        .route(
+            "/assets/{component_id}/{component_version}",
+            get(retrieve_asset),
+        )
         .route("/lod", get(list_lod_levels))
         .route("/cache", post(record_cache))
 }
@@ -50,13 +55,15 @@ const LOD_LEVELS: [LodLevel; 5] = [
     LodLevel {
         level: 0,
         name: "global_overview",
-        description: "Globe representation, major boundaries, low-resolution terrain, region manifests",
+        description:
+            "Globe representation, major boundaries, low-resolution terrain, region manifests",
         max_distance_m: 1_000_000.0,
     },
     LodLevel {
         level: 1,
         name: "regional",
-        description: "Regional manifests, terrain tiles, administrative boundaries, major infrastructure",
+        description:
+            "Regional manifests, terrain tiles, administrative boundaries, major infrastructure",
         max_distance_m: 100_000.0,
     },
     LodLevel {
@@ -101,6 +108,7 @@ pub struct SceneNodeRow {
     pub lod_level: i32,
     pub visibility: String,
     pub loading_state: String,
+    pub validation_state: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -153,7 +161,11 @@ pub async fn list_lod_levels(
     Query(params): Query<ListLodParams>,
 ) -> Result<Json<Vec<LodLevel>>, AppError> {
     let max = params.max_level.unwrap_or(4).min(4);
-    let levels: Vec<LodLevel> = LOD_LEVELS.iter().filter(|l| l.level <= max).copied().collect();
+    let levels: Vec<LodLevel> = LOD_LEVELS
+        .iter()
+        .filter(|l| l.level <= max)
+        .copied()
+        .collect();
     Ok(Json(levels))
 }
 
@@ -182,7 +194,16 @@ const MANIFEST_OBJECTS_FOR_SCENE: &str = "SELECT id, manifest_id, object_id, \
     available_lods, spatial_extent FROM manifest_objects WHERE manifest_id = $1 ORDER BY object_id";
 
 const INSERT_SCENE_GRAPH: &str = "INSERT INTO scene_graphs (manifest_id, region_id, \
-    lod_level, node_count, status) VALUES ($1, $2, $3, $4, $5) RETURNING id";
+    lod_level, node_count, status) VALUES ($1, $2, $3, $4, $5) \
+    RETURNING id, manifest_id, region_id, lod_level, node_count, status, created_at";
+
+fn normalize_validation_state(state: &str) -> &str {
+    match state {
+        "missing" => "missing",
+        "independently_valid" => "independently_valid",
+        _ => "preliminary",
+    }
+}
 
 pub async fn resolve_scene(
     State(state): State<AppState>,
@@ -207,13 +228,12 @@ async fn resolve_scene_internal(
     lod: i32,
 ) -> Result<Json<SceneWithNodes>, AppError> {
     // Verify manifest exists and get its region.
-    let manifest_region: Option<(Uuid, String)> = sqlx::query_as(
-        "SELECT id, region_id FROM world_manifests WHERE id = $1",
-    )
-    .bind(manifest_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| AppError::internal(format!("manifest query failed: {e}")))?;
+    let manifest_region: Option<(Uuid, String)> =
+        sqlx::query_as("SELECT id, region_id FROM world_manifests WHERE id = $1")
+            .bind(manifest_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("manifest query failed: {e}")))?;
 
     let (_, region_id) = manifest_region
         .ok_or_else(|| AppError::not_found(format!("manifest {manifest_id} not found")))?;
@@ -237,7 +257,11 @@ async fn resolve_scene_internal(
         .bind(&region_id)
         .bind(lod)
         .bind(objects.len() as i32)
-        .bind(if objects.is_empty() { "incomplete" } else { "ready" })
+        .bind(if objects.is_empty() {
+            "incomplete"
+        } else {
+            "ready"
+        })
         .fetch_one(&state.pool)
         .await
         .map_err(|e| AppError::internal(format!("scene graph insert failed: {e}")))?;
@@ -249,28 +273,26 @@ async fn resolve_scene_internal(
             r#"
             INSERT INTO scene_nodes (
                 scene_graph_id, object_id, component_version_id, parent_node_id,
-                transform, lod_level, visibility, loading_state
+                transform, lod_level, visibility, loading_state, validation_state
             )
-            VALUES ($1, $2, $3, NULL, NULL, $4, 'visible', 'pending')
+            VALUES ($1, $2, $3, NULL, NULL, $4, 'visible', 'pending', $5)
             RETURNING id, scene_graph_id, object_id, component_version_id,
                       parent_node_id, transform, lod_level, visibility,
-                      loading_state, created_at
+                      loading_state, validation_state, created_at
             "#,
         )
         .bind(scene.id)
         .bind(&obj.object_id)
         .bind(&obj.component_version_id)
         .bind(lod)
+        .bind(normalize_validation_state(&obj.validation_state))
         .fetch_one(&state.pool)
         .await
         .map_err(|e| AppError::internal(format!("node insert failed: {e}")))?;
         nodes.push(node);
     }
 
-    Ok(Json(SceneWithNodes {
-        scene,
-        nodes,
-    }))
+    Ok(Json(SceneWithNodes { scene, nodes }))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -291,7 +313,32 @@ struct AssemblyObjectRow {
 pub async fn retrieve_asset(
     State(state): State<AppState>,
     Path((component_id, component_version)): Path<(String, String)>,
+    auth: OptionalSignedRequest,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<AssetRetrieval>, AppError> {
+    let privacy: Option<(String, serde_json::Value)> = sqlx::query_as(
+        "SELECT privacy_classification, access_policy \
+         FROM component_packages \
+         WHERE component_id = $1 AND component_version = $2 \
+         ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(&component_id)
+    .bind(&component_version)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("privacy query failed: {e}")))?;
+
+    if let Some((privacy_classification, access_policy)) = privacy {
+        enforce_component_access(
+            &privacy_classification,
+            &access_policy,
+            auth.0.as_ref(),
+            &headers,
+            "GET",
+            &format!("/api/v1/runtime/assets/{component_id}/{component_version}"),
+        )?;
+    }
+
     let row = sqlx::query_as::<_, AssetRetrievalRow>(
         r#"
         SELECT pr.component_id, pr.component_version, sp.id as provider_id, \
@@ -316,7 +363,9 @@ pub async fn retrieve_asset(
     .map_err(|e| AppError::internal(format!("asset query failed: {e}")))?;
 
     let row = row.ok_or_else(|| {
-        AppError::not_found(format!("no available replica for component {component_id} version {component_version}"))
+        AppError::not_found(format!(
+            "no available replica for component {component_id} version {component_version}"
+        ))
     })?;
 
     Ok(Json(AssetRetrieval {

@@ -32,6 +32,7 @@ export interface SceneNodeRow {
   lod_level: number
   visibility: string
   loading_state: string
+  validation_state: 'missing' | 'preliminary' | 'independently_valid'
   created_at: string
   spatial_extent: any
 }
@@ -78,6 +79,24 @@ export interface CacheRow {
   cached_at: string
   last_accessed_at: string
   access_count: number
+}
+
+export interface DerivedJob {
+  id: string
+  kind: string
+  processing_key: string
+  input_hash: string
+  status: string
+  result_ref: string | null
+  result_hash: string | null
+  error: string | null
+  created_by: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface LeasedDerivedJob {
+  job: DerivedJob
 }
 
 // ---- Manifest creation (World Representation Manifest, REQ-027) ----
@@ -154,6 +173,43 @@ async function request<T>(
   timeoutMs = 30_000,
 ): Promise<T> {
   return requestUrl<T>(`${API_BASE}${path}`, init, retries, timeoutMs)
+}
+
+async function sha256Hex(data: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(data).buffer)
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
+export async function leaseDerivedJob(
+  wallet: string,
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>,
+): Promise<LeasedDerivedJob> {
+  const bodyHash = await sha256Hex(new TextEncoder().encode('{}'))
+  const timestamp = Math.floor(Date.now() / 1000)
+  const payload = `POST\n${API_BASE}/derived/jobs/lease\n${bodyHash}\n${timestamp}`
+  const signature = await signMessage(new TextEncoder().encode(payload))
+  const signatureBase64 = btoa(String.fromCharCode(...signature))
+  return requestUrl<LeasedDerivedJob>(
+    `${API_BASE}/derived/jobs/lease`,
+    {
+      method: 'POST',
+      body: '{}',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Signature ${signatureBase64}`,
+        'x-timestamp': String(timestamp),
+        'x-body-hash': bodyHash,
+        'x-wallet': wallet,
+      },
+    },
+  )
+}
+
+export function listDerivedJobs(status?: string): Promise<DerivedJob[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<DerivedJob[]>(`/derived/jobs${query}`)
 }
 
 // ---------------------------------------------------------------------------

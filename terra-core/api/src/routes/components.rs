@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::auth::{OptionalSignedRequest, SignedRequest};
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -158,6 +159,8 @@ const SELECT_COMPONENT: &str = "SELECT id, component_id, physical_entity_id, \
 pub async fn get_component(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    auth: OptionalSignedRequest,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<ComponentRow>, AppError> {
     let row = sqlx::query_as::<_, ComponentRow>(SELECT_COMPONENT)
         .bind(id)
@@ -166,7 +169,56 @@ pub async fn get_component(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?
         .ok_or_else(|| AppError::not_found(format!("component {id} not found")))?;
 
+    enforce_component_access(
+        &row.privacy_classification,
+        &row.access_policy,
+        auth.0.as_ref(),
+        &headers,
+        "GET",
+        &format!("/api/v1/components/{id}"),
+    )?;
+
     Ok(Json(row))
+}
+
+pub fn enforce_component_access(
+    privacy_classification: &str,
+    access_policy: &serde_json::Value,
+    auth: Option<&SignedRequest>,
+    headers: &axum::http::HeaderMap,
+    method: &str,
+    path: &str,
+) -> Result<(), AppError> {
+    if privacy_classification.eq_ignore_ascii_case("public") {
+        return Ok(());
+    }
+
+    let wallet = headers
+        .get("x-wallet")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| AppError::unauthorized("x-wallet required for private component"))?;
+    let auth = auth
+        .ok_or_else(|| AppError::unauthorized("signed request required for private component"))?;
+    auth.verify_wallet(wallet, method, path)?;
+
+    if access_policy
+        .get("owner_wallet")
+        .and_then(|value| value.as_str())
+        == Some(wallet)
+    {
+        return Ok(());
+    }
+    if access_policy
+        .get("allowed_wallets")
+        .and_then(|value| value.as_array())
+        .is_some_and(|allowed| allowed.iter().any(|value| value.as_str() == Some(wallet)))
+    {
+        return Ok(());
+    }
+
+    Err(AppError::Forbidden(
+        "wallet is not authorized to access private component".into(),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -196,11 +248,16 @@ const LIST_COMPONENTS: &str = "SELECT id, component_id, physical_entity_id, \
 pub async fn list_components(
     State(state): State<AppState>,
     Query(params): Query<ListComponentsParams>,
+    auth: OptionalSignedRequest,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<Vec<ComponentRow>>, AppError> {
     let limit = params.limit.min(500);
     let rows: Vec<ComponentRow> = match &params.physical_entity_id {
         Some(peid) => sqlx::query_as::<_, ComponentRow>(
-            format!("{LIST_COMPONENTS} WHERE physical_entity_id = $1 ORDER BY created_at DESC LIMIT $2").as_str(),
+            format!(
+                "{LIST_COMPONENTS} WHERE physical_entity_id = $1 ORDER BY created_at DESC LIMIT $2"
+            )
+            .as_str(),
         )
         .bind(peid)
         .bind(limit as i64)
@@ -216,5 +273,38 @@ pub async fn list_components(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
     };
 
+    let wallet = headers
+        .get("x-wallet")
+        .and_then(|value| value.to_str().ok());
+    let signed = auth.0.as_ref();
+
+    let rows = rows
+        .into_iter()
+        .filter(|row| {
+            if row.privacy_classification.eq_ignore_ascii_case("public") {
+                return true;
+            }
+            let Some(wallet) = wallet else {
+                return false;
+            };
+            let Some(signed) = signed else {
+                return false;
+            };
+            signed.verify_wallet(wallet, "GET", "/api/v1/components").is_ok()
+                && wallet_authorized(&row.access_policy, wallet)
+        })
+        .collect();
+
     Ok(Json(rows))
+}
+
+fn wallet_authorized(access_policy: &serde_json::Value, wallet: &str) -> bool {
+    access_policy
+        .get("owner_wallet")
+        .and_then(|value| value.as_str())
+        == Some(wallet)
+        || access_policy
+            .get("allowed_wallets")
+            .and_then(|value| value.as_array())
+            .is_some_and(|allowed| allowed.iter().any(|value| value.as_str() == Some(wallet)))
 }

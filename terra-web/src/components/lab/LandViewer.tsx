@@ -50,7 +50,7 @@ export interface VolumeLayer {
 
 const W = 680
 const H = 400
-const GRID = 14
+const GRID = 10
 const S = 2.1
 const H0 = 0.14
 

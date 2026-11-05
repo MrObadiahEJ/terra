@@ -6,10 +6,10 @@ maintained continuously and must stay sufficient context for a competent AI
 agent or human to continue the project without the founder repeating
 instructions.
 
-**Audit basis:** repository state at commit `e9b2e7d` (dev branch),
-re-verified 2026-11-02 (API 133/133, vitest 65/65, eslint clean, build + bundle
-PASS; historical suite baselines recorded per their last verified runs — see
-IMPLEMENTATION_STATUS).
+**Audit basis:** repository state at commit `244ed7e` (dev branch),
+re-verified 2026-11-05 (API 133/133, geo-engine 33 (+2 ignored), vitest 83/83,
+tsc clean, build + bundle PASS; historical suite baselines recorded per their
+last verified runs — see IMPLEMENTATION_STATUS).
 
 ## Canonical trust principle
 
@@ -72,10 +72,10 @@ Never inflate a status. When evidence is unavailable, say so.
 - [chapters/08-institutional-identity.md](chapters/08-institutional-identity.md) — `SPECIFIED ONLY` (founder review flag, Q-003)
 - [chapters/09-external-replay.md](chapters/09-external-replay.md) — verified (REQ-018)
 - [chapters/10-derived-compute-and-provenance.md](chapters/10-derived-compute-and-provenance.md) — verified (REQ-019/024, R-016/R-017)
-- [chapters/11-distributed-spatial-reconstruction-and-assembly.md](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
-- [chapters/12-world-runtime-and-synchronized-rendering.md](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
-- [chapters/13-global-spatial-data-delivery-and-progressive-visualization.md](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
-- [chapters/14-implementation-preparation.md](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`SPECIFIED ONLY`)
+- [chapters/11-distributed-spatial-reconstruction-and-assembly.md](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (RFC-015 component package validator + `components`/`assemblies` routers + migrations 0035/0038/0041; gated on B6 devnet funding)
+- [chapters/12-world-runtime-and-synchronized-rendering.md](chapters/12-world-runtime-and-synchronized-rendering.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (`manifests`/`runtime` routers + migrations 0036/0039/0043 + frontend `runtime.ts`; gated on B6)
+- [chapters/13-global-spatial-data-delivery-and-progressive-visualization.md](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (LOD 0–4, provider discovery + fallback, progressive tier loading via `lod.ts`/`perfTier.ts`; gated on B6)
+- [chapters/14-implementation-preparation.md](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`IMPLEMENTED, NOT FULLY VERIFIED` for REQ-026/027/028; `SPECIFIED ONLY` for REQ-020/021/022)
 - [chapters/15-first-end-to-end-implementation-prototype.md](chapters/15-first-end-to-end-implementation-prototype.md) — First end-to-end prototype: one parcel, one building, five components, two workers, manifest → assembly → runtime → progressive render (`SPECIFIED ONLY`)
 
 ### Intents
@@ -88,7 +88,7 @@ Never inflate a status. When evidence is unavailable, say so.
 
 ### RFCs
 
-- [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, `SPECIFIED ONLY`)
+- [rfc-015-spatial-component-package.md](../rfc-015-spatial-component-package.md) — Spatial Component Package schema & conformance (REQ-026, `IMPLEMENTED, NOT FULLY VERIFIED` — validator in `geo-engine/src/component_package.rs`, router in `api/src/routes/components.rs`)
 - [rfc-016-protocol-security-decentralization-privacy.md](../rfc-016-protocol-security-decentralization-privacy.md) — Protocol security, decentralization, privacy & censorship resilience (RFC-016, `SPECIFIED ONLY`)
 
 ### Work & sprints

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import TerraGlobe, { type DrawVertex, type FocusTarget, type ViewCommand } from '../components/map/TerraGlobe'
-import LodLadder from '../components/map/LodLadder'
+import AtlasControlsPanel from '../components/panels/AtlasControlsPanel'
 import Sidenav, { type SidenavMode } from '../components/layout/Sidenav'
 import { lodFromHeight, lodFromLeafletZoom, LOD_TARGET_HEIGHT } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
@@ -13,6 +13,7 @@ import BuildingPanel from '../components/panels/BuildingPanel'
 import RepresentationPanel from '../components/panels/RepresentationPanel'
 import PlanRoadPanel from '../components/panels/PlanRoadPanel'
 import { useAppStore, type OnChainParcelItem } from '../store/appStore'
+import { DEMO_BUILDINGS } from '../lib/demoData'
 import {
   api,
   parseGeoJSON,
@@ -34,7 +35,7 @@ import {
 import { listModels, type ThreeDModel } from '../lib/reconstruction'
 import SpatialHistoryPanel from '../components/panels/SpatialHistoryPanel'
 import { listSpatialModels } from '../lib/spatial'
-import { searchLocal, searchPlaces, type SearchResult } from '../lib/search'
+import { type SearchResult } from '../lib/search'
 import { DEMO_ROADS, DEMO_POIS } from '../lib/demoData'
 import {
   buildingRing,
@@ -50,29 +51,16 @@ import {
 import { lineLengthM, polygonCentroid, snapPoint, type LonLat } from '../lib/geo'
 import {
   Box,
-  Building2,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Compass,
   LocateFixed,
   Map as MapIcon,
-  MapPin,
   Minus,
-  Move3d,
   PanelRight,
   PanelRightClose,
   PanelRightOpen,
   PictureInPicture2,
   Plus,
-  RotateCcw,
-  Route,
   Ruler,
-  Search,
   Share2,
-  Square,
-  Tag,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
 import { useLocale, type TranslationKey } from '../lib/locale'
@@ -85,12 +73,7 @@ import {
   type GraphicsTier,
   type TierPreference,
 } from '../lib/perfTier'
-import {
-  clearIonToken,
-  loadIonToken,
-  saveIonToken,
-  type TerrainStatus,
-} from '../lib/cesiumTerrain'
+import { type TerrainStatus } from '../lib/cesiumTerrain'
 
 function parcelFocus(parcel: OffChainParcel | null): FocusTarget | null {
   if (!parcel) return null
@@ -102,14 +85,6 @@ function parcelFocus(parcel: OffChainParcel | null): FocusTarget | null {
   return { longitude, latitude, height: 1800 }
 }
 
-const LAYER_ROWS: { key: AtlasLayerKey; icon: typeof Square; labelKey: TranslationKey }[] = [
-  { key: 'parcels', icon: Square, labelKey: 'layerParcels' },
-  { key: 'roads', icon: Route, labelKey: 'layerRoads' },
-  { key: 'buildings', icon: Building2, labelKey: 'layerBuildings' },
-  { key: 'pois', icon: MapPin, labelKey: 'layerPlaces' },
-  { key: 'labels', icon: Tag, labelKey: 'layerLabels' },
-]
-
 const TIER_LABEL: Record<GraphicsTier, TranslationKey> = {
   low: 'tierLow',
   medium: 'tierMedium',
@@ -117,19 +92,10 @@ const TIER_LABEL: Record<GraphicsTier, TranslationKey> = {
   ultra: 'tierUltra',
 }
 
-const TERRAIN_LABEL: Record<TerrainStatus, TranslationKey> = {
-  flat: 'terrainBadgeFlat',
-  loading: 'terrainBadgeLoading',
-  keyless: 'terrainBadgeRelief',
-  ion: 'terrainBadgeIon',
-}
-
 export default function GlobePage() {
   const { t } = useLocale()
   const offChainParcels = useAppStore((s) => s.offChainParcels)
   const refreshOffChain = useAppStore((s) => s.refreshOffChain)
-  const geoStats = useAppStore((s) => s.geoStats)
-  const fusionStats = useAppStore((s) => s.fusionStats)
   const loadStats = useAppStore((s) => s.loadStats)
   const selectedParcel = useAppStore((s) => s.selectedParcel)
   const selectParcel = useAppStore((s) => s.selectParcel)
@@ -138,17 +104,13 @@ export default function GlobePage() {
   const demoMode = useAppStore((s) => s.demoMode)
 
   const [drawing, setDrawing] = useState(false)
-  // GEV controls: search, one-shot camera commands, measure mode.
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchBusy, setSearchBusy] = useState(false)
+  // One-shot camera commands (reset / north-up / tilt / front / street).
   const [viewCommand, setViewCommand] = useState<ViewCommand | null>(null)
   const [drawKind, setDrawKind] = useState<'parcel' | 'road' | 'measure'>('parcel')
   const [webglStatus, setWebglStatus] = useState<string | null>(null)
   const [drawVertices, setDrawVertices] = useState<DrawVertex[]>([])
-  const [tab, setTab] = useState<'register' | 'browse' | 'plan' | 'media'>('browse')
+  const [tab, setTab] = useState<'register' | 'browse' | 'plan' | 'media' | 'scene'>('browse')
   const [layers, setLayers] = useState<AtlasLayers>(loadAtlasLayers)
-  const [layersCard, setLayersCard] = useState(false)
   const [plannedRoads, setPlannedRoads] = useState<PlannedRoad[]>(loadPlannedRoads)
   const [roads, setRoads] = useState<RoadRow[] | null>(null)
   const [pois, setPois] = useState<PoiRow[] | null>(null)
@@ -170,10 +132,16 @@ export default function GlobePage() {
     if (c) {
       const [lon, lat, h] = c.split(',').map(Number)
       if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        const cameraHeight =
+          Number.isFinite(h) && h >= 100
+            ? h
+            : Number.isFinite(h) && h > 0
+              ? Math.max(25_000, 591657550 / 2 ** h)
+              : 2_500_000
         return {
           longitude: lon,
           latitude: lat,
-          height: Number.isFinite(h) && h > 0 ? h : 2_500_000,
+          height: cameraHeight,
           duration: 0,
         }
       }
@@ -182,9 +150,10 @@ export default function GlobePage() {
   })
   const [lod, setLod] = useState(() => lodFromHeight(DEFAULT_FOCUS.height))
   const [basemap, setBasemap] = useState<'imagery' | 'terrain' | 'osm'>(
-    () =>
-      (localStorage.getItem('terra-atlas-basemap') as 'imagery' | 'terrain' | 'osm' | null) ??
-      'imagery',
+    () => {
+      const saved = localStorage.getItem('terra-atlas-basemap')
+      return saved === 'imagery' || saved === 'terrain' ? saved : 'osm'
+    },
   )
   const lastCamRef = useRef({ ...DEFAULT_FOCUS })
 
@@ -195,11 +164,8 @@ export default function GlobePage() {
   const [tierPref, setTierPref] = useState<TierPreference>(() => loadTierPreference())
   const [tierStep, setTierStep] = useState(0)
   const [fps, setFps] = useState<number | null>(null)
-  const [terrainStatus, setTerrainStatus] = useState<TerrainStatus>('flat')
+  const [, setTerrainStatus] = useState<TerrainStatus>('flat')
   const [hudNotice, setHudNotice] = useState<string | null>(null)
-  const [ionDraft, setIonDraft] = useState(() => loadIonToken())
-  const [hasIonToken, setHasIonToken] = useState(() => Boolean(loadIonToken()))
-  const [ionRev, setIonRev] = useState(0)
   const hardwareCap = useMemo(() => detectHardwareCap(), [])
 
   const resolvedTier = useMemo<GraphicsTier>(() => {
@@ -230,21 +196,6 @@ export default function GlobePage() {
     setTierStep((step) => step + 1)
     setHudNotice(t('tierDowngraded', { tier: t(TIER_LABEL[next]) }))
   }, [tierPref, resolvedTier, t])
-
-  const applyIonToken = useCallback(() => {
-    saveIonToken(ionDraft)
-    setHasIonToken(Boolean(ionDraft.trim()))
-    setIonRev((rev) => rev + 1)
-    setHudNotice(t('ionTokenSaved'))
-  }, [ionDraft, t])
-
-  const removeIonToken = useCallback(() => {
-    clearIonToken()
-    setIonDraft('')
-    setHasIonToken(false)
-    setIonRev((rev) => rev + 1)
-    setHudNotice(t('ionTokenRemoved'))
-  }, [t])
 
   useEffect(() => {
     saveAtlasLayers(layers)
@@ -324,22 +275,33 @@ export default function GlobePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Progressive disclosure: each dataset only joins the scene once the camera
+  // reaches its level (parcels at neighborhood, buildings at parcel level),
+  // so a zoomed-out globe never renders a whole collection at once.
   const shownParcels = useMemo(
-    () => (layers.parcels ? offChainParcels : []),
-    [layers.parcels, offChainParcels],
+    () => (layers.parcels && lod >= 4 ? offChainParcels : []),
+    [layers.parcels, lod, offChainParcels],
   )
   const usingDemo = demoMode
 
-  const visibleRoads = useMemo(() => (layers.roads ? roads ?? [] : []), [layers.roads, roads])
-  const visiblePois = useMemo(() => (layers.pois ? pois ?? [] : []), [layers.pois, pois])
+  const visibleRoads = useMemo(
+    () => (layers.roads && lod >= 3 ? roads ?? [] : []),
+    [layers.roads, lod, roads],
+  )
+  const visiblePois = useMemo(
+    () => (layers.pois && lod >= 4 ? pois ?? [] : []),
+    [layers.pois, lod, pois],
+  )
   const visibleBuildings = useMemo(() => {
-    if (!layers.buildings) return []
+    if (lod < 5) return []
+    if (!layers.buildings && !usingDemo) return []
+    const source = buildings?.length ? buildings : usingDemo ? DEMO_BUILDINGS : []
     return selectBuildingsForTier(
-      buildings ?? [],
+      source,
       TIER_SETTINGS[resolvedTier].buildingCap,
       resolvedTier,
     )
-  }, [layers.buildings, buildings, resolvedTier])
+  }, [lod, layers.buildings, buildings, resolvedTier, usingDemo])
   const showLabels = layers.labels && lod >= TIER_SETTINGS[resolvedTier].labelMinLod
 
   // 3D reconstruction models for the selected parcel (RFC-013 Ph.C). Only
@@ -373,6 +335,10 @@ export default function GlobePage() {
   // Distributed runtime: current manifest for the camera's region
   const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
   const [currentRegion, setCurrentRegion] = useState<string | null>(null)
+  // Regions the runtime has already tried (and failed) to resolve. Without this
+  // the effect retries on every camera tick while the backend is down, which
+  // produced a storm of error banners; a region only re-tries when it changes.
+  const failedRegionsRef = useRef<Set<string>>(new Set())
   const manifestRev = useRef(0)
   // Explicit "open on globe" from a Phase C model claim (bypasses the tier
   // gate); bound to the parcel it was requested for, so a selection change
@@ -468,7 +434,12 @@ export default function GlobePage() {
       layerOn: boolean,
     ) => {
       const cap = TIER_SETTINGS[tier].buildingCap
-      if (!layerOn || cap <= 0) {
+      // Buildings are only drawn within a few km of the camera, so at
+      // neighbourhood-plus heights we skip the OSM query entirely; reset the
+      // query key so the same grid cell re-fetches when we descend again.
+      if (!layerOn || cap <= 0 || cam.height > 40000) {
+        buildingQueryRef.current.lon = Number.NaN
+        buildingQueryRef.current.lat = Number.NaN
         setBuildings((prev) => (prev && prev.length === 0 ? prev : []))
         return
       }
@@ -507,8 +478,8 @@ export default function GlobePage() {
   useEffect(() => {
     const cam = lastCamRef.current
     const regionId = `region-${Math.round(cam.longitude)}-${Math.round(cam.latitude)}`
+    // Already resolved this region: just ensure the scene graph matches LOD.
     if (currentRegion === regionId && currentManifest) {
-      // Already have a manifest for this region; just ensure scene graph matches LOD
       const lod = runtimeLodFromHeight(cam.height)
       if (sceneGraph && sceneGraph.scene.lod_level !== lod) {
         resolveSceneAtLod(currentManifest.id, lod)
@@ -517,7 +488,9 @@ export default function GlobePage() {
       }
       return
     }
-    // New region: create or find manifest, then resolve scene graph
+    // Backend down (no API): skip silently instead of spamming an error banner
+    // on every camera tick. The "Scene" tab still offers a manual retry.
+    if (failedRegionsRef.current.has(regionId)) return
     setSceneResolving(true)
     setSceneError(null)
     let cancelled = false
@@ -534,6 +507,7 @@ export default function GlobePage() {
         if (cancelled) return
         setCurrentManifest(manifest)
         setCurrentRegion(regionId)
+        failedRegionsRef.current.delete(regionId)
         manifestRev.current += 1
         const lod = runtimeLodFromHeight(cam.height)
         const graph = await resolveSceneAtLod(manifest.id, lod)
@@ -542,6 +516,7 @@ export default function GlobePage() {
         setSceneError(null)
       } catch (err) {
         if (cancelled) return
+        failedRegionsRef.current.add(regionId)
         setSceneError(err instanceof Error ? err.message : String(err))
       } finally {
         if (cancelled) return
@@ -558,6 +533,7 @@ export default function GlobePage() {
     const cam = lastCamRef.current
     const regionId = `region-${Math.round(cam.longitude)}-${Math.round(cam.latitude)}`
     const regionName = `${cam.latitude.toFixed(2)}°N, ${cam.longitude.toFixed(2)}°E`
+    failedRegionsRef.current.delete(regionId)
     try {
       const existing = await listManifests(regionId)
       const manifest =
@@ -711,28 +687,22 @@ export default function GlobePage() {
     else setSnapGrid((v) => !v)
   }, [])
 
-  // ---- GEV: search / view commands / measure --------------------------------
-  const localResults = useMemo(() => searchLocal(searchQuery, 6), [searchQuery])
+  // ---- sidebar controls: search / camera / goto ----------------------------
   const pickSearch = useCallback((r: SearchResult) => {
     setFocus({ longitude: r.longitude, latitude: r.latitude, height: r.height, duration: 1.4 })
-    setSearchOpen(false)
-    setSearchQuery(r.label)
   }, [])
-  const submitSearch = useCallback(async () => {
-    if (localResults.length > 0) {
-      pickSearch(localResults[0])
-      return
-    }
-    const q = searchQuery.trim()
-    if (!q) return
-    setSearchBusy(true)
-    try {
-      const remote = await searchPlaces(q)
-      if (remote.length > 0) pickSearch(remote[0])
-    } finally {
-      setSearchBusy(false)
-    }
-  }, [localResults, pickSearch, searchQuery])
+
+  const gotoCoordinates = useCallback((longitude: number, latitude: number, height: number) => {
+    setFocus({ longitude, latitude, height, duration: 1.2 })
+  }, [])
+
+  const runViewCommand = useCallback((kind: 'reset' | 'north' | 'tilt') => {
+    setViewCommand({ kind, nonce: Date.now() })
+  }, [])
+
+  const toggleLayer = useCallback((key: AtlasLayerKey) => {
+    setLayers((l) => ({ ...l, [key]: !l[key] }))
+  }, [])
   const toggleMeasure = useCallback(() => {
     if (drawKind === 'measure') {
       setDrawing(false)
@@ -755,6 +725,8 @@ export default function GlobePage() {
   }, [selectedParcel, offChainParcels])
 
   const selectedOffRecord = selectedOffChain ?? selectedSummary?.off ?? null
+  // Off-chain geometry linked to the selected on-chain parcel (detail actions).
+  const linkedOffParcel = selectedSummary?.off ?? null
   const selectedOffRing = useMemo(() => {
     if (!selectedOffRecord) return null
     const poly = parseGeoJSON<{ type: string; coordinates: number[][][] }>(
@@ -816,6 +788,7 @@ export default function GlobePage() {
   const onBuildingClick = useCallback(
     (osmId: number) => {
       const found = buildings?.find((b) => b.osm_id === osmId)
+        ?? DEMO_BUILDINGS.find((b) => b.osm_id === osmId)
       if (!found) return
       selectParcel(null)
       selectOffChain(null)
@@ -826,11 +799,28 @@ export default function GlobePage() {
       const ring = buildingRing(found)
       if (ring) {
         const [longitude, latitude] = polygonCentroid(ring)
-        setFocus({ longitude, latitude, height: 900, duration: 0.8 })
+        const closeUpHeight = found.height_m && found.height_m > 0
+          ? Math.max(120, found.height_m * 5)
+          : 900
+        setFocus({ longitude, latitude, height: closeUpHeight, duration: 0.8 })
       }
     },
     [buildings, changeSidenavOpen, selectOffChain, selectParcel],
   )
+
+  const focusDemoBuilding = useCallback((osmId: number) => {
+    const building = DEMO_BUILDINGS.find((item) => item.osm_id === osmId)
+    if (!building) return
+    const ring = buildingRing(building)
+    if (!ring) return
+    const [longitude, latitude] = polygonCentroid(ring)
+    setSelectedBuilding(building)
+    selectParcel(null)
+    selectOffChain(null)
+    setTab('browse')
+    changeSidenavOpen(true)
+    setFocus({ longitude, latitude, height: 120, duration: 0.9 })
+  }, [changeSidenavOpen, selectOffChain, selectParcel])
 
   const openRepresentation = useCallback(
     (title: string, ring: LonLat[], source: 'parcel' | 'building') => {
@@ -879,6 +869,44 @@ export default function GlobePage() {
     if (!selectedOffRecord || !selectedOffRing) return
     openRepresentation(selectedOffRecord.name, selectedOffRing, 'parcel')
   }, [openRepresentation, selectedOffRecord, selectedOffRing])
+
+  // Close observation commands: fly the camera to a frontal or street-level
+  // position over the given geometry's centroid (parcels and buildings alike).
+  const sendCloseView = useCallback(
+    (kind: 'front' | 'street', longitude: number, latitude: number) => {
+      setViewMode('3d')
+      setViewCommand({ kind, longitude, latitude, nonce: Date.now() })
+    },
+    [],
+  )
+
+  const frontViewOf = useCallback(
+    (parcel: OffChainParcel) => {
+      const target = parcelFocus(parcel)
+      if (target) sendCloseView('front', target.longitude, target.latitude)
+    },
+    [sendCloseView],
+  )
+
+  const streetViewOf = useCallback(
+    (parcel: OffChainParcel) => {
+      const target = parcelFocus(parcel)
+      if (target) sendCloseView('street', target.longitude, target.latitude)
+    },
+    [sendCloseView],
+  )
+
+  // Close frontal / street-level observation of the selected building.
+  const viewBuildingClose = useCallback(
+    (kind: 'front' | 'street') => {
+      if (!selectedBuilding) return
+      const ring = buildingRing(selectedBuilding)
+      if (!ring) return
+      const [longitude, latitude] = polygonCentroid(ring)
+      sendCloseView(kind, longitude, latitude)
+    },
+    [selectedBuilding, sendCloseView],
+  )
 
   // Deep link: /atlas?parcel=<id|name|holder|address> selects and frames the land.
   const [searchParams] = useSearchParams()
@@ -971,6 +999,8 @@ export default function GlobePage() {
           onDrawFinish={finishDrawing}
           onParcelClick={onParcelClick}
           onBuildingClick={onBuildingClick}
+          highlightParcelId={selectedOffRecord?.id ?? null}
+          highlightBuildingId={selectedBuilding?.osm_id ?? null}
           onCameraMoved={onCameraMoved}
           onMapZoom={onMapZoom}
           showLabels={showLabels}
@@ -978,11 +1008,9 @@ export default function GlobePage() {
           resizeKey={mapResizeKey}
           onWebGLStatus={(status) => {
             setWebglStatus(status)
-            if (status) setViewMode('2d')
           }}
           graphicsTier={resolvedTier}
           autoTier={tierPref === 'auto'}
-          ionTokenRev={ionRev}
           onFps={setFps}
           onTierCapped={onTierCapped}
           onTerrainStatus={setTerrainStatus}
@@ -1000,77 +1028,9 @@ export default function GlobePage() {
           <p>{t('atlasSubtitle')}</p>
         </div>
 
-        {/* stats overlay */}
-        <div className="globe-stats absolute top-3 left-3 bg-surface/90 rounded-lg shadow px-3 py-2 text-[11px] pointer-events-none flex flex-wrap gap-3 items-center">
-          <span>{t('statsParcels', { n: offChainParcels.length })}</span>
-          <span>{t('statsRoads', { n: fusionStats?.roads ?? geoStats?.roads ?? 0 })}</span>
-          <span>{t('statsPois', { n: fusionStats?.pois ?? geoStats?.pois ?? 0 })}</span>
-          <span>
-            {geoStats?.road_length_km
-              ? t('statsKm', { n: geoStats.road_length_km.toFixed(0) })
-              : t('statsSpatial')}
-          </span>
-          <span
-            className={`terrain-badge terrain-${terrainStatus}`}
-            title={
-              terrainStatus === 'flat' && !TIER_SETTINGS[resolvedTier].terrain
-                ? t('terrainNeedsTier')
-                : undefined
-            }
-          >
-            {t(TERRAIN_LABEL[terrainStatus])}
-          </span>
-          {usingDemo && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
-              {t('demoDataBadge')}
-            </span>
-          )}
-        </div>
-
-        {/* GEV tool cluster: search, measure, view commands */}
-        <div className="globe-gev">
-          <div className="globe-chips bg-surface/90 rounded-lg shadow px-1.5 py-1 flex gap-1 text-[11px]">
-            <button
-              className={`btn btn-ghost px-2 py-1 gap-1 ${searchOpen ? 'globe-basemap-on' : 'text-muted'}`}
-              onClick={() => setSearchOpen((o) => !o)}
-              aria-pressed={searchOpen}
-              title={t('searchTitle')}
-            >
-              <Search size={12} /> {t('searchAction')}
-            </button>
-            <span className="globe-chip-sep" aria-hidden="true" />
-            <button
-              className={`btn btn-ghost px-2 py-1 gap-1 ${drawKind === 'measure' && drawing ? 'text-amber-700' : 'text-muted'}`}
-              onClick={toggleMeasure}
-              aria-pressed={drawKind === 'measure' && drawing}
-              title={t('measureTitle')}
-            >
-              <Ruler size={12} /> {t('measureAction')}
-            </button>
-            <span className="globe-chip-sep" aria-hidden="true" />
-            <button
-              className="btn btn-ghost px-2 py-1"
-              onClick={() => setViewCommand({ kind: 'reset', nonce: Date.now() })}
-              title={t('resetViewTitle')}
-            >
-              <RotateCcw size={12} />
-            </button>
-            <button
-              className="btn btn-ghost px-2 py-1"
-              onClick={() => setViewCommand({ kind: 'north', nonce: Date.now() })}
-              title={t('northUpTitle')}
-            >
-              <Compass size={12} />
-            </button>
-            <button
-              className="btn btn-ghost px-2 py-1"
-              onClick={() => setViewCommand({ kind: 'tilt', nonce: Date.now() })}
-              title={t('tiltTitle')}
-            >
-              <Move3d size={12} />
-            </button>
-          </div>
-          {drawKind === 'measure' && drawVertices.length >= 1 && (
+        {/* Transient measure readout — search, camera commands, layers and the
+            zoom ladder all live in the single sidebar (AtlasControlsPanel). */}
+        {drawKind === 'measure' && drawVertices.length >= 1 && (
             <div className="measure-bar">
               <Ruler size={12} className="text-muted" />
               <span>
@@ -1087,244 +1047,12 @@ export default function GlobePage() {
               </button>
             </div>
           )}
-          {searchOpen && (
-            <div className="globe-search">
-              <input
-                autoFocus
-                className="text-input w-full"
-                placeholder={t('searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void submitSearch()
-                  if (e.key === 'Escape') setSearchOpen(false)
-                }}
-              />
-              {localResults.map((r) => (
-                <button
-                  key={r.id}
-                  className="btn btn-ghost justify-start px-2 py-1 text-left"
-                  onClick={() => pickSearch(r)}
-                >
-                  {r.label}
-                </button>
-              ))}
-              {localResults.length === 0 && (
-                <button
-                  className="btn btn-ghost justify-start px-2 py-1 text-left"
-                  disabled={searchBusy || !searchQuery.trim()}
-                  onClick={() => void submitSearch()}
-                >
-                  {searchBusy ? '…' : t('searchOnline')}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
 
         {hudNotice && (
           <div className="hud-notice" role="status">
             {hudNotice}
           </div>
         )}
-
-        {/* layer toggles + basemap switcher */}
-        <div className="globe-chips absolute top-3 right-3 bg-surface/90 rounded-lg shadow px-2 py-1.5 flex gap-1 text-[11px]">
-          <button
-            className={`btn btn-ghost px-2 py-1 gap-1 ${layers.parcels ? 'text-emerald-700' : 'text-muted'}`}
-            onClick={() => setLayers((l) => ({ ...l, parcels: !l.parcels }))}
-            aria-pressed={layers.parcels}
-            title={t('toggleParcelOutlines')}
-          >
-            <Square size={12} /> {t('layerParcels')}
-          </button>
-          <span className="globe-chip-sep" aria-hidden="true" />
-          {([
-            ['imagery', 'basemapSatellite'],
-            ['terrain', 'basemapTerrain'],
-            ['osm', 'basemapStreets'],
-          ] as const).map(([style, labelKey]) => (
-            <button
-              key={style}
-              className={`btn btn-ghost px-2 py-1 ${basemap === style ? 'globe-basemap-on' : 'text-muted'}`}
-              onClick={() => setBasemap(style)}
-              aria-pressed={basemap === style}
-              title={t('switchBasemap', { label: t(labelKey) })}
-            >
-              {t(labelKey)}
-            </button>
-          ))}
-          <span className="globe-chip-sep" aria-hidden="true" />
-          <select
-            className="globe-tier-select"
-            value={tierPref}
-            onChange={(event) => changeTierPref(event.target.value as TierPreference)}
-            aria-label={t('graphicsTierLabel')}
-            title={t('graphicsTierLabel')}
-          >
-            <option value="auto">{t('tierAuto')}</option>
-            <option value="low">{t('tierLow')}</option>
-            <option value="medium">{t('tierMedium')}</option>
-            <option value="high">{t('tierHigh')}</option>
-            <option value="ultra">{t('tierUltra')}</option>
-          </select>
-          <span className="perf-readout">
-            {fps !== null ? t('fpsLabel', { n: fps }) : t('fpsIdle')}
-          </span>
-          <span className="globe-chip-sep" aria-hidden="true" />
-          <button
-            className={`btn btn-ghost px-2 py-1 gap-1 ${layersCard ? 'globe-basemap-on' : 'text-muted'}`}
-            onClick={() => setLayersCard((open) => !open)}
-            aria-pressed={layersCard}
-            aria-expanded={layersCard}
-            title={t('mapLayers')}
-          >
-            <Layers size={12} /> {t('layersChip')}
-          </button>
-          {layersCard && (
-            <div className="globe-layers-card" role="group" aria-label={t('mapLayers')}>
-              <div className="globe-layers-card-head">
-                <span>{t('mapDetails')}</span>
-                <button
-                  onClick={() => setLayersCard(false)}
-                  aria-label={t('closeLayerPanel')}
-                  title={t('close')}
-                >
-                  ✕
-                </button>
-              </div>
-              {LAYER_ROWS.map(({ key, icon: Icon, labelKey }) => (
-                <button
-                  key={key}
-                  className="layer-row"
-                  aria-pressed={layers[key]}
-                  onClick={() => setLayers((l) => ({ ...l, [key]: !l[key] }))}
-                >
-                  <span className={`layer-box ${layers[key] ? 'on' : ''}`} aria-hidden="true">
-                    {layers[key] ? <Check size={11} /> : null}
-                  </span>
-                  <Icon size={14} />
-                  <span className="flex-1 text-left">{t(labelKey)}</span>
-                </button>
-              ))}
-              <div className="ion-token-row">
-                <label htmlFor="terra-ion-token">{t('ionTokenField')}</label>
-                <div className="ion-token-input">
-                  <input
-                    id="terra-ion-token"
-                    type="password"
-                    value={ionDraft}
-                    placeholder="••••••••"
-                    onChange={(event) => setIonDraft(event.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <button className="btn btn-ghost px-2 py-1" onClick={applyIonToken}>
-                    {t('ionTokenSave')}
-                  </button>
-                  {hasIonToken && (
-                    <button className="btn btn-ghost px-2 py-1" onClick={removeIonToken}>
-                      {t('ionTokenRemove')}
-                    </button>
-                  )}
-                </div>
-                <p>{t('ionTokenHint')}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* progressive zoom ladder */}
-        <LodLadder lod={lod} onSelect={jumpToLod} />
-
-        {/* Distributed runtime scene resolver (REQ-027 / REQ-028) */}
-        <div className="globe-runtime">
-          <div className="globe-runtime-head">
-            <span className="globe-chip-sep" aria-hidden="true" />
-            <span className="runtime-label">{t('runtimeSceneLabel')}</span>
-            {currentManifest ? (
-              <>
-                <span className="runtime-manifest-badge">
-                  {currentManifest.region_name} v{currentManifest.version}
-                </span>
-                <span className="runtime-region">{currentRegion}</span>
-                <button
-                  className="btn btn-ghost px-2 py-1 text-[10px]"
-                  onClick={() => setCurrentManifest(null)}
-                  title={t('clearSceneTitle')}
-                >
-                  ✕
-                </button>
-              </>
-            ) : (
-              <button
-                className="btn btn-ghost px-2 py-1 text-[10px]"
-                onClick={createManifestForRegion}
-                title={t('createManifestTitle')}
-                disabled={sceneResolving}
-              >
-                {t('createManifestAction')}
-              </button>
-            )}
-            {sceneResolving && <span className="runtime-dots">…</span>}
-          </div>
-          {sceneError && (
-            <div className="runtime-error">
-              <span className="runtime-error-icon">⚠</span>
-              {sceneError}
-            </div>
-          )}
-          {sceneGraph && (
-            <div className="runtime-nodes">
-              <span className="runtime-nodes-label">
-                {t('sceneNodesLabel', {
-                  n: sceneGraph.nodes.length,
-                  lod: sceneGraph.scene.lod_level,
-                })}
-              </span>
-              <div className="runtime-node-list">
-                {sceneGraph.nodes.map((node) => (
-                  <div
-                    key={node.id}
-                    className="runtime-node-row"
-                  >
-                    <span className="runtime-node-id">
-                      {node.object_id.slice(0, 12)}…
-                    </span>
-                    <span className="runtime-node-ver">
-                      {node.component_version_id.slice(0, 8)}…
-                    </span>
-                    <span className={`runtime-node-state runtime-state-${node.loading_state}`}>
-                      {node.loading_state}
-                    </span>
-                    <button
-                      className="btn btn-ghost px-1.5 py-0.5 text-[10px]"
-                      onClick={() => fetchComponent(node)}
-                      disabled={
-                        assetFetching === node.component_version_id ||
-                        node.loading_state !== 'pending'
-                      }
-                      title={t('fetchAssetTitle')}
-                    >
-                      {assetFetching === node.component_version_id
-                        ? '…'
-                        : t('fetchAction')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              {fetchedAsset && (
-                <div className="runtime-fetched">
-                  {t('assetFetchedLabel', {
-                    id: fetchedAsset.componentId.slice(0, 12),
-                    ver: fetchedAsset.componentVersion.slice(0, 8),
-                    size: fetchedAsset.sizeBytes,
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         <div className="map-controls">
           {!sidenavOpen && (
@@ -1367,8 +1095,7 @@ export default function GlobePage() {
               className={viewMode === '3d' ? 'active' : ''}
               onClick={() => setViewMode('3d')}
               aria-pressed={viewMode === '3d'}
-              disabled={Boolean(webglStatus)}
-              title={webglStatus ? t('threeDRequiresWebgl') : t('threeDGlobeView')}
+              title={webglStatus ? t('threeDGlobeView') + ' (lightweight fallback)' : t('threeDGlobeView')}
             >
               <Box size={14} /> 3D
             </button>
@@ -1430,18 +1157,30 @@ export default function GlobePage() {
             </button>
           </div>
         </div>
-        <div className="portfolio-summary">
-          <div><span>{t('registeredParcels')}</span><strong>{offChainParcels.length}</strong></div>
-          <div><span>{t('mappedArea')}</span><strong>{formatArea(offChainParcels.reduce((total, parcel) => total + (parcel.area_m2 ?? 0), 0))}</strong></div>
-        </div>
         {shareTarget && (
           <button className="atlas-share" onClick={shareLand} title={t('copyLinkTo', { name: shareTarget.name })}>
             <Share2 size={13} />
             {shareCopied ? t('linkCopied') : t('shareThisLand')}
           </button>
         )}
+        <AtlasControlsPanel
+          onFlyTo={pickSearch}
+          onGotoCoordinates={gotoCoordinates}
+          onCommand={runViewCommand}
+          onToggleMeasure={toggleMeasure}
+          measuring={drawKind === 'measure' && drawing}
+          layers={layers}
+          onToggleLayer={toggleLayer}
+          basemap={basemap}
+          onBasemap={setBasemap}
+          tierPref={tierPref}
+          onTierPref={changeTierPref}
+          fps={fps}
+          lod={lod}
+          onJumpLod={jumpToLod}
+        />
         <div className="flex border-b panel-tabs">
-          {(['register', 'browse', 'plan', 'media'] as const).map((tabId) => (
+          {(['register', 'browse', 'plan', 'media', 'scene'] as const).map((tabId) => (
             <button
               key={tabId}
               className={`flex-1 py-2 text-[13px] font-medium capitalize hover:bg-bg ${
@@ -1456,7 +1195,9 @@ export default function GlobePage() {
                   ? t('tabBrowse')
                   : tabId === 'plan'
                     ? t('tabPlan')
-                    : t('mediaGallery')}
+                    : tabId === 'scene'
+                      ? t('sceneTab')
+                      : t('mediaGallery')}
             </button>
           ))}
         </div>
@@ -1496,6 +1237,91 @@ export default function GlobePage() {
             <MediaPanel
               parcelId={selectedParcel?.address ?? selectedOffChain?.id ?? null}
             />
+          ) : tab === 'scene' ? (
+            /* Distributed runtime scene resolver (REQ-027 / REQ-028) */
+            <div className="atlas-scene">
+              <div className="atlas-scene-head">
+                <span className="runtime-label">{t('runtimeSceneLabel')}</span>
+                {currentManifest ? (
+                  <>
+                    <span className="runtime-manifest-badge">
+                      {currentManifest.region_name} v{currentManifest.version}
+                    </span>
+                    <span className="runtime-region">{currentRegion}</span>
+                    <button
+                      className="btn btn-ghost px-2 py-1 text-[10px]"
+                      onClick={() => setCurrentManifest(null)}
+                      title={t('clearSceneTitle')}
+                    >
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn btn-ghost px-2 py-1 text-[10px]"
+                    onClick={createManifestForRegion}
+                    title={t('createManifestTitle')}
+                    disabled={sceneResolving}
+                  >
+                    {t('createManifestAction')}
+                  </button>
+                )}
+                {sceneResolving && <span className="runtime-dots">…</span>}
+              </div>
+              {sceneError && (
+                <div className="runtime-error">
+                  <span className="runtime-error-icon">⚠</span>
+                  {sceneError}
+                </div>
+              )}
+              {sceneGraph ? (
+                <div className="runtime-nodes">
+                  <span className="runtime-nodes-label">
+                    {t('sceneNodesLabel', {
+                      n: sceneGraph.nodes.length,
+                      lod: sceneGraph.scene.lod_level,
+                    })}
+                  </span>
+                  <div className="runtime-node-list">
+                    {sceneGraph.nodes.map((node) => (
+                      <div key={node.id} className="runtime-node-row">
+                        <span className="runtime-node-id">
+                          {node.object_id.slice(0, 12)}…
+                        </span>
+                        <span className="runtime-node-ver">
+                          {node.component_version_id.slice(0, 8)}…
+                        </span>
+                        <span className={`runtime-node-state runtime-state-${node.loading_state}`}>
+                          {node.loading_state}
+                        </span>
+                        <button
+                          className="btn btn-ghost px-1.5 py-0.5 text-[10px]"
+                          onClick={() => fetchComponent(node)}
+                          disabled={
+                            assetFetching === node.component_version_id ||
+                            node.loading_state !== 'pending'
+                          }
+                          title={t('fetchAssetTitle')}
+                        >
+                          {assetFetching === node.component_version_id ? '…' : t('fetchAction')}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {fetchedAsset && (
+                    <div className="runtime-fetched">
+                      {t('assetFetchedLabel', {
+                        id: fetchedAsset.componentId.slice(0, 12),
+                        ver: fetchedAsset.componentVersion.slice(0, 8),
+                        size: fetchedAsset.sizeBytes,
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                !sceneResolving && <p className="atlas-scene-empty">{t('sceneEmpty')}</p>
+              )}
+            </div>
           ) : repr ? (
             <RepresentationPanel
               title={repr.title}
@@ -1523,6 +1349,12 @@ export default function GlobePage() {
                 account={selectedParcel.account}
                 holder={selectedParcel.holder}
                 onView3D={viewSelectedOff3D ?? undefined}
+                onFrontView={
+                  linkedOffParcel ? () => frontViewOf(linkedOffParcel) : undefined
+                }
+                onStreetView={
+                  linkedOffParcel ? () => streetViewOf(linkedOffParcel) : undefined
+                }
               />
               <SpatialHistoryPanel
                 parcelPubkey={selectedParcel.address}
@@ -1554,70 +1386,34 @@ export default function GlobePage() {
               <OffChainParcelPanel
                 parcel={selectedOffChain}
                 onView3D={viewSelectedOff3D ?? undefined}
+                onFrontView={
+                  selectedOffChain ? () => frontViewOf(selectedOffChain) : undefined
+                }
+                onStreetView={
+                  selectedOffChain ? () => streetViewOf(selectedOffChain) : undefined
+                }
               />
             </>
           ) : selectedBuilding ? (
             <BuildingPanel
               footprint={selectedBuilding}
               onView3D={viewBuilding3D}
+              onFrontView={() => viewBuildingClose('front')}
+              onStreetView={() => viewBuildingClose('street')}
               onClose={() => setSelectedBuilding(null)}
             />
           ) : (
-            <ParcelListPanel onSelect={onSelectParcel} onSelectOffChain={onSelectOffChain} />
+            <ParcelListPanel
+              onSelect={onSelectParcel}
+              onSelectOffChain={onSelectOffChain}
+              buildings={DEMO_BUILDINGS}
+              onSelectBuilding={(building) => focusDemoBuilding(building.osm_id)}
+              selectedBuildingId={null}
+            />
           )}
         </div>
 
-        {/* collapsible mini stats footer */}
-        <DetailsFooter geoStats={geoStats} fusionStats={fusionStats} />
       </Sidenav>
-    </div>
-  )
-}
-
-function formatArea(areaM2: number): string {
-  if (areaM2 >= 1_000_000) return `${(areaM2 / 1_000_000).toFixed(2)} km²`
-  if (areaM2 >= 10_000) return `${(areaM2 / 10_000).toFixed(2)} ha`
-  return `${Math.round(areaM2).toLocaleString()} m²`
-}
-
-function DetailsFooter({
-  geoStats,
-  fusionStats,
-}: {
-  geoStats: ReturnType<typeof useAppStore.getState>['geoStats']
-  fusionStats: ReturnType<typeof useAppStore.getState>['fusionStats']
-}) {
-  const { t } = useLocale()
-  const [open, setOpen] = useState(false)
-  const rows: [string, string][] = []
-  if (geoStats?.nodes != null) rows.push([t('statOsmNodes'), String(geoStats.nodes)])
-  if (geoStats?.roads != null) rows.push([t('statOsmRoads'), String(geoStats.roads)])
-  if (geoStats?.road_length_km != null) rows.push([t('statRoadLength'), `${geoStats.road_length_km.toFixed(1)} km`])
-  if (geoStats?.pois != null) rows.push([t('statOsmPois'), String(geoStats.pois)])
-  if (fusionStats?.roads != null) rows.push([t('statDbRoads'), String(fusionStats.roads)])
-  if (fusionStats?.pois != null) rows.push([t('statDbPois'), String(fusionStats.pois)])
-  if (fusionStats?.pilot_zones != null) rows.push([t('statPilotZones'), String(fusionStats.pilot_zones)])
-  if (rows.length === 0) rows.push([t('statDataNotLoaded'), '—'])
-
-  return (
-    <div className="border-t">
-      <button
-        className="w-full flex items-center justify-between px-3 py-2 text-[12px] font-medium hover:bg-bg"
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span>{t('geoDataStats')}</span>
-        {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-      </button>
-      {open && (
-        <dl className="px-3 pb-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
-          {rows.map(([k, v]) => (
-            <div key={k} className="flex justify-between">
-              <dt className="text-muted">{k}</dt>
-              <dd className="font-medium">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
     </div>
   )
 }

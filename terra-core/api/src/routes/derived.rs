@@ -24,6 +24,8 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/jobs", post(create_job))
+        .route("/jobs", get(list_jobs))
+        .route("/jobs/lease", post(lease_job))
         .route("/jobs/{id}", get(get_job))
         .route("/jobs/{id}/complete", post(complete_job))
         .route("/jobs/{id}/fail", post(fail_job))
@@ -227,6 +229,96 @@ pub async fn get_job(
             .await?
             .ok_or_else(|| AppError::not_found("derived job not found"))?;
     Ok(Json(job))
+}
+
+#[derive(Debug, Serialize)]
+pub struct LeasedDerivedJob {
+    pub job: DerivedJob,
+}
+
+const DERIVED_LEASE_TTL_SECS: i64 = 15 * 60;
+
+/// Lease the oldest pending derived job, or reclaim an expired lease.
+pub async fn lease_job(
+    State(state): State<AppState>,
+    auth: SignedRequest,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<LeasedDerivedJob>, AppError> {
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", "/api/v1/derived/jobs/lease")?;
+    let claimed_by = caller_wallet(&headers);
+    if let Some(ref wallet) = claimed_by {
+        auth.verify_wallet(wallet, "POST", "/api/v1/derived/jobs/lease")?;
+    }
+
+    sqlx::query(
+        "UPDATE derived_jobs SET status = 'pending', claimed_by = NULL, \
+         claimed_at = NULL, lease_expires_at = NULL \
+         WHERE status = 'running' AND lease_expires_at IS NOT NULL \
+         AND lease_expires_at < now()",
+    )
+    .execute(&state.pool)
+    .await?;
+
+    let claimed: Option<String> = sqlx::query_scalar(
+        "UPDATE derived_jobs SET status = 'running', claimed_by = $1, \
+         claimed_at = now(), lease_expires_at = now() + make_interval(secs => $2::double precision) \
+         WHERE id = (SELECT id FROM derived_jobs WHERE status = 'pending' \
+         ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED) \
+         RETURNING id",
+    )
+    .bind(&claimed_by)
+    .bind(DERIVED_LEASE_TTL_SECS as f64)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let Some(job_id) = claimed else {
+        return Err(AppError::not_found("no pending derived jobs"));
+    };
+    let job =
+        sqlx::query_as::<_, DerivedJob>(&format!("{SELECT_JOB} FROM derived_jobs WHERE id = $1"))
+            .bind(&job_id)
+            .fetch_one(&state.pool)
+            .await?;
+
+    if let Some(ref wallet) = claimed_by {
+        let _ = sqlx::query(
+            "INSERT INTO job_assignments (job_id, worker_id) \
+             VALUES ($1, $2) ON CONFLICT (job_id, worker_id) DO NOTHING",
+        )
+        .bind(&job_id)
+        .bind(wallet)
+        .execute(&state.pool)
+        .await;
+    }
+
+    Ok(Json(LeasedDerivedJob { job }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListJobsQuery {
+    #[serde(default = "default_jobs_limit")]
+    pub limit: i64,
+}
+
+fn default_jobs_limit() -> i64 {
+    100
+}
+
+pub async fn list_jobs(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListJobsQuery>,
+) -> Result<Json<Vec<DerivedJob>>, AppError> {
+    let limit = query.limit.clamp(1, 500);
+    let jobs = sqlx::query_as::<_, DerivedJob>(&format!(
+        "{SELECT_JOB} FROM derived_jobs ORDER BY created_at ASC LIMIT $1"
+    ))
+    .bind(limit)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(jobs))
 }
 
 /// Mark a pending/running job `done`. Idempotent: completing an already-`done`

@@ -2,6 +2,52 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-05 — Sprint 025/026: REQ-026/027/028 + RFC-016 implementation; Sprint 027/028: atlas fixes + doc reconciliation
+
+- **REQ-026 implemented** (`IMPLEMENTED, NOT FULLY VERIFIED`): `geo-engine/src/component_package.rs`
+  (RFC-015 conformance validator + `terra-geom-v2` 3D digest), migrations 0035
+  (`component_packages`) + 0041 (`component_version`), `api/src/routes/components.rs`
+  (`POST /components`, `GET /components/{id}`, `GET /components`), `api/src/routes/assemblies.rs`
+  (`POST /assemblies`, `GET /assemblies/{id}` with objects + conflicts, list, add objects,
+  add conflicts, `PUT /assemblies/{id}/status`), migration 0038.
+- **REQ-027 implemented** (`IMPLEMENTED, NOT FULLY VERIFIED`): migration 0036
+  (`world_manifests` + `manifest_objects`), `api/src/routes/manifests.rs` (create, get with
+  objects, list by region, upsert objects), frontend `terra-web/src/lib/runtime.ts` manifest
+  resolver + scene graph manager.
+- **REQ-028 implemented** (`IMPLEMENTED, NOT FULLY VERIFIED`): migrations 0037
+  (`storage_providers` + `provider_replicas` + `provider_capabilities`), 0039
+  (`runtime_scene_graphs` + `scene_nodes` + `asset_cache`), 0040 (`worker_registration`),
+  0042 (`derived_job_leases`), 0043 (`scene_node_validation_state`); `api/src/routes/providers.rs`
+  (provider discovery + fallback + replication), `api/src/routes/runtime.rs` (`/runtime/scene`,
+  `/runtime/scene/{lod}`, `/runtime/assets` with fallback, `/runtime/lod`, `/runtime/cache`),
+  `api/src/routes/workers.rs` (worker registration + heartbeat staleness + job assignment),
+  frontend `runtime.ts` (LOD 0–4, provider fallback, asset retrieval) + `runtime.test.ts`,
+  `WorkerConsolePage.tsx`.
+- **RFC-016 on-chain security core implemented** (`IMPLEMENTED, NOT FULLY VERIFIED`):
+  `src/security.rs` (1070 lines) — 11 PDAs + 11 instructions + 13 `TerraError` codes,
+  registered in `lib.rs`; REQ-029…REQ-040 → `IMPLEMENTED, NOT FULLY VERIFIED`.
+- **Sprint 027 — Atlas 16-point requirement audit (frontend fixes):** `ThreeAtlasFallback.tsx`
+  restored missing `return <div ref={hostRef}>` host (was returning `void`); `TerraGlobe.tsx`
+  typed `ring.map` destructuring + typed runtime accessor for `moveWest/East/South/North/Up/Down`
+  + WASD keyboard handler; `GlobePage.tsx` `failedRegionsRef` dedupes `sceneError` banner
+  retries + manual "Create manifest" retry clears the failure; removed 3 empty files
+  (`ThreeNavOverlay.tsx`, `TerraFlightPad.tsx`, `__write-probe.ts`).
+- **Sprint 028 — Doc reconciliation (all `.md` layer-focused):** IMPLEMENTATION_STATUS.md
+  audit basis → `244ed7e`/2026-11-05, vitest **83/83**, bundle entry **305.1 kB gz** /
+  Cesium **1098.5 kB gz** / total **1864.3 kB gz**, geo-engine **33 (+2 ignored)**; added
+  A37–A40 (RFC-016), B15–B19 (REQ-026/027/028 + workers), D12–D18 (runtime client, 3D
+  model rendering, atlas verification, progressive tier loading, front-view/single sidebar,
+  backend-down graceful degradation, worker console); REQUIREMENTS_TRACEABILITY
+  REQ-026/027/028 → `IMPLEMENTED, NOT FULLY VERIFIED`; chapters 11/12/13/14 +
+  `rfc-015` + BOOK_OF_INTENTS/SUMMARY → `IMPLEMENTED, NOT FULLY VERIFIED` with
+  "why this chapter exists" updated to reflect implemented code; work/CURRENT.md
+  reconciled to 2026-11-05.
+- Verification this date: API 133/133, geo-engine 33 (+2 ignored), registry lib 153/153,
+  vitest 83/83, `tsc -b` clean, `pnpm build:check` PASS, eslint matches pre-existing
+  baseline (3 errors + 3 warnings on `GlobePage.tsx`/`TerraGlobe.tsx`, unchanged).
+- All REQ-026/027/028 + RFC-016 code is **local-verified only** — B6 devnet funding
+  (Q-001, deployer wallet 0 SOL) blocks live-cluster verification.
+
 ## 2026-11-02 — RFC-016 Protocol Security, Decentralization, Privacy & Censorship Resilience
 
 - New `docs/rfc-016-protocol-security-decentralization-privacy.md` — full security

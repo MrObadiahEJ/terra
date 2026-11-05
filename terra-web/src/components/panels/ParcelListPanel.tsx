@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAppStore, type OnChainParcelItem } from '../../store/appStore'
 import type { OffChainParcel } from '../../lib/api'
+import type { OsmBuildingFootprint } from '../../lib/api'
 import { PARCEL_STATUS } from '../../lib/constants'
 import { Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { useLocale } from '../../lib/locale'
@@ -8,11 +9,22 @@ import { useLocale } from '../../lib/locale'
 interface Props {
   onSelect: (p: OnChainParcelItem) => void
   onSelectOffChain: (p: OffChainParcel) => void
+  buildings?: OsmBuildingFootprint[]
+  onSelectBuilding?: (building: OsmBuildingFootprint) => void
+  selectedBuildingId?: number | null
 }
 
-export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
+export default function ParcelListPanel({
+  onSelect,
+  onSelectOffChain,
+  buildings = [],
+  onSelectBuilding,
+  selectedBuildingId,
+}: Props) {
   const { t } = useLocale()
   const [query, setQuery] = useState('')
+  const [kind, setKind] = useState<'all' | 'parcels' | 'buildings'>('all')
+  const [visibleCount, setVisibleCount] = useState(12)
   const parcels = useAppStore((s) => s.parcels)
   const loading = useAppStore((s) => s.loadingParcels)
   const error = useAppStore((s) => s.parcelsError)
@@ -36,6 +48,13 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
       ),
     [offChainParcels, normalizedQuery],
   )
+  const filteredBuildings = useMemo(
+    () =>
+      buildings.filter((building) =>
+        `${building.name ?? ''} ${building.building ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
+      ),
+    [buildings, normalizedQuery],
+  )
 
   if (loading) {
     return (
@@ -45,7 +64,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
     )
   }
 
-  if (parcels.length === 0 && offChainParcels.length === 0) {
+  if (parcels.length === 0 && offChainParcels.length === 0 && buildings.length === 0) {
     return (
       <div className="p-3 text-center">
         <p className="text-muted text-[12px] mb-2">
@@ -74,8 +93,24 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
           </button>
         )}
       </label>
+      <div className="atlas-inventory-filter" role="group" aria-label="Object type">
+        {(['all', 'parcels', 'buildings'] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={kind === item ? 'active' : ''}
+            onClick={() => {
+              setKind(item)
+              setVisibleCount(12)
+            }}
+            aria-pressed={kind === item}
+          >
+            {item === 'all' ? 'All' : item === 'parcels' ? 'Parcels' : 'Buildings'}
+          </button>
+        ))}
+      </div>
 
-      {filteredParcels.length > 0 && (
+      {(kind === 'all' || kind === 'parcels') && filteredParcels.length > 0 && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5">
             <span className="text-[12px] font-semibold flex-1">
@@ -86,7 +121,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
             </button>
           </div>
           <ul className="max-h-[300px] overflow-y-auto">
-            {filteredParcels.map((p) => {
+            {filteredParcels.slice(0, visibleCount).map((p) => {
               const active = selected?.address === p.address
               return (
                 <li key={p.address}>
@@ -113,7 +148,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
         </>
       )}
 
-      {filteredOffChainParcels.length > 0 && (
+      {(kind === 'all' || kind === 'parcels') && filteredOffChainParcels.length > 0 && (
         <>
           <div className="flex items-center gap-2 px-3 py-1.5 mt-1">
             <span className="text-[12px] font-semibold flex-1">
@@ -126,7 +161,7 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
             )}
           </div>
           <ul className="max-h-[300px] overflow-y-auto">
-            {filteredOffChainParcels.map((p) => {
+            {filteredOffChainParcels.slice(0, visibleCount).map((p) => {
               const active = selectedOff?.id === p.id
               return (
                 <li key={p.id}>
@@ -152,6 +187,44 @@ export default function ParcelListPanel({ onSelect, onSelectOffChain }: Props) {
             })}
           </ul>
         </>
+      )}
+      {(kind === 'all' || kind === 'buildings') && filteredBuildings.length > 0 && onSelectBuilding && (
+        <>
+          <div className="flex items-center gap-2 px-3 py-1.5 mt-1">
+            <span className="text-[12px] font-semibold flex-1">
+              Buildings <span className="text-muted">({filteredBuildings.length})</span>
+            </span>
+          </div>
+          <ul className="atlas-sidebar-object-list">
+            {filteredBuildings.slice(0, visibleCount).map((building) => {
+              const active = selectedBuildingId === building.osm_id
+              return (
+                <li key={building.osm_id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelectBuilding(building)}
+                    className={`atlas-sidebar-object-row ${active ? 'active' : ''}`}
+                  >
+                    <span>
+                      <strong>{building.name ?? `Building ${building.osm_id}`}</strong>
+                      <small>{building.building ?? 'building'} · {building.height_m ?? 0} m</small>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+      {(kind === 'buildings'
+        ? filteredBuildings.length
+        : kind === 'parcels'
+          ? filteredOffChainParcels.length
+          : filteredOffChainParcels.length + filteredBuildings.length
+      ) > visibleCount && (
+        <button type="button" className="atlas-load-more" onClick={() => setVisibleCount((count) => count + 12)}>
+          Load more
+        </button>
       )}
       {filteredParcels.length === 0 && filteredOffChainParcels.length === 0 && (
         <p className="parcel-search-empty">

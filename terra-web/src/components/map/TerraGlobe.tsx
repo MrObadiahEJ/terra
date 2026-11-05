@@ -14,10 +14,13 @@ import { FpsWatchdog, TIER_SETTINGS, type GraphicsTier } from '../../lib/perfTie
 import { resolveTerrain, type TerrainStatus } from '../../lib/cesiumTerrain'
 import { type SceneNodeRow } from '../../lib/runtime'
 import LeafletMap from './LeafletMap'
+import ThreeAtlasFallback from './ThreeAtlasFallback'
+import { DEMO_BUILDINGS } from '../../lib/demoData'
 
 // Ion stays off by default: world terrain and 3D tiles are an explicit,
 // per-browser upgrade (the token lives in localStorage, never in this file).
 Cesium.Ion.defaultAccessToken = ''
+
 
 export interface DrawVertex {
   lon: number
@@ -38,7 +41,9 @@ type DrawKind = 'parcel' | 'road' | 'measure'
 
 /** One-shot camera commands driven from the page (reset / north-up / tilt). */
 export interface ViewCommand {
-  kind: 'reset' | 'north' | 'tilt'
+  kind: 'reset' | 'north' | 'tilt' | 'front' | 'street'
+  longitude?: number
+  latitude?: number
   /** Bumped per press so repeating the same command re-fires the effect. */
   nonce: number
 }
@@ -88,7 +93,6 @@ interface TerraGlobeProps {
   /** Runtime scene graph nodes (REQ-027/REQ-028): independently stored
    *  components fetched with provider fallback. Rendered as clamped
    *  footprint polygons; fetched nodes render as extruded volumes. */
-  /** Runtime scene graph nodes (REQ-027/REQ-028). */
   runtimeNodes?: SceneNodeRow[]
   /** IDs of nodes whose component assets have been fetched (render as volumes). */
   fetchedNodeIds?: string[]
@@ -100,6 +104,10 @@ interface TerraGlobeProps {
   }>
   /** One-shot camera commands (reset view, north-up, tilt). */
   viewCommand?: ViewCommand | null
+  /** Off-chain parcel the sidebar has selected — drawn with a brighter fill. */
+  highlightParcelId?: string | null
+  /** Building the sidebar has selected — drawn with a brighter volume. */
+  highlightBuildingId?: number | null
 }
 
 function basemapProvider(
@@ -115,15 +123,16 @@ function basemapProvider(
   }
   if (style === 'terrain') {
     return new Cesium.UrlTemplateImageryProvider({
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topographic_Map/MapServer/tile/{z}/{y}/{x}',
+      url: 'https://tile.opentopomap.org/{z}/{x}/{y}.png',
       maximumLevel: Math.min(19, maxLevel),
-      credit: 'Esri, HERE, Garmin, FAO, NOAA, USGS and others',
+      credit: '© OpenTopoMap contributors, SRTM · map data © OpenStreetMap contributors',
     })
   }
   return new Cesium.UrlTemplateImageryProvider({
+    // Keyless Esri World Imagery — free satellite tiles, no API key needed.
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    maximumLevel: maxLevel,
-    credit: 'Esri, Maxar, Earthstar Geographics and the GIS User Community',
+    maximumLevel: Math.min(19, maxLevel),
+    credit: 'Esri, Maxar, Earthstar Geographics, and the GIS User Community',
   })
 }
 
@@ -171,6 +180,8 @@ export default function TerraGlobe({
   }>(),
   onFetchComponent,
   viewCommand = null,
+  highlightParcelId = null,
+  highlightBuildingId = null,
 }: TerraGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
@@ -210,6 +221,15 @@ export default function TerraGlobe({
   // jank; remember that the *next* double-click belongs to the drawing
   // gesture that just finished and must not reach Cesium's zoomTo.
   const pendingDblSwallowRef = useRef(false)
+  const axisDragRef = useRef<{ axis: 'X' | 'Y' | 'Z'; x: number; y: number } | null>(null)
+  const onWebGLContextLost = (event: Event) => {
+    event.preventDefault()
+    onWebGLStatusRef.current?.('WebGL context lost. Terra is restoring the 3D view.')
+  }
+  const onWebGLContextRestored = () => {
+    onWebGLStatusRef.current?.(null)
+    viewerRef.current?.scene.requestRender()
+  }
 
   // ---- init viewer ---------------------------------------------------------
   useEffect(() => {
@@ -219,6 +239,18 @@ export default function TerraGlobe({
     let viewer: Cesium.Viewer
     try {
       viewer = new Cesium.Viewer(container, {
+        contextOptions: {
+          webgl: {
+            alpha: false,
+            depth: true,
+            stencil: false,
+            antialias: true,
+            premultipliedAlpha: true,
+            preserveDrawingBuffer: false,
+            powerPreference: 'low-power',
+            failIfMajorPerformanceCaveat: false,
+          },
+        },
         // The custom 2D/3D + basemap controls are the single source of truth;
         // Cesium's own widget chrome (scene mode, geocoder, home, fullscreen)
         // is disabled so the two never desync.
@@ -242,8 +274,18 @@ export default function TerraGlobe({
       })
       appliedBasemapRef.current = `${basemap}@${TIER_SETTINGS[graphicsTier].imageryMaxLevel}`
 
-      viewer.scene.globe.enableLighting = true
-      viewer.scene.screenSpaceCameraController.minimumZoomDistance = 1
+      viewer.scene.globe.enableLighting = false
+      viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#dfe3e1')
+      viewer.scene.globe.showGroundAtmosphere = false
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false
+      const navigation = viewer.scene.screenSpaceCameraController
+      navigation.minimumZoomDistance = 2
+      navigation.maximumZoomDistance = 50000000
+      navigation.enableCollisionDetection = true
+      navigation.inertiaSpin = 0.92
+      navigation.inertiaTranslate = 0.85
+      navigation.inertiaZoom = 0.88
+      navigation.zoomFactor = 4
       viewer.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(
           DEFAULT_FOCUS.longitude,
@@ -251,6 +293,19 @@ export default function TerraGlobe({
           DEFAULT_FOCUS.height,
         ),
       })
+      Cesium.GeoJsonDataSource.load('/continents.geojson', {
+        stroke: Cesium.Color.fromCssColorString('#f0ead7'),
+        fill: Cesium.Color.fromCssColorString('#b9b29a').withAlpha(0.96),
+        strokeWidth: 1.4,
+        clampToGround: true,
+      }).then((continents) => {
+        if (!viewer.isDestroyed()) viewer.dataSources.add(continents)
+      }).catch((error: unknown) => {
+        console.warn('Bundled continent fallback could not be loaded', error)
+      })
+      const canvas = viewer.scene.canvas
+      canvas.addEventListener('webglcontextlost', onWebGLContextLost)
+      canvas.addEventListener('webglcontextrestored', onWebGLContextRestored)
     } catch (err) {
       // WebGL unavailable (no GPU / acceleration disabled / remote session).
       // Show a fallback panel instead of letting the error kill the app.
@@ -280,6 +335,10 @@ export default function TerraGlobe({
       const h = carto?.height ?? 0
       const lon = Cesium.Math.toDegrees(carto?.longitude ?? 0)
       const lat = Cesium.Math.toDegrees(carto?.latitude ?? 0)
+      // Progressive content: presentation models only stream in once the
+      // camera is within 4 km of the ground (React bails out on no-ops).
+      const near = h <= 4000
+      nearGroundRef.current = near
       const heightStable =
         !force && lastReported >= 0 && Math.abs(h - lastReported) <= Math.max(lastReported * 0.06, 1)
       const lonlatStable =
@@ -305,6 +364,8 @@ export default function TerraGlobe({
     return () => {
       viewer.camera.changed.removeEventListener(onCamChange)
       viewer.camera.moveEnd.removeEventListener(onCamMoveEnd)
+      viewer.scene.canvas.removeEventListener('webglcontextlost', onWebGLContextLost)
+      viewer.scene.canvas.removeEventListener('webglcontextrestored', onWebGLContextRestored)
       viewer.destroy()
       viewerRef.current = null
       appliedBasemapRef.current = null
@@ -474,6 +535,12 @@ export default function TerraGlobe({
       } else {
         if (now < suppressPickRef.current) return
         const picked = viewer.scene.pick(movement.position)
+        const pickedId = picked?.id != null ? String(picked.id) : ''
+        const demoModelMatch = pickedId.match(/^demo-house-(-?\d+)$/)
+        if (demoModelMatch) {
+          onBuildingClick?.(Number(demoModelMatch[1]))
+          return
+        }
         const entity: Cesium.Entity | undefined =
           picked && Cesium.defined(picked.id) ? (picked.id as Cesium.Entity) : undefined
         const props = entity?.properties
@@ -534,21 +601,28 @@ export default function TerraGlobe({
     if (!viewer) return
     removeEntitiesByIdPrefix(viewer, ['ter-', 'road-', 'poi-', 'plan-'])
 
-    // off-chain parcels -> footprints
+    // off-chain parcels -> footprints (transparent fill, clearer outline when
+    // the sidebar selects the parcel; distance-gated so a zoomed-out globe
+    // never draws the whole collection at once)
     for (const parcel of offChainParcels) {
       const poly = parseGeoJSON<{ type: string; coordinates: number[][][] }>(parcel.geometry)
       if (!poly || poly.type !== 'Polygon') continue
       const ring = poly.coordinates[0]
       const hierarchy = ring.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat))
-      viewer.entities.add({
+      const selected = parcel.id === highlightParcelId
+      const parcelEntity = viewer.entities.add({
         id: `ter-${parcel.id}`,
         name: parcel.name,
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(hierarchy),
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-          material: Cesium.Color.LIME.withAlpha(0.16),
+          material: selected
+            ? Cesium.Color.fromCssColorString('#34d399').withAlpha(0.14)
+            : Cesium.Color.fromCssColorString('#b7c0c5').withAlpha(0.02),
           outline: true,
-          outlineColor: Cesium.Color.YELLOW,
+          outlineColor: selected
+            ? Cesium.Color.fromCssColorString('#34d399').withAlpha(0.95)
+            : Cesium.Color.fromCssColorString('#d6c98f').withAlpha(0.58),
           classificationType: Cesium.ClassificationType.TERRAIN,
         },
         properties: {
@@ -565,13 +639,19 @@ export default function TerraGlobe({
           pixelOffset: new Cesium.Cartesian2(0, -18),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
           eyeOffset: new Cesium.Cartesian3(0, 0, -50),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 4000),
         },
       })
+      if (parcelEntity.polygon) {
+        parcelEntity.polygon.distanceDisplayCondition = new Cesium.ConstantProperty(
+          new Cesium.DistanceDisplayCondition(0, 9000),
+        )
+      }
     }
 
     // building footprints are extruded in their own effect (terrain-aware)
 
-    // roads -> class-coloured clamped polylines
+    // roads -> class-coloured clamped polylines (city level and closer)
     for (const road of roads) {
       const poly = parseGeoJSON<{ type: string; coordinates: number[][] }>(road.geometry)
       if (!poly || poly.type !== 'LineString' || poly.coordinates.length < 2) continue
@@ -583,11 +663,12 @@ export default function TerraGlobe({
           width: style.width,
           material: Cesium.Color.fromCssColorString(style.color).withAlpha(0.95),
           clampToGround: true,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 150_000),
         },
       })
     }
 
-    // POIs -> point markers with optional labels
+    // POIs -> point markers with optional labels (region level and closer)
     for (const poi of pois) {
       const poly = parseGeoJSON<{ type: string; coordinates: number[] }>(poi.geometry)
       if (!poly || poly.type !== 'Point') continue
@@ -603,6 +684,7 @@ export default function TerraGlobe({
           outlineWidth: 2,
           heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 60_000),
         },
         label:
           showLabels && poi.name
@@ -614,6 +696,7 @@ export default function TerraGlobe({
                 backgroundColor: Cesium.Color.BLACK.withAlpha(0.45),
                 pixelOffset: new Cesium.Cartesian2(0, -14),
                 disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 12_000),
               }
             : undefined,
       })
@@ -632,17 +715,82 @@ export default function TerraGlobe({
         },
       })
     }
-  }, [offChainParcels, roads, pois, plannedRoads, showLabels])
+  }, [offChainParcels, roads, pois, plannedRoads, showLabels, highlightParcelId])
 
   useEffect(() => {
     viewerRef.current?.scene.requestRender()
   }, [offChainParcels, roads, pois, plannedRoads, showLabels, drawVertices])
 
-  // ---- extruded building footprints (tier-capped, terrain-sampled) --------
-  // Extruded OSM footprints. Ground-relative heights let Cesium clamp both
-  // the roof and the base to the terrain surface (or the ellipsoid on flat
-  // tiers) — manual getHeight sampling mid-stream produced wild values
-  // (−1.8 km over a 500 m valley), so no sampling/retries are needed.
+  // Presentation houses aligned with DEMO_BUILDINGS. Progressive by design:
+  // nothing loads at startup — models stream in only once the camera is close
+  // to the ground (≤ 4 km), one GLB at a time (never concurrent), staggered,
+  // cancellable, and capped per graphics tier so memory stays bounded.
+  const nearGroundRef = useRef(false)
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer || !nearGroundRef.current) return
+    let cancelled = false
+    const primitives: Cesium.Model[] = []
+    const modelUrls = [
+      '/models/house_scene.glb',
+      '/models/modern-house.glb',
+    ]
+    const presentationCount =
+      graphicsTier === 'low' ? 2 : graphicsTier === 'medium' ? 4 : graphicsTier === 'high' ? 6 : 9
+    let chain: Promise<void> = Promise.resolve()
+    DEMO_BUILDINGS.slice(0, presentationCount).forEach((building, index) => {
+      const ring = building.geometry.coordinates[0]
+      const usable = ring.slice(0, -1)
+      const lon = usable.reduce((sum, point) => sum + point[0], 0) / usable.length
+      const lat = usable.reduce((sum, point) => sum + point[1], 0) / usable.length
+      const centre = Cesium.Cartesian3.fromDegrees(lon, lat, 0)
+      const url = modelUrls[index % modelUrls.length]
+      // Single-flight queue: wait for the previous GLB (and a short breath)
+      // before starting the next request.
+      chain = chain.then(async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 350))
+        if (cancelled) return
+        try {
+          const model = await Cesium.Model.fromGltfAsync({
+            url,
+            modelMatrix: Cesium.Transforms.headingPitchRollToFixedFrame(
+              centre,
+              new Cesium.HeadingPitchRoll(index * Math.PI / 9, 0, 0),
+            ),
+            maximumScale: 1,
+          })
+          if (cancelled) {
+            model.destroy()
+            return
+          }
+          // Varied footprints: alternate scale and yaw so repeated models do
+          // not read as a stamped row of identical houses.
+          model.scale = url.endsWith('house_scene.glb')
+            ? 0.48 + (index % 3) * 0.07
+            : 0.24 + (index % 4) * 0.05
+          model.distanceDisplayCondition = new Cesium.DistanceDisplayCondition(0, 900)
+          model.id = `demo-house-${building.osm_id}`
+          viewer.scene.primitives.add(model)
+          primitives.push(model)
+          viewer.scene.requestRender()
+        } catch (error: unknown) {
+          if (!cancelled) console.warn(`Failed to load demo house ${building.osm_id}`, error)
+        }
+      })
+    })
+
+    return () => {
+      cancelled = true
+      for (const model of primitives) {
+        viewer.scene.primitives.remove(model)
+        if (!model.isDestroyed()) model.destroy()
+      }
+    }
+  }, [graphicsTier])
+
+  // ---- extruded building footprints (tier-capped) -------------------------
+  // Ground-relative heights clamp roof and base to the surface; manual
+  // getHeight sampling was unusable (−1.8 km over a 500 m valley), so none.
   useEffect(() => {
     const viewer = viewerRef.current
     if (!viewer) return
@@ -657,19 +805,23 @@ export default function TerraGlobe({
       const ring = building.geometry?.coordinates?.[0]
       if (!ring || ring.length < 4) continue
       const hierarchy = ring.map(([lon, lat]) => Cesium.Cartesian3.fromDegrees(lon, lat))
+      const selected = building.osm_id === highlightBuildingId
       viewer.entities.add({
         id: `bld-${building.osm_id}`,
         polygon: {
           hierarchy: new Cesium.PolygonHierarchy(hierarchy),
-          height: buildingHeightM(building),
-          extrudedHeight: 0,
+          height: 0,
+          extrudedHeight: buildingHeightM(building),
           ...(groundClamp
             ? {
                 heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
                 extrudedHeightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
               }
             : {}),
-          material: Cesium.Color.fromCssColorString('#9fb6c9').withAlpha(0.72),
+          material: selected
+            ? Cesium.Color.fromCssColorString('#5eead4').withAlpha(0.85)
+            : Cesium.Color.fromCssColorString('#9fb6c9').withAlpha(0.72),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 6000),
         },
         properties: {
           bldId: building.osm_id,
@@ -685,12 +837,13 @@ export default function TerraGlobe({
                 disableDepthTestDistance: Number.POSITIVE_INFINITY,
                 showBackground: true,
                 backgroundColor: Cesium.Color.BLACK.withAlpha(0.45),
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 2500),
               }
             : undefined,
       })
     }
     viewer.scene.requestRender()
-  }, [buildings, showLabels, graphicsTier])
+  }, [buildings, showLabels, graphicsTier, highlightBuildingId])
 
   // Optional 3D Tiles model (photogrammetry scaffolding, RFC-013 Ph.C).
   // The page only supplies a URL on high/ultra tiers; a failed load never
@@ -724,10 +877,8 @@ export default function TerraGlobe({
   }, [tilesetUrl])
 
   // ---- runtime scene graph nodes (REQ-027/REQ-028) -------------------------
-  // Render each independently stored component as a clamped footprint polygon.
-  // Nodes that have been fetched (asset bytes in cache) render as extruded
-  // volumes; unfetched nodes render as outlines with a "pending" badge, and
-  // can be fetched on click via the page's fetchComponent callback.
+  // Fetched components render as extruded volumes; unfetched nodes render as
+  // outlines the page can fetch on click via the fetchComponent callback.
   const fetchedNodesRef = useRef<Set<string>>(new Set())
   // Sync fetched node IDs from props into the ref for render decisions.
   fetchedNodeIds.forEach((id) => fetchedNodesRef.current.add(id))
@@ -825,17 +976,14 @@ export default function TerraGlobe({
           transform[12], transform[13], transform[14], transform[15],
         )
       } else {
-        // Fall back to centroid of the footprint
-        const hierarchy = ring.map(([lon, lat]: [number, number]) =>
-          Cesium.Cartesian3.fromDegrees(lon, lat)
-        )
-        const lons = hierarchy.map((p: Cesium.Cartesian3) => p.x)
-        const lats = hierarchy.map((p: Cesium.Cartesian3) => p.y)
+        // Footprint centroid in degrees (ECEF x/y would be meaningless here).
+        const lons = ring.map(([lon]: [number, number]) => lon)
+        const lats = ring.map(([, lat]: [number, number]) => lat)
         modelMatrix = Cesium.Transforms.headingPitchRollToFixedFrame(
           Cesium.Cartesian3.fromDegrees(
             lons.reduce((a: number, b: number) => a + b, 0) / lons.length,
             lats.reduce((a: number, b: number) => a + b, 0) / lats.length,
-            0
+            0,
           ),
           new Cesium.HeadingPitchRoll(0, 0, 0),
         )
@@ -945,6 +1093,50 @@ export default function TerraGlobe({
       viewer.scene.requestRender()
       return
     }
+    if (viewCommand.kind === 'front' && viewCommand.longitude != null && viewCommand.latitude != null) {
+      const target = Cesium.Cartesian3.fromDegrees(viewCommand.longitude, viewCommand.latitude, 0)
+      const transform = Cesium.Transforms.eastNorthUpToFixedFrame(target)
+      const localDestination = new Cesium.Cartesian3(32, -18, 10)
+      const destination = Cesium.Matrix4.multiplyByPoint(transform, localDestination, new Cesium.Cartesian3())
+      camera.flyTo({
+        destination,
+        orientation: {
+          heading: 0,
+          pitch: Cesium.Math.toRadians(-16),
+          roll: 0,
+        },
+        duration: 1.4,
+        maximumHeight: 500,
+      })
+      return
+    }
+    if (viewCommand.kind === 'street' && viewCommand.longitude != null && viewCommand.latitude != null) {
+      const target = Cesium.Cartesian3.fromDegrees(viewCommand.longitude, viewCommand.latitude)
+      const transform = Cesium.Transforms.eastNorthUpToFixedFrame(target)
+      const destination = Cesium.Matrix4.multiplyByPoint(
+        transform,
+        new Cesium.Cartesian3(12, -8, 2),
+        new Cesium.Cartesian3(),
+      )
+      const observer = Cesium.Matrix4.multiplyByPoint(
+        transform,
+        new Cesium.Cartesian3(0, 0, 2),
+        new Cesium.Cartesian3(),
+      )
+      camera.flyTo({
+        destination,
+        orientation: {
+          direction: Cesium.Cartesian3.normalize(
+            Cesium.Cartesian3.subtract(observer, destination, new Cesium.Cartesian3()),
+            new Cesium.Cartesian3(),
+          ),
+          up: new Cesium.Cartesian3(0, 0, 1),
+        },
+        duration: 1.4,
+        maximumHeight: 20,
+      })
+      return
+    }
     // tilt: swing the camera to a ~45° pitch around the ground point below.
     const carto = Cesium.Cartographic.fromCartesian(camera.position)
     const target = Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 0)
@@ -1017,34 +1209,240 @@ export default function TerraGlobe({
     return () => mo.disconnect()
   }, [webglError])
 
+  useEffect(() => {
+    const keys = new Set<string>()
+    const isTypingTarget = (target: EventTarget | null) =>
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(event.code)) {
+        event.preventDefault()
+        keys.add(event.code)
+      }
+    }
+    const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code)
+    const clearKeys = () => keys.clear()
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', clearKeys)
+
+    const moveCameraWhileNavigating = () => {
+      if (keys.size === 0) return
+      const viewer = viewerRef.current
+      if (!viewer) return
+      const camera = viewer.camera as unknown as {
+        positionCartographic: Cesium.Cartographic
+        moveForward: (m: number) => void
+        moveBackward: (m: number) => void
+        moveLeft: (m: number) => void
+        moveRight: (m: number) => void
+        moveDown: (m: number) => void
+        moveUp: (m: number) => void
+      }
+      const speed = Math.max(
+        1.5,
+        camera.positionCartographic.height * 0.0015 * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 5 : 1),
+      )
+      if (keys.has('KeyW')) camera.moveForward(speed)
+      if (keys.has('KeyS')) camera.moveBackward(speed)
+      if (keys.has('KeyA')) camera.moveLeft(speed)
+      if (keys.has('KeyD')) camera.moveRight(speed)
+      if (keys.has('KeyQ')) camera.moveDown(speed)
+      if (keys.has('KeyE')) camera.moveUp(speed)
+    }
+    viewerRef.current?.scene.postRender.addEventListener(moveCameraWhileNavigating)
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', clearKeys)
+      viewerRef.current?.scene.postRender.removeEventListener(moveCameraWhileNavigating)
+    }
+  }, [webglError])
+
+  const rotateAxisDrag = (axis: 'X' | 'Y' | 'Z', dx: number, dy: number) => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+    const amount = 0.006
+    if (axis === 'X') viewer.camera.rotateRight(dx * amount)
+    if (axis === 'Y') viewer.camera.rotateUp(-dy * amount)
+    if (axis === 'Z') viewer.camera.twistRight((dx - dy) * amount)
+    viewer.scene.requestRender()
+  }
+
   if (webglError) {
     return (
       <div className="globe-shell">
         <div className="globe-map">
-          <LeafletMap
-            offChainParcels={offChainParcels}
-            roads={roads}
-            pois={pois}
-            buildings={buildings}
-            plannedRoads={plannedRoads}
-            drawing={drawing}
-            drawKind={drawKind}
-            drawVertices={drawVertices}
-            onDrawVertexAdd={onDrawVertexAdd}
-            onDrawFinish={onDrawFinish}
-            onParcelClick={onParcelClick}
-            onBuildingClick={onBuildingClick}
-            focus={focus}
-            onZoom={onMapZoom}
-            basemap={basemap}
-            resizeKey={resizeKey}
-            showLabels={showLabels}
-            imageryMaxLevel={TIER_SETTINGS[graphicsTier].imageryMaxLevel}
-          />
+          {viewMode === '3d' ? (
+            <ThreeAtlasFallback
+              focus={focus}
+              viewCommand={viewCommand}
+              offChainParcels={offChainParcels}
+              buildings={buildings}
+              onParcelClick={onParcelClick}
+              onBuildingClick={onBuildingClick}
+              highlightParcelId={highlightParcelId}
+              highlightBuildingId={highlightBuildingId}
+              onCameraMoved={onCameraMoved}
+            />
+          ) : (
+            <LeafletMap
+              offChainParcels={offChainParcels}
+              roads={roads}
+              pois={pois}
+              buildings={buildings.length > 0 ? buildings : DEMO_BUILDINGS}
+              plannedRoads={plannedRoads}
+              drawing={drawing}
+              drawKind={drawKind}
+              drawVertices={drawVertices}
+              onDrawVertexAdd={onDrawVertexAdd}
+              onDrawFinish={onDrawFinish}
+              onParcelClick={onParcelClick}
+              onBuildingClick={onBuildingClick}
+              focus={focus}
+              onZoom={onMapZoom}
+              basemap={basemap}
+              resizeKey={resizeKey}
+              showLabels={showLabels}
+              imageryMaxLevel={TIER_SETTINGS[graphicsTier].imageryMaxLevel}
+            />
+          )}
         </div>
       </div>
     )
   }
 
-  return <div ref={containerRef} className="w-full h-full" />
+  return (
+    <div className="terra-3d-shell w-full h-full">
+      <div ref={containerRef} className="w-full h-full" />
+      <div className="terra-navigation-hud" aria-label="3D navigation controls">
+        <div className="terra-axis-gizmo" aria-label="World axes">
+          <svg
+            viewBox="0 0 92 92"
+            role="img"
+            aria-label="Drag an axis to rotate the camera"
+            onPointerDown={(event) => {
+              const target = event.target as SVGElement
+              const label = target.textContent?.trim()
+              const axis = label === 'X' || label === 'Y' || label === 'Z' ? label : 'X'
+              axisDragRef.current = { axis, x: event.clientX, y: event.clientY }
+              event.currentTarget.setPointerCapture(event.pointerId)
+            }}
+            onPointerMove={(event) => {
+              const drag = axisDragRef.current
+              if (!drag) return
+              rotateAxisDrag(drag.axis, event.clientX - drag.x, event.clientY - drag.y)
+              drag.x = event.clientX
+              drag.y = event.clientY
+            }}
+            onPointerUp={() => { axisDragRef.current = null }}
+            onPointerCancel={() => { axisDragRef.current = null }}
+          >
+            <circle cx="46" cy="46" r="31" className="terra-axis-ring" />
+            <line x1="46" y1="46" x2="46" y2="8" className="terra-axis-z" />
+            <line x1="46" y1="46" x2="82" y2="61" className="terra-axis-x" />
+            <line x1="46" y1="46" x2="15" y2="70" className="terra-axis-y" />
+            <circle cx="46" cy="46" r="3" fill="#fff" />
+            <text x="43" y="7" className="terra-axis-label terra-axis-label-z" onClick={() => {
+              const viewer = viewerRef.current
+              if (!viewer) return
+              const canvasCenter = new Cesium.Cartesian2(
+                viewer.canvas.clientWidth / 2,
+                viewer.canvas.clientHeight / 2,
+              )
+              const target = viewer.camera.pickEllipsoid(canvasCenter, viewer.scene.globe.ellipsoid)
+                ?? viewer.scene.globe.ellipsoid.cartographicToCartesian(viewer.camera.positionCartographic)
+              viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+              viewer.camera.lookAt(target, new Cesium.Cartesian3(0, 0, 90))
+            }}>Z</text>
+            <text x="83" y="68" className="terra-axis-label terra-axis-label-x" onClick={() => {
+              const viewer = viewerRef.current
+              if (!viewer) return
+              const canvasCenter = new Cesium.Cartesian2(viewer.canvas.clientWidth / 2, viewer.canvas.clientHeight / 2)
+              const target = viewer.camera.pickEllipsoid(canvasCenter, viewer.scene.globe.ellipsoid)
+              if (!target) return
+              viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+              viewer.camera.lookAt(
+                target,
+                new Cesium.Cartesian3(70, 0, 25),
+              )
+            }}>X</text>
+            <text x="5" y="78" className="terra-axis-label terra-axis-label-y" onClick={() => {
+              const viewer = viewerRef.current
+              if (!viewer) return
+              const canvasCenter = new Cesium.Cartesian2(viewer.canvas.clientWidth / 2, viewer.canvas.clientHeight / 2)
+              const target = viewer.camera.pickEllipsoid(canvasCenter, viewer.scene.globe.ellipsoid)
+              if (!target) return
+              viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY)
+              viewer.camera.lookAt(
+                target,
+                new Cesium.Cartesian3(0, 70, 25),
+              )
+            }}>Y</text>
+          </svg>
+        </div>
+        <div className="terra-axis-move" aria-label="Axis move">
+          {(
+            [
+              ['X−', 'Move west (X−)', 'west'],
+              ['Y−', 'Move south (Y−)', 'south'],
+              ['Z−', 'Descend (Z−)', 'down'],
+              ['X+', 'Move east (X+)', 'east'],
+              ['Y+', 'Move north (Y+)', 'north'],
+              ['Z+', 'Ascend (Z+)', 'up'],
+            ] as const
+          ).map(([label, title, dir]) => (
+            <button
+              key={label}
+              type="button"
+              title={title}
+              aria-label={title}
+              onClick={() => {
+                const viewer = viewerRef.current
+                if (!viewer) return
+                const step = Math.max(
+                  3,
+                  viewer.camera.positionCartographic.height * 0.12,
+                )
+                // World-ENU movement: independent of the camera heading, so
+                // X/Y/Z each slide along their own axis in both directions.
+                // Cesium's Camera exposes moveWest/East/South/North at runtime
+                // (they pre-transform the ENU vector into the camera frame); the
+                // TS types omit them, so we call through the runtime object.
+                const cam = viewer.camera as unknown as {
+                  moveWest: (m: number) => void
+                  moveEast: (m: number) => void
+                  moveSouth: (m: number) => void
+                  moveNorth: (m: number) => void
+                  moveDown: (m: number) => void
+                  moveUp: (m: number) => void
+                }
+                if (dir === 'west') cam.moveWest(step)
+                else if (dir === 'east') cam.moveEast(step)
+                else if (dir === 'south') cam.moveSouth(step)
+                else if (dir === 'north') cam.moveNorth(step)
+                else if (dir === 'down') cam.moveDown(step)
+                else cam.moveUp(step)
+                viewer.scene.requestRender()
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="terra-flight-pad" title="WASD to move · Q/E altitude · Shift faster">
+        {(['W','A','S','D','Q','E'] as const).map((k) => <button key={k} onClick={() => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { code: `Key${k}` }))
+          window.setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: `Key${k}` })), 160)
+        }}>{k}</button>)}
+      </div>
+    </div>
+  )
 }

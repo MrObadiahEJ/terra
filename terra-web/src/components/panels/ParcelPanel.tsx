@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PublicKey, Transaction } from '@solana/web3.js'
-import { Box } from 'lucide-react'
+import { Box, Eye, Footprints } from 'lucide-react'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
 import {
@@ -22,9 +22,20 @@ interface Props {
   account: ParcelAccount
   holder: string
   onView3D?: () => void
+  /** Close frontal observation of the parcel's linked geometry. */
+  onFrontView?: () => void
+  /** Street-level observation of the parcel's linked geometry. */
+  onStreetView?: () => void
 }
 
-export default function ParcelPanel({ address, account, holder, onView3D }: Props) {
+export default function ParcelPanel({
+  address,
+  account,
+  holder,
+  onView3D,
+  onFrontView,
+  onStreetView,
+}: Props) {
   const { t } = useLocale()
   const { publicKey, send } = useWallet()
   const setLastSignature = useAppStore((s) => s.setLastSignature)
@@ -161,6 +172,29 @@ export default function ParcelPanel({ address, account, holder, onView3D }: Prop
         <button className="btn btn-secondary w-full justify-center" onClick={onView3D}>
           <Box size={14} /> {t('viewIn3D')}
         </button>
+      )}
+      {(onFrontView || onStreetView) && (
+        <div className="flex gap-2">
+          {onFrontView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onFrontView}
+              title={t('frontViewHint')}
+            >
+              <Eye size={14} /> {t('frontViewAction')}
+            </button>
+          )}
+          {onStreetView && (
+            <button
+              type="button"
+              className="btn btn-secondary flex-1 justify-center"
+              onClick={onStreetView}
+            >
+              <Footprints size={14} /> {t('streetViewAction')}
+            </button>
+          )}
+        </div>
       )}
 
       <div>

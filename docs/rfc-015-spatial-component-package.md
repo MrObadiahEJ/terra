@@ -1,6 +1,10 @@
 # RFC-015 — Spatial Component Package (Vision Stage 4 boundary)
 
-- **Status:** `SPECIFIED ONLY` — specification, no implementation code.
+- **Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the schema is specified here and
+  the conformance validator is implemented (`terra-core/geo-engine/src/component_package.rs`,
+  `validate()` + `ComponentPackage`); the API surface is implemented
+  (`api/src/routes/components.rs` + migrations 0035/0041). Not yet exercised
+  against a live cluster — B6 devnet funding blocks that.
 - **Depends on:** RFC-012 (architecture contract), RFC-013 (spatial intelligence
   pipeline, `terra-geom-v1` digest), Chapter 11 (distributed reconstruction &
   assembly), Chapter 12 (world runtime & synchronized rendering),

@@ -3,6 +3,7 @@ use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use std::convert::Infallible;
 
 /// Authority public key loaded from `API_AUTHORITY_PUBKEY` env var.
 /// When `None`, privileged endpoints reject all requests (fail-closed).
@@ -87,6 +88,7 @@ where
         if sig_bytes.len() != 64 {
             return Err(StatusCode::UNAUTHORIZED);
         }
+
         let mut sig_arr = [0u8; 64];
         sig_arr.copy_from_slice(&sig_bytes);
         let signature = Signature::from_bytes(&sig_arr);
@@ -120,6 +122,21 @@ where
             timestamp,
             body_hash_hex,
         })
+    }
+}
+
+pub struct OptionalSignedRequest(pub Option<SignedRequest>);
+
+impl<S> FromRequestParts<S> for OptionalSignedRequest
+where
+    S: Send + Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        Ok(OptionalSignedRequest(
+            SignedRequest::from_request_parts(parts, state).await.ok(),
+        ))
     }
 }
 

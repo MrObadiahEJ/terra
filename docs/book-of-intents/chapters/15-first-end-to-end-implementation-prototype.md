@@ -284,11 +284,10 @@ The prototype runs on modest hardware: a single machine can host all three worke
 
 | Code area | Change | Depends on |
 |-----------|--------|------------|
-| `terra-core/api/src/routes/derived.rs` | Add worker lease/claim for derived jobs | RFC-015 component package |
+| `terra-core/api/src/routes/derived.rs` | Worker lease/claim for derived jobs, including expired-lease recovery | RFC-015 component package |
 | `terra-core/api/src/routes/workers.rs` | Already implemented (worker registration, job assignment) | — |
-| `terra-web/src/pages/WorkerConsolePage.tsx` | Already implemented (worker registration UI) | — |
+| `terra-web/src/pages/WorkerConsolePage.tsx` | Worker registration plus signed derived-job claim controls | — |
 | `terra-web/src/pages/GlobePage.tsx` | Already implemented (runtime scene rendering) | RFC-015 component package |
-| `terra-web/src/pages/` | New: Derived jobs page (worker claims derived jobs) | RFC-015 component package |
 | `terra-core/programs/terra_registry/src/task_economics.rs` | Extend for reconstruction task types (not verification-only) | Founder decision (economic model) |
 | `terra-core/programs/terra_registry/src/spatial_asset.rs` | Already implemented (versioned geometry anchors) | — |
 

@@ -35,10 +35,10 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [Chapter 8 — Institutional Identity](chapters/08-institutional-identity.md) — `SPECIFIED ONLY` (founder review flag, Q-003)
 - [Chapter 9 — External Read-Only Story Replay](chapters/09-external-replay.md) — `IMPLEMENTED AND VERIFIED` (REQ-018)
 - [Chapter 10 — Derived Compute, Request Authenticity, AI Provenance](chapters/10-derived-compute-and-provenance.md) — `IMPLEMENTED AND VERIFIED` (REQ-019/024, R-016/R-017)
-- [Chapter 11 — Distributed Spatial Reconstruction and Assembly](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `SPECIFIED ONLY`
-- [Chapter 12 — World Runtime and Synchronized Spatial Rendering](chapters/12-world-runtime-and-synchronized-rendering.md) — `SPECIFIED ONLY`
-- [Chapter 13 — Global Spatial Data Delivery and Progressive Visualization](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `SPECIFIED ONLY`
-- [Chapter 14 — Implementation Preparation](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`SPECIFIED ONLY`)
+- [Chapter 11 — Distributed Spatial Reconstruction and Assembly](chapters/11-distributed-spatial-reconstruction-and-assembly.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (RFC-015 validator + `components`/`assemblies` routers; gated on B6)
+- [Chapter 12 — World Runtime and Synchronized Spatial Rendering](chapters/12-world-runtime-and-synchronized-rendering.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (`manifests`/`runtime` routers + frontend `runtime.ts`; gated on B6)
+- [Chapter 13 — Global Spatial Data Delivery and Progressive Visualization](chapters/13-global-spatial-data-delivery-and-progressive-visualization.md) — `IMPLEMENTED, NOT FULLY VERIFIED` (LOD 0–4, provider discovery + fallback, progressive tier loading; gated on B6)
+- [Chapter 14 — Implementation Preparation](chapters/14-implementation-preparation.md) — code-area mapping for REQ-020…REQ-028, dependency order, what not to build yet (`IMPLEMENTED, NOT FULLY VERIFIED` for REQ-026/027/028; `SPECIFIED ONLY` for REQ-020/021/022)
 - [Chapter 15 — First End-to-End Implementation Prototype](chapters/15-first-end-to-end-implementation-prototype.md) — one parcel, one building, five components, two workers, manifest → assembly → runtime → progressive render (`SPECIFIED ONLY`)
 
 Further volumes (Transactions & Lineage · AI-Assisted Understanding · Developer
