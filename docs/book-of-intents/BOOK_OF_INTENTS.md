@@ -117,6 +117,11 @@ Never inflate a status. When evidence is unavailable, say so.
 - [sprints/021-book-consistency-traceability.md](sprints/021-book-consistency-traceability.md) — Book consistency catch-up + requirements traceability (REQ-025).
 - [sprints/022-frontend-activity-store-tests.md](sprints/022-frontend-activity-store-tests.md) — Frontend logic unit tests — activity store + API GeoJSON parse.
 - [sprints/023-research-q003-q004.md](sprints/023-research-q003-q004.md) — Research: institutional bootstrap (Q-003) and residency attestation (Q-004).
+- [sprints/024-architecture-spec.md](sprints/024-architecture-spec.md) — Architecture spec: distributed reconstruction & assembly (Ch11), world runtime & synchronized rendering (Ch12), global spatial data delivery & progressive visualization (Ch13).
+- [sprints/025-req-026-027-028-implementation.md](sprints/025-req-026-027-028-implementation.md) — REQ-026/027/028 implementation: RFC-015 component package validator + components/assemblies/manifests/providers/runtime/workers routers + frontend runtime client.
+- [sprints/026-rfc-016-on-chain-security-core.md](sprints/026-rfc-016-on-chain-security-core.md) — RFC-016 on-chain security/privacy governance core (REQ-029–040): 11 PDAs + 11 instructions + 13 TerraError codes in `src/security.rs`.
+- [sprints/027-atlas-16-point-audit.md](sprints/027-atlas-16-point-audit.md) — Atlas 16-point requirement audit: ThreeAtlasFallback host restore, TerraGlobe typed camera accessors, GlobePage failedRegionsRef dedup.
+- [sprints/028-book-of-intents-doc-reconciliation.md](sprints/028-book-of-intents-doc-reconciliation.md) — Book of Intents doc reconciliation: all `.md` files layer-focused, statuses cite verified evidence.
 
 ## Planned volumes (not yet written; see ROADMAP Stage 3–4)
 
@@ -125,11 +130,9 @@ Governance & Security Resilience · Land-Administration Research (Cameroon +
 comparative). Each becomes a chapter only when grounded in repository evidence
 or explicit research — never as filler.
 
-Architecture chapters now written (specified only, no code yet):
-
-- Chapter 11 — Distributed Spatial Reconstruction and Assembly.
-- Chapter 12 — World Runtime and Synchronized Spatial Rendering.
-- Chapter 13 — Global Spatial Data Delivery and Progressive Visualization.
+Architecture chapters 11/12/13 are now **implemented, not fully verified**
+(Sprint 025, 2026-11-02/03) — see their status lines. Remaining `SPECIFIED ONLY`
+chapters (02, 06, 08, 15) are founder-review-gated research specifications.
 
 ---
 

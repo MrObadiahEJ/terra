@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-05 (committed `244ed7e`; sprints 001–025 delivered; atlas
-fix sprint + doc reconciliation in flight).
+Last reconciled: 2026-11-05 (committed `ee13843`; sprints 001–028 delivered).
+Sprint notes for 025–028 are in `sprints/025-*.md` … `sprints/028-*.md`.
 
 ## Active intents
 

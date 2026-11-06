@@ -41,7 +41,9 @@ Format: date · version · what changed · evidence/why. Append-only.
   REQ-026/027/028 → `IMPLEMENTED, NOT FULLY VERIFIED`; chapters 11/12/13/14 +
   `rfc-015` + BOOK_OF_INTENTS/SUMMARY → `IMPLEMENTED, NOT FULLY VERIFIED` with
   "why this chapter exists" updated to reflect implemented code; work/CURRENT.md
-  reconciled to 2026-11-05.
+  reconciled to 2026-11-05; ADR-016 resolved (`terra-geom-v2` integrated); R-012/R-021
+  re-verified; ROADMAP stages relabeled; new sprint notes `sprints/025-*.md` …
+  `sprints/028-*.md` per the Book's one-`.md`-per-sprint convention.
 - Verification this date: API 133/133, geo-engine 33 (+2 ignored), registry lib 153/153,
   vitest 83/83, `tsc -b` clean, `pnpm build:check` PASS, eslint matches pre-existing
   baseline (3 errors + 3 warnings on `GlobePage.tsx`/`TerraGlobe.tsx`, unchanged).

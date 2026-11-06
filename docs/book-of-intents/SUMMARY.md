@@ -81,3 +81,7 @@ Stage 3.
 - [sprints/022-frontend-activity-store-tests.md](sprints/022-frontend-activity-store-tests.md) — Frontend logic unit tests — activity store + API GeoJSON parse
 - [sprints/023-research-q003-q004.md](sprints/023-research-q003-q004.md) — Research: institutional bootstrap (Q-003) and residency attestation (Q-004)
 - [sprints/024-architecture-spec.md](sprints/024-architecture-spec.md) — Architecture spec: distributed reconstruction, world runtime, progressive delivery (Chapters 11–13)
+- [sprints/025-req-026-027-028-implementation.md](sprints/025-req-026-027-028-implementation.md) — REQ-026/027/028 implementation: RFC-015 component package validator + components/assemblies/manifests/providers/runtime/workers routers + frontend runtime client
+- [sprints/026-rfc-016-on-chain-security-core.md](sprints/026-rfc-016-on-chain-security-core.md) — RFC-016 on-chain security/privacy governance core (REQ-029–040): 11 PDAs + 11 instructions + 13 TerraError codes
+- [sprints/027-atlas-16-point-audit.md](sprints/027-atlas-16-point-audit.md) — Atlas 16-point requirement audit: ThreeAtlasFallback host restore, TerraGlobe typed camera accessors, GlobePage failedRegionsRef dedup
+- [sprints/028-book-of-intents-doc-reconciliation.md](sprints/028-book-of-intents-doc-reconciliation.md) — Book of Intents doc reconciliation: all `.md` files layer-focused, statuses cite verified evidence
