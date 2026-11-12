@@ -168,7 +168,9 @@ export default function GlobePage() {
   const [basemap, setBasemap] = useState<'imagery' | 'terrain' | 'osm'>(
     () => {
       const saved = localStorage.getItem('terra-atlas-basemap')
-      return saved === 'imagery' || saved === 'terrain' ? saved : 'osm'
+      // Google-Earth-style default: satellite imagery. Streets and terrain
+      // remain one click away and an explicit saved choice always wins.
+      return saved === 'osm' || saved === 'terrain' ? saved : 'imagery'
     },
   )
   const lastCamRef = useRef({ ...DEFAULT_FOCUS })
