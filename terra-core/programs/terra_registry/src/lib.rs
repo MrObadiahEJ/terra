@@ -268,6 +268,14 @@ pub mod quorum;
 pub mod recovery;
 pub mod routing;
 pub mod security;
+
+// RFC-016 security instruction contexts live in `security::`; re-export them at
+// the crate root so the `#[program]` block can name them as `Context<…>`.
+pub use security::{
+    AppealDecision, AssignReviewer, CastReviewVote, CreateReviewCase,
+    EmergencyProtect, FinalizeAppeal, FinalizeDecision, RecordAuditEvent,
+    SubmitJurisdictionalRestriction, SubmitPrivacyRequest, SubmitSecurityRequest,
+};
 pub mod spatial_asset;
 pub mod spatial_snapshot;
 pub mod staking;
@@ -2706,6 +2714,113 @@ pub mod terra_registry {
 
     pub fn finalize_quorum(ctx: Context<FinalizeQuorum>) -> Result<()> {
         verification::quorum_voting::finalize_quorum(ctx)
+    }
+
+    // -----------------------------------------------------------------------
+    // RFC-016 — Security / privacy request governance (REQ-029…REQ-040)
+    //
+    // Handlers live in `security::`; the `#[program]` block is the single
+    // instruction dispatch point, so every security instruction must be
+    // wired here or it is unreachable (InstructionFallbackNotFound).
+    // -----------------------------------------------------------------------
+
+    pub fn submit_security_request(
+        ctx: Context<SubmitSecurityRequest>,
+        nonce: u16,
+        request_type: u8,
+        description: String,
+        requested_remedy: u8,
+        jurisdiction: [u8; 2],
+        emergency: bool,
+    ) -> Result<()> {
+        security::submit_security_request(
+            ctx, nonce, request_type, description, requested_remedy, jurisdiction, emergency,
+        )
+    }
+
+    pub fn submit_privacy_request(
+        ctx: Context<SubmitPrivacyRequest>,
+        nonce: u16,
+        request_type: u8,
+        description: String,
+        requested_remedy: u8,
+        jurisdiction: [u8; 2],
+        emergency: bool,
+    ) -> Result<()> {
+        security::submit_privacy_request(
+            ctx, nonce, request_type, description, requested_remedy, jurisdiction, emergency,
+        )
+    }
+
+    pub fn submit_jurisdictional_restriction(
+        ctx: Context<SubmitJurisdictionalRestriction>,
+        nonce: u16,
+        restriction_type: u8,
+        description: String,
+        requested_remedy: u8,
+        jurisdiction: [u8; 2],
+        expires_at: Option<i64>,
+    ) -> Result<()> {
+        security::submit_jurisdictional_restriction(
+            ctx, nonce, restriction_type, description, requested_remedy, jurisdiction, expires_at,
+        )
+    }
+
+    pub fn create_review_case(
+        ctx: Context<CreateReviewCase>,
+        nonce: u16,
+    ) -> Result<()> {
+        security::create_review_case(ctx, nonce)
+    }
+
+    pub fn assign_reviewer(
+        ctx: Context<AssignReviewer>,
+    ) -> Result<()> {
+        security::assign_reviewer(ctx)
+    }
+
+    pub fn cast_review_vote(
+        ctx: Context<CastReviewVote>,
+        vote: u8,
+    ) -> Result<()> {
+        security::cast_review_vote(ctx, vote)
+    }
+
+    pub fn finalize_decision(
+        ctx: Context<FinalizeDecision>,
+    ) -> Result<()> {
+        security::finalize_decision(ctx)
+    }
+
+    pub fn appeal_decision(
+        ctx: Context<AppealDecision>,
+        nonce: u16,
+        reason: String,
+    ) -> Result<()> {
+        security::appeal_decision(ctx, nonce, reason)
+    }
+
+    pub fn finalize_appeal(
+        ctx: Context<FinalizeAppeal>,
+        upheld_appeal: bool,
+    ) -> Result<()> {
+        security::finalize_appeal(ctx, upheld_appeal)
+    }
+
+    pub fn record_audit_event(
+        ctx: Context<RecordAuditEvent>,
+        sequence: u32,
+        action: u8,
+        reason: String,
+    ) -> Result<()> {
+        security::record_audit_event(ctx, sequence, action, reason)
+    }
+
+    pub fn emergency_protect(
+        ctx: Context<EmergencyProtect>,
+        nonce: u16,
+    ) -> Result<()> {
+        security::emergency_protect(ctx, nonce)
     }
 }
 
