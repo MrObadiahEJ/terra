@@ -2,6 +2,25 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-12 — Sprint 029: merge `origin/dev` + GitHub Pages publication
+
+- **Merged** local `dev` with `origin/dev` (`92613c8`); upstream low-tier
+  building fix `4eb7c5a` plus local Book commits `eef0087`; no conflicts.
+- **Published the frontend** at <https://mrobadiahej.github.io/terra/> from
+  `dev`: `base=/terra/` (env-driven), `%BASE_URL%` Cesium base, router
+  basename, postbuild `404.html` + `.nojekyll`, new
+  `.github/workflows/deploy-pages.yml`; Pages enabled with `build_type=workflow`
+  and the `github-pages` branch policy extended to `dev`.
+- **Fixed base-path assets:** `lib/assets.ts` for `continents.geojson` and GLB
+  models (Cesium + Three fallback), router `Link` for playground
+  `/transactions` links; bundle gate accepts prefixed asset URLs.
+- **Verified live** in headless Chrome: welcome/atlas/demo/stories render with
+  keyless Esri/OSM tiles and demo parcels, deep links resolve through
+  `404.html`; only `/api/v1/*` returns 404 (API intentionally not deployed).
+- `terra-web/README.md` rewritten to the actual route/page/router/IDL state;
+  `work/CURRENT.md` reconciled; sprints 027/028 marked committed; evidence
+  `sprints/029-merge-and-pages-publication.md`.
+
 ## 2026-11-05 — Sprint 025/026: REQ-026/027/028 + RFC-016 implementation; Sprint 027/028: atlas fixes + doc reconciliation
 
 - **REQ-026 implemented** (`IMPLEMENTED, NOT FULLY VERIFIED`): `geo-engine/src/component_package.rs`

@@ -85,3 +85,4 @@ Stage 3.
 - [sprints/026-rfc-016-on-chain-security-core.md](sprints/026-rfc-016-on-chain-security-core.md) — RFC-016 on-chain security/privacy governance core (REQ-029–040): 11 PDAs + 11 instructions + 13 TerraError codes
 - [sprints/027-atlas-16-point-audit.md](sprints/027-atlas-16-point-audit.md) — Atlas 16-point requirement audit: ThreeAtlasFallback host restore, TerraGlobe typed camera accessors, GlobePage failedRegionsRef dedup
 - [sprints/028-book-of-intents-doc-reconciliation.md](sprints/028-book-of-intents-doc-reconciliation.md) — Book of Intents doc reconciliation: all `.md` files layer-focused, statuses cite verified evidence
+- [sprints/029-merge-and-pages-publication.md](sprints/029-merge-and-pages-publication.md) — merge `origin/dev` + GitHub Pages publication of the frontend demo (base-path assets, SPA fallback, live verification)
