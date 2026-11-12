@@ -272,9 +272,21 @@ pub mod security;
 // RFC-016 security instruction contexts live in `security::`; re-export them at
 // the crate root so the `#[program]` block can name them as `Context<…>`.
 pub use security::{
-    AppealDecision, AssignReviewer, CastReviewVote, CreateReviewCase,
-    EmergencyProtect, FinalizeAppeal, FinalizeDecision, RecordAuditEvent,
-    SubmitJurisdictionalRestriction, SubmitPrivacyRequest, SubmitSecurityRequest,
+    AppealDecision, AssignReviewer, CastReviewVote, CreateReviewCase, EmergencyProtect,
+    FinalizeAppeal, FinalizeDecision, RecordAuditEvent, SubmitJurisdictionalRestriction,
+    SubmitPrivacyRequest, SubmitSecurityRequest,
+};
+// `#[derive(Accounts)]` emits a hidden `__client_accounts_*` module next to
+// each struct. Anchor's `#[program]` macro resolves those at the crate root,
+// so the modules generated inside `security` must be re-exported there too.
+#[doc(hidden)]
+pub(crate) use security::{
+    __client_accounts_appeal_decision, __client_accounts_assign_reviewer,
+    __client_accounts_cast_review_vote, __client_accounts_create_review_case,
+    __client_accounts_emergency_protect, __client_accounts_finalize_appeal,
+    __client_accounts_finalize_decision, __client_accounts_record_audit_event,
+    __client_accounts_submit_jurisdictional_restriction, __client_accounts_submit_privacy_request,
+    __client_accounts_submit_security_request,
 };
 pub mod spatial_asset;
 pub mod spatial_snapshot;
@@ -2734,7 +2746,13 @@ pub mod terra_registry {
         emergency: bool,
     ) -> Result<()> {
         security::submit_security_request(
-            ctx, nonce, request_type, description, requested_remedy, jurisdiction, emergency,
+            ctx,
+            nonce,
+            request_type,
+            description,
+            requested_remedy,
+            jurisdiction,
+            emergency,
         )
     }
 
@@ -2748,7 +2766,13 @@ pub mod terra_registry {
         emergency: bool,
     ) -> Result<()> {
         security::submit_privacy_request(
-            ctx, nonce, request_type, description, requested_remedy, jurisdiction, emergency,
+            ctx,
+            nonce,
+            request_type,
+            description,
+            requested_remedy,
+            jurisdiction,
+            emergency,
         )
     }
 
@@ -2762,48 +2786,37 @@ pub mod terra_registry {
         expires_at: Option<i64>,
     ) -> Result<()> {
         security::submit_jurisdictional_restriction(
-            ctx, nonce, restriction_type, description, requested_remedy, jurisdiction, expires_at,
+            ctx,
+            nonce,
+            restriction_type,
+            description,
+            requested_remedy,
+            jurisdiction,
+            expires_at,
         )
     }
 
-    pub fn create_review_case(
-        ctx: Context<CreateReviewCase>,
-        nonce: u16,
-    ) -> Result<()> {
+    pub fn create_review_case(ctx: Context<CreateReviewCase>, nonce: u16) -> Result<()> {
         security::create_review_case(ctx, nonce)
     }
 
-    pub fn assign_reviewer(
-        ctx: Context<AssignReviewer>,
-    ) -> Result<()> {
+    pub fn assign_reviewer(ctx: Context<AssignReviewer>) -> Result<()> {
         security::assign_reviewer(ctx)
     }
 
-    pub fn cast_review_vote(
-        ctx: Context<CastReviewVote>,
-        vote: u8,
-    ) -> Result<()> {
+    pub fn cast_review_vote(ctx: Context<CastReviewVote>, vote: u8) -> Result<()> {
         security::cast_review_vote(ctx, vote)
     }
 
-    pub fn finalize_decision(
-        ctx: Context<FinalizeDecision>,
-    ) -> Result<()> {
+    pub fn finalize_decision(ctx: Context<FinalizeDecision>) -> Result<()> {
         security::finalize_decision(ctx)
     }
 
-    pub fn appeal_decision(
-        ctx: Context<AppealDecision>,
-        nonce: u16,
-        reason: String,
-    ) -> Result<()> {
+    pub fn appeal_decision(ctx: Context<AppealDecision>, nonce: u16, reason: String) -> Result<()> {
         security::appeal_decision(ctx, nonce, reason)
     }
 
-    pub fn finalize_appeal(
-        ctx: Context<FinalizeAppeal>,
-        upheld_appeal: bool,
-    ) -> Result<()> {
+    pub fn finalize_appeal(ctx: Context<FinalizeAppeal>, upheld_appeal: bool) -> Result<()> {
         security::finalize_appeal(ctx, upheld_appeal)
     }
 
@@ -2816,10 +2829,7 @@ pub mod terra_registry {
         security::record_audit_event(ctx, sequence, action, reason)
     }
 
-    pub fn emergency_protect(
-        ctx: Context<EmergencyProtect>,
-        nonce: u16,
-    ) -> Result<()> {
+    pub fn emergency_protect(ctx: Context<EmergencyProtect>, nonce: u16) -> Result<()> {
         security::emergency_protect(ctx, nonce)
     }
 }
