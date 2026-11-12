@@ -20,8 +20,10 @@ export const TIER_SETTINGS: Record<GraphicsTier, TierSettings> = {
     resolutionScale: 0.75,
     msaaSamples: 1,
     labelMinLod: 5,
-    buildings: false,
-    buildingCap: 0,
+    // Low keeps a small building budget: software GL and weak integrated GPUs
+    // still need the 3D houses, otherwise the atlas has nothing to fly into.
+    buildings: true,
+    buildingCap: 120,
   },
   medium: {
     terrain: false,
