@@ -2,6 +2,23 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-12 — Sprint 031: RFC-016 registry dispatch repair
+
+- **Fixed the E0432 left by `9bb31f4`:** Anchor's `#[program]` macro resolves
+  `Context<…>` against the crate root, so the eleven generated
+  `__client_accounts_*` modules for the RFC-016 security contexts are now
+  re-exported there with `#[doc(hidden)] pub(crate) use security::{…}`
+  (`41fe53d`). Plain `pub use` fails with E0365 because the generated modules
+  are only crate-public.
+- **Formatted the RFC-016 files** that had never been rustfmt'd
+  (`src/security.rs`, `tests/security.rs`, `3a6c0a1`); formatting only.
+- **Verified:** `cargo check -p terra-registry` passes in 33.6 s;
+  `cargo fmt -p terra-registry -- --check` clean. No BPF/SBF suite was run.
+- A37 stays `2 – IMPLEMENTED, NOT FULLY VERIFIED`: dispatch resolves, but the
+  security instructions still have no BPF tests and are not deployed (B6).
+- Evidence: `sprints/031-rfc-016-dispatch-repair.md`; `IMPLEMENTATION_STATUS.md`
+  A37; `work/CURRENT.md`.
+
 ## 2026-11-12 — Sprint 030: Google-Earth-style immersive atlas
 
 - **Immersive atlas route** (`48286af`, with `d2d3d25` + `cd93c25` follow-ups): `body.atlas-immersive` floats the

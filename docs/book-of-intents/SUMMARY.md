@@ -87,3 +87,4 @@ Stage 3.
 - [sprints/028-book-of-intents-doc-reconciliation.md](sprints/028-book-of-intents-doc-reconciliation.md) — Book of Intents doc reconciliation: all `.md` files layer-focused, statuses cite verified evidence
 - [sprints/029-merge-and-pages-publication.md](sprints/029-merge-and-pages-publication.md) — merge `origin/dev` + GitHub Pages publication of the frontend demo (base-path assets, SPA fallback, live verification)
 - [sprints/030-immersive-atlas-ux.md](sprints/030-immersive-atlas-ux.md) — Google-Earth-style immersive atlas: floating chrome, responsive land panel/bottom sheet, camera-preserving 2D↔3D, collapsible navigation pad, live viewport verification
+- [sprints/031-rfc-016-dispatch-repair.md](sprints/031-rfc-016-dispatch-repair.md) — RFC-016 registry dispatch repair: re-export generated `__client_accounts_*` modules at the crate root, rustfmt security files, restore `cargo check -p terra-registry`

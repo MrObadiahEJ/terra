@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-12 (committed `cd93c25`; sprints 001–030 delivered).
-Sprint notes for 025–030 are in `sprints/025-*.md` … `sprints/030-*.md`.
+Last reconciled: 2026-11-12 (committed `3a6c0a1`; sprints 001–031 delivered).
+Sprint notes for 025–031 are in `sprints/025-*.md` … `sprints/031-*.md`.
 
 ## Active intents
 
@@ -49,6 +49,7 @@ Sprint notes for 025–030 are in `sprints/025-*.md` … `sprints/030-*.md`.
 | Sprint 028 — Doc reconciliation (all `.md` layer-focused) | **done & committed (2026-11-05, `eef0087`)** | IMPLEMENTATION_STATUS.md audit basis → `244ed7e`/2026-11-05, vitest 83/83, bundle entry 305.1/Cesium 1098.5/total 1864.3 kB gz, geo-engine 33 (+2 ignored); added A37–A40 (RFC-016), B15–B19 (REQ-026/027/028 + workers), D12–D18 (runtime, 3D models, atlas verification, tier loading, front-view/single sidebar, backend-down degradation, worker console); REQUIREMENTS_TRACEABILITY REQ-026/027/028 → `IMPLEMENTED, NOT FULLY VERIFIED`; chapters 11/12/13/14 → `IMPLEMENTED, NOT FULLY VERIFIED` with "why this chapter exists" updated to reflect implemented code; work/CURRENT.md reconciled to 2026-11-05 | Doc-only — no gate required |
 | Sprint 029 — Merge `origin/dev` + GitHub Pages publication | **done & deployed (2026-11-12)** | merge `92613c8` (upstream `4eb7c5a`, local `eef0087`, no conflicts); Pages workflow `.github/workflows/deploy-pages.yml` builds `terra-web` with `TERRA_BASE_PATH=/terra/`, writes `404.html` + `.nojekyll`, and deploys from `dev`; base-aware assets (`lib/assets.ts`, `%BASE_URL%` for Cesium, router basename); live <https://mrobadiahej.github.io/terra/> verified (welcome/atlas/demo/stories, keyless tiles, demo data, API-offline states); deploy runs `43263687324`, `43265003528`; tsc clean, vitest pass, build:check PASS (entry 299.8 / initial 305.1 / Cesium 1098.5 / total 1864.2 kB gz); sprints/029 |
 | Sprint 030 — Google-Earth-style immersive atlas | **done & deployed (2026-11-12)** | commits `48286af` (immersive chrome + camera-preserving 2D↔3D + dock HUD + swipe sheet), `d2d3d25` (satellite default) and `cd93c25` (fullscreen guard); files `GlobePage.tsx`, `AtlasSearchPill.tsx`, `Sidenav.tsx`, `TerraGlobe.tsx`, `Navbar.tsx`, `index.css`, four locales, README; live <https://mrobadiahej.github.io/terra/> on Pages runs `43289772629` + `43290890798` + `43292573392`; viewport sweep 360×640 … 1920×1080 and 844×390 with no horizontal overflow; tsc clean, vitest **83/83**, build:check PASS (entry 300.2 / initial 305.5 / Cesium 1098.5 / total 1866.7 kB gz); sprints/030 |
+| Sprint 031 — RFC-016 registry dispatch repair | **done & committed (2026-11-12)** | `41fe53d` re-exports the eleven generated `__client_accounts_*` modules at the crate root with `#[doc(hidden)] pub(crate)`; `3a6c0a1` rustfmt for `security.rs` + its tests; `cargo check -p terra-registry` passes (33.6 s) and `cargo fmt --check` clean; A37 remains `2 – IMPLEMENTED, NOT FULLY VERIFIED` (no BPF tests, not deployed); sprints/031 |
 
 ## Known blockers
 
