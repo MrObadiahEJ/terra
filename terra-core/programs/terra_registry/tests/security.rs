@@ -8,16 +8,19 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use terra_registry::security::{
-    request_status, restriction_type, review_decision, remedy_type,
-    SecurityRequest, SecurityReviewAssignment, SecurityReviewCase,
-    SecurityAuditEvent,
-    EmergencyProtection, JurisdictionalRestrictionRequest, PrivacyRequest,
+    remedy_type, request_status, restriction_type, review_decision, EmergencyProtection,
+    JurisdictionalRestrictionRequest, PrivacyRequest, SecurityAuditEvent, SecurityRequest,
+    SecurityReviewAssignment, SecurityReviewCase,
 };
 use terra_registry::ID as PROGRAM_ID;
 
 fn security_request_pda(requester: &Pubkey, nonce: u16) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[b"security_request", requester.as_ref(), &nonce.to_le_bytes()],
+        &[
+            b"security_request",
+            requester.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
         &PROGRAM_ID,
     )
 }
@@ -67,7 +70,12 @@ fn security_decision_pda(request: &Pubkey) -> (Pubkey, u8) {
 
 fn appeal_pda(decision: &Pubkey, appellant: &Pubkey, nonce: u16) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[b"appeal", decision.as_ref(), appellant.as_ref(), &nonce.to_le_bytes()],
+        &[
+            b"appeal",
+            decision.as_ref(),
+            appellant.as_ref(),
+            &nonce.to_le_bytes(),
+        ],
         &PROGRAM_ID,
     )
 }
@@ -103,11 +111,7 @@ fn borsh_ser<T: borsh::BorshSerialize>(v: &T) -> Vec<u8> {
     out
 }
 
-fn build_ix(
-    program_id: &Pubkey,
-    accounts: Vec<AccountMeta>,
-    data: Vec<u8>,
-) -> Instruction {
+fn build_ix(program_id: &Pubkey, accounts: Vec<AccountMeta>, data: Vec<u8>) -> Instruction {
     Instruction {
         program_id: *program_id,
         accounts,
@@ -249,7 +253,9 @@ async fn submit_privacy_request_ok() {
     let mut data = discriminator("global", "submit_privacy_request").to_vec();
     data.extend_from_slice(&nonce.to_le_bytes());
     data.extend_from_slice(&[restriction_type::SENSITIVE_EVIDENCE]);
-    data.extend_from_slice(&borsh_ser(&"Sensitive document should be restricted".to_string()));
+    data.extend_from_slice(&borsh_ser(
+        &"Sensitive document should be restricted".to_string(),
+    ));
     data.extend_from_slice(&[remedy_type::REDACT]);
     data.extend_from_slice(&[85, 83]); // US
     data.extend_from_slice(&[1]); // emergency = true
@@ -286,8 +292,7 @@ async fn submit_jurisdictional_restriction_ok() {
     let subject = payer.pubkey();
     let nonce: u16 = 1;
 
-    let (restriction_pda, _) =
-        jurisdictional_restriction_pda(&authority, &subject, nonce);
+    let (restriction_pda, _) = jurisdictional_restriction_pda(&authority, &subject, nonce);
 
     let mut data = discriminator("global", "submit_jurisdictional_restriction").to_vec();
     data.extend_from_slice(&nonce.to_le_bytes());
@@ -438,10 +443,8 @@ async fn assign_reviewer_ok() {
     let (case_pda, _) = review_case_pda(&request_pda);
 
     // Initialize validator reputation for reviewer
-    let reviewer_reputation_pda = Pubkey::find_program_address(
-        &[b"validator_reputation", reviewer.as_ref()],
-        &PROGRAM_ID,
-    ).0;
+    let reviewer_reputation_pda =
+        Pubkey::find_program_address(&[b"validator_reputation", reviewer.as_ref()], &PROGRAM_ID).0;
     let mut data = discriminator("global", "initialize_validator_reputation").to_vec();
     let ix = Instruction {
         program_id: PROGRAM_ID,

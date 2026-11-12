@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::TerraError;
 use crate::verification::reputation::ValidatorReputation;
+use crate::TerraError;
 
 // ---------------------------------------------------------------------------
 // RFC-016 — Protocol Security, Decentralization, Privacy and Censorship
@@ -108,16 +108,16 @@ pub mod appeal_status {
 #[derive(InitSpace)]
 pub struct SecurityRequest {
     pub requester: Pubkey,
-    pub subject: Pubkey,            // subject of the request (identity, asset, etc.)
+    pub subject: Pubkey, // subject of the request (identity, asset, etc.)
     pub nonce: u16,
-    pub request_type: u8,           // restriction_type enum
+    pub request_type: u8, // restriction_type enum
     #[max_len(MAX_REQUEST_NOTE_LEN)]
     pub description: String,
-    pub requested_remedy: u8,       // remedy_type enum
-    pub jurisdiction: [u8; 2],      // ISO 3166-1 alpha-2
-    pub status: u8,                 // request_status enum
-    pub emergency: bool,            // true if expedited review requested
-    pub expires_at: i64,            // review deadline
+    pub requested_remedy: u8,  // remedy_type enum
+    pub jurisdiction: [u8; 2], // ISO 3166-1 alpha-2
+    pub status: u8,            // request_status enum
+    pub emergency: bool,       // true if expedited review requested
+    pub expires_at: i64,       // review deadline
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -128,16 +128,16 @@ pub struct SecurityRequest {
 #[derive(InitSpace)]
 pub struct PrivacyRequest {
     pub requester: Pubkey,
-    pub subject: Pubkey,            // identity, asset, document, etc.
+    pub subject: Pubkey, // identity, asset, document, etc.
     pub nonce: u16,
-    pub request_type: u8,           // restriction_type enum
+    pub request_type: u8, // restriction_type enum
     #[max_len(MAX_REQUEST_NOTE_LEN)]
     pub description: String,
-    pub requested_remedy: u8,       // remedy_type enum
-    pub jurisdiction: [u8; 2],      // ISO 3166-1 alpha-2
-    pub status: u8,                 // request_status enum
-    pub emergency: bool,            // true if expedited review requested
-    pub expires_at: i64,            // review deadline
+    pub requested_remedy: u8,  // remedy_type enum
+    pub jurisdiction: [u8; 2], // ISO 3166-1 alpha-2
+    pub status: u8,            // request_status enum
+    pub emergency: bool,       // true if expedited review requested
+    pub expires_at: i64,       // review deadline
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -150,13 +150,13 @@ pub struct JurisdictionalRestrictionRequest {
     pub authority: Pubkey,
     pub subject: Pubkey,
     pub nonce: u16,
-    pub restriction_type: u8,       // restriction_type enum
+    pub restriction_type: u8, // restriction_type enum
     #[max_len(MAX_REQUEST_NOTE_LEN)]
     pub description: String,
-    pub requested_remedy: u8,       // remedy_type enum
-    pub jurisdiction: [u8; 2],      // ISO 3166-1 alpha-2
-    pub status: u8,                 // request_status enum
-    pub expires_at: Option<i64>,    // optional expiry
+    pub requested_remedy: u8,    // remedy_type enum
+    pub jurisdiction: [u8; 2],   // ISO 3166-1 alpha-2
+    pub status: u8,              // request_status enum
+    pub expires_at: Option<i64>, // optional expiry
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -169,10 +169,10 @@ pub struct JurisdictionalRestrictionRequest {
 pub struct PrivacyState {
     pub subject: Pubkey,
     pub version: u16,
-    pub state: u8,                  // privacy_state enum
-    pub remedy: u8,                 // remedy_type enum applied
+    pub state: u8,                           // privacy_state enum
+    pub remedy: u8,                          // remedy_type enum applied
     pub restriction_request: Option<Pubkey>, // the request that set this state
-    pub expires_at: Option<i64>,    // for TEMPORARILY_PROTECTED
+    pub expires_at: Option<i64>,             // for TEMPORARILY_PROTECTED
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -188,7 +188,7 @@ pub struct SecurityReviewCase {
     pub committee_size: u8,
     pub votes_upheld: u8,
     pub votes_dismissed: u8,
-    pub decision: u8,               // review_decision enum
+    pub decision: u8, // review_decision enum
     pub finalized_at: Option<i64>,
     pub created_at: i64,
 }
@@ -201,7 +201,7 @@ pub struct SecurityReviewAssignment {
     pub case: Pubkey,
     pub reviewer: Pubkey,
     pub voted: bool,
-    pub vote: u8,                   // review_decision enum
+    pub vote: u8, // review_decision enum
     pub voted_at: Option<i64>,
     pub assigned_at: i64,
 }
@@ -218,7 +218,7 @@ pub struct SecurityDecision {
     pub restriction_scope: [u8; 2], // jurisdiction
     pub expires_at: Option<i64>,
     pub decided_at: i64,
-    pub decided_by: Pubkey,         // review case PDA (recorded for audit)
+    pub decided_by: Pubkey, // review case PDA (recorded for audit)
 }
 
 /// Appeal of a security/privacy decision.
@@ -231,7 +231,7 @@ pub struct SecurityAppeal {
     pub nonce: u16,
     #[max_len(MAX_REQUEST_NOTE_LEN)]
     pub reason: String,
-    pub status: u8,                 // appeal_status enum
+    pub status: u8, // appeal_status enum
     pub created_at: i64,
     pub resolved_at: Option<i64>,
 }
@@ -241,9 +241,9 @@ pub struct SecurityAppeal {
 #[account]
 #[derive(InitSpace)]
 pub struct SecurityAuditEvent {
-    pub entity: Pubkey,             // subject or decision PDA
+    pub entity: Pubkey, // subject or decision PDA
     pub sequence: u32,
-    pub action: u8,                 // 1=request, 2=decision, 3=appeal, 4=emergency
+    pub action: u8, // 1=request, 2=decision, 3=appeal, 4=emergency
     pub actor: Pubkey,
     pub timestamp: i64,
     #[max_len(MAX_REASON_LEN)]
@@ -529,7 +529,10 @@ pub fn submit_security_request(
         requested_remedy <= remedy_type::MAX,
         TerraError::InvalidRemedyType
     );
-    require!(request_type <= restriction_type::MAX, TerraError::InvalidRestrictionType);
+    require!(
+        request_type <= restriction_type::MAX,
+        TerraError::InvalidRestrictionType
+    );
 
     sr.requester = ctx.accounts.requester.key();
     sr.subject = Pubkey::default(); // filled by specific request types
@@ -581,7 +584,10 @@ pub fn submit_privacy_request(
         requested_remedy <= remedy_type::MAX,
         TerraError::InvalidRemedyType
     );
-    require!(request_type <= restriction_type::MAX, TerraError::InvalidRestrictionType);
+    require!(
+        request_type <= restriction_type::MAX,
+        TerraError::InvalidRestrictionType
+    );
 
     pr.requester = ctx.accounts.requester.key();
     pr.subject = ctx.accounts.subject.key();
@@ -633,7 +639,10 @@ pub fn submit_jurisdictional_restriction(
         requested_remedy <= remedy_type::MAX,
         TerraError::InvalidRemedyType
     );
-    require!(restriction_type <= restriction_type::MAX, TerraError::InvalidRestrictionType);
+    require!(
+        restriction_type <= restriction_type::MAX,
+        TerraError::InvalidRestrictionType
+    );
 
     jr.authority = ctx.accounts.authority.key();
     jr.subject = ctx.accounts.subject.key();
@@ -659,10 +668,7 @@ pub fn submit_jurisdictional_restriction(
     Ok(())
 }
 
-pub fn create_review_case(
-    ctx: Context<CreateReviewCase>,
-    _nonce: u16,
-) -> Result<()> {
+pub fn create_review_case(ctx: Context<CreateReviewCase>, _nonce: u16) -> Result<()> {
     let case = &mut ctx.accounts.review_case;
     let request = &mut ctx.accounts.request;
     let now = Clock::get()?.unix_timestamp;
@@ -671,10 +677,7 @@ pub fn create_review_case(
         request.status == request_status::OPEN,
         TerraError::RequestNotOpen
     );
-    require!(
-        request.expires_at > now,
-        TerraError::RequestExpired
-    );
+    require!(request.expires_at > now, TerraError::RequestExpired);
 
     case.request = request.key();
     case.requester = request.requester;
@@ -701,9 +704,7 @@ pub fn create_review_case(
     Ok(())
 }
 
-pub fn assign_reviewer(
-    ctx: Context<AssignReviewer>,
-) -> Result<()> {
+pub fn assign_reviewer(ctx: Context<AssignReviewer>) -> Result<()> {
     let assignment = &mut ctx.accounts.assignment;
     let case = &mut ctx.accounts.case;
     let reviewer_reputation = &ctx.accounts.reviewer_reputation;
@@ -735,18 +736,12 @@ pub fn assign_reviewer(
     Ok(())
 }
 
-pub fn cast_review_vote(
-    ctx: Context<CastReviewVote>,
-    vote: u8,
-) -> Result<()> {
+pub fn cast_review_vote(ctx: Context<CastReviewVote>, vote: u8) -> Result<()> {
     let assignment = &mut ctx.accounts.assignment;
     let case = &mut ctx.accounts.case;
     let now = Clock::get()?.unix_timestamp;
 
-    require!(
-        !assignment.voted,
-        TerraError::AlreadyVoted
-    );
+    require!(!assignment.voted, TerraError::AlreadyVoted);
     require!(vote <= review_decision::MAX, TerraError::InvalidReviewVote);
 
     assignment.voted = true;
@@ -770,9 +765,7 @@ pub fn cast_review_vote(
     Ok(())
 }
 
-pub fn finalize_decision(
-    ctx: Context<FinalizeDecision>,
-) -> Result<()> {
+pub fn finalize_decision(ctx: Context<FinalizeDecision>) -> Result<()> {
     let case = &mut ctx.accounts.case;
     let decision = &mut ctx.accounts.decision;
     let request = &mut ctx.accounts.request;
@@ -828,24 +821,16 @@ pub fn finalize_decision(
     Ok(())
 }
 
-pub fn appeal_decision(
-    ctx: Context<AppealDecision>,
-    nonce: u16,
-    reason: String,
-) -> Result<()> {
+pub fn appeal_decision(ctx: Context<AppealDecision>, nonce: u16, reason: String) -> Result<()> {
     let appeal = &mut ctx.accounts.appeal;
     let decision = &mut ctx.accounts.decision;
     let now = Clock::get()?.unix_timestamp;
 
     require!(
-        decision.state == privacy_state::RESTRICTED
-            || decision.state == privacy_state::PRIVATE,
+        decision.state == privacy_state::RESTRICTED || decision.state == privacy_state::PRIVATE,
         TerraError::DecisionNotAppealable
     );
-    require!(
-        reason.len() <= MAX_REASON_LEN,
-        TerraError::ReasonTooLong
-    );
+    require!(reason.len() <= MAX_REASON_LEN, TerraError::ReasonTooLong);
 
     appeal.decision = decision.key();
     appeal.appellant = ctx.accounts.appellant.key();
@@ -865,10 +850,7 @@ pub fn appeal_decision(
     Ok(())
 }
 
-pub fn finalize_appeal(
-    ctx: Context<FinalizeAppeal>,
-    upheld_appeal: bool,
-) -> Result<()> {
+pub fn finalize_appeal(ctx: Context<FinalizeAppeal>, upheld_appeal: bool) -> Result<()> {
     let appeal = &mut ctx.accounts.appeal;
     let decision = &mut ctx.accounts.decision;
     let now = Clock::get()?.unix_timestamp;
@@ -909,10 +891,7 @@ pub fn record_audit_event(
     let audit = &mut ctx.accounts.audit_event;
     let now = Clock::get()?.unix_timestamp;
 
-    require!(
-        reason.len() <= MAX_REASON_LEN,
-        TerraError::ReasonTooLong
-    );
+    require!(reason.len() <= MAX_REASON_LEN, TerraError::ReasonTooLong);
 
     audit.entity = ctx.accounts.entity.key();
     audit.sequence = sequence;
@@ -933,17 +912,11 @@ pub fn record_audit_event(
     Ok(())
 }
 
-pub fn emergency_protect(
-    ctx: Context<EmergencyProtect>,
-    nonce: u16,
-) -> Result<()> {
+pub fn emergency_protect(ctx: Context<EmergencyProtect>, nonce: u16) -> Result<()> {
     let protection = &mut ctx.accounts.protection;
     let now = Clock::get()?.unix_timestamp;
 
-    require!(
-        !protection.lifted,
-        TerraError::ProtectionAlreadyActive
-    );
+    require!(!protection.lifted, TerraError::ProtectionAlreadyActive);
 
     protection.subject = ctx.accounts.subject.key();
     protection.nonce = nonce;
