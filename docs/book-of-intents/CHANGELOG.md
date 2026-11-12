@@ -4,7 +4,7 @@ Format: date · version · what changed · evidence/why. Append-only.
 
 ## 2026-11-12 — Sprint 030: Google-Earth-style immersive atlas
 
-- **Immersive atlas route** (`48286af`): `body.atlas-immersive` floats the
+- **Immersive atlas route** (`48286af`, with `d2d3d25` + `cd93c25` follow-ups): `body.atlas-immersive` floats the
   global header and a `100dvh` map; added the glass search pill, left tool rail
   (Layers, Stories, Register, Measure, Share, Fullscreen), basemap quick-switch
   and coordinate status bar. Cesium/Leaflet/Three remain the only renderers.
@@ -24,7 +24,7 @@ Format: date · version · what changed · evidence/why. Append-only.
   horizontal overflow at 360×640 … 1920×1080 or 844×390.
 - **Verified:** tsc clean; vitest **83/83**; `build:check` PASS (entry 300.2 /
   initial 305.5 / Cesium 1098.5 / total 1866.7 kB gz). Live Pages runs
-  `43289772629` + `43290890798` green; desktop/phone atlas, satellite/streets,
+  `43289772629` + `43290890798` + `43292573392` green; desktop/phone atlas, satellite/streets,
   search, 2D/3D, bottom sheet, `/demo` and `/stories` checked in headless
   Chrome. Only direct-document 404s (Pages SPA fallback) and `/api/v1/*` fail.
 - Evidence: `sprints/030-immersive-atlas-ux.md`; `IMPLEMENTATION_STATUS.md`

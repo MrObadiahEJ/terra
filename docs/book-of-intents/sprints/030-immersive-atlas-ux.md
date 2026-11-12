@@ -1,7 +1,7 @@
 # Sprint 030 — Google-Earth-Style Immersive Atlas
 
-**Date:** 2026-11-12 · **Status:** done, committed (`48286af`, `d2d3d25`) and deployed
-(`43289772629`, `43290890798`)
+**Date:** 2026-11-12 · **Status:** done, committed (`48286af`, `d2d3d25`, `cd93c25`)
+and deployed (`43289772629`, `43290890798`, `43292573392`)
 **Gate:** frontend — `tsc -b` clean, vitest **83/83**, `build:check` PASS;
 desktop/tablet/phone layout sweep and live Pages verification
 
@@ -87,8 +87,8 @@ flight pads; `DemoPage` still rendered the always-on HUD with no toggle.
 
 ### Live publication
 
-Pages runs `43289772629` (immersive atlas) and `43290890798` (satellite
-default) are green. Headless Chrome against the live site confirmed:
+Pages runs `43289772629` (immersive atlas), `43290890798` (satellite default)
+and `43292573392` (fullscreen guard) are green. Headless Chrome against the live site confirmed:
 
 - `/atlas?parcel=Soa%20Sample%20Lot%2006` boots with the Cesium canvas, the
   floating header/search/rail/panel/dock, and **Satellite** active by default.
