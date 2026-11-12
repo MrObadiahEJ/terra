@@ -64,10 +64,10 @@ const assets = new Map(
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8')
 const initialNames = new Set()
-for (const match of html.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)="\/assets\/([^"]+\.js)"/g)) {
+for (const match of html.matchAll(/<(?:script|link)\b[^>]*?(?:src|href)="[^"]*\/assets\/([^"]+\.js)"/g)) {
   initialNames.add(match[1])
 }
-for (const match of html.matchAll(/<link\b[^>]*rel="modulepreload"[^>]*href="\/assets\/([^"]+\.js)"/g)) {
+for (const match of html.matchAll(/<link\b[^>]*rel="modulepreload"[^>]*href="[^"]*\/assets\/([^"]+\.js)"/g)) {
   initialNames.add(match[1])
 }
 

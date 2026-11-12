@@ -78,7 +78,7 @@ function App() {
 
   return (
     <LocaleProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <div className="flex flex-col h-screen bg-bg text-ink">
           <DocumentTitle />
           <Navbar

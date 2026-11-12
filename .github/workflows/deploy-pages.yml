@@ -1,0 +1,72 @@
+name: Deploy frontend to GitHub Pages
+
+# Publishes the terra-web SPA as a project site:
+#   https://<owner>.github.io/terra/
+# The off-chain API is not deployed with the site; the frontend degrades to its
+# demo/empty states when /api/v1 is unreachable, so the atlas, stories and
+# protocol surfaces stay navigable in a browser-only demo.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'terra-web/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build terra-web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terra-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: terra-web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm exec tsc -b
+
+      - name: Build (project-site base path)
+        env:
+          TERRA_BASE_PATH: /terra/
+        run: pnpm build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: terra-web/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

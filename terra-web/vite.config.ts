@@ -36,8 +36,13 @@ function cesiumStaticPlugin(): { name: string; buildStart(): void } {
   }
 }
 
+// GitHub Pages serves this repository as a project site at /terra/. The deploy
+// workflow sets TERRA_BASE_PATH=/terra/; local dev and previews stay at /.
+const base = process.env.TERRA_BASE_PATH || '/'
+
 // https://vite.dev/config/
 export default defineConfig({
+  base,
   plugins: [react(), cesiumStaticPlugin()],
   build: {
     target: 'es2022',
