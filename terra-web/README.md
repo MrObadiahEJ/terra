@@ -47,7 +47,7 @@ terra-web/src/
 ├── main.tsx                # Entry
 ├── pages/                  # 13 route pages (see Routes)
 ├── components/
-│   ├── layout/             # Navbar, OneSidebar
+│   ├── layout/             # Navbar, Sidenav (floating land panel / bottom sheet)
 │   ├── map/                # TerraGlobe (Cesium), LeafletMap (2D), ThreeAtlasFallback, LodLadder
 │   ├── story/              # Story player / export
 │   └── lab/                # Protocol playground modules
@@ -64,7 +64,7 @@ terra-web/src/
 |-------|------|---------|
 | `/` | → `/welcome` | Redirect |
 | `/welcome` | `WelcomePage` | Landing page with atlas preview and offline/API status |
-| `/atlas` | `GlobePage` → `TerraGlobe` | Primary 3D atlas: keyless OSM / Esri World Imagery / OpenTopoMap basemaps, 2D+3D views, layer loading by LOD, parcel/building selection, navigation HUD (WASDQE + X/Y/Z), single sidebar. Deep links: `?parcel=…`, `?c=lon,lat,height`. Falls back to Leaflet (2D) or Three.js when WebGL/Cesium fails |
+| `/atlas` | `GlobePage` → `TerraGlobe` | Immersive, Google-Earth-style primary atlas: full-viewport map with floating glass header, search pill, tool rail and coordinate status bar; keyless OSM / Esri World Imagery / OpenTopoMap basemaps; 2D↔3D switch that preserves the camera; layer loading by LOD; parcel/building selection; floating land panel (bottom sheet on phones, swipe-down to dismiss); collapsible WASDQE/X-Y-Z navigation pad. Deep links: `?parcel=…`, `?c=lon,lat,height`. Falls back to Leaflet (2D) or Three.js when WebGL/Cesium fails |
 | `/lab` | `LabPage` | Interactive experiments (`components/lab/`); deep-link `?tab=vault\|pipeline\|crossborder` |
 | `/lab/land` | `LandDetailPage` | Land record detail / viewer |
 | `/demo` | `DemoPage` | Seeded scenario player (land registration, verification, cross-border, dispute, validator routing, spatial update, fraud review, recovery); deterministic browser preview when the scenario API is offline. Deep links: `?scenario=…&seed=…` |

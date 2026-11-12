@@ -93,7 +93,9 @@ export default function AtlasControlsPanel({
   children,
 }: Props) {
   const { t } = useLocale()
-  const [open, setOpen] = useState(false)
+  // Open by default: the atlas presents map style, layers and the zoom ladder
+  // like Google Earth's Layers panel instead of hiding them behind a toggle.
+  const [open, setOpen] = useState(true)
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])

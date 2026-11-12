@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Move3d } from 'lucide-react'
 import * as Cesium from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { DEFAULT_FOCUS } from '../../lib/constants'
@@ -17,6 +18,7 @@ import LeafletMap from './LeafletMap'
 import ThreeAtlasFallback from './ThreeAtlasFallback'
 import { DEMO_BUILDINGS } from '../../lib/demoData'
 import { assetUrl } from '../../lib/assets'
+import { useLocale } from '../../lib/locale'
 
 // Ion stays off by default: world terrain and 3D tiles are an explicit,
 // per-browser upgrade (the token lives in localStorage, never in this file).
@@ -66,6 +68,8 @@ interface TerraGlobeProps {
   /** Fetch an unfetched runtime scene node's component asset. */
   onFetchComponent?: (node: SceneNodeRow) => void
   viewMode: '2d' | '3d'
+  /** Immersive atlas: fold the 3D navigation pad behind one toggle button. */
+  collapsibleHud?: boolean
   focus?: FocusTarget | null
   /** Reports WebGL status upward: error message on fallback, null on success. */
   onWebGLStatus?: (msg: string | null) => void
@@ -158,6 +162,7 @@ export default function TerraGlobe({
   onParcelClick,
   onBuildingClick,
   viewMode,
+  collapsibleHud = false,
   focus,
   onWebGLStatus,
   onCameraMoved,
@@ -184,6 +189,8 @@ export default function TerraGlobe({
   highlightParcelId = null,
   highlightBuildingId = null,
 }: TerraGlobeProps) {
+  const { t } = useLocale()
+  const [hudOpen, setHudOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<Cesium.Viewer | null>(null)
   const drawingRef = useRef(false)
@@ -1168,27 +1175,57 @@ export default function TerraGlobe({
   }, [focus])
 
   useEffect(() => {
-    const scene = viewerRef.current?.scene
-    if (!scene) return
-    let morphed = false
-    if (viewMode === '2d' && scene.mode !== Cesium.SceneMode.SCENE2D) {
-      scene.morphTo2D(0.7)
-      morphed = true
-    } else if (viewMode === '3d' && scene.mode !== Cesium.SceneMode.SCENE3D) {
-      scene.morphTo3D(0.7)
-      morphed = true
+    const viewer = viewerRef.current
+    const scene = viewer?.scene
+    if (!viewer || !scene) return
+    const target = viewMode === '2d' ? Cesium.SceneMode.SCENE2D : Cesium.SceneMode.SCENE3D
+    if (scene.mode === target) return
+
+    // Preserve the current camera across the morph. Cesium otherwise animates
+    // 2D/3D switches from the default home view, which loses the parcel the
+    // user was inspecting (the old atlas reset to the whole planet).
+    const camera = scene.camera
+    // Capture the camera in cartographic space. In 2D the camera's world
+    // position sits far above the map plane, so restoring `positionWC` in 3D
+    // would jump to millions of metres; lon/lat/height works in both modes.
+    const carto = Cesium.Cartographic.clone(camera.positionCartographic)
+    const restore = () => {
+      scene.morphComplete.removeEventListener(restore)
+      if (viewer.isDestroyed()) return
+      const destination = Cesium.Cartesian3.fromRadians(
+        carto.longitude,
+        carto.latitude,
+        Math.max(100, carto.height),
+      )
+      camera.setView({
+        destination,
+        orientation: {
+          heading: 0,
+          pitch: -Cesium.Math.PI_OVER_TWO,
+          roll: 0,
+        },
+      })
+      scene.requestRender()
     }
-    if (!morphed || !TIER_SETTINGS[graphicsTier].requestRenderMode) return
+    scene.morphComplete.addEventListener(restore)
+    if (viewMode === '2d') scene.morphTo2D(0.7)
+    else scene.morphTo3D(0.7)
+
     // The morph animates over 0.7 s but request-render mode only paints on
     // demand; keep requesting frames for its duration so it stays smooth.
-    const tick = window.setInterval(() => scene.requestRender(), 80)
-    const stop = window.setTimeout(() => {
-      window.clearInterval(tick)
-      scene.requestRender()
-    }, 900)
+    let tick: number | undefined
+    let stop: number | undefined
+    if (TIER_SETTINGS[graphicsTier].requestRenderMode) {
+      tick = window.setInterval(() => scene.requestRender(), 80)
+      stop = window.setTimeout(() => {
+        window.clearInterval(tick)
+        scene.requestRender()
+      }, 900)
+    }
     return () => {
-      window.clearInterval(tick)
-      window.clearTimeout(stop)
+      scene.morphComplete.removeEventListener(restore)
+      if (tick !== undefined) window.clearInterval(tick)
+      if (stop !== undefined) window.clearTimeout(stop)
     }
   }, [viewMode, graphicsTier])
 
@@ -1322,7 +1359,11 @@ export default function TerraGlobe({
   return (
     <div className="terra-3d-shell w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      <div className="terra-navigation-hud" aria-label="3D navigation controls">
+      <div className={`terra-nav-dock${collapsibleHud ? ' terra-nav-dock--collapsible' : ''}`}>
+      <div
+        className={`terra-navigation-hud${collapsibleHud && !hudOpen ? ' terra-hud-collapsed' : ''}`}
+        aria-label="3D navigation controls"
+      >
         <div className="terra-axis-gizmo" aria-label="World axes">
           <svg
             viewBox="0 0 92 92"
@@ -1438,11 +1479,27 @@ export default function TerraGlobe({
           ))}
         </div>
       </div>
-      <div className="terra-flight-pad" title="WASD to move · Q/E altitude · Shift faster">
+      <div
+        className={`terra-flight-pad${collapsibleHud && !hudOpen ? ' terra-hud-collapsed' : ''}`}
+        title="WASD to move · Q/E altitude · Shift faster"
+      >
         {(['W','A','S','D','Q','E'] as const).map((k) => <button key={k} onClick={() => {
           window.dispatchEvent(new KeyboardEvent('keydown', { code: `Key${k}` }))
           window.setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: `Key${k}` })), 160)
         }}>{k}</button>)}
+      </div>
+      {collapsibleHud && (
+        <button
+          type="button"
+          className={`terra-hud-toggle${hudOpen ? ' is-open' : ''}`}
+          aria-expanded={hudOpen}
+          aria-label={hudOpen ? t('navHudHide') : t('navHudShow')}
+          title={hudOpen ? t('navHudHide') : t('navHudShow')}
+          onClick={() => setHudOpen((open) => !open)}
+        >
+          <Move3d size={17} />
+        </button>
+      )}
       </div>
     </div>
   )

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import TerraGlobe, { type DrawVertex, type FocusTarget, type ViewCommand } from '../components/map/TerraGlobe'
 import AtlasControlsPanel from '../components/panels/AtlasControlsPanel'
+import AtlasSearchPill from '../components/map/AtlasSearchPill'
 import Sidenav, { type SidenavMode } from '../components/layout/Sidenav'
 import { lodFromHeight, lodFromLeafletZoom, LOD_TARGET_HEIGHT } from '../lib/lod'
 import RegisterParcelPanel from '../components/panels/RegisterParcelPanel'
@@ -50,16 +51,24 @@ import {
 } from '../lib/atlasLayers'
 import { lineLengthM, polygonCentroid, snapPoint, type LonLat } from '../lib/geo'
 import {
+  BookOpen,
   Box,
+  Compass,
+  Layers,
   LocateFixed,
   Map as MapIcon,
+  Maximize2,
+  Minimize2,
   Minus,
+  Mountain,
   PanelRight,
   PanelRightClose,
   PanelRightOpen,
+  Pentagon,
   PictureInPicture2,
   Plus,
   Ruler,
+  Satellite,
   Share2,
 } from 'lucide-react'
 import { DEFAULT_FOCUS } from '../lib/constants'
@@ -102,6 +111,13 @@ export default function GlobePage() {
   const selectedOffChain = useAppStore((s) => s.selectedOffChain)
   const selectOffChain = useAppStore((s) => s.selectOffChain)
   const demoMode = useAppStore((s) => s.demoMode)
+
+  // Immersive atlas chrome: the global header floats over the globe and the
+  // document itself stops scrolling (Google-Earth-style full-viewport map).
+  useEffect(() => {
+    document.body.classList.add('atlas-immersive')
+    return () => document.body.classList.remove('atlas-immersive')
+  }, [])
 
   const [drawing, setDrawing] = useState(false)
   // One-shot camera commands (reset / north-up / tilt / front / street).
@@ -156,6 +172,9 @@ export default function GlobePage() {
     },
   )
   const lastCamRef = useRef({ ...DEFAULT_FOCUS })
+  // Mirror of the camera for render output: refs must not be read during
+  // render (React compiler rule), so the status bar reads this state instead.
+  const [cameraReadout, setCameraReadout] = useState({ ...DEFAULT_FOCUS })
 
   useEffect(() => {
     localStorage.setItem('terra-atlas-basemap', basemap)
@@ -205,11 +224,29 @@ export default function GlobePage() {
     savePlannedRoads(plannedRoads)
   }, [plannedRoads])
 
-  const [sidenavOpen, setSidenavOpen] = useState(true)
+  const [sidenavOpen, setSidenavOpen] = useState(() =>
+    typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 861px)').matches : true,
+  )
   const [sidenavMode, setSidenavMode] = useState<SidenavMode>(
     () => (localStorage.getItem('terra-atlas-sidenav-mode') === 'over' ? 'over' : 'side'),
   )
   const [mapResizeKey, setMapResizeKey] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    const request = document.fullscreenElement
+      ? document.exitFullscreen()
+      : document.documentElement.requestFullscreen()
+    void request?.catch(() => {
+      /* browser denied fullscreen (permissions / non-user gesture) */
+    })
+  }, [])
 
   const settleMapResize = useCallback(() => {
     window.setTimeout(() => setMapResizeKey((k) => k + 1), 260)
@@ -239,6 +276,7 @@ export default function GlobePage() {
 
   const onCameraMoved = useCallback((cam: { longitude: number; latitude: number; height: number }) => {
     lastCamRef.current = cam
+    setCameraReadout(cam)
     setLod((prev) => {
       const next = lodFromHeight(cam.height)
       return next === prev ? prev : next
@@ -252,6 +290,12 @@ export default function GlobePage() {
       const next = lodFromLeafletZoom(zoom)
       return next === prev ? prev : next
     })
+  }, [])
+
+  const switchViewMode = useCallback((mode: '2d' | '3d') => {
+    // TerraGlobe restores the camera across Cesium's 2D/3D morph, so toggling
+    // keeps the parcel in view instead of jumping back to the whole planet.
+    setViewMode(mode)
   }, [])
 
   const jumpToLod = useCallback((target: number) => {
@@ -926,7 +970,11 @@ export default function GlobePage() {
     if (off) {
       selectOffChain(off)
       setTab('browse')
-      changeSidenavOpen(true)
+      changeSidenavOpen(
+        typeof window.matchMedia === 'function'
+          ? window.matchMedia('(min-width: 861px)').matches
+          : true,
+      )
       const nextFocus = parcelFocus(off)
       if (nextFocus) setFocus(nextFocus)
       return
@@ -961,8 +1009,11 @@ export default function GlobePage() {
 
   const [shareCopied, setShareCopied] = useState(false)
   const shareLand = useCallback(() => {
-    if (!shareTarget) return
-    const url = `${window.location.origin}/atlas?parcel=${encodeURIComponent(shareTarget.id)}`
+    const cam = lastCamRef.current
+    const base = `${window.location.origin}${import.meta.env.BASE_URL}atlas`
+    const url = shareTarget
+      ? `${base}?parcel=${encodeURIComponent(shareTarget.id)}`
+      : `${base}?c=${cam.longitude.toFixed(5)},${cam.latitude.toFixed(5)},${Math.round(cam.height)}`
     const confirm = () => {
       setShareCopied(true)
       window.setTimeout(() => setShareCopied(false), 2000)
@@ -991,6 +1042,7 @@ export default function GlobePage() {
           buildings={visibleBuildings}
           plannedRoads={plannedRoads}
           viewMode={viewMode}
+          collapsibleHud
           focus={focus}
           drawing={drawing}
           drawKind={drawKind}
@@ -1021,6 +1073,83 @@ export default function GlobePage() {
           onFetchComponent={fetchComponent}
           viewCommand={viewCommand}
         />
+
+        <AtlasSearchPill onPick={pickSearch} />
+
+        <nav className="atlas-rail" aria-label={t('mapControlsTitle')}>
+          <button
+            type="button"
+            className={sidenavOpen ? 'active' : ''}
+            aria-pressed={sidenavOpen}
+            onClick={() => changeSidenavOpen(!sidenavOpen)}
+            title={t('mapControlsTitle')}
+          >
+            <Layers size={18} />
+            <span>{t('mapControlsTitle')}</span>
+          </button>
+          <NavLink to="/stories" className="atlas-rail-link" title={t('stories')}>
+            <BookOpen size={17} />
+            <span>{t('stories')}</span>
+          </NavLink>
+          <button
+            type="button"
+            className={drawing && drawKind === 'parcel' ? 'active' : ''}
+            aria-pressed={drawing && drawKind === 'parcel'}
+            onClick={toggleParcelDraw}
+            title={t('tabRegister')}
+          >
+            <Pentagon size={17} />
+            <span>{t('tabRegister')}</span>
+          </button>
+          <button
+            type="button"
+            className={drawing && drawKind === 'measure' ? 'active' : ''}
+            aria-pressed={drawing && drawKind === 'measure'}
+            onClick={toggleMeasure}
+            title={t('measureAction')}
+          >
+            <Ruler size={17} />
+            <span>{t('measureAction')}</span>
+          </button>
+          <button type="button" onClick={shareLand} title={t('shareThisLand')}>
+            <Share2 size={17} />
+            <span>{shareCopied ? t('linkCopied') : t('shareThisLand')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={fullscreen ? t('exitFullscreen') : t('enterFullscreen')}
+          >
+            {fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+            <span>{fullscreen ? t('exitFullscreen') : t('enterFullscreen')}</span>
+          </button>
+        </nav>
+
+        <div className="atlas-basemap-switch" role="group" aria-label={t('basemapSectionTitle')}>
+          {([
+            ['imagery', 'basemapSatellite', Satellite],
+            ['osm', 'basemapStreets', MapIcon],
+            ['terrain', 'basemapTerrain', Mountain],
+          ] as const).map(([style, labelKey, Icon]) => (
+            <button
+              key={style}
+              type="button"
+              className={basemap === style ? 'active' : ''}
+              aria-pressed={basemap === style}
+              onClick={() => setBasemap(style)}
+              title={t(labelKey)}
+            >
+              <Icon size={14} />
+              <span>{t(labelKey)}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="atlas-statusbar">
+          <span>{cameraReadout.latitude.toFixed(4)}°, {cameraReadout.longitude.toFixed(4)}°</span>
+          <span>{Math.round(cameraReadout.height).toLocaleString()} m</span>
+          <span>{t('zoomDetail')} {lod}</span>
+        </div>
 
         <div className="explore-heading">
           <span className="explore-kicker"><span className="live-dot" /> {t('atlasKicker')}</span>
@@ -1054,7 +1183,15 @@ export default function GlobePage() {
           </div>
         )}
 
-        <div className="map-controls">
+        <div className={`map-controls${sidenavOpen ? ' is-shifted' : ''}`}>
+          <button
+            className="map-icon-button"
+            onClick={() => runViewCommand('north')}
+            title={t('northUpTitle')}
+            aria-label={t('northUpTitle')}
+          >
+            <Compass size={17} />
+          </button>
           {!sidenavOpen && (
             <button
               className="map-icon-button"
@@ -1086,14 +1223,14 @@ export default function GlobePage() {
           <div className="map-mode-switch" role="group" aria-label={t('mapView')}>
             <button
               className={viewMode === '2d' ? 'active' : ''}
-              onClick={() => setViewMode('2d')}
+              onClick={() => switchViewMode('2d')}
               aria-pressed={viewMode === '2d'}
             >
               <MapIcon size={14} /> 2D
             </button>
             <button
               className={viewMode === '3d' ? 'active' : ''}
-              onClick={() => setViewMode('3d')}
+              onClick={() => switchViewMode('3d')}
               aria-pressed={viewMode === '3d'}
               title={webglStatus ? t('threeDGlobeView') + ' (lightweight fallback)' : t('threeDGlobeView')}
             >

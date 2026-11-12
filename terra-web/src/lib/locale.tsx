@@ -11,9 +11,9 @@ export function isLocale(value: string): value is Locale {
 const messages = {
   en: {
     home: 'Home', explore: 'Explore', activity: 'Activity', demo: 'Demo', network: 'Network',
-    portfolio: 'Portfolio', studio: 'Studio', status: 'Status', console: 'Console', menu: 'Menu', language: 'Language',
+    portfolio: 'Portfolio', studio: 'Studio', status: 'Status', console: 'Console', stories: 'Stories', menu: 'Menu', language: 'Language',
     connectWallet: 'Connect wallet', walletConnected: 'Wallet connected', themeLight: 'Switch to light theme',
-    themeDark: 'Switch to dark theme', welcomeEyebrow: 'LAND • IDENTITY • TRUST',
+    themeDark: 'Switch to dark theme', navHudShow: 'Show 3D navigation', navHudHide: 'Hide 3D navigation', enterFullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen', welcomeEyebrow: 'LAND • IDENTITY • TRUST',
     welcomeTitleA: 'Land ownership,', welcomeTitleB: 'made visible.',
     welcomeIntro: 'Explore mapped parcels, connect an identity, and follow how land records move through independent review.',
     openAtlas: 'Open the atlas', watchDemo: 'Watch the demo', walletFirst: 'Wallet-first identity',
@@ -745,9 +745,9 @@ const messages = {
   },
   fr: {
     home: 'Accueil', explore: 'Explorer', activity: 'Activité', demo: 'Démo', network: 'Réseau',
-    portfolio: 'Portefeuille', studio: 'Studio', status: 'État', console: 'Console', menu: 'Menu', language: 'Langue',
+    portfolio: 'Portefeuille', studio: 'Studio', status: 'État', console: 'Console', stories: 'Histoires', menu: 'Menu', language: 'Langue',
     connectWallet: 'Connecter le portefeuille', walletConnected: 'Portefeuille connecté',
-    themeLight: 'Passer au thème clair', themeDark: 'Passer au thème sombre',
+    themeLight: 'Passer au thème clair', themeDark: 'Passer au thème sombre', navHudShow: 'Afficher la navigation 3D', navHudHide: 'Masquer la navigation 3D', enterFullscreen: 'Passer en plein écran', exitFullscreen: 'Quitter le plein écran',
     welcomeEyebrow: 'TERRE • IDENTITÉ • CONFIANCE', welcomeTitleA: 'La propriété foncière,',
     welcomeTitleB: 'en toute clarté.', welcomeIntro: 'Explorez les parcelles cartographiées, associez une identité et suivez les registres fonciers lors de leur vérification indépendante.',
     openAtlas: 'Ouvrir l’atlas', watchDemo: 'Voir la démo', walletFirst: 'Identité liée au portefeuille',
@@ -1486,9 +1486,9 @@ const messages = {
   },
   ru: {
     home: 'Главная', explore: 'Обзор', activity: 'Активность', demo: 'Демо', network: 'Сеть',
-    portfolio: 'Портфель', studio: 'Студия', status: 'Статус', console: 'Консоль', menu: 'Меню', language: 'Язык',
+    portfolio: 'Портфель', studio: 'Студия', status: 'Статус', console: 'Консоль', stories: 'Истории', menu: 'Меню', language: 'Язык',
     connectWallet: 'Подключить кошелёк', walletConnected: 'Кошелёк подключён',
-    themeLight: 'Светлая тема', themeDark: 'Тёмная тема', welcomeEyebrow: 'ЗЕМЛЯ • ЛИЧНОСТЬ • ДОВЕРИЕ',
+    themeLight: 'Светлая тема', themeDark: 'Тёмная тема', navHudShow: 'Показать 3D-навигацию', navHudHide: 'Скрыть 3D-навигацию', enterFullscreen: 'Во весь экран', exitFullscreen: 'Выйти из полноэкранного режима', welcomeEyebrow: 'ЗЕМЛЯ • ЛИЧНОСТЬ • ДОВЕРИЕ',
     welcomeTitleA: 'Владение землёй,', welcomeTitleB: 'на виду.',
     welcomeIntro: 'Изучайте нанесённые на карту участки, связывайте их с личностью и следите за независимой проверкой земельных записей.',
     openAtlas: 'Открыть атлас', watchDemo: 'Смотреть демо', walletFirst: 'Идентификация через кошелёк',
@@ -2225,9 +2225,9 @@ const messages = {
   },
   zh: {
     home: '首页', explore: '探索', activity: '活动', demo: '演示', network: '网络',
-    portfolio: '资产', studio: '工作室', status: '状态', console: '控制台', menu: '菜单', language: '语言',
+    portfolio: '资产', studio: '工作室', status: '状态', console: '控制台', stories: '故事', menu: '菜单', language: '语言',
     connectWallet: '连接钱包', walletConnected: '钱包已连接', themeLight: '切换浅色主题',
-    themeDark: '切换深色主题', welcomeEyebrow: '土地 • 身份 • 信任',
+    themeDark: '切换深色主题', navHudShow: '显示 3D 导航', navHudHide: '隐藏 3D 导航', enterFullscreen: '进入全屏', exitFullscreen: '退出全屏', welcomeEyebrow: '土地 • 身份 • 信任',
     welcomeTitleA: '让土地所有权', welcomeTitleB: '清晰可见。',
     welcomeIntro: '探索地图地块、关联身份，并查看土地记录如何接受独立审核。',
     openAtlas: '打开地图', watchDemo: '观看演示', walletFirst: '钱包优先身份',

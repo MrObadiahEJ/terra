@@ -4,6 +4,7 @@ import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapte
 import {
   Activity,
   ArrowUpRight,
+  BookOpen,
   Compass,
   FlaskConical,
   Languages,
@@ -30,6 +31,7 @@ const navigation: { to: string; label: TranslationKey; icon: typeof Compass; end
   { to: '/atlas', label: 'explore', icon: Compass },
   { to: '/transactions', label: 'activity', icon: Activity },
   { to: '/demo', label: 'demo', icon: ShieldCheck },
+  { to: '/stories', label: 'stories', icon: BookOpen },
   { to: '/network', label: 'network', icon: Network },
   { to: '/portfolio', label: 'portfolio', icon: BriefcaseBusiness },
   { to: '/lab', label: 'studio', icon: FlaskConical },
