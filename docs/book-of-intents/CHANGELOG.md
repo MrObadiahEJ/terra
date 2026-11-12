@@ -2,6 +2,34 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-12 — Sprint 030: Google-Earth-style immersive atlas
+
+- **Immersive atlas route** (`48286af`): `body.atlas-immersive` floats the
+  global header and a `100dvh` map; added the glass search pill, left tool rail
+  (Layers, Stories, Register, Measure, Share, Fullscreen), basemap quick-switch
+  and coordinate status bar. Cesium/Leaflet/Three remain the only renderers.
+- **Responsive land panel:** floating 400px panel (440px ≥1800px) on desktop;
+  `76dvh` bottom sheet at ≤860px with scrim, Escape/close, and a swipe-down
+  handle that dismisses past 90px. Mobile opens with the sheet closed.
+- **Search:** bundled coordinates/gazetteer resolve instantly; an explicit
+  online Photon row appears when nothing local matches. Fresh visits default to
+  satellite imagery (`d2d3d25`); saved Streets/Terrain choices still win.
+- **2D↔3D camera preservation:** the Cesium morph captures cartographic camera
+  position and restores it on `morphComplete`; repeated toggles stayed at
+  `3.8480°, 11.5021° · 400,000 m` in verification.
+- **Navigation HUD:** WASDQE + X/Y/Z pads fold behind one dock button on the
+  atlas (`collapsibleHud`); DemoPage keeps the always-on HUD.
+- **Responsive fixes:** icon-only compact menu, mark-only header ≤560px,
+  compact language selector, landscape control row at ≤860px × ≤560px; no
+  horizontal overflow at 360×640 … 1920×1080 or 844×390.
+- **Verified:** tsc clean; vitest **83/83**; `build:check` PASS (entry 300.2 /
+  initial 305.5 / Cesium 1098.5 / total 1866.7 kB gz). Live Pages runs
+  `43289772629` + `43290890798` green; desktop/phone atlas, satellite/streets,
+  search, 2D/3D, bottom sheet, `/demo` and `/stories` checked in headless
+  Chrome. Only direct-document 404s (Pages SPA fallback) and `/api/v1/*` fail.
+- Evidence: `sprints/030-immersive-atlas-ux.md`; `IMPLEMENTATION_STATUS.md`
+  D19 + frontend baselines; `work/CURRENT.md`; `terra-web/README.md`.
+
 ## 2026-11-12 — Sprint 029: merge `origin/dev` + GitHub Pages publication
 
 - **Merged** local `dev` with `origin/dev` (`92613c8`); upstream low-tier
