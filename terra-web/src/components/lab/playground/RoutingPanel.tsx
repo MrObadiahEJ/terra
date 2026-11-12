@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { MapPin, Shuffle } from 'lucide-react'
 import {
   AVAILABILITIES,
@@ -325,7 +326,7 @@ export default function RoutingPanel() {
       <p className="text-[10px] text-muted mt-2">
         Demo chain view: failed broadcasts land as{' '}
         <span className="font-mono">{lastGate.ok ? 'confirmed route record' : lastGate.summary.split(' — ').slice(0, 2).join(' — ')}</span>{' '}
-        on <a href="/transactions">/transactions</a>. Winner set includes 2 pre-qualified rivals so the 10000/n
+        on <Link to="/transactions">/transactions</Link>. Winner set includes 2 pre-qualified rivals so the 10000/n
         admission gate is always exercised with n ≥ 3.
       </p>
       <ClockBar now={now} onAdvance={(s) => setNow(now + s)} onReset={() => setNow(SIM_START)} />

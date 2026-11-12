@@ -6,6 +6,7 @@ import { DEMO_BUILDINGS } from '../../lib/demoData'
 import { parseGeoJSON, type OffChainParcel, type OsmBuildingFootprint } from '../../lib/api'
 import type { FocusTarget, ViewCommand } from './TerraGlobe'
 import { buildingHeightM } from '../../lib/atlasLayers'
+import { assetUrl } from '../../lib/assets'
 
 interface ThreeAtlasFallbackProps {
   focus?: FocusTarget | null
@@ -215,7 +216,7 @@ export default function ThreeAtlasFallback({
       content.add(mesh)
     }
     // Progressive GLB houses: staggered single-flight loads, cancellable.
-    const modelUrls = ['/models/house_scene.glb', '/models/modern-house.glb']
+    const modelUrls = [assetUrl('models/house_scene.glb'), assetUrl('models/modern-house.glb')]
     const protos = new Map<string, THREE.Object3D>()
     const houses: { g: THREE.Group; c: THREE.Vector3 }[] = []
     let chain: Promise<void> = Promise.resolve()

@@ -16,6 +16,7 @@ import { type SceneNodeRow } from '../../lib/runtime'
 import LeafletMap from './LeafletMap'
 import ThreeAtlasFallback from './ThreeAtlasFallback'
 import { DEMO_BUILDINGS } from '../../lib/demoData'
+import { assetUrl } from '../../lib/assets'
 
 // Ion stays off by default: world terrain and 3D tiles are an explicit,
 // per-browser upgrade (the token lives in localStorage, never in this file).
@@ -293,7 +294,7 @@ export default function TerraGlobe({
           DEFAULT_FOCUS.height,
         ),
       })
-      Cesium.GeoJsonDataSource.load('/continents.geojson', {
+      Cesium.GeoJsonDataSource.load(assetUrl('continents.geojson'), {
         stroke: Cesium.Color.fromCssColorString('#f0ead7'),
         fill: Cesium.Color.fromCssColorString('#b9b29a').withAlpha(0.96),
         strokeWidth: 1.4,
@@ -732,8 +733,8 @@ export default function TerraGlobe({
     let cancelled = false
     const primitives: Cesium.Model[] = []
     const modelUrls = [
-      '/models/house_scene.glb',
-      '/models/modern-house.glb',
+      assetUrl('models/house_scene.glb'),
+      assetUrl('models/modern-house.glb'),
     ]
     const presentationCount =
       graphicsTier === 'low' ? 2 : graphicsTier === 'medium' ? 4 : graphicsTier === 'high' ? 6 : 9

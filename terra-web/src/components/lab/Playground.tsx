@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Gamepad2 } from 'lucide-react'
 import RoutingPanel from './playground/RoutingPanel'
 import EscrowPanel from './playground/EscrowPanel'
@@ -50,7 +51,7 @@ export default function Playground() {
           Each sub-tab mirrors one program module: the same state transitions, the same guard order, and the
           exact <span className="font-mono">TerraError</span> names+codes read live from{' '}
           <span className="font-mono">TerraError = 6000 + variant index</span> in the IDL. Actions emit demo
-          transactions to <a href="/transactions">/transactions</a> — wrong inputs land failed with the code you
+          transactions to <Link to="/transactions">/transactions</Link> — wrong inputs land failed with the code you
           saw in the trace, never a silently fixed value. Time-based guards (7d unbonding, 90d disputes, 48h
           injection timelock, +24h/+30d fraud windows) use the per-panel simulated clock.
         </p>
