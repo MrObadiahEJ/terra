@@ -242,9 +242,11 @@ export default function GlobePage() {
   }, [])
 
   const toggleFullscreen = useCallback(() => {
+    // iOS browsers may not expose the Fullscreen API at all; optional calls
+    // keep the rail button harmless there. Rejections are equally benign.
     const request = document.fullscreenElement
-      ? document.exitFullscreen()
-      : document.documentElement.requestFullscreen()
+      ? document.exitFullscreen?.()
+      : document.documentElement.requestFullscreen?.()
     void request?.catch(() => {
       /* browser denied fullscreen (permissions / non-user gesture) */
     })
