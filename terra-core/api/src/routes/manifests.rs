@@ -517,4 +517,55 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, AppError::BadRequest(_)));
     }
+
+    /// End-to-end persistence/retrieval. CI sets `DATABASE_URL` and applies
+    /// migrations; local runs without a database skip the test.
+    #[tokio::test]
+    async fn signed_manifest_store_and_retrieve_roundtrip() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed signed manifest test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local {
+                root: std::path::PathBuf::from("/tmp/terra-test-signed-manifests"),
+            }),
+            zk: None,
+        };
+
+        let manifest = signed_manifest();
+        let address = manifest.content_address().unwrap().to_string();
+
+        let (status, Json(stored)) =
+            store_signed_manifest(State(state.clone()), Json(manifest.clone()))
+                .await
+                .unwrap();
+        assert_eq!(status, axum::http::StatusCode::CREATED);
+        assert_eq!(stored.content_address, address);
+        assert!(stored.created);
+
+        let (status, Json(repeated)) =
+            store_signed_manifest(State(state.clone()), Json(manifest.clone()))
+                .await
+                .unwrap();
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert!(!repeated.created);
+
+        let Json(fetched) = get_signed_manifest(State(state.clone()), Path(address.clone()))
+            .await
+            .unwrap();
+        assert_eq!(fetched, manifest);
+
+        sqlx::query("DELETE FROM signed_manifests WHERE content_address = $1")
+            .bind(&address)
+            .execute(&pool)
+            .await
+            .expect("clean up test manifest");
+    }
 }

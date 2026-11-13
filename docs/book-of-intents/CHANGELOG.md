@@ -15,9 +15,10 @@ Format: date · version · what changed · evidence/why. Append-only.
   error.
 - **ADR-021:** the API is not a publisher signer; signing stays external, and
   Terra-operated key custody (KMS/HSM/offline) remains to be chosen.
-- **Verified:** `cargo test -p terra-api` **141 passed** (2 new), `cargo
-  test -p terra-geo --lib` **48 passed, 2 ignored**, workspace clippy and fmt
-  clean. DB-backed roundtrip and data-plane component storage remain.
+- **Verified:** `cargo test -p terra-api` **142 passed** (3 new, including an
+  env-gated DB roundtrip that runs in CI), `cargo test -p terra-geo --lib`
+  **48 passed, 2 ignored**, workspace clippy and fmt clean. Data-plane component
+  storage remains.
 - Evidence: `sprints/035-signed-manifest-persistence.md`;
   `ARCHITECTURAL_DECISIONS.md` ADR-021; Chapter 12 §12.8/§12.13; Chapter 13
   §13.8; Chapter 14; REQ-027; `IMPLEMENTATION_STATUS.md` B16/B20/C5;

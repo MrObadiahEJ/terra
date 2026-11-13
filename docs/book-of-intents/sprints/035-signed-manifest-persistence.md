@@ -1,8 +1,8 @@
 # Sprint 035 — Persist and Retrieve Signed Manifests by Content Address
 
-**Date:** 2026-11-13 · **Status:** done, committed (`795c60d`)
+**Date:** 2026-11-13 · **Status:** done, committed (`795c60d`, plus the DB-backed roundtrip test)
 **Gate:** `cargo fmt --all -- --check`; `cargo clippy -- -D warnings`;
-`cargo test -p terra-api` — **141 passed** (2 new)
+`cargo test -p terra-api` — **142 passed** (3 new; DB test skips without `DATABASE_URL`)
 
 ## Trigger
 
@@ -57,18 +57,18 @@ The API does not require a signing key for either endpoint.
 | --- | --- |
 | `cargo fmt --all -- --check` | clean |
 | `cargo clippy -- -D warnings` | clean workspace-wide |
-| `cargo test -p terra-api` | **141 passed** (2 new: tampered store rejected before insert; malformed address rejected) |
+| `cargo test -p terra-api` | **142 passed** (3 new: tampered store rejected before insert; malformed address rejected; DB-backed store/retrieve roundtrip) |
 | `cargo test -p terra-geo --lib` | **48 passed, 2 ignored** |
 
-The DB-backed store/retrieve roundtrip is not exercised locally because no
-PostgreSQL instance is available on this machine. CI applies migrations before
-`cargo test -p terra-api`, so the migration syntax is checked there; the unit
-tests cover the pre-database rejection paths. No BPF/SBF build was run locally.
+The roundtrip test is env-gated: it connects to `DATABASE_URL`, exercises the
+idempotent `201`/`200` store and digest retrieval, then deletes its row. CI sets
+`DATABASE_URL` and applies migrations before `cargo test -p terra-api`, so the
+migration and full path run there. A local run without `DATABASE_URL` prints a
+skip message and passes the pre-database tests. No BPF/SBF build was run
+locally.
 
 ## What is still missing
 
-- A DB-backed integration test for the idempotent store and retrieval path
-  (needs a test database or a transactional test fixture).
 - Content-addressed storage for **component bytes** (the manifest references
   storage URLs; ADR-020's `ContentAddress::verify_bytes` is not yet used on the
   data plane).

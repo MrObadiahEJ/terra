@@ -91,4 +91,4 @@ Stage 3.
 - [sprints/032-spatial-index-signed-manifests.md](sprints/032-spatial-index-signed-manifests.md) — spatial index decision (ADR-020) + quadtree discovery cells and content-addressed Ed25519-signed manifest library in `terra-geo`
 - [sprints/033-api-discovery-and-manifest-verification.md](sprints/033-api-discovery-and-manifest-verification.md) — API quadtree cell/cover endpoints and stateless signed-manifest verification; 6 targeted tests
 - [sprints/034-ci-format-and-clippy-gates.md](sprints/034-ci-format-and-clippy-gates.md) — workspace formatting + clippy cleanup with no behavior changes; 139 API tests, 48 geo tests
-- [sprints/035-signed-manifest-persistence.md](sprints/035-signed-manifest-persistence.md) — immutable signed-envelope storage and retrieval by content address (ADR-021); 141 API tests
+- [sprints/035-signed-manifest-persistence.md](sprints/035-signed-manifest-persistence.md) — immutable signed-envelope storage and retrieval by content address (ADR-021); 142 API tests
