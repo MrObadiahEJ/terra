@@ -27,6 +27,15 @@
   --accent-hover: #ffffff;
   --accent-soft: rgba(255, 255, 255, 0.06);
   --shadow-soft: 0 22px 60px rgba(0, 0, 0, 0.42);
+--accent-violet: #AB9FF2;
+--accent-violet-hover: #c0b6f0;
+--accent-violet-soft: rgba(171, 159, 242, 0.10);
+--surface-glass: color-mix(in srgb, var(--surface) 70%, transparent);
+--glass-border: color-mix(in srgb, var(--ink) 25%, transparent);
+--shadow-glass: 0 20px 50px rgba(0, 0, 0, 0.35);
+--gradient-violet-blue: linear-gradient(135deg, #AB9FF2 0%, #6B7BE0 40%, #4AA3DF 100%);
+--gradient-mesh: conic-gradient(from 0deg at 50% 50%, #AB9FF2 0%, #6B7BE0 120deg, #4AA3DF 240deg, #2E8BC0 360deg);
+--reduced-motion: none;
 }
 
 * {
@@ -6106,4 +6115,335 @@ body.atlas-immersive .compact-nav > summary span { display: none; }
   }
   body.atlas-immersive .map-controls .map-zoom-group { flex-direction: row; }
   .terra-nav-dock--collapsible { bottom: calc(46px + env(safe-area-inset-bottom)); }
+}
+
+/* ==========================================================================
+   Terra Atlas — investor-facing planetary observation surface
+   Dark glass chrome, violet accent, ambient gradient mesh behind the globe.
+   ========================================================================== */
+
+/* --- Ambient gradient mesh (behind globe chrome) --- */
+.atlas-gradient-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 20% 30%, color-mix(in srgb, var(--accent-violet) 25%, transparent), transparent 45rem),
+              radial-gradient(ellipse at 80% 70%, color-mix(in srgb, #6B7BE0 20%, transparent), 45rem),
+              radial-gradient(ellipse at 40% 10%, color-mix(in srgb, #4AA3DF 18%, transparent), 45rem),
+              var(--bg);
+  overflow: hidden;
+}
+.atlas-gradient-mesh::before {
+  content: "";
+  position: absolute;
+  inset: -50% -50% -50% -50%;
+  background: var(--gradient-mesh);
+  opacity: 0.14;
+  animation: atlas-mesh-pulse 10s ease-in-out infinite;
+}
+@keyframes atlas-mesh-pulse {
+  0%, 100% { opacity: 0.14; transform: scale(1); }
+  50% { opacity: 0.22; transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-gradient-mesh::before { animation: none; opacity: 0.16; }
+  .atlas-gradient-mesh { background: var(--bg); }
+}
+
+/* --- Glass window system --- */
+.atlas-window {
+  position: absolute;
+  z-index: 2000;
+  min-width: 280px;
+  min-height: 240px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.atlas-window.focused {
+  z-index: 2010;
+  border-color: color-mix(in srgb, var(--accent-violet) 55%, transparent);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--accent-violet) 30%, transparent);
+}
+.atlas-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  cursor: grab;
+}
+.atlas-window-header:active { cursor: grabbing; }
+.atlas-window-header h3 {
+  margin: 0;
+  font: 600 13px var(--font-display);
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.atlas-window-header-actions { display: flex; gap: 4px; }
+.atlas-window-btn {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.atlas-window-btn:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.atlas-window-btn.close:hover { background: color-mix(in srgb, #ef4444 20%, transparent); color: #fca5a5; }
+.atlas-window-body {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+}
+.atlas-window.resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  border-bottom: 2px solid var(--glass-border);
+  border-right: 2px solid var(--glass-border);
+  border-bottom-right-radius: 16px;
+  cursor: se-resize;
+}
+
+/* --- Minimized dock --- */
+.atlas-dock {
+  position: fixed;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1900;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.atlas-dock-item {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+.atlas-dock-item:hover { background: var(--accent-violet-soft); border-color: color-mix(in srgb, var(--accent-violet) 45%, transparent); }
+.atlas-dock-item.active { background: var(--accent-violet); color: var(--bg); }
+
+/* --- Mobile bottom sheets (<768px) --- */
+@media (max-width: 767px) {
+  .atlas-window {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 75dvh;
+    border-radius: 24px 24px 0 0;
+    border: none;
+    border-top: 1px solid var(--glass-border);
+  }
+  .atlas-window.resize-handle { display: none; }
+  .atlas-dock { bottom: 86px; left: 50%; transform: translateX(-50%); }
+  body.atlas-immersive .atlas-dock { bottom: 82px; }
+}
+
+/* --- Asset Inspector (3DGS) --- */
+.atlas-inspector-stage {
+  position: relative;
+  width: 100%;
+  height: 260px;
+  border-radius: 14px;
+  background: #0a0a0f;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.atlas-inspector-canvas { width: 100%; height: 100%; display: block; }
+.atlas-inspector-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12px;
+  gap: 8px;
+}
+
+/* --- Wallet / Rights panel --- */
+.atlas-wallet-header {
+  padding: 14px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--gradient-violet-blue);
+  border-radius: 20px 20px 0 0;
+}
+.atlas-wallet-header h3 {
+  margin: 0 0 8px 0;
+  font: 700 15px var(--font-display);
+  color: var(--bg);
+}
+.atlas-wallet-subtitle { font: 400 11px var(--font-display); color: color-mix(in srgb, var(--bg) 75%, transparent); }
+.atlas-wallet-account {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--bg) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 12%, transparent);
+  font-size: 12px;
+}
+.atlas-wallet-chip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+}
+.atlas-wallet-body { padding: 14px; }
+
+.atlas-rights-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  margin-bottom: 8px;
+  gap: 10px;
+}
+.atlas-rights-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.atlas-rights-info { flex: 1; min-width: 0; }
+.atlas-rights-name { font: 600 12.5px var(--font-display); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atlas-rights-loc { font: 400 10px var(--font-mono); color: var(--muted); }
+.atlas-rights-badge {
+  font: 500 10px var(--font-mono);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-violet) 15%, transparent);
+  color: var(--accent-violet);
+  border: 1px solid color-mix(in srgb, var(--accent-violet) 40%, transparent);
+}
+.atlas-rights-badge.sim { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #fbbf24; border-color: color-mix(in srgb, #f59e0b 40%, transparent); }
+.atlas-rights-badge.proto { background: color-mix(in srgb, #6366f1 15%, transparent); color: #a5b4fc; border-color: color-mix(in srgb, #6366f1 40%, transparent); }
+.atlas-rights-badge.vision { background: color-mix(in srgb, #8b5cf6 15%, transparent); color: #c084fc; border-color: color-mix(in srgb, #8b5cf6 40%, transparent); }
+.atlas-rights-badge.claimed { background: color-mix(in srgb, #22c55e 15%, transparent); color: #86efac; border-color: color-mix(in srgb, #22c55e 40%, transparent); }
+
+/* --- Honesty labels --- */
+.atlas-honesty {
+  font: 500 10px var(--font-mono);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--muted);
+  border: 1px solid var(--glass-border);
+}
+
+/* --- Tour overlay --- */
+.atlas-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--ink);
+}
+.atlas-tour-card {
+  width: min(460px, 92%);
+  max-height: 80dvh;
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  background: var(--surface-glass);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.atlas-tour-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.atlas-tour-progress {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  margin: 0 12px;
+  overflow: hidden;
+}
+.atlas-tour-progress-fill {
+  height: 100%;
+  background: var(--gradient-violet-blue);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.atlas-tour-body {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.atlas-tour-stop {
+  text-align: center;
+}
+.atlas-tour-stop h3 { margin: 0 0 6px 0; font: 600 16px var(--font-display); color: var(--ink); }
+.atlas-tour-stop p { margin: 0; font: 400 13px var(--font-display); color: var(--muted); line-height: 1.5; }
+.atlas-tour-actions {
+  padding: 16px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* --- 3DGS fallback note --- */
+.atlas-splat-note {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  padding-top: 6px;
 }

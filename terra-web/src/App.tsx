@@ -7,7 +7,7 @@ import { useWallet } from './lib/wallet'
 import { useAppStore } from './store/appStore'
 import { LocaleProvider, useLocale, type TranslationKey } from './lib/locale'
 
-const GlobePage = lazy(() => import('./pages/GlobePage'))
+const AtlasPage = lazy(() => import('./components/atlas/AtlasPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
 const LabPage = lazy(() => import('./pages/LabPage'))
 const LandDetailPage = lazy(() => import('./pages/LandDetailPage'))
@@ -89,7 +89,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/welcome" replace />} />
               <Route path="/welcome" element={<WelcomePage />} />
-              <Route path="/atlas" element={<GlobePage />} />
+              <Route path="/atlas" element={<AtlasPage />} />
               <Route path="/lab/land" element={<LandDetailPage />} />
               <Route path="/lab" element={<LabPage />} />
               <Route path="/demo" element={<DemoPage />} />
