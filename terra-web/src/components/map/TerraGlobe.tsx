@@ -14,6 +14,7 @@ import { buildingHeightM, roadStyle, type PlannedRoad } from '../../lib/atlasLay
 import { FpsWatchdog, TIER_SETTINGS, type GraphicsTier } from '../../lib/perfTier'
 import { resolveTerrain, type TerrainStatus } from '../../lib/cesiumTerrain'
 import { type SceneNodeRow } from '../../lib/runtime'
+import { type QuadCellRow, type QuadCoverRow } from '../../lib/runtime'
 import LeafletMap from './LeafletMap'
 import ThreeAtlasFallback from './ThreeAtlasFallback'
 import { DEMO_BUILDINGS } from '../../lib/demoData'
@@ -95,6 +96,9 @@ interface TerraGlobeProps {
   onTerrainStatus?: (status: TerrainStatus) => void
   /** Optional 3D Tiles tileset (photogrammetry model, RFC-013 Ph.C). */
   tilesetUrl?: string | null
+  /** Quadtree cover cells for the current camera frustum, used to coarsely
+   *  cull runtime nodes before rendering (Chapter 13 §13.3). */
+  coverCells?: QuadCoverRow | null
   /** Runtime scene graph nodes (REQ-027/REQ-028): independently stored
    *  components fetched with provider fallback. Rendered as clamped
    *  footprint polygons; fetched nodes render as extruded volumes. */
@@ -177,6 +181,7 @@ export default function TerraGlobe({
   onTierCapped,
   onTerrainStatus,
   tilesetUrl = null,
+  coverCells = null,
   runtimeNodes = [],
   fetchedNodeIds = [],
   fetchedAssets = new Map<string, {
@@ -900,6 +905,28 @@ export default function TerraGlobe({
       if (!extent || extent.type !== 'Polygon') continue
       const ring = extent.coordinates?.[0]
       if (!ring || ring.length < 4) continue
+      if (coverCells) {
+        let nMinLon = Infinity
+        let nMinLat = Infinity
+        let nMaxLon = -Infinity
+        let nMaxLat = -Infinity
+        for (const [lon, lat] of ring) {
+          nMinLon = Math.min(nMinLon, lon)
+          nMaxLon = Math.max(nMaxLon, lon)
+          nMinLat = Math.min(nMinLat, lat)
+          nMaxLat = Math.max(nMaxLat, lat)
+        }
+        const hitsCell = coverCells.cells.some((c: QuadCellRow) => {
+          const cb = c.bounds
+          return !(
+            nMaxLon < cb.min_lon ||
+            nMinLon > cb.max_lon ||
+            nMaxLat < cb.min_lat ||
+            nMinLat > cb.max_lat
+          )
+        })
+        if (!hitsCell) continue
+      }
       const hierarchy = ring.map(([lon, lat]: [number, number]) => Cesium.Cartesian3.fromDegrees(lon, lat))
       const isFetched = fetchedNodesRef.current.has(node.object_id)
       viewer.entities.add({
@@ -947,7 +974,7 @@ export default function TerraGlobe({
       })
     }
     viewer.scene.requestRender()
-  }, [runtimeNodes, fetchedNodeIds, showLabels, graphicsTier])
+  }, [runtimeNodes, fetchedNodeIds, showLabels, graphicsTier, coverCells])
 
   // ---- render fetched 3D model assets as Cesium models -----------------------
   // Each fetched component asset (GLB bytes) is rendered as a Cesium Model at

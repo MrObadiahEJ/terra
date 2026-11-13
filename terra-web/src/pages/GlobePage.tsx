@@ -28,11 +28,20 @@ import {
   fetchComponentAsset,
   createManifest,
   listManifests,
+  getQuadCover,
   type SceneWithNodes,
   type SceneNodeRow,
   type ManifestRow,
+  type QuadCoverRow,
   runtimeLodFromHeight,
 } from '../lib/runtime'
+import {
+  cameraViewBounds,
+  selectVisible,
+  type Bounds,
+  type Camera,
+  type Viewport,
+} from '../lib/viewport'
 import { listModels, type ThreeDModel } from '../lib/reconstruction'
 import SpatialHistoryPanel from '../components/panels/SpatialHistoryPanel'
 import { listSpatialModels } from '../lib/spatial'
@@ -165,6 +174,9 @@ export default function GlobePage() {
     return parcelFocus(useAppStore.getState().selectedOffChain) ?? DEFAULT_FOCUS
   })
   const [lod, setLod] = useState(() => lodFromHeight(DEFAULT_FOCUS.height))
+  /** Quadtree cover cells for the current camera frustum (Chapter 13 §13.3),
+   * derived from camera bounds each time the camera moves. */
+  const [coverCells, setCoverCells] = useState<QuadCoverRow | null>(null)
   const [basemap, setBasemap] = useState<'imagery' | 'terrain' | 'osm'>(
     () => {
       const saved = localStorage.getItem('terra-atlas-basemap')
@@ -521,6 +533,56 @@ export default function GlobePage() {
     refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
   }, [refreshBuildings, resolvedTier, layers.buildings])
 
+  const viewportRef = useRef<Viewport>({
+    widthPx: window.innerWidth,
+    heightPx: window.innerHeight,
+    fovDeg: 60,
+  })
+
+  /** Bounding box of a scene node's spatial_extent polygon (for culling). */
+  const nodeBounds = (node: SceneNodeRow): Bounds | null => {
+    const extent = node.spatial_extent
+    if (!extent || extent.type !== 'Polygon') return null
+    const ring = extent.coordinates?.[0]
+    if (!ring || ring.length < 4) return null
+    let minLon = Infinity
+    let minLat = Infinity
+    let maxLon = -Infinity
+    let maxLat = -Infinity
+    for (const [lon, lat] of ring) {
+      minLon = Math.min(minLon, lon)
+      maxLon = Math.max(maxLon, lon)
+      minLat = Math.min(minLat, lat)
+      maxLat = Math.max(maxLat, lat)
+    }
+    return { minLon, minLat, maxLon, maxLat }
+  }
+
+  /** Derive quadtree cover cells from the camera frustum (Chapter 13 §13.3). */
+  const refreshCoverCellsForCam = async (cam: {
+    longitude: number
+    latitude: number
+    height: number
+  }) => {
+    const camBounds = cameraViewBounds(
+      {
+        lon: cam.longitude,
+        lat: cam.latitude,
+        heightM: cam.height,
+        headingDeg: 0,
+        pitchDeg: -45,
+        rollDeg: 0,
+      },
+      viewportRef.current,
+    )
+    void getQuadCover({
+      min_lon: camBounds.minLon,
+      min_lat: camBounds.minLat,
+      max_lon: camBounds.maxLon,
+      max_lat: camBounds.maxLat,
+    }).then((cells: QuadCoverRow) => setCoverCells(cells))
+  }
+
   // Auto-create/resolve manifest when camera enters a new region (grid cell).
   // Resolves scene graph at current LOD whenever manifest or LOD changes.
   useEffect(() => {
@@ -531,7 +593,10 @@ export default function GlobePage() {
       const lod = runtimeLodFromHeight(cam.height)
       if (sceneGraph && sceneGraph.scene.lod_level !== lod) {
         resolveSceneAtLod(currentManifest.id, lod)
-          .then((graph) => setSceneGraph(graph))
+          .then((graph) => {
+            setSceneGraph(graph)
+            void refreshCoverCellsForCam(cam)
+          })
           .catch((err) => setSceneError(err instanceof Error ? err.message : String(err)))
       }
       return
@@ -561,6 +626,7 @@ export default function GlobePage() {
         const graph = await resolveSceneAtLod(manifest.id, lod)
         if (cancelled) return
         setSceneGraph(graph)
+        void refreshCoverCellsForCam(cam)
         setSceneError(null)
       } catch (err) {
         if (cancelled) return
@@ -1029,6 +1095,41 @@ export default function GlobePage() {
     }
   }, [shareTarget])
 
+  /** Cull scene-graph nodes to those visible in the current camera frustum
+   * (Chapter 13 §13.6: frustum + occlusion + range culling, SSE-based LOD).
+   * Computed in an effect so refs are read outside render. */
+  const [culledNodes, setCulledNodes] = useState<SceneNodeRow[]>([])
+  useEffect(() => {
+    const cam = lastCamRef.current
+    const camera: Camera = {
+      lon: cam.longitude,
+      lat: cam.latitude,
+      heightM: cam.height,
+      headingDeg: 0,
+      pitchDeg: -45,
+      rollDeg: 0,
+      viewportFovDeg: 60,
+    }
+    const viewport: Viewport = {
+      widthPx: window.innerWidth,
+      heightPx: window.innerHeight,
+      fovDeg: 60,
+    }
+    const nodes = sceneGraph?.nodes ?? []
+    const results = selectVisible(
+      nodes
+        .map((n) => ({ componentId: n.object_id, bounds: nodeBounds(n) }))
+        .filter(
+          (n): n is { componentId: string; bounds: Bounds } =>
+            n.bounds != null,
+        ),
+      camera,
+      viewport,
+    )
+    const visibleIds = new Set(results.filter((r) => r.visible).map((r) => r.componentId))
+    setCulledNodes(nodes.filter((n) => visibleIds.has(n.object_id)))
+  }, [sceneGraph, camMoveTick])
+
   return (
     <div className="globe-layout">
       {/* 3D globe (2D Leaflet fallback without WebGL) */}
@@ -1071,7 +1172,8 @@ export default function GlobePage() {
           onTierCapped={onTierCapped}
           onTerrainStatus={setTerrainStatus}
           tilesetUrl={tilesetUrl}
-          runtimeNodes={sceneGraph?.nodes ?? []}
+          runtimeNodes={culledNodes}
+          coverCells={coverCells}
           fetchedNodeIds={fetchedNodeIds}
           fetchedAssets={fetchedAssets}
           onFetchComponent={fetchComponent}

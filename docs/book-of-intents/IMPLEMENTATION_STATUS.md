@@ -8,9 +8,11 @@ signed discovery `638912a` (2026-11-13); **data-plane component artifact
 storage + `submit_component` bug fixes (Sprint 037)**; **frontend quadtree
 discovery client `getQuadCell`/`getQuadCover` + data-plane artifact fallback
 in `fetchComponentAsset` (Sprint 038)**; **frustum/occlusion culling +
-screen-space-error LOD module `viewport.ts` (Sprint 039)**.
+screen-space-error LOD module `viewport.ts` + GlobePage wiring
+(`cameraViewBounds` cover cells + `selectVisible` culling of runtime nodes)
+(Sprints 039–040)**.
 **Method:** source inspection + test execution where machine limits allow.
-Vitest **115/115** executed this date. Cargo suites: baselines below are from their
+Vitest **120/120** executed this date. Cargo suites: baselines below are from their
 last verified runs (BPF count re-confirmed by source: 307 `#[tokio::test]`);
 re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 
@@ -115,7 +117,7 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | D9 | Frontend/UX polish: demo header source chip | 1 | `src/pages/DemoPage.tsx`; frontend full gate green (2026-11-02) | — |
 | D10 | Frontend/UX polish: welcome offline badge | 1 | `src/pages/WelcomePage.tsx`; frontend full gate green (2026-11-02) | — |
 | D11 | Frontend logic unit tests: activity store + API GeoJSON parse helpers | 1 | `src/lib/activityStore.test.ts` + `src/lib/api.test.ts`; vitest **65/65** (2026-11-02) | — |
-| D12 | Distributed runtime client (REQ-027/028): manifest resolver, scene-graph manager, LOD 0–4, provider fallback, asset retrieval, validation-state tracking | 2 – IMPLEMENTED, NOT FULLY VERIFIED | `src/lib/runtime.ts` (637 lines) + `src/lib/runtime.test.ts` (524 lines) + `src/lib/viewport.ts` (283 lines) + `src/lib/viewport.test.ts` (304 lines); wired into `GlobePage.tsx`; vitest **115/115** (2026-11-13) | No live-cluster multi-provider retrieval yet (B6 devnet funding blocks it); runtime is wired but unexercised end-to-end. New: `fetchComponentArtifact` data-plane fallback (content-addressed `GET /components/{id}/artifact` with client-side digest re-verification); `getQuadCell`/`getQuadCover` quadtree discovery client (Chapter 13 §13.3); `screenSpaceError`/`lodFromScreenSpaceError` + frustum/occlusion cull (`cullComponent`/`selectVisible`) per Chapter 13 §13.6 |
+| D12 | Distributed runtime client (REQ-027/028): manifest resolver, scene-graph manager, LOD 0–4, provider fallback, asset retrieval, validation-state tracking | 2 – IMPLEMENTED, NOT FULLY VERIFIED | `src/lib/runtime.ts` (637 lines) + `src/lib/runtime.test.ts` (524 lines) + `src/lib/viewport.ts` (~352 lines) + `src/lib/viewport.test.ts` (~353 lines); wired into `GlobePage.tsx` (cover cells from camera bounds + frustum/occlusion culling of runtime nodes); vitest **120/120** (2026-11-13) | No live-cluster multi-provider retrieval yet (B6 devnet funding blocks it); runtime is wired but unexercised end-to-end. New: `fetchComponentArtifact` data-plane fallback (content-addressed `GET /components/{id}/artifact` with client-side digest re-verification); `getQuadCell`/`getQuadCover` quadtree discovery client (Chapter 13 §13.3); `screenSpaceError`/`lodFromScreenSpaceError` + frustum/occlusion cull (`cullComponent`/`selectVisible`) per Chapter 13 §13.6, wired into `GlobePage` scene requests |
 | D13 | Fetched 3D model rendering on Cesium globe with component transform | 2 – IMPLEMENTED, NOT FULLY VERIFIED | commit `b60f192`; `TerraGlobe.tsx` renders GLB models placed by component `global_transform`; tsc clean, build OK | Model provenance display pending |
 | D14 | Atlas/globe visual verification (16-point requirement audit) | 1 – IMPLEMENTED AND VERIFIED | `ThreeAtlasFallback.tsx` renders a Three.js host `<div>` (was returning `void`); `TerraGlobe.tsx` axis-move buttons + WASD use typed runtime accessors (`moveWest/East/South/North/Up/Down`); `GlobePage.tsx` `failedRegionsRef` dedupes `sceneError` banner retries; 3 empty files removed (`ThreeNavOverlay.tsx`, `TerraFlightPad.tsx`, `__write-probe.ts`) | tsc clean; vitest 83/83; `vite build` PASS (GlobePage 82.4 kB gz, TerraGlobe 874.2 kB gz) |
 | D15 | Progressive tier loading (lodFromHeight, TIER_SETTINGS.buildingCap, selectBuildingsForTier, distanceDisplayCondition) | 1 – IMPLEMENTED AND VERIFIED | `src/lib/lod.ts`, `src/lib/perfTier.ts`; drives building LOD selection by camera distance + height; vitest 83/83 | — |
@@ -143,6 +145,6 @@ re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1.
 | API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **147** | **2026-11-13 (executed; grew from 143 via 2 DB-backed component-artifact roundtrip tests + 2 storage unit tests)** | before release |
 | Geo-engine (`cargo test --lib` + doctests) | **48 (+2 ignored)** | **2026-11-13 (executed; unchanged from Sprint 032)** | before release |
 | Identity BPF | **23** | **2026-11-02 (executed; required `anchor build --skip-lint` — stale-`.so` guard)** | before release |
-| Frontend vitest (`pnpm exec vitest run`) | **115/115** | **2026-11-13 (executed; grew from 91 via 24 viewport culling/SSE tests)** | each story change |
+| Frontend vitest (`pnpm exec vitest run`) | **120/120** | **2026-11-13 (executed; grew from 115 via 5 `destinationPoint`/`cameraViewBounds` tests)** | each story change |
 | Frontend gates (`tsc -b` + eslint + build) | tsc/build green; eslint not green (17 pre-existing errors) | **2026-11-13 (executed; no new lint errors from Sprint 037 — `runtime.ts` carries 8 pre-existing `no-explicit-any` errors, unchanged)** | each story change |
 | Frontend bundle budget (`pnpm build:check`) | entry **300.2 kB gz** / initial **305.5 kB gz** / Cesium **1098.5 kB lazy** / total **1866.9 kB** | **2026-11-13 (executed; PASS, within budget: entry ≤360, Cesium ≤1200, total ≤1900)** | each frontend build |

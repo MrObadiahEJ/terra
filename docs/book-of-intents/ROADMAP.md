@@ -122,11 +122,13 @@ concern, not a Stage 4 blocker.
   retrieval now exist (Sprints 032/033/035/036); data-plane component byte
   storage (`PUT/GET /components/{id}/artifact`, migration 0045,
   `store_content_addressed`) is local-verified (Sprint 037); the frontend
-  quadtree discovery client (`getQuadCell`/`getQuadCover`) and screen-space
-  error + frustum/occlusion culling module (`viewport.ts`, `cullComponent`,
-  `selectVisible`) are local-verified (Sprints 038/039) but not yet wired into
-  `GlobePage` scene requests or exercised against a live cluster; live-cluster
-  verification (B6).
+  quadtree discovery client (`getQuadCell`/`getQuadCover`) is derived from
+  camera bounds via `cameraViewBounds` and wired into `GlobePage` scene
+  requests (Sprint 038); the screen-space-error + frustum/occlusion culling
+  module (`viewport.ts`, `cullComponent`, `selectVisible`) is applied to
+  `runtimeNodes` in `GlobePage` (Sprints 039–040). Remaining: spatial tiling /
+  3D Tiles pipeline; expose the package UUID through scene nodes so
+  `fetchComponentArtifact` is automatic; live-cluster verification (B6).
 
 ## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
 research complete; founder-gated)

@@ -2,6 +2,29 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 040: wire quadtree discovery + culling/SSE LOD into GlobePage
+
+- **`terra-web/src/lib/viewport.ts`**: added `destinationPoint` (great-circle
+  destination point) and `cameraViewBounds` (projects the camera frustum to a
+  ground bounding box for deriving quadtree cover cells from camera bounds).
+- **`terra-web/src/pages/GlobePage.tsx`**: `viewportRef` + `nodeBounds(node)`;
+  `refreshCoverCellsForCam` (`cameraViewBounds` → `getQuadCover`) invoked on
+  scene-graph resolution; `culledNodes` state recomputed via `selectVisible`
+  (frustum/occlusion/range cull + SSE LOD) on camera move; `coverCells` passed
+  to `TerraGlobe`.
+- **`terra-web/src/components/map/TerraGlobe.tsx`**: new `coverCells` prop;
+  runtime-node render loop skips nodes whose `spatial_extent` bounding box does
+  not intersect any cover cell (coarse quadtree pre-cull).
+- **`terra-web/src/lib/viewport.test.ts`**: +5 tests (`destinationPoint`,
+  `cameraViewBounds`); viewport suite now 29 tests.
+- **Verified:** `tsc -b` clean, vitest **120/120** (was 115/115), eslint no new
+  errors, `pnpm build:check` PASS (entry 300.2 / initial 305.5 / Cesium
+  1098.5 / total 1868.7 kB gz).
+- Evidence: `sprints/040-viewport-globe-wiring.md`;
+  `IMPLEMENTATION_STATUS.md` header/D12/baselines;
+  `REQUIREMENTS_TRACEABILITY.md` REQ-028;
+  `work/CURRENT.md` items 4–5; ROADMAP.md Stage 4 item.
+
 ## 2026-11-13 — Sprint 039: frustum/occlusion culling + screen-space-error LOD
 
 - **`terra-web/src/lib/viewport.ts`** (new): pure, dependency-free viewport /

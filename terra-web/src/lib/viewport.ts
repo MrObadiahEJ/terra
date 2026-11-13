@@ -177,6 +177,71 @@ export function bearingDeg(lat1: number, lon1: number, lat2: number, lon2: numbe
   return normaliseHeading((Math.atan2(y, x) * RAD2DEG + 360) % 360)
 }
 
+/** Destination point given a start, a bearing (degrees clockwise from north)
+ * and a great-circle distance in metres. Wraps longitude to [-180, 180]. */
+export function destinationPoint(
+  latDeg: number,
+  lonDeg: number,
+  bearing: number,
+  distanceM: number,
+): { lat: number; lon: number } {
+  const lat1 = latDeg * DEG2RAD
+  const lon1 = lonDeg * DEG2RAD
+  const brg = bearing * DEG2RAD
+  const d = distanceM / EARTH_RADIUS_M
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) +
+      Math.cos(lat1) * Math.sin(d) * Math.cos(brg),
+  )
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(brg) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
+    )
+  return {
+    lat: lat2 * RAD2DEG,
+    lon: ((lon2 * RAD2DEG + 540) % 360) - 180,
+  }
+}
+
+/** Project the camera frustum to a ground bounding box (Chapter 13 §13.3:
+ * visible frustum → spatial partitions). Uses the camera heading as the view
+ * centre, the FOV as the left/right extent, and pitch-derived near/far
+ * distances along the look direction. */
+export function cameraViewBounds(
+  camera: Camera,
+  viewport: Viewport,
+): Bounds {
+  const fov = (viewport.fovDeg || DEFAULT_FOV_DEG) * DEG2RAD
+  const halfFov = fov / 2
+  const h = Math.max(camera.heightM, 10)
+  const pitch = Math.abs(camera.pitchDeg) * DEG2RAD
+  const centerDistM = h / Math.max(Math.tan(pitch), 0.05)
+  const nearDistM = centerDistM * 0.5
+  const farDistM = centerDistM * 2
+  const brgCenter = normaliseHeading(camera.headingDeg)
+  const corners = [
+    [nearDistM, -halfFov],
+    [nearDistM, +halfFov],
+    [farDistM, -halfFov],
+    [farDistM, +halfFov],
+  ]
+  let minLon = Infinity
+  let minLat = Infinity
+  let maxLon = -Infinity
+  let maxLat = -Infinity
+  for (const [distM, bearingOffset] of corners) {
+    const brg = normaliseHeading(brgCenter + bearingOffset * RAD2DEG)
+    const dest = destinationPoint(camera.lat, camera.lon, brg, distM)
+    minLon = Math.min(minLon, dest.lon)
+    maxLon = Math.max(maxLon, dest.lon)
+    minLat = Math.min(minLat, dest.lat)
+    maxLat = Math.max(maxLat, dest.lat)
+  }
+  return { minLon, minLat, maxLon, maxLat }
+}
+
 /** True when `bounds` centre is outside the camera's horizontal view cone. */
 export function outsideHorizontalFov(bounds: Bounds, camera: Camera): boolean {
   const { lon, lat } = boundsCenterAndRadius(bounds)

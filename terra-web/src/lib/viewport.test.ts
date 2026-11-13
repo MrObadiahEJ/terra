@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   bearingDeg,
   boundsCenterAndRadius,
+  cameraViewBounds,
   cullComponent,
   defaultOptions,
   DEFAULT_LOD_STEP_SSE,
   DEFAULT_SSE_THRESHOLD,
+  destinationPoint,
   haversineDeg,
   headingDelta,
   isOccluded,
@@ -85,6 +87,58 @@ describe('bearingDeg', () => {
   })
   it('east is 90', () => {
     expect(bearingDeg(0, 0, 0, 1)).toBeCloseTo(90, 1)
+  })
+})
+
+describe('destinationPoint', () => {
+  it('moving north 1 degree of latitude lands ~1 deg lat higher', () => {
+    const d = destinationPoint(0, 0, 0, haversineDeg(0, 0, 1, 0))
+    expect(d.lat).toBeCloseTo(1, 1)
+    expect(d.lon).toBeCloseTo(0, 1)
+  })
+  it('moving east 1 degree of longitude at equator lands ~1 deg lon higher', () => {
+    const d = destinationPoint(0, 0, 90, haversineDeg(0, 0, 0, 1))
+    expect(d.lon).toBeCloseTo(1, 1)
+    expect(d.lat).toBeCloseTo(0, 1)
+  })
+  it('south then north returns to the start', () => {
+    const south = destinationPoint(10, 20, 180, 500_000)
+    const back = destinationPoint(south.lat, south.lon, 0, 500_000)
+    expect(back.lat).toBeCloseTo(10, 1)
+    expect(back.lon).toBeCloseTo(20, 1)
+  })
+})
+
+describe('cameraViewBounds', () => {
+  const camera: Camera = {
+    lon: 8.5,
+    lat: 47.4,
+    heightM: 1000,
+    headingDeg: 0,
+    pitchDeg: -45,
+    rollDeg: 0,
+  }
+  const viewport: Viewport = { widthPx: 1920, heightPx: 1080, fovDeg: 60 }
+
+  it('returns a valid bounds extending in the view direction', () => {
+    const b = cameraViewBounds(camera, viewport)
+    // Non-empty box.
+    expect(b.minLon).toBeLessThan(b.maxLon)
+    expect(b.minLat).toBeLessThan(b.maxLat)
+    // Camera longitude is near the box centre; box extends north (heading 0).
+    expect(b.minLon).toBeLessThanOrEqual(camera.lon)
+    expect(b.maxLon).toBeGreaterThanOrEqual(camera.lon)
+    expect(b.maxLat).toBeGreaterThan(camera.lat)
+  })
+  it('grows with camera height', () => {
+    const near = cameraViewBounds({ ...camera, heightM: 500 }, viewport)
+    const far = cameraViewBounds({ ...camera, heightM: 5000 }, viewport)
+    expect(far.maxLon - far.minLon).toBeGreaterThan(
+      near.maxLon - near.minLon,
+    )
+    expect(far.maxLat - far.minLat).toBeGreaterThan(
+      near.maxLat - near.minLat,
+    )
   })
 })
 
