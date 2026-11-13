@@ -130,7 +130,6 @@ pub async fn register_worker(
         INSERT INTO worker_registrations (worker_id, wallet_address, capabilities)
         VALUES ($1, $2, $3)
         ON CONFLICT (worker_id) DO UPDATE SET
-            wallet_address = EXCLUDED.wallet_address,
             capabilities = EXCLUDED.capabilities,
             status = 'active',
             last_heartbeat_at = now(),

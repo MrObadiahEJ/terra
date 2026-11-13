@@ -2,6 +2,16 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 043: worker identity takeover fix (REQ-038)
+
+- **`terra-core/api/src/routes/workers.rs`**: `register_worker` no longer overwrites
+  `wallet_address` on `ON CONFLICT (worker_id)` — a worker's wallet is set once at
+  creation and cannot be hijacked by re-registering under a different wallet.
+  Closes the REQ-038 identity-takeover vector where any caller could re-register
+  an existing worker under their own wallet.
+- Verified: `cargo check -p terra-api` clean; `cargo clippy -- -D warnings` clean;
+  `cargo fmt --check` clean.
+
 ## 2026-11-13 — Sprint 042: P0 security & trust-chain fixes (REQ-026/026a/027/028/029–040)
 
 - **`terra-core/programs/terra_registry/src/security.rs`**: Fixed PDA seed circular reference in `create_review_case`/`finalize_decision` (was deriving PDA from the account's own key, making review pipeline unexecutable); `finalize_appeal` now requires committee reputation + `appeal.decision == decision.key()` binding (was permissionless); added `emergency_lift` instruction with `close = requester` (was a censorship gadget with no lift path); added `AppealDecisionMismatch` and `ProtectionExpired` `TerraError` variants; added `EmergencyProtectionLifted` event.
