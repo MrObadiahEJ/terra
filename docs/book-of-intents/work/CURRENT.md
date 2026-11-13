@@ -1,7 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `638912a`; sprints 001–036 delivered).
+Last reconciled: 2026-11-13 (committed `638912a`; sprints 001–036 delivered;
+sprint 037 done but uncommitted).
 Sprint notes for 025–036 are in `sprints/025-*.md` … `sprints/036-*.md`.
 
 ## Active intents
@@ -84,11 +85,24 @@ Sprint notes for 025–036 are in `sprints/025-*.md` … `sprints/036-*.md`.
 3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
    institutional identity (REQ-020), residency credential (REQ-021), lien
    encumbrance (REQ-022).
-4. **Data-plane content-addressed storage + scene-path cells** — signed
-   manifests now persist, list by region/cell, and retrieve by digest (Sprints
-   035/036). Next: store and verify component bytes by digest, expose retrieval,
-   and derive quadtree cells from camera bounds in scene requests. This is local
-   work and does not need SOL.
-5. **Frustum/occlusion culling + screen-space error LOD** — specified in
-   Chapter 13, not yet coded.
+4. **Data-plane component artifact storage** — **done (Sprint 037)**: component
+   bytes stored under their SHA-256 content address (`migration 0045` +
+   `PUT/GET /components/{id}/artifact` + `store_content_addressed`), served with
+   client-side digest re-verification, and wired as a frontend fallback in
+   `fetchComponentAsset`.
+   **Quadtree discovery cells wired into the frontend runtime client (Sprint 038):**
+   `getQuadCell`/`getQuadCover` call `GET /spatial/cell` + `GET /spatial/cover`
+   (Chapter 13 §13.3), so scene requests can resolve coverage cells instead of
+   only PostGIS/manifest lookups. Remaining: expose the package UUID through
+   scene nodes so `fetchComponentArtifact` is automatic; derive cover cells from
+   camera bounds in `GlobePage` scene requests.
+5. **Frustum/occlusion culling + screen-space error LOD** — **done (Sprint 039):**
+   new pure module `terra-web/src/lib/viewport.ts` (no Cesium dependency) with
+   `screenSpaceError`, `lodFromScreenSpaceError`, frustum cull
+   (`outsideHorizontalFov`/`outsideVerticalFov`), occlusion/backface cull
+   (`isOccluded`), and combined `cullComponent`/`selectVisible`, plus
+   `terra-web/src/lib/viewport.test.ts` (24 tests). Distance-based LOD
+   (`lodFromHeight`, `TIER_SETTINGS.buildingCap`, `selectBuildingsForTier`)
+   already existed; screen-space error and culling are now implemented and
+   unit-tested, awaiting GlobePage wiring + live-cluster verification.
 

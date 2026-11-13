@@ -116,12 +116,17 @@ concern, not a Stage 4 blocker.
   025, 2026-11-02). Remaining: route reconstruction jobs through component
   packages; live-cluster verification (B6).
 - ~~Progressive delivery & runtime discovery (REQ-028)~~ — **implemented** (sprint
-  025, 2026-11-02/03). Remaining: spatial tiling / 3D Tiles pipeline, frustum +
-  occlusion culling, screen-space error LOD; quadtree discovery cells, cell/cover
-  API endpoints, and content-addressed signed manifests with verification,
-  persistence, region/cell discovery and retrieval now exist (Sprints
-  032/033/035/036) but still need data-plane component storage and scene-path
-  wiring; live-cluster verification (B6).
+  025, 2026-11-02/03). Remaining: spatial tiling / 3D Tiles pipeline,
+  quadtree discovery cells, cell/cover API endpoints, and content-addressed
+  signed manifests with verification, persistence, region/cell discovery and
+  retrieval now exist (Sprints 032/033/035/036); data-plane component byte
+  storage (`PUT/GET /components/{id}/artifact`, migration 0045,
+  `store_content_addressed`) is local-verified (Sprint 037); the frontend
+  quadtree discovery client (`getQuadCell`/`getQuadCover`) and screen-space
+  error + frustum/occlusion culling module (`viewport.ts`, `cullComponent`,
+  `selectVisible`) are local-verified (Sprints 038/039) but not yet wired into
+  `GlobePage` scene requests or exercised against a live cluster; live-cluster
+  verification (B6).
 
 ## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
 research complete; founder-gated)

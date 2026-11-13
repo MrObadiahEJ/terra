@@ -2,7 +2,71 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
-## 2026-11-13 — Sprint 036: signed manifest discovery by region and cell
+## 2026-11-13 — Sprint 039: frustum/occlusion culling + screen-space-error LOD
+
+- **`terra-web/src/lib/viewport.ts`** (new): pure, dependency-free viewport /
+  culling module per Chapter 13 §13.6 — `screenSpaceError`, `lodFromScreenSpaceError`,
+  frustum cull (`outsideHorizontalFov`/`outsideVerticalFov`), occlusion/backface
+  cull (`isOccluded`), combined `cullComponent`/`selectVisible`, and WGS84
+  geometry helpers (`haversineDeg`, `bearingDeg`, `metersPerDegreeLat/Lon`).
+- **`terra-web/src/lib/viewport.test.ts`** (new): 24 unit tests covering geometry,
+  SSE, LOD clamping, and all cull reasons; no Cesium, no network.
+- **Verified:** `tsc -b` clean, vitest **115/115** (was 91/115; +24), eslint no
+  new errors, `pnpm build:check` PASS (entry 300.2 / initial 305.5 / Cesium
+  1098.5 / total 1866.9 kB gz).
+- Evidence: `sprints/039-frustum-culling-sse-lod.md`;
+  `IMPLEMENTATION_STATUS.md` header/D12/baselines;
+  `REQUIREMENTS_TRACEABILITY.md` REQ-028;
+  `work/CURRENT.md` item 5; ROADMAP.md Stage 4 item.
+
+- **`getQuadCell(lon, lat, level?)`** (`runtime.ts`): `GET /spatial/cell` — the
+  quadtree cell containing a point, mirroring the API `CellResponse` schema.
+- **`getQuadCover(min_lon, min_lat, max_lon, max_lat, level?)`** (`runtime.ts`):
+  `GET /spatial/cover` — the quadtree cells intersecting a bounds rectangle,
+  south-to-north / west-to-east order, mirroring `CoverResponse`. Stateless
+  control-plane lookups; no database dependency on the client.
+- Both use the existing `request` helper (retries, timeout, `API_BASE`).
+- **Verified:** `tsc -b` clean, vitest **91/91** (was 86/86; +5 quadtree
+  discovery tests), eslint no new errors (8 pre-existing `no-explicit-any` in
+  `runtime.ts`, unchanged), `pnpm build:check` PASS
+  (entry 300.2 / initial 305.5 / Cesium 1098.5 / total 1866.9 kB gz).
+- Evidence: `sprints/038-quadtree-discovery-client.md`;
+  `IMPLEMENTATION_STATUS.md` header/D12/baselines;
+  `REQUIREMENTS_TRACEABILITY.md` REQ-028;
+  `work/CURRENT.md` items 4–5; ROADMAP.md Stage 4 item.
+
+- **Migration 0045** (`terra-core/api/migrations/0045_component_artifacts.sql`):
+  `component_artifacts(component_package_id PK → component_packages,
+  content_address, storage_ref, storage_backend, content_type, size_bytes)`
+  plus a `content_address` index. Content-addressed storage for component package
+  bytes.
+- **`PUT /components/{id}/artifact`** (`components.rs`): stores raw bytes under
+  the SHA-256 content address; optional `X-Content-SHA256` declared digest is
+  normalized (`sha256:` prefix) and checked before storage; identical bytes are
+  idempotent, different bytes → `409 Conflict`; public components get immutable
+  cache headers.
+- **`GET /components/{id}/artifact`** (`components.rs`): enforces privacy
+  access, loads bytes by `storage_ref`, re-hashes and rejects digest mismatch.
+- **`StorageBackend::store_content_addressed`** (`storage.rs`): stores under
+  `content/sha256/aa/bb/<hex>`, idempotent.
+- **Bug fixes exposed by new DB-backed tests:** `submit_component` had 35
+  columns vs 36 placeholders (stray `$36` left from migration 0041's
+  `component_version` column — now takes its DEFAULT `'v1'`); `creation_timestamp`
+  parsed from RFC3339 into `DateTime<Utc>` instead of bound as text to a
+  `TIMESTAMPTZ` column; `dependencies`/`overlap_ids` coerced `None → []` for
+  `TEXT[] NOT NULL` columns.
+- **Frontend:** `fetchComponentArtifact(componentId)` in `runtime.ts`
+  (`GET /components/{id}/artifact` with client-side digest re-verification) and
+  `fetchComponentAsset` falls back to the data-plane artifact endpoint when no
+  provider replica serves the bytes.
+- **Verified:** `cargo test -p terra-api` **147 passed** (2 DB-backed artifact
+  roundtrip + 2 storage unit tests), `cargo clippy` + `cargo fmt` clean, `tsc -b`
+  clean, vitest **86/86** (was 83/83), `pnpm build:check` PASS
+  (entry 300.2 / initial 305.5 / Cesium 1098.5 / total 1866.9 kB gz). DB-backed
+  component-artifact tests ran against local PostgreSQL (`terra_dev`).
+- Evidence: `sprints/037-data-plane-component-artifacts.md`;
+  `IMPLEMENTATION_STATUS.md` B15/B15a/D12/E4/baselines/E5;
+  `work/CURRENT.md` item 4; ROADMAP.md Stage 4 item.
 
 - **`GET /manifests/signed`** (`638912a`): lists persisted signed envelopes by
   optional `region_id` and exact `q/level/x/y` cell, with `limit` defaulting to

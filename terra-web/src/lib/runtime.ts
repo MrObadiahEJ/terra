@@ -322,15 +322,92 @@ export async function fetchComponentAsset(
     return { data: cached, retrieval: { component_id: componentId, component_version: componentVersion, provider_id: '', provider_name: '', storage_reference: '', latency_ms: null, reliability_score: 0, global_transform: null, crs: null } }
   }
 
-  const retrieval = await request<AssetRetrieval>(
-    `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
-      componentVersion,
-    )}`,
-  )
+  try {
+    const retrieval = await request<AssetRetrieval>(
+      `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
+        componentVersion,
+      )}`,
+    )
 
-  const data = await fetchAssetWithFallback([retrieval])
-  setCachedAsset(componentId, componentVersion, data)
-  return { data, retrieval }
+    const data = await fetchAssetWithFallback([retrieval])
+    setCachedAsset(componentId, componentVersion, data)
+    return { data, retrieval }
+  } catch (providerErr) {
+    // Fallback: the component package may store its artifact directly with
+    // the data plane (`GET /components/{id}/artifact`), which is content-
+    // addressed and self-verifying. Surface the provider error only if the
+    // fallback also fails.
+    try {
+      const artifact = await fetchComponentArtifact(componentId)
+      setCachedAsset(componentId, componentVersion, artifact.data)
+      return {
+        data: artifact.data,
+        retrieval: {
+          component_id: componentId,
+          component_version: componentVersion,
+          provider_id: '',
+          provider_name: 'data-plane',
+          storage_reference: `/components/${encodeURIComponent(componentId)}/artifact`,
+          latency_ms: null,
+          reliability_score: 1,
+          global_transform: null,
+          crs: null,
+        },
+      }
+    } catch (artifactErr) {
+      throw new Error(
+        `no provider or data-plane artifact for ${componentId}: ${providerErr instanceof Error ? providerErr.message : providerErr}; ${artifactErr instanceof Error ? artifactErr.message : artifactErr}`,
+        { cause: artifactErr },
+      )
+    }
+  }
+}
+
+/**
+ * Component artifact bytes served by the data plane
+ * (`GET /api/v1/components/{id}/artifact`). The response carries the
+ * `x-content-sha256` header; the fetched bytes are re-hashed and the
+ * response is rejected if the digest does not match.
+ */
+export interface ComponentArtifact {
+  data: ArrayBuffer
+  contentType: string
+  contentAddress: string
+}
+
+export async function fetchComponentArtifact(
+  componentId: string,
+): Promise<ComponentArtifact> {
+  const url = `${API_BASE}/components/${encodeURIComponent(componentId)}/artifact`
+  const res = await fetch(url)
+  if (!res.ok) {
+    let detail = res.statusText
+    try {
+      const body = await res.json()
+      detail = body?.message ?? body?.error ?? detail
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`${res.status}: ${detail}`)
+  }
+  const declared = res.headers.get('x-content-sha256') ?? ''
+  const data = await res.arrayBuffer()
+  if (declared) {
+    const hex = await sha256Hex(new Uint8Array(data))
+    const expected = declared.startsWith('sha256:')
+      ? declared.slice('sha256:'.length)
+      : declared
+    if (hex !== expected) {
+      throw new Error(
+        `component artifact digest mismatch: expected ${expected}, got ${hex}`,
+      )
+    }
+  }
+  return {
+    data,
+    contentType: res.headers.get('content-type') ?? 'application/octet-stream',
+    contentAddress: declared,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +462,61 @@ export async function listManifests(
   if (regionId) q.set('region_id', regionId)
   if (maxLevel != null) q.set('limit', String(maxLevel))
   return request<ManifestRow[]>(`/manifests${q.size > 0 ? `?${q}` : ''}`)
+}
+
+// ---------------------------------------------------------------------------
+// Quadtree spatial discovery: GET /spatial/cell + GET /spatial/cover
+// (Chapter 13 §13.3 — wire quadtree discovery cells into scene requests).
+// Stateless: no database dependency, safe when the API runs without a
+// populated geo mirror.
+// ---------------------------------------------------------------------------
+
+export interface QuadCellRow {
+  id: string
+  level: number
+  x: number
+  y: number
+  bounds: { min_lon: number; min_lat: number; max_lon: number; max_lat: number }
+}
+
+export interface QuadCoverRow {
+  level: number
+  count: number
+  cells: QuadCellRow[]
+}
+
+export interface QuadCellParams {
+  lon: number
+  lat: number
+  level?: number
+}
+
+export interface QuadCoverParams {
+  min_lon: number
+  min_lat: number
+  max_lon: number
+  max_lat: number
+  level?: number
+}
+
+/** The quadtree cell containing a point. */
+export async function getQuadCell(params: QuadCellParams): Promise<QuadCellRow> {
+  const q = new URLSearchParams({ lon: String(params.lon), lat: String(params.lat) })
+  if (params.level != null) q.set('level', String(params.level))
+  return request<QuadCellRow>(`/spatial/cell?${q}`)
+}
+
+/** The quadtree cells intersecting a bounds rectangle, south-to-north,
+ * west-to-east order. */
+export async function getQuadCover(params: QuadCoverParams): Promise<QuadCoverRow> {
+  const q = new URLSearchParams({
+    min_lon: String(params.min_lon),
+    min_lat: String(params.min_lat),
+    max_lon: String(params.max_lon),
+    max_lat: String(params.max_lat),
+  })
+  if (params.level != null) q.set('level', String(params.level))
+  return request<QuadCoverRow>(`/spatial/cover?${q}`)
 }
 
 // ---------------------------------------------------------------------------

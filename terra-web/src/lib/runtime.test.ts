@@ -8,6 +8,9 @@ import {
   cachedComponentCount,
   runtimeLodFromHeight,
   fetchAssetWithFallback,
+  fetchComponentArtifact,
+  getQuadCell,
+  getQuadCover,
   type AssetRetrieval,
 } from './runtime'
 
@@ -318,5 +321,204 @@ describe('fetchAssetWithFallback', () => {
     const data = await fetchAssetWithFallback(retrievals)
     expect(new Uint8Array(data)).toEqual(new Uint8Array([1, 2, 3]))
     expect(calls).toEqual(['https://best.example.com/c1.glb'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchComponentArtifact — data-plane content-addressed retrieval
+// ---------------------------------------------------------------------------
+
+const sha256Hex = async (data: Uint8Array): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(data).buffer)
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+describe('fetchComponentArtifact', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('serves bytes and verifies the declared content address', async () => {
+    const bytes = new TextEncoder().encode('glTF artifact bytes')
+    const hex = await sha256Hex(bytes)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({
+          'Content-Type': 'model/gltf-binary',
+          'x-content-sha256': `sha256:${hex}`,
+        }),
+        arrayBuffer: async () => bytes.buffer,
+      })) as unknown as typeof fetch,
+    )
+
+    const artifact = await fetchComponentArtifact('comp-001')
+    expect(new Uint8Array(artifact.data)).toEqual(bytes)
+    expect(artifact.contentType).toBe('model/gltf-binary')
+    expect(artifact.contentAddress).toBe(`sha256:${hex}`)
+  })
+
+  it('rejects when the fetched bytes do not match the declared digest', async () => {
+    const bytes = new TextEncoder().encode('glTF artifact bytes')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers({
+          'Content-Type': 'model/gltf-binary',
+          'x-content-sha256': 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
+        }),
+        arrayBuffer: async () => bytes.buffer,
+      })) as unknown as typeof fetch,
+    )
+
+    await expect(fetchComponentArtifact('comp-001')).rejects.toThrow(
+      /digest mismatch/,
+    )
+  })
+
+  it('throws on non-OK responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        headers: new Headers({}),
+        arrayBuffer: async () => new ArrayBuffer(0),
+      })) as unknown as typeof fetch,
+    )
+
+    await expect(fetchComponentArtifact('comp-001')).rejects.toThrow(/404/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Quadtree spatial discovery — mocked fetch
+// ---------------------------------------------------------------------------
+
+describe('getQuadCell', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('requests the cell for a point with default level', async () => {
+    const captured: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        captured.push(String(input))
+        return new Response(
+          JSON.stringify({
+            id: 'q/12/1234/4567',
+            level: 12,
+            x: 1234,
+            y: 4567,
+            bounds: { min_lon: 11.5, min_lat: 3.85, max_lon: 11.51, max_lat: 3.86 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }) as unknown as typeof fetch,
+    )
+
+    const cell = await getQuadCell({ lon: 11.5, lat: 3.85 })
+    expect(cell).toEqual({
+      id: 'q/12/1234/4567',
+      level: 12,
+      x: 1234,
+      y: 4567,
+      bounds: { min_lon: 11.5, min_lat: 3.85, max_lon: 11.51, max_lat: 3.86 },
+    })
+    expect(captured[0]).toContain('/spatial/cell')
+    expect(captured[0]).toContain('lon=11.5')
+    expect(captured[0]).toContain('lat=3.85')
+  })
+
+  it('includes an explicit level in the query string', async () => {
+    const captured: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        captured.push(String(input))
+        return new Response(
+          JSON.stringify({ id: 'q/8/1/2', level: 8, x: 1, y: 2, bounds: {} }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }) as unknown as typeof fetch,
+    )
+
+    await getQuadCell({ lon: 0, lat: 0, level: 8 })
+    expect(captured[0]).toContain('level=8')
+  })
+
+  it('throws on non-OK responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response('not found', { status: 404, statusText: 'Not Found' }),
+      ) as unknown as typeof fetch,
+    )
+
+    await expect(getQuadCell({ lon: 0, lat: 0 })).rejects.toThrow(/404/)
+  })
+})
+
+describe('getQuadCover', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('requests cover cells for a bounds rectangle', async () => {
+    const captured: string[] = []
+    const body = JSON.stringify({
+      level: 10,
+      count: 3,
+      cells: [
+        { id: 'q/10/1/2', level: 10, x: 1, y: 2, bounds: {} },
+        { id: 'q/10/1/3', level: 10, x: 1, y: 3, bounds: {} },
+        { id: 'q/10/1/4', level: 10, x: 1, y: 4, bounds: {} },
+      ],
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL) => {
+        captured.push(String(_input))
+        return new Response(body, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }) as unknown as typeof fetch,
+    )
+
+    const cover = await getQuadCover({
+      min_lon: 11.49,
+      min_lat: 3.84,
+      max_lon: 11.53,
+      max_lat: 3.88,
+    })
+    expect(cover.level).toBe(10)
+    expect(cover.count).toBe(3)
+    expect(cover.cells).toHaveLength(3)
+    expect(captured[0]).toContain('/spatial/cover')
+    expect(captured[0]).toContain('min_lon=11.49')
+    expect(captured[0]).toContain('max_lat=3.88')
+  })
+
+  it('throws on non-OK responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response('error', { status: 500, statusText: 'Internal Error' }),
+      ) as unknown as typeof fetch,
+    )
+
+    await expect(
+      getQuadCover({ min_lon: 0, min_lat: 0, max_lon: 1, max_lat: 1 }),
+    ).rejects.toThrow(/500/)
   })
 })
