@@ -224,7 +224,10 @@ mod tests {
             )
             .layer(middleware::from_fn(security_headers))
             .layer(RequestBodyLimitLayer::new(8))
-            .layer(TimeoutLayer::new(std::time::Duration::from_millis(1)))
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::REQUEST_TIMEOUT,
+                std::time::Duration::from_millis(1),
+            ))
             .with_state(state)
     }
 

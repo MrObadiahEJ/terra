@@ -257,7 +257,7 @@ impl ManifestPayload {
         Ok(serde_json::to_vec(self)?)
     }
 
-    /// Content address of the exact serialized payload bytes.
+    /// Content address of the canonical payload bytes (see [`Self::to_bytes`]).
     pub fn content_address(&self) -> Result<ContentAddress, ManifestError> {
         Ok(ContentAddress::of(self.to_bytes()?))
     }

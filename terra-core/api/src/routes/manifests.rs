@@ -5,6 +5,9 @@
 //!   GET    /manifests/{id}                     get a manifest with its objects
 //!   GET    /manifests                          list manifests (filter by region)
 //!   PUT    /manifests/{id}/objects             update/replace objects in a manifest
+//!   POST   /manifests/verify                   verify a signed manifest envelope
+//!   POST   /manifests/signed                   store a verified signed envelope
+//!   GET    /manifests/signed/{address}         fetch a signed envelope by SHA-256
 //!
 //! The manifest stores references and relationships, not geometry.
 
@@ -12,7 +15,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use terra_geo::SignedManifest;
+use terra_geo::{ContentAddress, SignedManifest};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -22,6 +25,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_manifest).get(list_manifests))
         .route("/verify", post(verify_manifest))
+        .route("/signed", post(store_signed_manifest))
+        .route("/signed/{address}", get(get_signed_manifest))
         .route("/{id}", get(get_manifest))
         .route("/{id}/objects", put(update_manifest_objects))
 }
@@ -173,6 +178,103 @@ pub async fn verify_manifest(
         version: manifest.payload.version,
         object_count: manifest.payload.objects.len(),
     }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /manifests/signed — store a verified envelope (content-addressed)
+// GET  /manifests/signed/{address} — retrieve and re-verify by SHA-256
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct StoreSignedManifestResponse {
+    pub content_address: String,
+    pub publisher: String,
+    pub created: bool,
+    pub region_id: String,
+    pub version: u32,
+}
+
+/// Persist a pre-signed `terra.manifest/v1` envelope. The API does not hold a
+/// publisher key: callers sign externally, and this endpoint only verifies and
+/// stores the artifact under its canonical payload digest. Re-publishing the
+/// same payload with the same publisher is idempotent.
+pub async fn store_signed_manifest(
+    State(state): State<AppState>,
+    Json(manifest): Json<SignedManifest>,
+) -> Result<(axum::http::StatusCode, Json<StoreSignedManifestResponse>), AppError> {
+    let address = manifest
+        .verify()
+        .map_err(|e| AppError::bad_request(format!("invalid signed manifest: {e}")))?;
+    let envelope = serde_json::to_value(&manifest)
+        .map_err(|e| AppError::internal(format!("serialize envelope failed: {e}")))?;
+
+    let result = sqlx::query(
+        "INSERT INTO signed_manifests (content_address, publisher, region_id, \
+         region_name, version, region_cell, signature, envelope) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+         ON CONFLICT (content_address, publisher) DO NOTHING",
+    )
+    .bind(address.to_string())
+    .bind(&manifest.publisher)
+    .bind(&manifest.payload.region_id)
+    .bind(&manifest.payload.region_name)
+    .bind(i64::from(manifest.payload.version))
+    .bind(manifest.payload.region_cell.to_string())
+    .bind(&manifest.signature)
+    .bind(envelope)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("insert signed manifest failed: {e}")))?;
+
+    let created = result.rows_affected() == 1;
+    Ok((
+        if created {
+            axum::http::StatusCode::CREATED
+        } else {
+            axum::http::StatusCode::OK
+        },
+        Json(StoreSignedManifestResponse {
+            content_address: address.to_string(),
+            publisher: manifest.publisher.clone(),
+            created,
+            region_id: manifest.payload.region_id.clone(),
+            version: manifest.payload.version,
+        }),
+    ))
+}
+
+/// Retrieve a stored envelope by content address and re-verify it before
+/// returning. A stored artifact that no longer verifies is an internal error,
+/// not a client error.
+pub async fn get_signed_manifest(
+    State(state): State<AppState>,
+    Path(address): Path<String>,
+) -> Result<Json<SignedManifest>, AppError> {
+    let requested: ContentAddress = address
+        .parse()
+        .map_err(|e| AppError::bad_request(format!("invalid content address: {e}")))?;
+
+    let envelope = sqlx::query_scalar::<_, serde_json::Value>(
+        "SELECT envelope FROM signed_manifests WHERE content_address = $1 \
+         ORDER BY publisher LIMIT 1",
+    )
+    .bind(requested.to_string())
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("query signed manifest failed: {e}")))?
+    .ok_or_else(|| AppError::not_found(format!("signed manifest {address} not found")))?;
+
+    let manifest: SignedManifest = serde_json::from_value(envelope)
+        .map_err(|e| AppError::internal(format!("stored envelope is malformed: {e}")))?;
+    let actual = manifest
+        .verify()
+        .map_err(|e| AppError::internal(format!("stored envelope failed verification: {e}")))?;
+    if actual != requested {
+        return Err(AppError::internal(
+            "stored envelope content address does not match its key",
+        ));
+    }
+    Ok(Json(manifest))
 }
 
 // ---------------------------------------------------------------------------
@@ -330,10 +432,25 @@ pub async fn update_manifest_objects(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::ApiAuthority;
+    use crate::storage::StorageBackend;
     use ed25519_dalek::SigningKey;
+    use std::sync::Arc;
     use terra_geo::{
         ContentAddress, GeoBounds, ManifestObject, ManifestPayload, QuadCell, ValidationState,
     };
+
+    fn test_state() -> AppState {
+        AppState {
+            pool: sqlx::PgPool::connect_lazy("postgres://x:x@localhost/x").unwrap(),
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local {
+                root: std::path::PathBuf::from("/tmp/terra-test-signed-manifests"),
+            }),
+            zk: None,
+        }
+    }
 
     fn signed_manifest() -> SignedManifest {
         let cell = QuadCell::from_point(11.5, 3.85, 8).unwrap();
@@ -375,6 +492,29 @@ mod tests {
         let mut manifest = signed_manifest();
         manifest.payload.version = 2;
         let err = verify_manifest(Json(manifest)).await.unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn store_endpoint_rejects_tampered_manifest_before_persisting() {
+        let mut manifest = signed_manifest();
+        manifest.payload.version = 2;
+        let err = store_signed_manifest(State(test_state()), Json(manifest))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
+
+    #[tokio::test]
+    async fn get_endpoint_rejects_malformed_content_address() {
+        let err = get_signed_manifest(State(test_state()), Path("sha256:nothex".to_string()))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+
+        let err = get_signed_manifest(State(test_state()), Path("not-an-address".to_string()))
+            .await
+            .unwrap_err();
         assert!(matches!(err, AppError::BadRequest(_)));
     }
 }
