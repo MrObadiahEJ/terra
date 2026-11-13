@@ -119,9 +119,9 @@ concern, not a Stage 4 blocker.
   025, 2026-11-02/03). Remaining: spatial tiling / 3D Tiles pipeline, frustum +
   occlusion culling, screen-space error LOD; quadtree discovery cells, cell/cover
   API endpoints, and content-addressed signed manifests with verification,
-  persistence and retrieval now exist (Sprints 032/033/035) but still need
-  data-plane component storage and scene-path wiring; live-cluster verification
-  (B6).
+  persistence, region/cell discovery and retrieval now exist (Sprints
+  032/033/035/036) but still need data-plane component storage and scene-path
+  wiring; live-cluster verification (B6).
 
 ## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
 research complete; founder-gated)

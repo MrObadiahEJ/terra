@@ -311,6 +311,7 @@ existing CRUD path until it migrates to immutable versions. No signing key is
 held by the API.
 **Evidence:** `api/migrations/0044_signed_manifests.sql`;
 `api/src/routes/manifests.rs` (`POST /manifests/signed`,
-`GET /manifests/signed/{address}`); Sprint 035 tests.
+`GET /manifests/signed` region/cell discovery, `GET /manifests/signed/{address}`);
+Sprint 035 tests and Sprint 036 discovery tests.
 
 

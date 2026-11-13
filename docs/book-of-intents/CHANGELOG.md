@@ -2,6 +2,21 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 036: signed manifest discovery by region and cell
+
+- **`GET /manifests/signed`** (`638912a`): lists persisted signed envelopes by
+  optional `region_id` and exact `q/level/x/y` cell, with `limit` defaulting to
+  20 and clamping to 1–100. Returns metadata only; callers fetch the envelope
+  by content address.
+- **Validation:** a malformed cell is rejected with `400` before the query; the
+  DB roundtrip test now also asserts the stored manifest is listed.
+- **Verified:** `cargo test -p terra-api` **143 passed**, workspace clippy and
+  fmt clean. Pagination, parent/prefix discovery, and data-plane component
+  storage remain.
+- Evidence: `sprints/036-signed-manifest-discovery.md`; Chapter 12
+  §12.8/table/status; Chapter 13 table; Chapter 14; REQ-027;
+  `IMPLEMENTATION_STATUS.md` B16/B20/C5; `work/CURRENT.md`; ADR-021 evidence.
+
 ## 2026-11-13 — Sprint 035: signed manifest persistence + content-addressed retrieval
 
 - **Migration 0044** (`795c60d`): `signed_manifests` stores verified envelopes

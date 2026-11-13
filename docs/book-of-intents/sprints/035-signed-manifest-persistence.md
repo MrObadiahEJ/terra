@@ -72,8 +72,8 @@ locally.
 - Content-addressed storage for **component bytes** (the manifest references
   storage URLs; ADR-020's `ContentAddress::verify_bytes` is not yet used on the
   data plane).
-- Discovery by region/cell over stored signed manifests (the columns exist, but
-  no list endpoint is exposed).
+- Discovery by region/cell over stored signed manifests — **done** in Sprint
+  036 (`GET /manifests/signed?region_id=&cell=&limit=`).
 - Terra-operated publisher key custody and rotation (ADR-021 defers this).
 - Scene-path quadtree use, frustum/occlusion culling, and live-cluster
   verification (B6 devnet funding).

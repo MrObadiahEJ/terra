@@ -92,3 +92,4 @@ Stage 3.
 - [sprints/033-api-discovery-and-manifest-verification.md](sprints/033-api-discovery-and-manifest-verification.md) — API quadtree cell/cover endpoints and stateless signed-manifest verification; 6 targeted tests
 - [sprints/034-ci-format-and-clippy-gates.md](sprints/034-ci-format-and-clippy-gates.md) — workspace formatting + clippy cleanup with no behavior changes; 139 API tests, 48 geo tests
 - [sprints/035-signed-manifest-persistence.md](sprints/035-signed-manifest-persistence.md) — immutable signed-envelope storage and retrieval by content address (ADR-021); 142 API tests
+- [sprints/036-signed-manifest-discovery.md](sprints/036-signed-manifest-discovery.md) — region/cell discovery over stored signed envelopes; 143 API tests

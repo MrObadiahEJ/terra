@@ -54,8 +54,8 @@ against a live cluster (B6).
 | Code area | Change | Evidence |
 |---|---|---|
 | `terra-core/api/migrations/0036_world_manifests.sql` | `world_manifests` (region, version, parent/neighbor manifests) + `manifest_objects` (object_id, component version, assembly version, storage reference, LODs, validation state, access rules) | — |
-| `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert), `POST /manifests/verify` (signed envelope), `POST /manifests/signed` + `GET /manifests/signed/{address}` (content-addressed persistence/retrieval) | 9 targeted API tests; full suite 142/142, 2026-11-13 |
-| `terra-core/api/migrations/0044_signed_manifests.sql` | Immutable signed-envelope storage keyed by `(content_address, publisher)` with region/cell/version indexes | additive migration, applied in CI |
+| `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert), `POST /manifests/verify` (signed envelope), `POST /manifests/signed` + `GET /manifests/signed` (region/cell discovery) + `GET /manifests/signed/{address}` (content-addressed persistence/retrieval) | 10 targeted API tests; full suite 143/143, 2026-11-13 |
+| `terra-core/api/migrations/0044_signed_manifests.sql` | Immutable signed-envelope storage keyed by `(content_address, publisher)` with region/cell/version indexes; discovery reads these columns | additive migration, applied in CI |
 | `terra-core/api/src/routes/spatial.rs` | `GET /spatial/cell` + `GET /spatial/cover` over the quadtree | 4 targeted API tests, 2026-11-13 |
 | `terra-core/geo-engine/src/spatial_index.rs` | Quadtree discovery cells (`q/level/x/y`), point/parent/children, conservative covering (ADR-020) | geo 48/48 (+2 ignored), 2026-11-13 |
 | `terra-core/geo-engine/src/manifest.rs` | `terra.manifest/v1` content-addressed payloads, Ed25519 signatures, object/component references and validation | geo 48/48 (+2 ignored), 2026-11-13 |
@@ -172,9 +172,9 @@ items are:
   `/spatial/cover` are live, scene-path wiring remains.
 - Manifest architecture founder decision — documented, pending.
 - Content-addressed retrieval + signed manifests — **implemented** for
-  manifest envelopes (Sprints 032/033/035: `geo-engine/src/manifest.rs`, verify
-  + signed store/retrieve endpoints, ADR-021); data-plane component bytes remain
-  external, and Terra-operated publisher key custody is deferred.
+  manifest envelopes (Sprints 032/033/035/036: `geo-engine/src/manifest.rs`,
+  verify + signed store/list/retrieve endpoints, ADR-021); data-plane component
+  bytes remain external, and Terra-operated publisher key custody is deferred.
 - Frustum/occlusion culling + screen-space error LOD — specified, not coded.
 - Reconstruction-task economic model — founder decision pending.
 
