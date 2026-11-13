@@ -3,9 +3,11 @@ pub mod canonical;
 pub mod canonical3d;
 pub mod component_package;
 pub mod graph;
+pub mod manifest;
 pub mod osm;
 pub mod poi;
 pub mod reach;
+pub mod spatial_index;
 
 pub use access::{nearest_road_access, road_access_along_boundary, AccessPoint};
 pub use canonical::{canonicalize as canonicalize_geometry, geometry_digest, geometry_digest_hex};
@@ -15,9 +17,16 @@ pub use canonical3d::{
 };
 pub use component_package::{validate, validate_with_geometry, ComponentPackage, ConformanceError};
 pub use graph::{build_graph, RoadGraph, RoadSegment};
+pub use manifest::{
+    ContentAddress, ManifestError, ManifestObject, ManifestPayload, SignedManifest,
+    ValidationState, CONTENT_ADDRESS_PREFIX, MANIFEST_SCHEMA, MANIFEST_SIGNATURE_DOMAIN, MAX_LOD,
+};
 pub use osm::{read_osm_pbf, BuildingFootprint, OsmData, Poi, RoadWay};
 pub use poi::{pois_near, pois_within};
 pub use reach::{
     access_digest, analyze, encode_metrics, is_sealed_highway, NetworkGraph, ReachabilityReport,
     FLAG_ROAD_ACCESS, ROAD_ACCESS_THRESHOLD_M,
+};
+pub use spatial_index::{
+    covering_cells, GeoBounds, QuadCell, SpatialIndexError, MAX_COVERAGE_CELLS, MAX_LEVEL,
 };
