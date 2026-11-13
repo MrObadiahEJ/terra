@@ -2,6 +2,11 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 046a: REQ-046a cost-asymmetric anti-spam + ADR-022 node-local admission (docs only)
+
+- **`docs/book-of-intents/REQUIREMENTS_TRACEABILITY.md`**: added **REQ-046a** — cost-asymmetric anti-spam: bonds + reputation-weighted throughput, not hard caps; honest volume never punished (status 4 – SPECIFIED ONLY; RFC-014 §6; Q-022 bond sizing).
+- **`docs/book-of-intents/ARCHITECTURAL_DECISIONS.md`**: ADR-022 extended — rate limits/quotas are each provider's LOCAL policy (SubmissionPolicy defaults advisory); the protocol supplies economic Sybil resistance (bonds, fees, reputation, slashing); no mandatory central rate limiter (directive §10).
+
 ## 2026-11-13 — Sprint 046: Protocol architecture directives — RFC-014 economics + RFC-017 secure evidence intake (docs only)
 
 - **`docs/rfc-014-protocol-economics-contributor-rewards.md`** (new): Protocol

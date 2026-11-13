@@ -330,6 +330,7 @@ until Q-005 counsel sign-off (RFC-014 §9).
 counting); protocol token at launch (rejected: Q-005 securities gate).
 **Consequences:** contributor payouts capped by reserves; allocation
 independently recomputable; bootstrap admin → council migration founder-gated.
+Rate limits and quotas are each provider's LOCAL policy (SubmissionPolicy defaults are advisory); the protocol supplies economic Sybil resistance (bonds, fees, reputation, slashing) — no mandatory central rate limiter (directive §10).
 **Evidence:** `docs/rfc-014-protocol-economics-contributor-rewards.md`.
 
 ## ADR-023 — Quarantine + rendition: never modify the signed original; Assurance Profiles not OS mandates
