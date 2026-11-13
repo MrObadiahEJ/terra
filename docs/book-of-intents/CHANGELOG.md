@@ -2,6 +2,32 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 032: spatial index decision + signed content-addressed manifests
+
+- **ADR-020:** control-plane 2D discovery uses a deterministic **quadtree over
+  EPSG:4326** with stable `q/{level}/{x}/{y}` IDs (level 0 = world, max level
+  30, 65,536-cell covering cap). S2/H3 is deferred to a future
+  visualization-tile adapter; octree/BVH remains the 3D-volume structure.
+- **`geo-engine/src/spatial_index.rs`** (`db22de0`): validated `GeoBounds`,
+  `QuadCell` point/parent/children/bounds, conservative `covering_cells`, and
+  edge clamping so boundary objects are never missed.
+- **`geo-engine/src/manifest.rs`** (`db22de0`): `terra.manifest/v1` payloads
+  addressed by SHA-256 and signed with Ed25519 over
+  `terra.manifest.signature.v1\0 || payload_digest`. Objects bind component
+  versions, content digests, storage references, bounds, LODs 0–4, and
+  validation state. Validation rejects tampering, duplicates, out-of-range
+  LODs, and objects outside the region cell.
+- **Verified:** `cargo check -p terra-geo` passes; `cargo test -p terra-geo
+  --lib` **48 passed, 2 ignored** (15 new: 7 spatial-index, 8 manifest);
+  `cargo fmt -p terra-geo -- --check` clean. `component_package.rs` rustfmt is
+  a separate formatting-only commit (`40b6633`).
+- **Not done:** API still stores mutable unsigned rows and does not serve signed
+  envelopes, content addresses, or quadtree lookups; no live-cluster
+  verification (B6). C4/C5 stay `3 – PARTIALLY IMPLEMENTED`.
+- Evidence: `sprints/032-spatial-index-signed-manifests.md`;
+  `ARCHITECTURAL_DECISIONS.md` ADR-020; Chapter 12 §12.4/§12.8/§12.13; Chapter
+  13 §13.3/§13.8; REQ-027; `IMPLEMENTATION_STATUS.md` C4/C5/B16; `work/CURRENT.md`.
+
 ## 2026-11-12 — Sprint 031: RFC-016 registry dispatch repair
 
 - **Fixed the E0432 left by `9bb31f4`:** Anchor's `#[program]` macro resolves

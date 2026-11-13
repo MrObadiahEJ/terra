@@ -55,12 +55,15 @@ against a live cluster (B6).
 |---|---|---|
 | `terra-core/api/migrations/0036_world_manifests.sql` | `world_manifests` (region, version, parent/neighbor manifests) + `manifest_objects` (object_id, component version, assembly version, storage reference, LODs, validation state, access rules) | — |
 | `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert) | API 133/133 |
+| `terra-core/geo-engine/src/spatial_index.rs` | Quadtree discovery cells (`q/level/x/y`), point/parent/children, conservative covering (ADR-020) | geo 48/48 (+2 ignored), 2026-11-13 |
+| `terra-core/geo-engine/src/manifest.rs` | `terra.manifest/v1` content-addressed payloads, Ed25519 signatures, object/component references and validation | geo 48/48 (+2 ignored), 2026-11-13 |
 | `terra-web/src/lib/runtime.ts` | Manifest resolver + scene graph manager + LOD 0–4 + provider fallback | vitest 83/83 |
 
 ### Still to do
 
-- Spatial index service: hierarchical spatial index (quadtree/S2/H3 decision
-  still pending) for partition queries.
+- Wire the quadtree discovery cells into API partition/scene queries and persist
+  signed `terra.manifest/v1` envelopes (the library exists; no service endpoint
+  yet).
 - Cache invalidation propagation on manifest version change.
 - Live-cluster manifest version transition (B6).
 
@@ -96,8 +99,10 @@ exist and pass local suites; not yet exercised against a live cluster (B6).
 
 ### Still to do
 
-- Content-addressed retrieval + signed manifests.
+- Serve and persist the content-addressed signed manifests implemented in
+  `geo-engine/src/manifest.rs` (no API endpoint yet).
 - Frustum culling, occlusion culling, screen-space error LOD.
+- Wire quadtree cells into scene requests.
 - Live-cluster multi-provider retrieval + provider failover (B6).
 
 ### Acceptance evidence
@@ -156,9 +161,11 @@ Per ROADMAP Stage 3–4 and Chapter 47:
 All of the above is implemented and passes local suites. The remaining non-funding
 items are:
 
-- Spatial index design decision (quadtree/S2/H3) — documented, not coded.
+- Spatial index design decision — **done** (ADR-020: quadtree for control-plane
+  discovery; S2/H3 deferred to visualization tiles); API wiring remains.
 - Manifest architecture founder decision — documented, pending.
-- Content-addressed retrieval + signed manifests — specified, not coded.
+- Content-addressed retrieval + signed manifests — **library done** (Sprint 032:
+  `geo-engine/src/manifest.rs`); API persistence/serving remains.
 - Frustum/occlusion culling + screen-space error LOD — specified, not coded.
 - Reconstruction-task economic model — founder decision pending.
 

@@ -246,4 +246,40 @@ decentralization); no jurisdiction support (rejected: unworkable legally).
 **Consequences:** challenge process for disputed orders; public vs private
 separation preserved per jurisdiction. **Evidence:** RFC-016 §5.
 
+## ADR-020 — Quadtree discovery partitions; signed content-addressed manifests
+**Date:** 2026-11-13 · **Status:** Accepted (library foundation implemented, Sprint 032)
+**Context:** Chapter 12 §12.4 left the hierarchical spatial index choice open
+(quadtree/S2/H3), and §12.8 required signed, content-addressed manifest
+retrieval. The control plane needs stable geographic partition IDs and
+tamper-evident manifest artifacts without adding a heavy geospatial dependency
+or requiring a live cluster.
+**Decision:** Use a deterministic quadtree over EPSG:4326 for 2D
+control-plane discovery. Cell IDs are `q/{level}/{x}/{y}`; level 0 is the world
+and level *n* has `2^n × 2^n` cells, capped at level 30. Point lookup uses
+`floor` with edge clamping; extent covering is conservative and bounded
+(65,536 cells per query). S2/H3 is deferred to a future visualization-tile
+adapter; manifest cell IDs remain opaque strings so an adapter can be added
+without rewriting stored references. Octree/BVH remains the 3D-volume and
+component-culling structure. Manifests are immutable artifacts: identity is
+SHA-256 over the exact serialized payload bytes, and authenticity is Ed25519
+over `terra.manifest.signature.v1\0 || payload_digest`. Manifest objects bind
+object/component versions, component content digests, storage references,
+bounds, LODs (0–4), and validation state; object bounds must lie inside the
+manifest's region cell. Retrieval verifies content bytes before parsing or
+trusting a manifest.
+**Alternatives:** S2/H3 immediately (rejected for now: extra dependency and
+tile-oriented semantics for a control-plane partition that does not need
+spherical cells); geohash-only (rejected: less direct hierarchical
+parent/child/covering semantics and ambiguous precision rules); embedding
+geometry in manifests (rejected: duplicates the data plane and breaks
+content-addressing); signing canonicalized JSON across languages (rejected:
+adds a canonicalization dependency; signing exact published bytes is
+equivalent for immutable artifacts).
+**Consequences:** manifests can be cached and fetched by digest; publishers
+are identifiable and tampering is detectable; quadtree cells are discovery
+partitions, not storage chunks or visualization tiles. The API must still be
+wired to produce/verify signed envelopes and to use cells in scene requests.
+**Evidence:** `geo-engine/src/spatial_index.rs`, `geo-engine/src/manifest.rs`;
+Chapter 12 §12.4/§12.8; Chapter 13 §13.3; Sprint 032 tests (15 new).
+
 

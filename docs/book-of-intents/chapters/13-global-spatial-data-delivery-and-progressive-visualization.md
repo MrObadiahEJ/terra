@@ -2,10 +2,12 @@
 
 **Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the specification (this chapter)
 was written first (Sprint 024, commit `d293b0e`); the code followed immediately
-after (2026-11-02/03). Progressive lazy loading by LOD 0–4, provider discovery +
-fallback, and the runtime scene graph below are now backed by real routes,
-migrations, and a frontend runtime client. **Not yet exercised against a live
-cluster** — B6 devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
+after (2026-11-02/03), with the quadtree discovery partition added in Sprint 032
+(`db22de0`). Progressive lazy loading by LOD 0–4, provider discovery + fallback,
+and the runtime scene graph below are now backed by real routes, migrations, a
+`terra-geo` discovery index, and a frontend runtime client. **Not yet exercised
+against a live cluster** — B6 devnet funding blocks that (see
+`IMPLEMENTATION_STATUS.md`).
 
 **See:** Chapter 12, RFC-013, RFC-014, Chapter 3, Chapter 10.
 
@@ -26,7 +28,8 @@ Terra's frontend renders a Cesium globe and defines `LOD_LEVELS` /
   `selectBuildingsForTier`, `distanceDisplayCondition` in `lod.ts` / `perfTier.ts`).
 
 Still missing (tracked separately, not by this chapter): a spatial tiling scheme,
-3D Tiles or glTF streaming pipeline, frustum/occlusion culling, and live-cluster
+3D Tiles or glTF streaming pipeline, frustum/occlusion culling, wiring the
+quadtree discovery index into the scene request path, and live-cluster
 verification of every item above (B6 devnet funding blocks it).
 
 This chapter documents how Terra retrieves only the data needed for the current
@@ -117,6 +120,11 @@ For every view request, the runtime calculates:
 - Required component versions.
 - Required LOD.
 - Expected data size, priority, network and memory constraints.
+
+The discovery partition now exists: `terra-geo` `QuadCell`/`covering_cells`
+converts a bounds rectangle into deterministic `q/{level}/{x}/{y}` cells.
+The runtime client does not call it yet; the API scene path still resolves
+objects through manifests/PostGIS rather than a quadtree lookup.
 
 The system should support both **geographic tile retrieval** and
 **direct object/component retrieval**.
@@ -215,12 +223,13 @@ The data model must remain consistent even when rendering quality differs.
 | `cesiumTerrain.ts` (single terrain provider + retry) | Terrain loading pattern | Provider discovery + fallback now live via `routes/providers.rs` + `runtime.ts`; single terrain provider remains |
 | `story/roads.ts` (`buildRoadRoute`, `snapToRoadNetwork`) | Client-side routing baseline | Server-side `/geo/route` absent (Q-007 closed as sufficient) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No progressive 3D streaming |
-| `routes/spatial.rs` (`/parcels/near`) | Spatial query baseline | No hierarchical tiles, no object streaming |
+| `routes/spatial.rs` (`/parcels/near`) | Spatial query baseline | No hierarchical tiles, no object streaming; quadtree cells exist in `terra-geo` but are not used by this route |
 | `routes/geo.rs` (nearest-roads, pois, buildings, stats) | Geo read model | No 3D mesh retrieval, no LOD streaming |
+| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — quadtree discovery cells and covering queries | Not yet wired into scene requests; S2/H3 tile adapter deferred |
 | `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — `/runtime/scene/{id}/{lod}`, `/runtime/assets/{id}` (provider fallback), `/runtime/lod` (LOD 0–4), `/runtime/cache` | — |
 | `api/src/routes/providers.rs` + migration 0037 | **New (2026-11-02)** — provider discovery + fallback + replication | — |
 | `terra-web/src/lib/runtime.ts` + `runtime.test.ts` | **New (2026-11-02/03)** — frontend runtime client: LOD 0–4, provider fallback, asset retrieval, validation-state tracking | — |
 
-The specification is implemented. Remaining work is the spatial tiling / 3D Tiles
-pipeline, frustum/occlusion culling, and live-cluster verification (B6 devnet
-funding).
+The specification is implemented. Remaining work is the spatial tiling / 3D
+Tiles pipeline, wiring the quadtree discovery index into scene requests,
+frustum/occlusion culling, and live-cluster verification (B6 devnet funding).

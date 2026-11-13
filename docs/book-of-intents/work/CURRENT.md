@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-12 (committed `3a6c0a1`; sprints 001–031 delivered).
-Sprint notes for 025–031 are in `sprints/025-*.md` … `sprints/031-*.md`.
+Last reconciled: 2026-11-13 (committed `db22de0`; sprints 001–032 delivered).
+Sprint notes for 025–032 are in `sprints/025-*.md` … `sprints/032-*.md`.
 
 ## Active intents
 
@@ -50,6 +50,7 @@ Sprint notes for 025–031 are in `sprints/025-*.md` … `sprints/031-*.md`.
 | Sprint 029 — Merge `origin/dev` + GitHub Pages publication | **done & deployed (2026-11-12)** | merge `92613c8` (upstream `4eb7c5a`, local `eef0087`, no conflicts); Pages workflow `.github/workflows/deploy-pages.yml` builds `terra-web` with `TERRA_BASE_PATH=/terra/`, writes `404.html` + `.nojekyll`, and deploys from `dev`; base-aware assets (`lib/assets.ts`, `%BASE_URL%` for Cesium, router basename); live <https://mrobadiahej.github.io/terra/> verified (welcome/atlas/demo/stories, keyless tiles, demo data, API-offline states); deploy runs `43263687324`, `43265003528`; tsc clean, vitest pass, build:check PASS (entry 299.8 / initial 305.1 / Cesium 1098.5 / total 1864.2 kB gz); sprints/029 |
 | Sprint 030 — Google-Earth-style immersive atlas | **done & deployed (2026-11-12)** | commits `48286af` (immersive chrome + camera-preserving 2D↔3D + dock HUD + swipe sheet), `d2d3d25` (satellite default) and `cd93c25` (fullscreen guard); files `GlobePage.tsx`, `AtlasSearchPill.tsx`, `Sidenav.tsx`, `TerraGlobe.tsx`, `Navbar.tsx`, `index.css`, four locales, README; live <https://mrobadiahej.github.io/terra/> on Pages runs `43289772629` + `43290890798` + `43292573392`; viewport sweep 360×640 … 1920×1080 and 844×390 with no horizontal overflow; tsc clean, vitest **83/83**, build:check PASS (entry 300.2 / initial 305.5 / Cesium 1098.5 / total 1866.7 kB gz); sprints/030 |
 | Sprint 031 — RFC-016 registry dispatch repair | **done & committed (2026-11-12)** | `41fe53d` re-exports the eleven generated `__client_accounts_*` modules at the crate root with `#[doc(hidden)] pub(crate)`; `3a6c0a1` rustfmt for `security.rs` + its tests; `cargo check -p terra-registry` passes (33.6 s) and `cargo fmt --check` clean; A37 remains `2 – IMPLEMENTED, NOT FULLY VERIFIED` (no BPF tests, not deployed); sprints/031 |
+| Sprint 032 — Spatial index decision + signed content-addressed manifests | **done & committed (2026-11-13)** | `db22de0` adds `geo-engine/src/spatial_index.rs` (EPSG:4326 quadtree, `q/level/x/y` IDs, covering with 65,536-cell cap) and `manifest.rs` (`terra.manifest/v1` payload, SHA-256 content addresses, Ed25519 domain-separated signatures, object/component references, bounds/LOD/validation invariants); ADR-020 records quadtree-now/S2-H3-later/octree-BVH-for-3D; `40b6633` rustfmt for `component_package.rs`; `cargo test -p terra-geo --lib` **48 passed, 2 ignored** (15 new), `cargo check -p terra-geo` and `cargo fmt --check` pass; API integration still outstanding; sprints/032 |
 
 ## Known blockers
 
@@ -79,8 +80,11 @@ Sprint notes for 025–031 are in `sprints/025-*.md` … `sprints/031-*.md`.
 3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
    institutional identity (REQ-020), residency credential (REQ-021), lien
    encumbrance (REQ-022).
-4. **Spatial index decision** (quadtree/S2/H3) and content-addressed retrieval +
-   signed manifests — specified in Chapters 12/13, not yet coded.
+4. **Wire the spatial index + signed manifests into the API** — the tested
+   library foundation landed in Sprint 032 (`spatial_index.rs`, `manifest.rs`,
+   ADR-020). Next: derive quadtree cells from scene/query bounds, emit/verify
+   signed `terra.manifest/v1` envelopes, serve content addresses, and persist
+   signatures. This is local work and does not need SOL.
 5. **Frustum/occlusion culling + screen-space error LOD** — specified in
    Chapter 13, not yet coded.
 

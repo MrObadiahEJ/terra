@@ -117,8 +117,9 @@ concern, not a Stage 4 blocker.
   packages; live-cluster verification (B6).
 - ~~Progressive delivery & runtime discovery (REQ-028)~~ — **implemented** (sprint
   025, 2026-11-02/03). Remaining: spatial tiling / 3D Tiles pipeline, frustum +
-  occlusion culling, screen-space error LOD, content-addressed retrieval + signed
-  manifests; live-cluster verification (B6).
+  occlusion culling, screen-space error LOD; quadtree discovery cells and signed
+  content-addressed manifests now exist as tested `terra-geo` libraries (Sprint
+  032) but still need API/scene-path wiring; live-cluster verification (B6).
 
 ## Stage 4.5 — Protocol security, decentralization & privacy (entry: Stage 3 +
 research complete; founder-gated)

@@ -2,10 +2,12 @@
 
 **Status:** `IMPLEMENTED, NOT FULLY VERIFIED` — the specification (this chapter)
 was written first (Sprint 024, commit `d293b0e`); the code followed immediately
-after (2026-11-02/03). The central coordination object, control-plane/data-plane
-separation, spatial index, and synchronized runtime below are now backed by real
-routes, migrations, and a frontend runtime client. **Not yet exercised against a
-live cluster** — B6 devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
+after (2026-11-02/03), with the quadtree discovery index and signed manifest
+format added in Sprint 032 (`db22de0`). The central coordination object,
+control-plane/data-plane separation, spatial index, and synchronized runtime
+below are now backed by real routes, migrations, a `terra-geo` library, and a
+frontend runtime client. **Not yet exercised against a live cluster** — B6
+devnet funding blocks that (see `IMPLEMENTATION_STATUS.md`).
 
 **See:** Chapter 11, Chapter 13, RFC-013, RFC-014, `docs/canonical-geometry-digest.md`,
 Chapter 3, Chapter 10.
@@ -21,12 +23,14 @@ demos. As of 2026-11-02/03 it now has:
 - an explicit separation of control plane (manifests, spatial index, version references) from data plane (component storage, providers),
 - a synchronized runtime that merges components from multiple storage providers into one coherent scene (`api/src/routes/runtime.rs` + `terra-web/src/lib/runtime.ts`),
 - progressive lazy loading driven by LOD 0–4 rather than hardcoded `LOD_LEVELS` constants alone,
-- provider discovery and fallback (`api/src/routes/providers.rs`).
+- provider discovery and fallback (`api/src/routes/providers.rs`),
+- a quadtree discovery partition and signed, content-addressed manifest format
+  (`terra-core/geo-engine/src/spatial_index.rs`, `manifest.rs`; ADR-020).
 
-Still missing (tracked separately, not by this chapter): a hierarchical spatial
-index service (quadtree/S2/H3 decision pending), content-addressed retrieval with
-signed manifests, and live-cluster verification of every item above (B6 devnet
-funding blocks it).
+Still missing (tracked separately, not by this chapter): wiring the quadtree
+index into the API manifest/scene request path, serving signed manifest
+envelopes and content-addressed retrieval, and live-cluster verification of
+every item above (B6 devnet funding blocks it).
 
 This chapter documents the runtime architecture that makes separately stored
 spatial objects feel like one coherent physical world.
@@ -231,6 +235,18 @@ structures serve global discovery, geographic queries, 3D volumes, terrain
 tiles, buildings, large point clouds, component-level lookup, and runtime
 streaming.
 
+**Decision (ADR-020, Sprint 032).** Control-plane 2D discovery uses a
+deterministic quadtree over EPSG:4326 at
+`terra-core/geo-engine/src/spatial_index.rs`. Cell IDs are `q/{level}/{x}/{y}`;
+level 0 is the world, level *n* has `2^n × 2^n` cells, and the maximum level is
+30 (~3.7 cm at the equator). Point lookup uses `floor` with edge clamping;
+extent covering is conservative so an object on a cell boundary is never
+missed, and queries above 65,536 cells are rejected. S2/H3 remain the preferred
+future adapter for streaming visualization tiles — manifest cell IDs are opaque
+strings, so adopting an adapter does not rewrite stored references. Octree/BVH
+remains the structure for 3D volumes and component culling. A quadtree cell is
+a discovery partition, not a storage chunk, tile, or assembly.
+
 **Relationships (distinct concepts):** geographic partitions, spatial objects,
 spatial components, storage chunks, visualization tiles, and assembly manifests
 are related but must not be confused.
@@ -318,6 +334,27 @@ Use separate interfaces for separate concerns:
 Define which communication is synchronous, asynchronous, or eventually
 consistent. Define message schemas, version compatibility, authentication,
 retries, timeouts, idempotency, and error handling.
+
+**Signed manifest contract (Sprint 032).** `terra-core/geo-engine/src/manifest.rs`
+implements the content-addressed artifact:
+
+- Payload schema `terra.manifest/v1` carries region ID/name, quadtree region
+  cell, version, optional parent/neighbours, object references, optional
+  description, and a Unix timestamp.
+- Each object binds an object ID, component version, optional assembly version,
+  component content digest, data-plane storage reference, bounds, available
+  LODs (0–4), and validation state.
+- Identity is `sha256:<hex>` over the exact serialized payload bytes.
+- Authenticity is Ed25519 over
+  `terra.manifest.signature.v1\0 || payload_digest`; the publisher key is
+  carried with the envelope. `from_json()` verifies before returning, and
+  `ContentAddress::verify_bytes()` lets a retriever check bytes before parsing.
+- Validation rejects wrong schema, empty identifiers, version 0, duplicate
+  objects/neighbours/LODs, out-of-range LODs, invalid bounds, and object bounds
+  outside the region cell.
+
+The API does not yet emit or serve these envelopes; `routes/manifests.rs`
+continues to store mutable PostgreSQL rows. That wiring is the next slice.
 
 ---
 
@@ -460,14 +497,18 @@ sequenceDiagram
 | `routes/derived.rs` (derived_jobs, processing_key dedup) | Derived-job reuse pattern for component reuse | `derived_job_leases` migration (0042) now adds worker lease/claim with expired-lease recovery |
 | `routes/reconstruction.rs` (jobs, drafts, anchor) | Component submission baseline | Multi-provider retrieval now via `routes/runtime.rs` (`/runtime/assets` with fallback) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No synchronized 3D scene assembly |
-| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | No hierarchical spatial index service yet (quadtree/S2/H3 decision pending) |
+| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | No hierarchical spatial index service yet; quadtree cells exist in `terra-geo` but are not wired into this route |
 | `routes/geo.rs` (`nearest-roads`, `pois`, `buildings`, `stats`) | Geo read model | No 3D mesh retrieval, no LOD streaming |
-| `terra-core/geo-engine` (`canonical.rs`, `reach.rs`, `graph.rs`, `osm.rs`) | Geometry digest, sealed-road reach | No component storage, no spatial index, no scene graph |
+| `terra-core/geo-engine` (`canonical.rs`, `reach.rs`, `graph.rs`, `osm.rs`) | Geometry digest, sealed-road reach | No component storage or scene graph |
+| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — deterministic quadtree discovery cells, covering queries | Not yet wired into API/scene requests; S2/H3 adapter deferred |
+| `terra-core/geo-engine/src/manifest.rs` | **New (2026-11-13)** — content-addressed, Ed25519-signed manifest payloads and object references | API still stores unsigned mutable rows; no content-addressed retrieval endpoint yet |
 | Frontend `lod.ts` (`LOD_LEVELS`, `LOD_TARGET_HEIGHT`) | LOD level definitions | `lodFromHeight` + `TIER_SETTINGS.buildingCap` + `selectBuildingsForTier` now drive progressive tier loading |
 | Frontend `cesiumTerrain.ts` | Terrain loading with retry | Single terrain provider; provider discovery + fallback now live in `routes/providers.rs` + `runtime.ts` |
 | `api/src/routes/manifests.rs` + migration 0036 | **New (2026-11-02)** — World Representation Manifest router | — |
 | `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — scene graph + LOD manager + asset retrieval with fallback | — |
 | `terra-web/src/lib/runtime.ts` (505 lines) + `runtime.test.ts` (322 lines) | **New (2026-11-02/03)** — frontend runtime client (manifest resolver, scene graph, LOD 0–4, provider fallback) | — |
 
-The specification is implemented. Remaining work is the hierarchical spatial
-index decision and live-cluster verification (B6 devnet funding).
+The specification is implemented, and the quadtree discovery index plus signed
+manifest format now exist as tested `terra-geo` libraries. Remaining work is
+service integration (persist/serve signatures and content addresses, derive
+cells from camera bounds) and live-cluster verification (B6 devnet funding).
