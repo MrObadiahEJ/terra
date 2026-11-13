@@ -2,6 +2,17 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 042: P0 security & trust-chain fixes (REQ-026/026a/027/028/029–040)
+
+- **`terra-core/programs/terra_registry/src/security.rs`**: Fixed PDA seed circular reference in `create_review_case`/`finalize_decision` (was deriving PDA from the account's own key, making review pipeline unexecutable); `finalize_appeal` now requires committee reputation + `appeal.decision == decision.key()` binding (was permissionless); added `emergency_lift` instruction with `close = requester` (was a censorship gadget with no lift path); added `AppealDecisionMismatch` and `ProtectionExpired` `TerraError` variants; added `EmergencyProtectionLifted` event.
+- **`terra-core/api/src/routes/components.rs`**: `validation_state` forced to `'pending'` server-side (submitters could self-declare `independently_valid`); `upload_component_artifact` now verifies `x-body-hash` against actual request body SHA-256 (replay-with-swapped-body protection).
+- **`terra-core/api/src/routes/components.rs`**: Added `sha2` dependency import for body hash verification.
+- **`.github/workflows/ci.yml`**: Added `cargo test -p terra-registry --test security` to CI (`lib-tests` job) — security tests were previously never executed.
+- **`terra-core/programs/terra_registry/src/lib.rs`**: Updated `finalize_decision` dispatcher to pass `nonce` and `requester` instruction args.
+- **`terra-core/programs/terra_registry/tests/security.rs`**: Updated `review_case_pda` to derive from `[b"review_case", requester, nonce]` (was `[b"review_case", request.key()]`).
+- **Verified:** `cargo check` clean; `cargo clippy -- -D warnings` clean; `cargo fmt --check` clean; frontend `tsc` clean; vitest **120/120**; eslint no new errors on changed files; `pnpm build:check` PASS.
+- Evidence: `sprints/042-p0-security-trust-chain-fixes.md`; `IMPLEMENTATION_STATUS.md` (A37, B15); `REQUIREMENTS_TRACEABILITY.md` (REQ-029–040).
+
 ## 2026-11-13 — Sprint 041: Terra File protocol architecture directive
 
 - **`docs/book-of-intents/TERRA_PROTOCOL_DIRECTIVE.md`** (new): long-term

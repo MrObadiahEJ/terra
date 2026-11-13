@@ -1,10 +1,12 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `3dc2c6d`; sprints 001–039 delivered:
+Last reconciled: 2026-11-13 (committed `7dbe27a`; sprints 001–042 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
-039 frustum/occlusion culling + screen-space-error LOD).
-Sprint notes for 025–039 are in `sprints/025-*.md` … `sprints/039-*.md`.
+039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
+wiring, 041 Terra File protocol architecture directive, 042 P0 security &
+trust-chain fixes).
+Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
 
 ## Active intents
 
@@ -57,6 +59,7 @@ Sprint notes for 025–039 are in `sprints/025-*.md` … `sprints/039-*.md`.
 | Sprint 034 — Restore CI formatting and clippy gates | **done & committed (2026-11-13, `9ab419d`, `f9f0a0d`)** | `cargo fmt --all` for five API files; clippy cleanup (deprecated `TimeoutLayer`, unused runtime items/import, needless borrows, `i32` cast, `component_package.rs` lints); workspace `cargo clippy -- -D warnings` and `cargo fmt --all -- --check` clean; `cargo test -p terra-api` **139 passed**, `cargo test -p terra-geo --lib` **48 passed, 2 ignored**; CI run `43460062612` fully green (format, clippy, unit/RFC-012/geo, SBF, BPF, API, frontend); no behavior change; sprints/034 |
 | Sprint 035 — Signed manifest persistence + content-addressed retrieval | **done & committed (2026-11-13, `795c60d`, `ff7adbe`)** | migration 0044 `signed_manifests` keyed by `(content_address, publisher)`; `POST /manifests/signed` verifies and stores pre-signed envelopes idempotently; `GET /manifests/signed/{address}` re-verifies and returns them; ADR-021 records that the API is not a signer; `cargo test -p terra-api` **142 passed** (3 new, including the env-gated DB roundtrip), clippy/fmt clean; data-plane component bytes and Terra publisher key custody remain; sprints/035 |
 | Sprint 036 — Signed manifest discovery by region/cell | **done & committed (2026-11-13, `638912a`)** | `GET /manifests/signed?region_id=&cell=&limit=` lists stored envelopes (metadata only) with exact `q/level/x/y` cell validation, default limit 20, clamp 1–100 and deterministic ordering; the DB roundtrip also asserts listing; `cargo test -p terra-api` **143 passed**, clippy/fmt clean; pagination, parent/prefix discovery and data-plane component storage remain; sprints/036 |
+| Sprint 042 — P0 security & trust-chain fixes (REQ-026/026a/027/028/029–040) | **done & committed** | Fixed PDA seed circular reference in `create_review_case`/`finalize_decision` (review pipeline was unexecutable); `finalize_appeal` now requires committee reputation + `appeal.decision == decision.key()` binding; added `emergency_lift` instruction (was a censorship gadget with no lift path); `validation_state` forced to `'pending'` server-side on component submission; `upload_component_artifact` verifies `x-body-hash` against actual body SHA-256; added `tests/security.rs` to CI. All Rust gates clean (`cargo check`, `clippy -- -D warnings`, `fmt --check`); frontend gates clean. | `sprints/042-p0-security-trust-chain-fixes.md` |
 
 ## Known blockers
 

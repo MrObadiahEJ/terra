@@ -53,8 +53,11 @@ fn jurisdictional_restriction_pda(
     )
 }
 
-fn review_case_pda(request: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[b"review_case", request.as_ref()], &PROGRAM_ID)
+fn review_case_pda(requester: &Pubkey, nonce: u16) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[b"review_case", requester.as_ref(), &nonce.to_le_bytes()],
+        &PROGRAM_ID,
+    )
 }
 
 fn review_assignment_pda(case: &Pubkey, reviewer: &Pubkey) -> (Pubkey, u8) {
@@ -362,7 +365,7 @@ async fn create_review_case_ok() {
     let ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
-            AccountMeta::new(review_case_pda(&request_pda).0, false),
+            AccountMeta::new(review_case_pda(&requester, nonce).0, false),
             AccountMeta::new(request_pda, false),
             AccountMeta::new(requester, true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -371,7 +374,7 @@ async fn create_review_case_ok() {
     };
     process_with(&mut ctx, &payer, &[&payer], ix).await.unwrap();
 
-    let (case_pda, _) = review_case_pda(&request_pda);
+    let (case_pda, _) = review_case_pda(&requester, nonce);
     let rc: SecurityReviewCase = read_account(&ctx, case_pda).await;
 
     assert_eq!(rc.request, request_pda);
@@ -432,7 +435,7 @@ async fn assign_reviewer_ok() {
     let ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
-            AccountMeta::new(review_case_pda(&request_pda).0, false),
+            AccountMeta::new(review_case_pda(&requester, nonce).0, false),
             AccountMeta::new(request_pda, false),
             AccountMeta::new(requester, true),
             AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
@@ -440,7 +443,7 @@ async fn assign_reviewer_ok() {
         data,
     };
     process_with(&mut ctx, &payer, &[&payer], ix).await.unwrap();
-    let (case_pda, _) = review_case_pda(&request_pda);
+    let (case_pda, _) = review_case_pda(&requester, nonce);
 
     // Initialize validator reputation for reviewer
     let reviewer_reputation_pda =

@@ -41,6 +41,10 @@ jobs:
         run: cargo test -p terra-identity --lib
         working-directory: terra-core
 
+      - name: RFC-016 security tests
+        run: cargo test -p terra-registry --test security
+        working-directory: terra-core
+
       - name: RFC-012 structural tests
         run: cargo test -p terra-registry --test rfc012_structure
         working-directory: terra-core

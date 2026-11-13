@@ -329,13 +329,21 @@ pub struct CreateReviewCase<'info> {
         init,
         payer = requester,
         space = 8 + SecurityReviewCase::INIT_SPACE,
-        seeds = [b"review_case", request.key().as_ref()],
+        seeds = [
+            b"review_case",
+            requester.key().as_ref(),
+            nonce.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
     pub review_case: Account<'info, SecurityReviewCase>,
     #[account(
         mut,
-        seeds = [b"security_request", request.key().as_ref()],
+        seeds = [
+            b"security_request",
+            requester.key().as_ref(),
+            nonce.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
     pub request: Account<'info, SecurityRequest>,
@@ -387,10 +395,15 @@ pub struct CastReviewVote<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(nonce: u16, requester: Pubkey)]
 pub struct FinalizeDecision<'info> {
     #[account(
         mut,
-        seeds = [b"review_case", request.key().as_ref()],
+        seeds = [
+            b"review_case",
+            requester.as_ref(),
+            nonce.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
     pub case: Account<'info, SecurityReviewCase>,
@@ -398,13 +411,21 @@ pub struct FinalizeDecision<'info> {
         init,
         payer = authority,
         space = 8 + SecurityDecision::INIT_SPACE,
-        seeds = [b"decision", request.key().as_ref()],
+        seeds = [
+            b"decision",
+            requester.as_ref(),
+            nonce.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
     pub decision: Account<'info, SecurityDecision>,
     #[account(
         mut,
-        seeds = [b"security_request", request.key().as_ref()],
+        seeds = [
+            b"security_request",
+            requester.as_ref(),
+            nonce.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
     pub request: Account<'info, SecurityRequest>,
@@ -442,8 +463,31 @@ pub struct FinalizeAppeal<'info> {
     pub appeal: Account<'info, SecurityAppeal>,
     #[account(mut)]
     pub decision: Account<'info, SecurityDecision>,
+    #[account(
+        seeds = [b"validator_reputation", authority.key().as_ref()],
+        bump,
+    )]
+    pub reviewer_reputation: Account<'info, ValidatorReputation>,
     #[account(mut)]
     pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(nonce: u16)]
+pub struct EmergencyLift<'info> {
+    #[account(
+        mut,
+        seeds = [b"emergency_protect", subject.key().as_ref(), nonce.to_le_bytes().as_ref()],
+        bump,
+        close = requester,
+    )]
+    pub protection: Account<'info, EmergencyProtection>,
+    #[account(mut)]
+    pub requester: Signer<'info>,
+    /// CHECK: subject being emergency-protected
+    pub subject: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -668,7 +712,8 @@ pub fn submit_jurisdictional_restriction(
     Ok(())
 }
 
-pub fn create_review_case(ctx: Context<CreateReviewCase>, _nonce: u16) -> Result<()> {
+pub fn create_review_case(ctx: Context<CreateReviewCase>, nonce: u16) -> Result<()> {
+    let _ = (nonce,);
     let case = &mut ctx.accounts.review_case;
     let request = &mut ctx.accounts.request;
     let now = Clock::get()?.unix_timestamp;
@@ -765,7 +810,12 @@ pub fn cast_review_vote(ctx: Context<CastReviewVote>, vote: u8) -> Result<()> {
     Ok(())
 }
 
-pub fn finalize_decision(ctx: Context<FinalizeDecision>) -> Result<()> {
+pub fn finalize_decision(
+    ctx: Context<FinalizeDecision>,
+    nonce: u16,
+    requester: Pubkey,
+) -> Result<()> {
+    let _ = (nonce, requester);
     let case = &mut ctx.accounts.case;
     let decision = &mut ctx.accounts.decision;
     let request = &mut ctx.accounts.request;
@@ -853,11 +903,20 @@ pub fn appeal_decision(ctx: Context<AppealDecision>, nonce: u16, reason: String)
 pub fn finalize_appeal(ctx: Context<FinalizeAppeal>, upheld_appeal: bool) -> Result<()> {
     let appeal = &mut ctx.accounts.appeal;
     let decision = &mut ctx.accounts.decision;
+    let reviewer_reputation = &ctx.accounts.reviewer_reputation;
     let now = Clock::get()?.unix_timestamp;
 
     require!(
         appeal.status == appeal_status::PENDING,
         TerraError::AppealAlreadyDecided
+    );
+    require!(
+        appeal.decision == decision.key(),
+        TerraError::AppealDecisionMismatch
+    );
+    require!(
+        reviewer_reputation.reputation_score >= MIN_SECURITY_REPUTATION,
+        TerraError::ReviewerInsufficientReputation
     );
 
     appeal.status = if upheld_appeal {
@@ -931,6 +990,30 @@ pub fn emergency_protect(ctx: Context<EmergencyProtect>, nonce: u16) -> Result<(
         requester: protection.requester,
         expires_at: protection.expires_at,
         created_at: now,
+    });
+
+    Ok(())
+}
+
+pub fn emergency_lift(ctx: Context<EmergencyLift>, nonce: u16) -> Result<()> {
+    let _ = (nonce,);
+    let protection = &mut ctx.accounts.protection;
+    let now = Clock::get()?.unix_timestamp;
+
+    require!(!protection.lifted, TerraError::ProtectionAlreadyActive);
+    require!(now < protection.expires_at, TerraError::ProtectionExpired);
+    require!(
+        ctx.accounts.requester.key() == protection.requester,
+        TerraError::NotAuthorized
+    );
+
+    protection.lifted = true;
+
+    emit!(EmergencyProtectionLifted {
+        protection: protection.key(),
+        subject: protection.subject,
+        requester: protection.requester,
+        lifted_at: now,
     });
 
     Ok(())
@@ -1030,6 +1113,14 @@ pub struct EmergencyProtectionStarted {
     pub requester: Pubkey,
     pub expires_at: i64,
     pub created_at: i64,
+}
+
+#[event]
+pub struct EmergencyProtectionLifted {
+    pub protection: Pubkey,
+    pub subject: Pubkey,
+    pub requester: Pubkey,
+    pub lifted_at: i64,
 }
 
 #[event]

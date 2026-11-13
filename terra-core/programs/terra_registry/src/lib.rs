@@ -2808,8 +2808,12 @@ pub mod terra_registry {
         security::cast_review_vote(ctx, vote)
     }
 
-    pub fn finalize_decision(ctx: Context<FinalizeDecision>) -> Result<()> {
-        security::finalize_decision(ctx)
+    pub fn finalize_decision(
+        ctx: Context<FinalizeDecision>,
+        nonce: u16,
+        requester: Pubkey,
+    ) -> Result<()> {
+        security::finalize_decision(ctx, nonce, requester)
     }
 
     pub fn appeal_decision(ctx: Context<AppealDecision>, nonce: u16, reason: String) -> Result<()> {
@@ -8069,8 +8073,12 @@ pub enum TerraError {
     ReasonTooLong,
     #[msg("Appeal is already decided")]
     AppealAlreadyDecided,
+    #[msg("Appeal decision account does not match appeal")]
+    AppealDecisionMismatch,
     #[msg("Emergency protection is already active")]
     ProtectionAlreadyActive,
+    #[msg("Emergency protection has expired")]
+    ProtectionExpired,
 }
 
 #[cfg(test)]

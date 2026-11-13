@@ -15,6 +15,7 @@ use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::auth::{OptionalSignedRequest, SignedRequest};
@@ -149,7 +150,7 @@ pub async fn submit_component(
     .bind(pkg.overlap_ids.as_deref().unwrap_or(&[]))
     .bind(&pkg.privacy_classification)
     .bind(serde_json::to_value(&pkg.access_policy).unwrap_or(Value::Null))
-    .bind(&pkg.validation_state)
+    .bind("pending") // validation_state forced server-side; submitters cannot self-declare trust
     .bind(serde_json::to_value(&pkg.version_lineage).unwrap_or(Value::Null))
     .fetch_one(&state.pool)
     .await
@@ -270,6 +271,17 @@ pub async fn upload_component_artifact(
         "PUT",
         &format!("/api/v1/components/{id}/artifact"),
     )?;
+
+    // Verify the signed body hash matches the actual request body so that a
+    // captured signature cannot be replayed with a swapped body.
+    let mut hasher = Sha256::new();
+    hasher.update(&body);
+    let actual_hash = format!("{:x}", hasher.finalize());
+    if auth.body_hash_hex != actual_hash {
+        return Err(AppError::bad_request(
+            "body hash does not match signed request",
+        ));
+    }
 
     if body.is_empty() {
         return Err(AppError::bad_request("empty artifact"));
