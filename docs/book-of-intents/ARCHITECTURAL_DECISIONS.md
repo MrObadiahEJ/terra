@@ -285,4 +285,32 @@ wired to produce/verify signed envelopes and to use cells in scene requests.
 **Evidence:** `geo-engine/src/spatial_index.rs`, `geo-engine/src/manifest.rs`;
 Chapter 12 §12.4/§12.8; Chapter 13 §13.3; Sprint 032 tests (15 new).
 
+## ADR-021 — Signed manifests are stored by content address; the API is not a signer
+**Date:** 2026-11-13 · **Status:** Accepted (implemented, Sprint 035)
+**Context:** ADR-020 defined immutable signed manifests, but `world_manifests`
+stayed a mutable row store and no endpoint could retrieve an artifact by digest.
+Signing inside request handlers would force key-custody, rotation, and audit
+decisions into the API process.
+**Decision:** Accept pre-signed `terra.manifest/v1` envelopes and persist them in
+`signed_manifests`, keyed by `(content_address, publisher)`. Identity remains the
+canonical payload digest, so one payload can carry attestations from more than
+one publisher. `GET /manifests/signed/{sha256:…}` re-parses the stored envelope,
+re-verifies the signature and digest, and treats a mismatch as a server error.
+The API holds no publisher signing key. Terra-operated publishers must sign with
+keys managed outside the request path (offline signing or KMS/HSM); that
+operational custody still has to be chosen before such a publisher launches.
+Data-plane component bytes remain referenced by storage URLs, not stored here.
+**Alternatives:** signature columns on mutable `world_manifests` (rejected:
+mutation breaks content addressing and version history); API signing key from an
+environment variable as the default (rejected: custody/rotation/audit undefined;
+a separate publisher service can be added later); addressing the envelope hash
+(rejected: identity must describe the payload, not one signature).
+**Consequences:** publishing is idempotent per signer; clients can fetch and
+verify the exact artifact by digest; mutable manifest rows remain for the
+existing CRUD path until it migrates to immutable versions. No signing key is
+held by the API.
+**Evidence:** `api/migrations/0044_signed_manifests.sql`;
+`api/src/routes/manifests.rs` (`POST /manifests/signed`,
+`GET /manifests/signed/{address}`); Sprint 035 tests.
+
 

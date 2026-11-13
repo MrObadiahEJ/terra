@@ -228,11 +228,12 @@ The data model must remain consistent even when rendering quality differs.
 | `routes/geo.rs` (nearest-roads, pois, buildings, stats) | Geo read model | No 3D mesh retrieval, no LOD streaming |
 | `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — quadtree discovery cells and covering queries | S2/H3 tile adapter deferred; not yet in scene requests |
 | `api/src/routes/spatial.rs` (new endpoints) | **New (2026-11-13)** — `GET /spatial/cell`, `GET /spatial/cover` | Stateless discovery primitives; no runtime-client integration |
+| `api/src/routes/manifests.rs` + migration 0044 | **New (2026-11-13)** — `POST /manifests/signed`, `GET /manifests/signed/{address}` | Signed manifest envelopes are content-addressed; component bytes remain provider-hosted |
 | `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — `/runtime/scene/{id}/{lod}`, `/runtime/assets/{id}` (provider fallback), `/runtime/lod` (LOD 0–4), `/runtime/cache` | — |
 | `api/src/routes/providers.rs` + migration 0037 | **New (2026-11-02)** — provider discovery + fallback + replication | — |
 | `terra-web/src/lib/runtime.ts` + `runtime.test.ts` | **New (2026-11-02/03)** — frontend runtime client: LOD 0–4, provider fallback, asset retrieval, validation-state tracking | — |
 
 The specification is implemented. Remaining work is the spatial tiling / 3D
 Tiles pipeline, using the quadtree discovery endpoints in scene requests,
-persisting/serving signed content-addressed manifests, frustum/occlusion
+content-addressed storage for data-plane component bytes, frustum/occlusion
 culling, and live-cluster verification (B6 devnet funding).

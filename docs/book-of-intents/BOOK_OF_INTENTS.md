@@ -126,7 +126,9 @@ Never inflate a status. When evidence is unavailable, say so.
 - [sprints/030-immersive-atlas-ux.md](sprints/030-immersive-atlas-ux.md) — Google-Earth-style immersive atlas: floating chrome, responsive land panel/bottom sheet, camera-preserving 2D↔3D, collapsible navigation pad
 - [sprints/031-rfc-016-dispatch-repair.md](sprints/031-rfc-016-dispatch-repair.md) — RFC-016 registry dispatch repair: generated `__client_accounts_*` modules re-exported at the crate root; `cargo check -p terra-registry` green again.
 - [sprints/032-spatial-index-signed-manifests.md](sprints/032-spatial-index-signed-manifests.md) — spatial index decision (ADR-020) + quadtree discovery cells and content-addressed Ed25519-signed manifests in `terra-geo`; 15 new tests.
-- [sprints/033-api-discovery-and-manifest-verification.md](sprints/033-api-discovery-and-manifest-verification.md) — API `GET /spatial/cell` + `/spatial/cover` and `POST /manifests/verify`; 6 targeted tests; signed persistence still outstanding.
+- [sprints/033-api-discovery-and-manifest-verification.md](sprints/033-api-discovery-and-manifest-verification.md) — API `GET /spatial/cell` + `/spatial/cover` and `POST /manifests/verify`; 6 targeted tests.
+- [sprints/034-ci-format-and-clippy-gates.md](sprints/034-ci-format-and-clippy-gates.md) — restored the `cargo fmt` and `cargo clippy -D warnings` gates without behavior changes.
+- [sprints/035-signed-manifest-persistence.md](sprints/035-signed-manifest-persistence.md) — signed manifest envelopes persist and retrieve by content address; API is not a signer (ADR-021).
 
 ## Planned volumes (not yet written; see ROADMAP Stage 3–4)
 

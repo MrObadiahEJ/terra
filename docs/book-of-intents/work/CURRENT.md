@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `496ec49`; sprints 001–033 delivered).
-Sprint notes for 025–033 are in `sprints/025-*.md` … `sprints/033-*.md`.
+Last reconciled: 2026-11-13 (committed `795c60d`; sprints 001–035 delivered).
+Sprint notes for 025–035 are in `sprints/025-*.md` … `sprints/035-*.md`.
 
 ## Active intents
 
@@ -52,6 +52,8 @@ Sprint notes for 025–033 are in `sprints/025-*.md` … `sprints/033-*.md`.
 | Sprint 031 — RFC-016 registry dispatch repair | **done & committed (2026-11-12)** | `41fe53d` re-exports the eleven generated `__client_accounts_*` modules at the crate root with `#[doc(hidden)] pub(crate)`; `3a6c0a1` rustfmt for `security.rs` + its tests; `cargo check -p terra-registry` passes (33.6 s) and `cargo fmt --check` clean; A37 remains `2 – IMPLEMENTED, NOT FULLY VERIFIED` (no BPF tests, not deployed); sprints/031 |
 | Sprint 032 — Spatial index decision + signed content-addressed manifests | **done & committed (2026-11-13)** | `db22de0` adds `geo-engine/src/spatial_index.rs` (EPSG:4326 quadtree, `q/level/x/y` IDs, covering with 65,536-cell cap) and `manifest.rs` (`terra.manifest/v1` payload, SHA-256 content addresses, Ed25519 domain-separated signatures, object/component references, bounds/LOD/validation invariants); ADR-020 records quadtree-now/S2-H3-later/octree-BVH-for-3D; `40b6633` rustfmt for `component_package.rs`; `cargo test -p terra-geo --lib` **48 passed, 2 ignored** (15 new), `cargo check -p terra-geo` and `cargo fmt --check` pass; API integration still outstanding; sprints/032 |
 | Sprint 033 — API discovery cells + signed manifest verification | **done & committed (2026-11-13, `496ec49`)** | `GET /spatial/cell` + `GET /spatial/cover` expose the quadtree without DB access; `POST /manifests/verify` validates `terra.manifest/v1` envelopes (payload invariants, publisher key, Ed25519 signature, content address) without persisting; `cargo check -p terra-api` passes (5m08s); `cargo test -p terra-api endpoint` **6 passed** (133 filtered); rustfmt clean; signed persistence, content-addressed retrieval, signing-key custody and scene-path cell use remain; sprints/033 |
+| Sprint 034 — Restore CI formatting and clippy gates | **done & committed (2026-11-13, `9ab419d`, `f9f0a0d`)** | `cargo fmt --all` for five API files; clippy cleanup (deprecated `TimeoutLayer`, unused runtime items/import, needless borrows, `i32` cast, `component_package.rs` lints); workspace `cargo clippy -- -D warnings` and `cargo fmt --all -- --check` clean; `cargo test -p terra-api` **139 passed**, `cargo test -p terra-geo --lib` **48 passed, 2 ignored**; CI run `43460062612` fully green (format, clippy, unit/RFC-012/geo, SBF, BPF, API, frontend); no behavior change; sprints/034 |
+| Sprint 035 — Signed manifest persistence + content-addressed retrieval | **done & committed (2026-11-13, `795c60d`)** | migration 0044 `signed_manifests` keyed by `(content_address, publisher)`; `POST /manifests/signed` verifies and stores pre-signed envelopes idempotently; `GET /manifests/signed/{address}` re-verifies and returns them; ADR-021 records that the API is not a signer; `cargo test -p terra-api` **141 passed** (2 new), clippy/fmt clean; data-plane component bytes, Terra publisher key custody and DB-backed roundtrip test remain; sprints/035 |
 
 ## Known blockers
 
@@ -81,11 +83,12 @@ Sprint notes for 025–033 are in `sprints/025-*.md` … `sprints/033-*.md`.
 3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
    institutional identity (REQ-020), residency credential (REQ-021), lien
    encumbrance (REQ-022).
-4. **Persist signed manifests + serve content-addressed retrieval** — the
-   quadtree endpoints and stateless `POST /manifests/verify` landed in Sprint
-   033. Next: choose signing-key custody, add publisher/signature/content-address
-   persistence, expose content-addressed retrieval, and use cells in scene
-   requests. This is local work and does not need SOL.
+4. **Data-plane content-addressed storage + scene-path cells** — signed
+   manifests now persist and retrieve by digest (Sprint 035). Next: store and
+   verify component bytes by digest, expose retrieval, derive quadtree cells
+   from camera bounds in scene requests, and add a discovery listing over
+   `signed_manifests` region/cell columns. This is local work and does not need
+   SOL.
 5. **Frustum/occlusion culling + screen-space error LOD** — specified in
    Chapter 13, not yet coded.
 

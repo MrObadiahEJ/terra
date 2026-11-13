@@ -2,6 +2,41 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 035: signed manifest persistence + content-addressed retrieval
+
+- **Migration 0044** (`795c60d`): `signed_manifests` stores verified envelopes
+  keyed by `(content_address, publisher)`, with region/cell/version indexes; the
+  migration is additive and leaves mutable `world_manifests` untouched.
+- **`POST /manifests/signed`** (`795c60d`): verifies a pre-signed
+  `terra.manifest/v1` envelope and stores it; returns `201` on first store and
+  `200` on an idempotent repeat.
+- **`GET /manifests/signed/{address}`** (`795c60d`): fetches by `sha256:…`,
+  re-verifies payload and signature, and rejects a digest mismatch as a server
+  error.
+- **ADR-021:** the API is not a publisher signer; signing stays external, and
+  Terra-operated key custody (KMS/HSM/offline) remains to be chosen.
+- **Verified:** `cargo test -p terra-api` **141 passed** (2 new), `cargo
+  test -p terra-geo --lib` **48 passed, 2 ignored**, workspace clippy and fmt
+  clean. DB-backed roundtrip and data-plane component storage remain.
+- Evidence: `sprints/035-signed-manifest-persistence.md`;
+  `ARCHITECTURAL_DECISIONS.md` ADR-021; Chapter 12 §12.8/§12.13; Chapter 13
+  §13.8; Chapter 14; REQ-027; `IMPLEMENTATION_STATUS.md` B16/B20/C5;
+  `work/CURRENT.md`.
+
+## 2026-11-13 — Sprint 034: restore CI formatting and clippy gates
+
+- **`9ab419d`:** `cargo fmt --all` across five API files; formatting was the
+  only failure in CI `43454803577`.
+- **`f9f0a0d`:** clear the workspace clippy backlog without behavior changes:
+  deprecated `TimeoutLayer::new` → `with_status_code(REQUEST_TIMEOUT, …)`,
+  remove unused runtime items/import, drop needless borrows and an `i32` cast,
+  and simplify `component_package.rs` lints.
+- **Verified:** `cargo fmt --all -- --check` and `cargo clippy -- -D warnings`
+  clean; `cargo test -p terra-api` **139 passed**; `cargo test -p terra-geo
+  --lib` **48 passed, 2 ignored**. CI `43460062612` is fully green, including
+  SBF builds and BPF integration; no behavior changed.
+- Evidence: `sprints/034-ci-format-and-clippy-gates.md`; `work/CURRENT.md`.
+
 ## 2026-11-13 — Sprint 033: API quadtree discovery + signed manifest verification
 
 - **`GET /spatial/cell?lon=&lat=&level=`** (`496ec49`): returns the stable
