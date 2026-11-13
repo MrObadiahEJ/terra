@@ -357,23 +357,46 @@ pub async fn upload_component_artifact(
 
 /// `GET /api/v1/components/{id}/artifact` — serve the bytes only after the
 /// stored file re-hashes to its recorded content address.
+///
+/// `id` may be either the package UUID or the package's `component_id` text.
+/// When a text `component_id` is supplied it is resolved to the package UUID
+/// before fetching the artifact.
 pub async fn get_component_artifact(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path(id): Path<String>,
     auth: OptionalSignedRequest,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    let component = fetch_component(&state, id).await?;
+    let package_id = match id.parse::<Uuid>() {
+        Ok(uuid) => uuid,
+        Err(_) => {
+            // Treat `id` as a component_id text; look up the package UUID.
+            let row: Option<(Uuid,)> =
+                sqlx::query_as("SELECT id FROM component_packages WHERE component_id = $1")
+                    .bind(&id)
+                    .fetch_optional(&state.pool)
+                    .await
+                    .map_err(|e| AppError::internal(format!("query failed: {e}")))?;
+            match row {
+                Some((uuid,)) => uuid,
+                None => {
+                    return Err(AppError::not_found(format!("component {id} not found")));
+                }
+            }
+        }
+    };
+
+    let component = fetch_component(&state, package_id).await?;
     enforce_component_access(
         &component.privacy_classification,
         &component.access_policy,
         auth.0.as_ref(),
         &headers,
         "GET",
-        &format!("/api/v1/components/{id}/artifact"),
+        &format!("/api/v1/components/{package_id}/artifact"),
     )?;
 
-    let artifact = fetch_artifact(&state, id)
+    let artifact = fetch_artifact(&state, package_id)
         .await?
         .ok_or_else(|| AppError::not_found(format!("component {id} has no stored artifact")))?;
 
@@ -778,6 +801,71 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, AppError::BadRequest(_)));
+
+        sqlx::query("DELETE FROM component_packages WHERE id = $1")
+            .bind(row.id)
+            .execute(&pool)
+            .await
+            .expect("clean up test component");
+    }
+
+    #[tokio::test]
+    async fn artifact_retrieval_by_component_id_text() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed artifact retrieval test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        let mut pkg = base_package();
+        pkg.component_id = format!("comp-artifact-id-text-{}", Uuid::new_v4());
+        let (_, Json(row)) =
+            submit_component(State(state.clone()), Json(SubmitComponent { package: pkg }))
+                .await
+                .unwrap();
+        assert_eq!(row.component_id, pkg.component_id);
+
+        let bytes = Bytes::from_static(b"glTF artifact bytes");
+        let _content_address = ContentAddress::of(&bytes).to_string();
+        let _ = upload_component_artifact(
+            State(state.clone()),
+            Path(row.id),
+            signed_request(),
+            artifact_headers("model/gltf-binary"),
+            bytes.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Retrieve by component_id TEXT (not UUID) — the frontend path.
+        let response = get_component_artifact(
+            State(state.clone()),
+            Path(row.component_id.clone()),
+            OptionalSignedRequest(None),
+            HeaderMap::new(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "model/gltf-binary"
+        );
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        assert_eq!(body.as_ref(), bytes.as_ref());
 
         sqlx::query("DELETE FROM component_packages WHERE id = $1")
             .bind(row.id)

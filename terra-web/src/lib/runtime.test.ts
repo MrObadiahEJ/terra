@@ -341,24 +341,30 @@ describe('fetchComponentArtifact', () => {
   it('serves bytes and verifies the declared content address', async () => {
     const bytes = new TextEncoder().encode('glTF artifact bytes')
     const hex = await sha256Hex(bytes)
+    const captured: string[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({
-          'Content-Type': 'model/gltf-binary',
-          'x-content-sha256': `sha256:${hex}`,
-        }),
-        arrayBuffer: async () => bytes.buffer,
-      })) as unknown as typeof fetch,
+      vi.fn(async (input: RequestInfo | URL) => {
+        captured.push(String(input))
+        return new Response(
+          new Uint8Array(bytes),
+          {
+            status: 200,
+            headers: new Headers({
+              'Content-Type': 'model/gltf-binary',
+              'x-content-sha256': `sha256:${hex}`,
+            }),
+          },
+        )
+      }) as unknown as typeof fetch,
     )
 
     const artifact = await fetchComponentArtifact('comp-001')
     expect(new Uint8Array(artifact.data)).toEqual(bytes)
     expect(artifact.contentType).toBe('model/gltf-binary')
     expect(artifact.contentAddress).toBe(`sha256:${hex}`)
+    // The text component_id is passed as-is in the URL (not converted to a UUID).
+    expect(captured[0]).toContain('/components/comp-001/artifact')
   })
 
   it('rejects when the fetched bytes do not match the declared digest', async () => {
