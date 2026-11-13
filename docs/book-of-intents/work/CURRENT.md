@@ -107,7 +107,12 @@ Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
 3. **RFC-016 Phase 2+ code** — unblocked agent work: `SecurityRequest.subject`,
    `PrivacyState` writes on finalize, provider proof-of-possession, client-side
    digest verification vs signed manifest, `POST /components` auth,
-   `complete_assignment` auth, UUID/component_id fallback mismatch.
+   `complete_assignment` auth. **UUID/component_id fallback mismatch — done
+   (Sprint 047):** `GET /components/{id}/artifact` now accepts `Path<String>`
+   instead of `Path<Uuid>`; a text `component_id` is resolved to the package
+   UUID via `SELECT id FROM component_packages WHERE component_id = $1`.
+   Frontend `fetchComponentArtifact(componentId)` passes the text component_id
+   as-is and it resolves correctly.
 
 4. **Data-plane component artifact storage** — **done (Sprint 037)**: component
    bytes stored under their SHA-256 content address (`migration 0045` +

@@ -2,6 +2,23 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 047: Fix UUID/component_id mismatch in artifact retrieval
+
+- **`terra-core/api/src/routes/components.rs`**: `GET /components/{id}/artifact`
+  now accepts `Path<String>` instead of `Path<Uuid>`. When the path segment is
+  not a valid UUID it is treated as a `component_id` text and resolved to the
+  package UUID via `SELECT id FROM component_packages WHERE component_id = $1`.
+  This fixes the frontend fallback path: `fetchComponentArtifact(componentId)`
+  passes a text component_id (e.g. `parcel-1`), not a UUID.
+- **`terra-core/api/src/routes/components.rs`**: new test
+  `artifact_retrieval_by_component_id_text` submits a component, uploads an
+  artifact, and retrieves it by component_id text.
+- **`terra-web/src/lib/runtime.test.ts`**: `fetchComponentArtifact` test now
+  asserts the fetch URL uses the text component_id as-is
+  (`/components/comp-001/artifact`).
+- Verified: `cargo check -p terra-api` clean; `cargo clippy -- -D warnings`
+  clean; `cargo fmt --check` clean; `tsc -b --noEmit` clean; vitest 26/26.
+
 ## 2026-11-13 — Sprint 046a: REQ-046a cost-asymmetric anti-spam + ADR-022 node-local admission (docs only)
 
 - **`docs/book-of-intents/REQUIREMENTS_TRACEABILITY.md`**: added **REQ-046a** — cost-asymmetric anti-spam: bonds + reputation-weighted throughput, not hard caps; honest volume never punished (status 4 – SPECIFIED ONLY; RFC-014 §6; Q-022 bond sizing).
