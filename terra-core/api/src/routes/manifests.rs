@@ -7,6 +7,7 @@
 //!   PUT    /manifests/{id}/objects             update/replace objects in a manifest
 //!   POST   /manifests/verify                   verify a signed manifest envelope
 //!   POST   /manifests/signed                   store a verified signed envelope
+//!   GET    /manifests/signed                   list stored envelopes by region/cell
 //!   GET    /manifests/signed/{address}         fetch a signed envelope by SHA-256
 //!
 //! The manifest stores references and relationships, not geometry.
@@ -15,7 +16,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use terra_geo::{ContentAddress, SignedManifest};
+use terra_geo::{ContentAddress, QuadCell, SignedManifest};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -25,7 +26,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_manifest).get(list_manifests))
         .route("/verify", post(verify_manifest))
-        .route("/signed", post(store_signed_manifest))
+        .route(
+            "/signed",
+            post(store_signed_manifest).get(list_signed_manifests),
+        )
         .route("/signed/{address}", get(get_signed_manifest))
         .route("/{id}", get(get_manifest))
         .route("/{id}/objects", put(update_manifest_objects))
@@ -241,6 +245,65 @@ pub async fn store_signed_manifest(
             version: manifest.payload.version,
         }),
     ))
+}
+
+/// List stored envelopes, optionally filtered by region ID and exact quadtree
+/// cell. Only metadata is returned; fetch an envelope by its content address.
+#[derive(Debug, Deserialize)]
+pub struct ListSignedManifestsParams {
+    pub region_id: Option<String>,
+    pub cell: Option<String>,
+    #[serde(default = "default_signed_limit")]
+    pub limit: i64,
+}
+
+fn default_signed_limit() -> i64 {
+    20
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct SignedManifestSummary {
+    pub content_address: String,
+    pub publisher: String,
+    pub region_id: String,
+    pub region_name: String,
+    pub version: i64,
+    pub region_cell: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// `GET /manifests/signed?region_id=&cell=&limit=` — discovery over persisted
+/// signed envelopes. `cell` is an exact `q/level/x/y` match; invalid cells are
+/// rejected before querying.
+pub async fn list_signed_manifests(
+    State(state): State<AppState>,
+    Query(params): Query<ListSignedManifestsParams>,
+) -> Result<Json<Vec<SignedManifestSummary>>, AppError> {
+    let cell = match params.cell {
+        Some(raw) => Some(
+            raw.parse::<QuadCell>()
+                .map_err(|e| AppError::bad_request(format!("invalid cell: {e}")))?
+                .to_string(),
+        ),
+        None => None,
+    };
+    let limit = params.limit.clamp(1, 100);
+
+    let rows = sqlx::query_as::<_, SignedManifestSummary>(
+        "SELECT content_address, publisher, region_id, region_name, version, \
+         region_cell, created_at FROM signed_manifests \
+         WHERE ($1::text IS NULL OR region_id = $1) \
+         AND ($2::text IS NULL OR region_cell = $2) \
+         ORDER BY created_at DESC, content_address ASC LIMIT $3",
+    )
+    .bind(params.region_id)
+    .bind(cell)
+    .bind(limit)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("query signed manifests failed: {e}")))?;
+
+    Ok(Json(rows))
 }
 
 /// Retrieve a stored envelope by content address and re-verify it before
@@ -518,6 +581,21 @@ mod tests {
         assert!(matches!(err, AppError::BadRequest(_)));
     }
 
+    #[tokio::test]
+    async fn list_endpoint_rejects_malformed_cell_before_querying() {
+        let err = list_signed_manifests(
+            State(test_state()),
+            Query(ListSignedManifestsParams {
+                region_id: None,
+                cell: Some("q/8/not-a-number/1".to_string()),
+                limit: 20,
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
+
     /// End-to-end persistence/retrieval. CI sets `DATABASE_URL` and applies
     /// migrations; local runs without a database skip the test.
     #[tokio::test]
@@ -561,6 +639,18 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(fetched, manifest);
+
+        let Json(listed) = list_signed_manifests(
+            State(state.clone()),
+            Query(ListSignedManifestsParams {
+                region_id: Some("cm-centre".to_string()),
+                cell: Some(manifest.payload.region_cell.to_string()),
+                limit: 10,
+            }),
+        )
+        .await
+        .unwrap();
+        assert!(listed.iter().any(|row| row.content_address == address));
 
         sqlx::query("DELETE FROM signed_manifests WHERE content_address = $1")
             .bind(&address)
