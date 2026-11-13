@@ -47,6 +47,7 @@ Never inflate a status. When evidence is unavailable, say so.
 ### Registers (continuously maintained)
 
 - [TERRA_VISION.md](TERRA_VISION.md) — authoritative vision and principles.
+- [TERRA_PROTOCOL_DIRECTIVE.md](TERRA_PROTOCOL_DIRECTIVE.md) — long-term protocol architecture, Terra File `.terra` package & Rust-first SDK (`SPECIFIED ONLY`).
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — evidence-based feature register.
 - [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — intent → requirement → code → test mapping.
 - [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — decision log with alternatives.

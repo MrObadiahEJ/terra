@@ -2,6 +2,24 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 041: Terra File protocol architecture directive
+
+- **`docs/book-of-intents/TERRA_PROTOCOL_DIRECTIVE.md`** (new): long-term
+  protocol architecture directive covering the Terra File `.terra` portable
+  spatial world package (§5–10), modular SDK boundaries (§3), progressive and
+  backward-compatible evolution (§4), Rust-first SDK strategy (§12),
+  reconstruction/surveying/quality (§13), creative construction (§14),
+  asynchronous world updates (§15), memory reconstruction (§16), full
+  decentralization (§17), open interoperability (§18), required work process
+  (§19) and required first deliverables (§20).
+- Overlap check against existing docs: §1 vision → `TERRA_VISION.md`;
+  §17 decentralization → `TERRA_VISION.md` §5 + `ARCHITECTURAL_DECISIONS.md`;
+  §18 interoperability → chapters 11/13 + `rfc-015`. All other sections (§2–4,
+  §5–16, §12, §19–20) are new concepts not previously documented — captured in
+  this single doc rather than scattered edits.
+- Wired into `SUMMARY.md` (registers) and `BOOK_OF_INTENTS.md`
+  (Documents/Registers).
+
 ## 2026-11-13 — Sprint 040: wire quadtree discovery + culling/SSE LOD into GlobePage
 
 - **`terra-web/src/lib/viewport.ts`**: added `destinationPoint` (great-circle

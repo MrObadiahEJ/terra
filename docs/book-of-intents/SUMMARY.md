@@ -7,6 +7,7 @@ Navigation only; never a state store. Current phase derives from evidence in
 
 - [BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md) — central index & vocabulary
 - [TERRA_VISION.md](TERRA_VISION.md) — authoritative vision
+- [TERRA_PROTOCOL_DIRECTIVE.md](TERRA_PROTOCOL_DIRECTIVE.md) — long-term protocol architecture, Terra File `.terra` package & Rust-first SDK (`SPECIFIED ONLY`)
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — evidence register
 - [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-040
 - [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…019
