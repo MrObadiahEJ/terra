@@ -8,9 +8,9 @@
 //! geometry bytes. `validate_with_geometry()` additionally checks rule 1
 //! (digest integrity) given the geometry document as a GeoJSON string.
 
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use anyhow::{Result, bail, Context};
 
 use crate::canonical3d::{canonicalize_v2, geometry_digest_hex_v2};
 
@@ -97,7 +97,9 @@ pub fn validate(pkg: &ComponentPackage) -> Result<()> {
         pkg.elevation_ref.as_str(),
         "EGM2008" | "WGS84-ELLIPSOID" | "local" | "unknown"
     ) {
-        bail!(ConformanceError::ElevationRefInvalid(pkg.elevation_ref.clone()));
+        bail!(ConformanceError::ElevationRefInvalid(
+            pkg.elevation_ref.clone()
+        ));
     }
 
     // Rule 4 — Vertical units.
@@ -113,8 +115,7 @@ pub fn validate(pkg: &ComponentPackage) -> Result<()> {
     }
 
     // Rule 7 — Provenance completeness.
-    let is_ai_kind = pkg.provenance_classification == "reconstructed"
-        && pkg.confidence.is_some();
+    let is_ai_kind = pkg.provenance_classification == "reconstructed" && pkg.confidence.is_some();
     if is_ai_kind {
         if pkg.reconstruction_engine_id.is_empty()
             || pkg.reconstruction_engine_version.is_empty()
@@ -140,16 +141,17 @@ pub fn validate(pkg: &ComponentPackage) -> Result<()> {
 /// `geometry` is the GeoJSON document referenced by `geometry_artifact`,
 /// used to recompute and compare the canonical digest. If `None`, rule 1
 /// is skipped.
-pub fn validate_with_geometry(
-    pkg: &ComponentPackage,
-    geometry: Option<&str>,
-) -> Result<()> {
+pub fn validate_with_geometry(pkg: &ComponentPackage, geometry: Option<&str>) -> Result<()> {
     validate(pkg)?;
 
     // Rule 1 — Digest integrity.
     if let Some(geom) = geometry {
-        let canonical = canonicalize_v2(geom)
-            .with_context(|| format!("failed to canonicalize geometry_artifact '{}'", pkg.geometry_artifact))?;
+        let canonical = canonicalize_v2(geom).with_context(|| {
+            format!(
+                "failed to canonicalize geometry_artifact '{}'",
+                pkg.geometry_artifact
+            )
+        })?;
         let digest = geometry_digest_hex_v2(&canonical)
             .with_context(|| "failed to compute geometry digest")?;
         if digest != pkg.geometry_digest {
@@ -176,13 +178,18 @@ fn bounding_encloses(bv: &BoundingVolume, extent: &Value) -> bool {
         Some(c) => c,
         None => return false,
     };
-    let (min_lon, min_lat, min_z, max_lon, max_lat, max_z) =
-        coord_extremes(coords);
+    let (min_lon, min_lat, min_z, max_lon, max_lat, max_z) = coord_extremes(coords);
     if min_lon.is_none() {
         return false;
     }
-    let (min_lon, min_lat, min_z, max_lon, max_lat, max_z) =
-        (min_lon.unwrap(), min_lat.unwrap(), min_z.unwrap(), max_lon.unwrap(), max_lat.unwrap(), max_z.unwrap());
+    let (min_lon, min_lat, min_z, max_lon, max_lat, max_z) = (
+        min_lon.unwrap(),
+        min_lat.unwrap(),
+        min_z.unwrap(),
+        max_lon.unwrap(),
+        max_lat.unwrap(),
+        max_z.unwrap(),
+    );
     let bv_min = &bv.min;
     let bv_max = &bv.max;
     let blon = bv_min.get(0).copied().unwrap_or(f64::NEG_INFINITY);
@@ -191,12 +198,25 @@ fn bounding_encloses(bv: &BoundingVolume, extent: &Value) -> bool {
     let tlon = bv_max.get(0).copied().unwrap_or(f64::INFINITY);
     let tlat = bv_max.get(1).copied().unwrap_or(f64::INFINITY);
     let tzmax = bv_max.get(2).copied().unwrap_or(f64::INFINITY);
-    min_lon >= blon && min_lat >= blat && min_z >= bzmin
-        && max_lon <= tlon && max_lat <= tlat && max_z <= tzmax
+    min_lon >= blon
+        && min_lat >= blat
+        && min_z >= bzmin
+        && max_lon <= tlon
+        && max_lat <= tlat
+        && max_z <= tzmax
 }
 
 /// Extract lon/lat/z extremes from a GeoJSON coordinates value.
-fn coord_extremes(coords: &Value) -> (Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>) {
+fn coord_extremes(
+    coords: &Value,
+) -> (
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+) {
     let mut min_lon: Option<f64> = None;
     let mut min_lat: Option<f64> = None;
     let mut min_z: Option<f64> = None;
@@ -225,7 +245,9 @@ where
         Value::Array(arr) => {
             // A position: [lon, lat, z?]
             if arr.len() >= 2 {
-                if let (Some(Value::Number(lon)), Some(Value::Number(lat))) = (arr.get(0), arr.get(1)) {
+                if let (Some(Value::Number(lon)), Some(Value::Number(lat))) =
+                    (arr.get(0), arr.get(1))
+                {
                     if let Some(ln) = lon.as_f64() {
                         if let Some(la) = lat.as_f64() {
                             let z = arr.get(2).and_then(Value::as_f64).unwrap_or(0.0);
@@ -277,7 +299,8 @@ mod tests {
             geometry_artifact: "https://storage.example.com/roof.glb".into(),
             format: "model/gltf-binary".into(),
             format_version: "2.0".into(),
-            geometry_digest: "0e5ac8e42361d78feabaedf8aa9dbb5173285f879f40e9fb2cf93f2943146674".into(),
+            geometry_digest: "0e5ac8e42361d78feabaedf8aa9dbb5173285f879f40e9fb2cf93f2943146674"
+                .into(),
             digest_algorithm_version: "terra-geom-v2".into(),
             crs: "EPSG:4326".into(),
             elevation_ref: "EGM2008".into(),
@@ -401,7 +424,11 @@ mod tests {
 
     #[test]
     fn crs_aliases_accepted() {
-        for crs in ["CRS84", "urn:ogc:def:crs:OGC:1.3:CRS84", "urn:ogc:def:crs:epsg::4326"] {
+        for crs in [
+            "CRS84",
+            "urn:ogc:def:crs:OGC:1.3:CRS84",
+            "urn:ogc:def:crs:epsg::4326",
+        ] {
             let mut pkg = base_pkg();
             pkg.crs = crs.to_string();
             assert!(validate(&pkg).is_ok(), "crs={crs} should be accepted");
