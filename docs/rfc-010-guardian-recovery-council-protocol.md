@@ -656,6 +656,24 @@ Expected: All events emitted in order, identity transitions correct, parcels re-
 
 ---
 
+## 15. Compromise fast-path
+
+### 15.1 Emergency freeze during RECOVERY grace
+If an identity is compromised while a RECOVERY succession (`kind = 1`) is in its grace period, the subject's recovery wallet (or registry admin acting on a verified court order) may call `cancel_succession` to prevent the attacker from completing the claim. The emergency freeze:
+- Cancels the pending RECOVERY succession before `effective_at`.
+- Requires the recovery wallet OR registry admin signer (same gates as `cancel_succession`).
+- Is time-boxed: it only applies while the recovery grace period is open; once claimed, revocation uses `revoke_guardianship` instead.
+
+### 15.2 Registry admin powers → council/court quorum (founder-gated)
+The `registry.admin` role currently holds unilateral cancel/revoke powers over cancellations (`cancel_succession`) and guardianship revocations (`revoke_guardianship`). Per directive §17 (no unilateral control), these powers are re-scoped:
+- **Cancel/revoke require council or court quorum**, not a single admin signature.
+- The migration from `registry.admin` to council/court quorum is **founder-gated** (Q-003/Q-019) — the council membership and sunset are decided by the founder; no code change takes effect until ratified.
+- Until migration, `registry.admin` retains the powers but each use is audited on-chain.
+
+Until the founder ratifies the council migration, `registry.admin` may still cancel/revoke, but every such action emits an auditable event and is reviewable under RFC-007/RFC-005 due process.
+
+---
+
 ## Handoff — status & next steps (2026-09-23)
 
 **Done:** Implemented as Succession specialization — `terra_identity` `guardianship.rs` (+ registry `guardian_claim` bridge); Phase 1: unique-validator sets, guardian claim authority (C-5).

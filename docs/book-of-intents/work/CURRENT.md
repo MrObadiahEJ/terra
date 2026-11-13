@@ -1,13 +1,14 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `3604545`; sprints 001–045 delivered:
+Last reconciled: 2026-11-13 (committed `1c3d50d`; sprints 001–046 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
 trust-chain fixes, 043 worker identity takeover fix, 044 open-questions →
-ratifiable decisions, 045 Terra Atlas frontend).
-Sprint notes for 025–045 are in `sprints/025-*.md` … `sprints/045-*.md`.
+ratifiable decisions, 045 Terra Atlas frontend, 046 protocol architecture
+directives RFC-014 economics + RFC-017 secure evidence intake).
+Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
 
 ## Active intents
 
@@ -74,8 +75,10 @@ Sprint notes for 025–045 are in `sprints/025-*.md` … `sprints/045-*.md`.
   (RISK R-001). **Founder directive 2026-11-02: funding is the last step, not
   the next one — it blocks only Stage 2, never frontend/API/local work.**
 - **Founder review pending:** Q-003 (bootstrap council), Q-004 (residency
-  attestation recognition), Q-005 (securities research). These gate Stage 4
-  implementation but do not block doc-only work.
+  attestation recognition), Q-005 (securities research), Q-019 (reward-governance
+  council), Q-020 (Assurance Profile per task class), Q-021 (vendor-neutral
+  attestation for global access). These gate Stage 4 implementation but do not
+  block doc-only work.
 - **Not blocked:** dev server (`pnpm dev` + terra-api), offline demo stories
   (no wallet/API), API suites, and frontend gates all run with zero SOL.
 
@@ -128,4 +131,19 @@ Sprint notes for 025–045 are in `sprints/025-*.md` … `sprints/045-*.md`.
    screen-space error and culling are implemented, unit-tested
    (viewport.test.ts, 29 tests), and wired into rendering. Awaiting live-cluster
    verification only.
+
+6. **Protocol architecture directives (docs only, Sprint 046):**
+   `docs/rfc-014-protocol-economics-contributor-rewards.md` (treasury outflow-only
+   economics, Q-005 securities hard gate, staging bonds) and
+   `docs/rfc-017-secure-evidence-and-accountable-validation.md` (secure evidence
+   intake, rendition + forensic marking, sealed attribution, Assurance Profiles
+   AP-0..AP-3), plus amendments to RFC-016 (§11 retention/erasure), RFC-010
+   (§15 compromise fast-path), RFC-007 (§9.5 compromise freeze trigger),
+   RFC-012 (§6 rule 16 Assurance Profile routing), and Terra File directive §7
+   (sensitive layers never default-on; identity documents excluded from exports
+   unless explicitly authorized). Book registers updated: REQ-041..052, ADR-022/023,
+   R-027..R-032, Q-019/020/021. Verified against code: `MAX_BODY_BYTES` default
+   64 MiB / `REQUEST_TIMEOUT_SECS` 60 s; `StorageBackend::Local` only, no
+   quarantine/isolation, no retention/TTL/purge path (R-027 documents the gap).
+   No code changed — docs only.
 

@@ -183,6 +183,7 @@ These entities define the canonical vocabulary. Not all need accounts on day one
 13. **Capability loss over binary ban.** Confirmed misconduct removes specific capabilities (high-value, legal-document, high-confidence); low-risk observation may remain. Rehabilitation restores gradually.
 14. **Due process:** accusation → evidence → notification → response → independent review → decision → appeal.
 15. **Terra does not replace law.** It establishes protocol facts ("according to evidence and consensus, this right exists"). Legal recognition remains with jurisdictions that choose to integrate.
+16. **Task classes declare a minimum Assurance Profile.** A task's `TaskRequirement` declares the minimum device/environment assurance profile (AP-0..AP-3, RFC-017 §7) required to perform it. Routing (Phase 6) filters candidates to those meeting the profile and re-checks it per session via capability-token issuance. Attestation is risk reduction, never proof of honesty; store only the assurance level + attestation digest, never device serials/IMEI. An exception/accessibility path must exist so low-resource regions are not excluded.
 
 ---
 

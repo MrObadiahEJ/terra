@@ -411,6 +411,29 @@ Disputes auto-expire after 90 days. This prevents:
 - The quorum is based on the declared validator set, not the current online set
 - If a validator is unavailable, the dispute can still proceed if the quorum is met
 
+### 9.5 Recovery-wallet compromise freeze trigger
+If a parcel owner's wallet is reported compromised, the owner's recovery wallet
+(or registry admin acting on a verified court order) may trigger a dispute
+freeze to prevent the attacker from disposing of the parcel:
+- The trigger opens a dispute against the parcel with `case_hash` bound to
+  the compromise report (SHA-256 of the off-chain compromise notice).
+- The dispute files at FILED, then proceeds to FROZEN with the standard
+  validator quorum (2+ co-signatures).
+- While frozen, no FOR_SALE or TRANSFERRED transitions are possible on the
+  parcel, preventing an attacker from selling or transferring a compromised
+  parcel.
+- Link to succession: once the parcel is frozen, the owner may file a
+  RECOVERY succession (`kind = 1`, RFC-010) to rotate control to a new wallet;
+  the freeze remains in effect until the succession is claimed, cancelled, or
+  adjudicated. Freeze → succession → (adjudicate or execute) is the safe
+  order: adjudication/execution must not finalize control transfer while a
+  contested succession is open.
+- Sealed-attribution opening (RFC-017 §6) may be used as dispute evidence:
+  if a leaked document or mark traces to a specific validation session,
+  threshold opening identifies the validator/session involved, and that
+  identification is admissible as RFC-007 dispute evidence supporting
+  slashing under RFC-005.
+
 ## 10. Storage Architecture
 
 ### 10.1 On-Chain State

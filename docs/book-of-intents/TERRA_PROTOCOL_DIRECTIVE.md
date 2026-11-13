@@ -259,6 +259,13 @@ quality, permissions, license and dependencies.
 
 Support future extensions without changing the core package format.
 
+Sensitive layers never default on: terrain/elevation, buildings, parcel
+boundaries and cadastral identifiers may be included only when explicitly
+requested. Identity documents and any layer whose contents identify a specific
+person are excluded from exports unless explicitly authorized by the subject
+or their legal representative — parcel boundary ≠ ownership and identity
+documents are not spatial evidence of a place.
+
 Parcel boundaries must not automatically be treated as proof of ownership.
 Legal rights and ownership information must include jurisdiction, source, date,
 verification status and legal limitations.

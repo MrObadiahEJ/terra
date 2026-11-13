@@ -2,6 +2,46 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 046: Protocol architecture directives — RFC-014 economics + RFC-017 secure evidence intake (docs only)
+
+- **`docs/rfc-014-protocol-economics-contributor-rewards.md`** (new): Protocol
+  Economics & Contributor Rewards. Three layers (treasury inflow exists /
+  RewardPolicy policy / RewardClaim outflow), cap-weighted allocation,
+  utility_weight = 0 until accepted-and-used, refundable staging bond, Sybil
+  resistance without fixed global caps, Q-005 securities hard gate (no token /
+  fee-yield / passive yield until counsel sign-off). Backward-compatible,
+  append-only, chain-agnostic; Solana one adapter.
+- **`docs/rfc-017-secure-evidence-and-accountable-validation.md`** (new): Secure
+  Evidence Intake, Rendition & Accountable Validation. Invariants: document
+  bytes never on-chain/in-RDBMS; signed original never modified; untrusted
+  content never parsed in the API process; no self-declared trust; no OS/vendor
+  lock-in; append-only. Intake pipeline (limits → quarantine → sandbox scan/CDR
+  → accept/purge), disclosure tiers T0–T3, per-session rendition + forensic
+  marking, sealed session attribution (threshold opening t-of-n key-holders),
+  vendor-neutral Assurance Profiles AP-0..AP-3, capture-resistant viewer
+  requirements, leak-tracing procedure, anti-coercion guards, acceptance tests,
+  5-phase roadmap.
+- **Amendments:** RFC-016 §11 Evidence Retention & Erasure (TTL, purge, key
+  destruction, keyed commitments instead of plain PII hashes, no anchor until
+  accepted); RFC-010 §15 Compromise fast-path (emergency freeze during RECOVERY
+  grace; registry.admin cancel/revoke → council/court quorum, founder-gated);
+  RFC-007 §9.5 Recovery-wallet compromise freeze trigger + sealed-attribution
+  opening as dispute evidence; RFC-012 §6 rule 16 Task classes declare a minimum
+  Assurance Profile; Terra File directive §7 sensitive layers never default-on,
+  identity documents excluded from exports unless explicitly authorized.
+- **Book registers:** REQ-041..052 (status 4 – SPECIFIED ONLY); ADR-022
+  (treasury outflow-only economics); ADR-023 (quarantine + rendition, Assurance
+  Profiles not OS mandates); R-027..R-032 (document-borne RCE/DoS, attestation
+  bypass, securities, governance capture, mark removal/collusion, excluding
+  low-resource validators); Q-019 (reward-governance council), Q-020 (Assurance
+  Profile per task class), Q-021 (vendor-neutral attestation for global access).
+- **Verification gate (Phase 0 — docs only):** exact body-limit/timeout values
+  confirmed from code (`api/src/config.rs`: `MAX_BODY_BYTES` default 64 MiB,
+  `REQUEST_TIMEOUT_SECS` default 60 s; `api/src/main.rs` security headers +
+  413/408 tests); storage backend confirmed (`StorageBackend::Local` only, no
+  quarantine/isolation, no retention/TTL/purge path — R-027 documents the gap).
+  No code changed; no counts invented.
+
 ## 2026-11-13 — Sprint 045: Terra Atlas frontend (investor-facing planetary observation surface)
 
 - **`terra-web/src/components/atlas/AtlasPage.tsx`** (new): investor-ready

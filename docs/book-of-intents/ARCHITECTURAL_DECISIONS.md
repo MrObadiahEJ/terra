@@ -314,4 +314,48 @@ held by the API.
 `GET /manifests/signed` region/cell discovery, `GET /manifests/signed/{address}`);
 Sprint 035 tests and Sprint 036 discovery tests.
 
+## ADR-022 — Treasury outflow-only economics; no FeePolicy mutation
+**Date:** 2026-11-13 · **Status:** Accepted (spec only)
+**Context:** Protocol economics must sustain development without taxing the free
+core or creating passive yield for holders. The treasury already accumulates
+fees and slashing; adding an inflow mechanism risks double-counting or
+unintended monetary policy.
+**Decision:** RFC-014 economics is outflow-only: it allocates existing treasury
+inflows (fees + slashing) to verified contributors via governed epochs and
+Merkle-claims. FeePolicy, TaskEscrow, RewardAllocation, CoverageIncentive
+layouts are unchanged; no new inflow. Append-only PDAs/instructions. A
+protocol token, fee-yield to passive holders, or profit-sharing is deferred
+until Q-005 counsel sign-off (RFC-014 §9).
+**Alternatives:** inflow mechanism (rejected: monetary-policy risk, double
+counting); protocol token at launch (rejected: Q-005 securities gate).
+**Consequences:** contributor payouts capped by reserves; allocation
+independently recomputable; bootstrap admin → council migration founder-gated.
+**Evidence:** `docs/rfc-014-protocol-economics-contributor-rewards.md`.
+
+## ADR-023 — Quarantine + rendition: never modify the signed original; Assurance Profiles not OS mandates
+**Date:** 2026-11-13 · **Status:** Accepted (spec only)
+**Context:** Untrusted documents are an attack vector (parser RCE, zip bombs,
+PDF active content, encrypted payloads evading scanners). Terra must ingest
+evidence without parsing it in the API process, without modifying signed
+originals, and without mandating any OS/vendor (global accessibility,
+directive §4/§10).
+**Decision:** (a) Intake quarantines bytes in an encrypted private object store
+with TTL; a sandbox worker (unprivileged, read-only FS, no network,
+CPU/mem/time caps) scans for malware and disarms active content; only derived
+renditions are watermarked, never the signed original. (b) Device/environment
+requirements are expressed as vendor-neutral Assurance Profiles (AP-0..AP-3,
+RFC-017 §7) declared per task class — never OS mandates; WebAuthn/FIDO2,
+Apple App Attest, Android Key Attestation (TEE/StrongBox) are accepted
+alternatives, Play Integrity optional not required; an exception/accessibility
+path exists for low-resource regions. Attestation is risk reduction, never
+proof of honesty; store only assurance level + digest, never device serials.
+**Alternatives:** parse in API process (rejected: RCE risk); modify signed
+original (rejected: breaks immutability); mandate Windows/iOS/Ubuntu (rejected:
+excludes most of the world, violates directive §4/§10).
+**Consequences:** storage is currently a single Local backend (R-020 document-
+borne risk); multi-provider + proof-of-possession is planned (Q-008).
+**Evidence:** `docs/rfc-017-secure-evidence-and-accountable-validation.md`;
+`docs/rfc-012-global-physical-digital-trust-architecture.md` §6 rule 16.
+
+
 

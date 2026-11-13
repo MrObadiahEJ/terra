@@ -630,6 +630,56 @@ The security layer is **not** complete until these conditions are proven:
 
 **Evidence** — Every capability marked `IMPLEMENTED AND VERIFIED` must have: source-code references; unit tests; integration or BPF tests where applicable; negative authorization tests; replay and expiry tests; collusion and adversarial tests where relevant; API and storage integration tests where applicable; a documented execution result.
 
+---
+
+## 11. Evidence Retention & Erasure
+
+### 11.1 Retention principles
+Retention is a deliberate decision, never an accident of implementation. Terra
+keeps only what the protocol needs to verify, challenge, or appeal, for as long
+as that verification may matter, and destroys the rest.
+
+- **No document bytes on-chain or in the relational database.** Only
+  commitments + references (extends DR10).
+- **Rejected or expired evidence is purged.** Bytes and any derived working
+  copies are destroyed; the decryption key is destroyed (cryptographic erasure).
+  Only a non-identifying audit line may remain: no hash, no filename, no PII.
+- **Accepted evidence keeps minimal provenance:** a keyed commitment (HMAC with
+  a destroyable key) rather than a plain PII hash, plus metadata sufficient to
+  challenge or appeal. The keyed commitment lets the custodian cryptographically
+  erase the linkage when the retention period ends.
+- **No anchor until accepted.** A document reference or commitment is not
+  anchored on-chain until the evidence has passed intake validation and been
+  accepted.
+- **Keyed commitments instead of plain PII hashes.** A raw hash of PII is still
+  PII (it can be attacked by precomputation/dictionary over known identities).
+  Use keyed commitments so linkage can be destroyed by key destruction.
+- **Explicit TTLs per task class and reputation tier.** Retention periods are
+  declared, not inherited. When a TTL expires, bytes and keys are destroyed.
+- **Purge is observable.** Destruction of bytes and keys is auditable without
+  revealing what was destroyed.
+- **Crypto-erasure is not guaranteed anonymization.** Destroying a key breaks
+  linkage, but residual copies or side channels may remain; assess case-by-case
+  (see EDPB Guidelines 02/2025 nuance).
+- **Mirrors implement tombstone + suppression.** Off-chain mirrors that cache
+  accepted evidence must honor retention: suppressed items are not re-displayed,
+  and corrected records replace superseded ones through append-only correction
+  (never silent rewrite).
+
+### 11.2 Disposal path
+accepted → (retention period elapses OR request granted) → purge bytes →
+destroy decryption key → record non-identifying audit line → complete.
+
+rejected/expired → purge bytes → destroy key → record non-identifying audit
+line → complete.
+
+### 11.3 Cross-reference
+Sealed-session attribution opening (RFC-017 §6) governs when, how, and by whom
+a closed session may be re-opened; retention does not extend the opening
+window.
+
+---
+
 A written RFC is not implementation. A passing unit test is not production deployment. A deployed smart contract is not proof of global decentralization. A cryptographic hash is not proof that information is true or that it is safe to publish.
 
 ---
