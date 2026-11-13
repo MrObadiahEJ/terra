@@ -83,6 +83,13 @@ exports a GLB or GeoJSON file. It must correctly declare the coordinate frame,
 geometry semantics, provenance, accuracy, dependencies and version information,
 and its package must pass the RFC-015 conformance test.
 
+The canonical implementation of the RFC-015 conformance validator is the
+**Terra Geo SDK** (`terra-geo` crate, version `0.1.0`, at
+`terra-core/geo-engine/`), which declares its capabilities, schema versions
+(RFC-015, terra-geom-v1/v2, terra.manifest/v1), dependencies, security
+assumptions, and upgrade behavior per directive §3 / §12. Workers and tools
+that implement RFC-015 should use this SDK as the reference implementation.
+
 ---
 
 ## 11.4 Reconstruction workflow
