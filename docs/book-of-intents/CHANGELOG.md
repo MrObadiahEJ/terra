@@ -2,6 +2,26 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 048: SDK standard shift — terra-geo SDK v0.1.0 declared + RFC-015/protocol alignment
+
+- **`terra-core/geo-engine/src/lib.rs`**: new `sdk_meta` module declaring the Terra
+  Geo SDK (`terra-geo` v0.1.0) identity per directive §3 / §12 — SDK name,
+  version, capabilities (geometry digest terra-geom-v1/v2, RFC-015 component
+  package conformance validator, signed manifests, quadtree discovery), schema
+  versions (RFC-015, terra-geom-v1/v2, terra.manifest/v1), direct crate
+  dependencies, security assumptions, and upgrade/migration behavior; unit test
+  `sdk_metadata_is_well_formed` verifies the declaration
+- **`docs/rfc-015-spatial-component-package.md`**: §5 names `terra-geo` SDK v0.1.0
+  as the canonical RFC-015 conformance validator implementation; adds §5.1 SDK
+  standard declaration; marks terra-geom-v2 promotion and conformance-validator
+  location as resolved
+- **`docs/book-of-intents/chapters/11-distributed-spatial-reconstruction-and-assembly.md`** §11.3: references the `terra-geo` SDK v0.1.0 as the canonical RFC-015 conformance validator implementation
+- **`docs/book-of-intents/IMPLEMENTATION_STATUS.md`**: section C adds row C6
+  (SDK standard declaration, status 1)
+- Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
+  warnings` clean; `cargo fmt --all --check` clean; `cargo test -p terra-geo
+  --lib` 49 passed (incl. new `sdk_metadata_is_well_formed` test)
+
 ## 2026-11-13 — Sprint 047: Fix UUID/component_id mismatch in artifact retrieval
 
 - **`terra-core/api/src/routes/components.rs`**: `GET /components/{id}/artifact`

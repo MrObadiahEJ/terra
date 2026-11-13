@@ -1,13 +1,16 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `1c3d50d`; sprints 001–046 delivered:
+Last reconciled: 2026-11-13 (committed `609d9f0`; sprints 001–048 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
 trust-chain fixes, 043 worker identity takeover fix, 044 open-questions →
 ratifiable decisions, 045 Terra Atlas frontend, 046 protocol architecture
-directives RFC-014 economics + RFC-017 secure evidence intake).
+directives RFC-014 economics + RFC-017 secure evidence intake, 047 UUID/
+component_id artifact-retrieval fix, 048 SDK standard shift — terra-geo
+SDK v0.1.0 declared + RFC-015/protocol alignment).
+Sprint notes for 025–048 are in `sprints/025-*.md` … `sprints/048-*.md`.
 Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
 
 ## Active intents
@@ -151,4 +154,19 @@ Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
    64 MiB / `REQUEST_TIMEOUT_SECS` 60 s; `StorageBackend::Local` only, no
    quarantine/isolation, no retention/TTL/purge path (R-027 documents the gap).
    No code changed — docs only.
+
+7. **SDK standard shift (code + docs, Sprint 048):**
+   `terra-core/geo-engine/src/lib.rs` adds an `sdk_meta` module declaring the
+   Terra Geo SDK (`terra-geo` v0.1.0) identity per directive §3 / §12:
+   capabilities (geometry digest terra-geom-v1/v2, RFC-015 component-package
+   conformance, signed manifests, quadtree discovery), schema versions
+   (RFC-015, terra-geom-v1/v2, terra.manifest/v1), direct crate dependencies,
+   security assumptions, and upgrade/migration behavior. Unit test
+   `sdk_meta::tests::sdk_metadata_is_well_formed` verifies the declaration.
+   RFC-015 §5 names `terra-geo` SDK v0.1.0 as the canonical RFC-015 conformance
+   validator implementation (adds §5.1 SDK standard declaration); chapter 11
+   §11.3 references the SDK as the canonical implementation. IMPLEMENTATION_STATUS
+   section C adds row C6 (SDK standard declaration, status 1). Verified:
+   cargo check --workspace clean; clippy --workspace -- -D warnings clean;
+   fmt --all --check clean; cargo test -p terra-geo --lib 49 passed.
 
