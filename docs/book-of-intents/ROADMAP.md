@@ -58,12 +58,17 @@ PostGIS mirror, geo-engine, story engine RFC-014 Phases 01–03.
   sprints 012/013/015); implemented and verified; REQ-025 traceability row added
   in the same change set; no stage criteria change.
 
-## Stage 2 — Devnet truth (entry: Stage 1 exit met; founder funds wallet)
+## Stage 2 — Devnet truth (entry: Stage 1 exit met; Q-001 decision proposed)
 
 **Sequencing (founder directive 2026-11-02):** devnet funding is the **last**
 step, not the next one. It gates only Stage 2; frontend, API, offline demo
-stories, and all local test suites run with zero SOL. Work continues on `dev`
-against the local stack until the founder chooses to fund the wallet.
+stories, and all local test suites run with zero SOL. Q-001 default decision:
+three tracks in parallel — (A) run the full A1–A21 smoke suite on a local
+validator/Surfpool today ($0), (B) faucet rotation (~17.1 devnet SOL via
+QuickNode/Helius/Chainstack/Alchemy; scripted cron claimer), (C) shrink rent
+(close stale programs, deploy registry first). Exit criterion: A1–A21 green on
+localnet/Surfpool AND registry deployed to devnet with wallet signing verified.
+Founder approves the exit definition.
 
 - Fund deployer (Q-001, founder). Run `./deploy.sh devnet`. Execute on-chain
   smoke: register parcel → rights → geometry version → 3D model → snapshot →
@@ -104,12 +109,13 @@ geo-engine 33 (+2 ignored), vitest 83/83, tsc clean, build:check PASS). **Only
 live-cluster verification remains** — that is a Stage 2 (B6 devnet funding)
 concern, not a Stage 4 blocker.
 
-## Stage 4 — Research-gated features (entry: Stage 3 + research complete)
+## Stage 4 — Research-gated features (entry: Stage 3 + decisions proposed)
 
-- Institutional identity implementation (REQ-020) — needs founder authorization
-  (bootstrap council is a trust commitment, ADR-level).
-- Fractional investment (REQ-023) — **hard-gated** on securities research
-  (Q-005). No code before written legal research.
+- Institutional identity implementation (REQ-020) — Q-003 decision proposed
+  (sunset bootstrap council with vLEI/DNSSEC evidence bundles); founder
+  ratification pending.
+- Fractional investment (REQ-023) — **hard-gated** on Q-005 decision proposed
+  (securities memo + counsel sign-off). No code before written legal research.
 - Transaction lineage/redemption (A26) — after replay/double-spend design
   review.
 - ~~Distributed reconstruction & assembly (REQ-026)~~ — **implemented** (sprint

@@ -13,8 +13,9 @@ Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
 - **INT-001/002/003** — maintained (`IMPLEMENTED AND VERIFIED`; regressions
   caught by BPF/vitest gates).
 - **INT-004** — `PARTIALLY IMPLEMENTED` (see intent for the exact gap list).
-- **INT-005** — `SPECIFIED ONLY` (founder review flag; Q-003 trust commitment
-  pending).
+- **INT-005** — `SPECIFIED ONLY` (Q-003 now a decision proposed: sunset bootstrap
+  council with vLEI/DNSSEC evidence bundles; founder ratification pending; does
+  not block doc-only work).
 
 ## Execution state
 
@@ -77,19 +78,31 @@ Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
 
 ## Next up (order)
 
-1. **Founder review** of remaining Stage 3/4 flags: Q-003 (bootstrap council),
-   Q-004 (residency recognition), Q-005 (securities research). These gate
-   REQ-020/021/022 implementation but do not block doc-only work.
-   REQ-026/027/028 are implemented (Sprint 025) and only need live-cluster
-   verification, which is blocked on funding.
-2. **Stage 2 (devnet)** — blocked on Q-001 devnet funding (founder). Once
-   funded: `./deploy.sh devnet` + on-chain smoke (register parcel → rights →
-   geometry version → 3D model → snapshot → escrow → dispute → slash dry-run),
-   then live-cluster verification of REQ-026/027/028 (component submission,
-   manifest version transition, multi-provider retrieval, worker heartbeat).
-3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
-   institutional identity (REQ-020), residency credential (REQ-021), lien
-   encumbrance (REQ-022).
+1. **Stage 2 (devnet)** — Q-001 devnet funding is now a *decision proposed*, not a
+   code blocker: default decision is three tracks in parallel — (A) run the full
+   A1–A21 smoke suite on a local validator/Surfpool today ($0), (B) faucet
+   rotation (~17.1 devnet SOL via QuickNode/Helius/Chainstack/Alchemy; scripted
+   cron claimer), (C) shrink rent (close stale programs, deploy registry first).
+   Exit criterion: A1–A21 green on localnet/Surfpool AND registry deployed to
+   devnet with wallet signing verified. Founder approves the exit definition.
+   Once satisfied: `./deploy.sh devnet` + on-chain smoke (register parcel →
+   rights → geometry version → 3D model → snapshot → escrow → dispute → slash
+   dry-run), then live-cluster verification of REQ-026/027/028.
+
+2. **Stage 4 (research-gated)** — Q-003/Q-004/Q-005 are now *decisions proposed*,
+   not indefinite research: (Q-003) sunset bootstrap council with vLEI/DNSSEC
+   evidence bundles; (Q-004) selective-disclosure VC profile + two-proof evidence
+   bundle + EUDI/QTSP pathway; (Q-005) securities memo (US, EU, LU, SG, AE) +
+   counsel sign-off, protocol ≠ issuer (compliance as adapter). After founder
+   ratification: implement institutional identity (REQ-020), residency credential
+   (REQ-021), lien encumbrance (REQ-022). Q-005 keeps REQ-023 hard-gated; no code
+   before written legal research.
+
+3. **RFC-016 Phase 2+ code** — unblocked agent work: `SecurityRequest.subject`,
+   `PrivacyState` writes on finalize, provider proof-of-possession, client-side
+   digest verification vs signed manifest, `POST /components` auth,
+   `complete_assignment` auth, UUID/component_id fallback mismatch.
+
 4. **Data-plane component artifact storage** — **done (Sprint 037)**: component
    bytes stored under their SHA-256 content address (`migration 0045` +
    `PUT/GET /components/{id}/artifact` + `store_content_addressed`), served with
@@ -100,14 +113,16 @@ Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
    are passed to `TerraGlobe`, which coarsely culls runtime nodes whose
    `spatial_extent` does not intersect a cover cell. Remaining: expose the
    package UUID through scene nodes so `fetchComponentArtifact` is automatic.
+
 5. **Frustum/occlusion culling + screen-space error LOD** — **done (Sprint 039),
-   wired into GlobePage (Sprint 040):** `screenSpaceError`, `lodFromScreenSpaceError`,
-   frustum cull (`outsideHorizontalFov`/`outsideVerticalFov`), occlusion/backface
-   cull (`isOccluded`), and combined `cullComponent`/`selectVisible` are applied
-   to `runtimeNodes` in `GlobePage` (culledNodes state, recomputed on camera
-   move), so only visible components are fetched/rendered. Distance-based LOD
-   (`lodFromHeight`, `TIER_SETTINGS.buildingCap`, `selectBuildingsForTier`)
-   already existed; screen-space error and culling are implemented, unit-tested
+   wired into GlobePage (Sprint 040):** `screenSpaceError`,
+   `lodFromScreenSpaceError`, frustum cull (`outsideHorizontalFov`/
+   `outsideVerticalFov`), occlusion/backface cull (`isOccluded`), and combined
+   `cullComponent`/`selectVisible` are applied to `runtimeNodes` in `GlobePage`
+   (culledNodes state, recomputed on camera move), so only visible components are
+   fetched/rendered. Distance-based LOD (`lodFromHeight`,
+   `TIER_SETTINGS.buildingCap`, `selectBuildingsForTier`) already existed;
+   screen-space error and culling are implemented, unit-tested
    (viewport.test.ts, 29 tests), and wired into rendering. Awaiting live-cluster
    verification only.
 
