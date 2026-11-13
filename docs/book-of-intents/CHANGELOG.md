@@ -2,6 +2,37 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 045: Terra Atlas frontend (investor-facing planetary observation surface)
+
+- **`terra-web/src/components/atlas/AtlasPage.tsx`** (new): investor-ready
+  `/atlas` experience wrapping `GlobePage` with violet gradient mesh, glass
+  window system, and guided investor tour. Route `/atlas` now points to
+  `AtlasPage` (replacing bare `GlobePage`).
+- **`terra-web/src/components/atlas/WindowSystem`/`AtlasWindow`** (new):
+  draggable, resizable, focusable glass windows with minimize-to-dock and
+  `localStorage`-persisted layout; lazy-loaded per route (Cesium stays out of
+  initial graph per R-012); mobile bottom sheets `<768px`.
+- **`terra-web/src/components/atlas/AssetInspector.tsx`** (new): 3D Gaussian
+  Splat inspector via three.js `Points` + custom shader — no SharedArrayBuffer,
+  no cross-origin isolation. Synthetic demo splat `demo-house.splat` (2.5 kB)
+  labeled honestly; GLB/static fallbacks.
+- **`terra-web/src/components/atlas/WalletPanel.tsx`** (new): Phantom-style
+  assets/rights panel; simulated data labeled honestly; optional read-only
+  Phantom connect (address + devnet balance via public RPC; no program calls,
+  no signing).
+- **`terra-web/src/components/atlas/LayersPanel.tsx` + `ProvenancePanel.tsx`**
+  (new): map layer toggles + evidence lineage with honest status chips.
+- **`terra-web/src/components/atlas/InvestorTour.tsx`** (new): 6-stop guided
+  narrative overlay, skippable/replayable/reduced-motion safe.
+- **`terra-web/src/lib/atlasStore.ts`** (new): zustand window layout store.
+- **`terra-web/src/index.css`**: dark surfaces, violet accent, ambient gradient
+  mesh, glassmorphic panels; `prefers-reduced-motion` fallback.
+- **`terra-web/src/lib/locale.tsx`**: new `atlas*` keys in en/fr/ru/zh.
+- **`terra-web/public/models/demo-house.splat`** (new): 2.5 kB synthetic splat.
+- Verified: `tsc` clean; eslint clean; vitest **120/120**; `build:check` PASS
+  (entry 308.8 kB gz ≤ 360; Cesium lazy 1098.5 kB ≤ 1200; total 1882.8 kB gz ≤ 1900).
+- No `terra-core` changes; no fake chain data; all simulated surfaces labeled.
+
 ## 2026-11-13 — Sprint 043: worker identity takeover fix (REQ-038)
 
 - **`terra-core/api/src/routes/workers.rs`**: `register_worker` no longer overwrites

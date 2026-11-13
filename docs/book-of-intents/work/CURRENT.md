@@ -1,12 +1,13 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `7dbe27a`; sprints 001–042 delivered:
+Last reconciled: 2026-11-13 (committed `3604545`; sprints 001–045 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
-trust-chain fixes).
-Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
+trust-chain fixes, 043 worker identity takeover fix, 044 open-questions →
+ratifiable decisions, 045 Terra Atlas frontend).
+Sprint notes for 025–045 are in `sprints/025-*.md` … `sprints/045-*.md`.
 
 ## Active intents
 
@@ -62,6 +63,8 @@ Sprint notes for 025–042 are in `sprints/025-*.md` … `sprints/042-*.md`.
 | Sprint 036 — Signed manifest discovery by region/cell | **done & committed (2026-11-13, `638912a`)** | `GET /manifests/signed?region_id=&cell=&limit=` lists stored envelopes (metadata only) with exact `q/level/x/y` cell validation, default limit 20, clamp 1–100 and deterministic ordering; the DB roundtrip also asserts listing; `cargo test -p terra-api` **143 passed**, clippy/fmt clean; pagination, parent/prefix discovery and data-plane component storage remain; sprints/036 |
 | Sprint 042 — P0 security & trust-chain fixes (REQ-026/026a/027/028/029–040) | **done & committed** | Fixed PDA seed circular reference in `create_review_case`/`finalize_decision` (review pipeline was unexecutable); `finalize_appeal` now requires committee reputation + `appeal.decision == decision.key()` binding; added `emergency_lift` instruction (was a censorship gadget with no lift path); `validation_state` forced to `'pending'` server-side on component submission; `upload_component_artifact` verifies `x-body-hash` against actual body SHA-256; added `tests/security.rs` to CI. All Rust gates clean (`cargo check`, `clippy -- -D warnings`, `fmt --check`); frontend gates clean. | `sprints/042-p0-security-trust-chain-fixes.md` |
 | Worker identity takeover fix (`workers.rs` ON CONFLICT wallet overwrite) | **done & committed** | `register_worker` no longer overwrites `wallet_address` on `ON CONFLICT (worker_id)` — a worker's wallet is set once at creation and cannot be hijacked by re-registering under a different wallet. Closes REQ-038 identity-takeover vector. | `cargo check -p terra-api` clean; `cargo clippy -- -D warnings` clean; `cargo fmt --check` clean |
+| Sprint 044 — Open questions → ratifiable decisions (Q-001–Q-006, Q-008–Q-018) | **done & committed** | `OPEN_QUESTIONS.md` rewritten: each blocker now a *decision proposed* with default recommendation, external grounding, and exit criterion. Q-001 devnet funding reframed as 3 tracks ($0 local validator/Surfpool, faucet rotation, shrink rent). Q-003 sunset bootstrap council w/ vLEI/DNSSEC evidence. Q-004 selective-disclosure VC + EUDI path. Q-005 keeps hard gate (protocol ≠ issuer). Q-006 7-point mainnet checklist. Q-008–Q-018 agent-research answers with code-vs-design split. | `sprints/044-open-questions-decisions.md` |
+| Sprint 045 — Terra Atlas frontend (investor-facing planetary observation surface) | **done & committed** | `AtlasPage` + glass window system (Asset Inspector 3DGS splat, Wallet/Rights simulated panel, Layers, Provenance, InvestorTour); lazy-loaded per route (Cesium out of initial graph); design tokens (violet accent, gradient mesh, glass panels); demo splat `demo-house.splat` (2.5 kB) labeled synthetic; i18n keys en/fr/ru/zh; verified: tsc clean, eslint clean, vitest 120/120, build:check PASS (entry 308.8 kB gz ≤ 360, Cesium lazy 1098.5 kB ≤ 1200, total 1882.8 kB gz ≤ 1900). Published at https://mrobadiahej.github.io/terra/atlas | `sprints/045-terra-atlas-frontend.md` |
 
 ## Known blockers
 
