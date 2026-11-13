@@ -25,12 +25,15 @@ demos. As of 2026-11-02/03 it now has:
 - progressive lazy loading driven by LOD 0–4 rather than hardcoded `LOD_LEVELS` constants alone,
 - provider discovery and fallback (`api/src/routes/providers.rs`),
 - a quadtree discovery partition and signed, content-addressed manifest format
-  (`terra-core/geo-engine/src/spatial_index.rs`, `manifest.rs`; ADR-020).
+  (`terra-core/geo-engine/src/spatial_index.rs`, `manifest.rs`; ADR-020),
+- read-only API primitives for cell lookup, extent covering, and signed
+  manifest verification (`GET /spatial/cell`, `GET /spatial/cover`,
+  `POST /manifests/verify`).
 
-Still missing (tracked separately, not by this chapter): wiring the quadtree
-index into the API manifest/scene request path, serving signed manifest
-envelopes and content-addressed retrieval, and live-cluster verification of
-every item above (B6 devnet funding blocks it).
+Still missing (tracked separately, not by this chapter): persisting signed
+envelopes and content-addressed retrieval, deriving cells from camera bounds in
+the scene request path, and live-cluster verification of every item above (B6
+devnet funding blocks it).
 
 This chapter documents the runtime architecture that makes separately stored
 spatial objects feel like one coherent physical world.
@@ -344,7 +347,10 @@ implements the content-addressed artifact:
 - Each object binds an object ID, component version, optional assembly version,
   component content digest, data-plane storage reference, bounds, available
   LODs (0–4), and validation state.
-- Identity is `sha256:<hex>` over the exact serialized payload bytes.
+- Identity is `sha256:<hex>` over the canonical payload bytes produced by
+  `ManifestPayload::to_bytes` (fixed schema order, no insignificant
+  whitespace). Parsing re-serializes the payload before hashing and verifying,
+  so formatting differences are tolerated but semantic changes are rejected.
 - Authenticity is Ed25519 over
   `terra.manifest.signature.v1\0 || payload_digest`; the publisher key is
   carried with the envelope. `from_json()` verifies before returning, and
@@ -353,8 +359,12 @@ implements the content-addressed artifact:
   objects/neighbours/LODs, out-of-range LODs, invalid bounds, and object bounds
   outside the region cell.
 
-The API does not yet emit or serve these envelopes; `routes/manifests.rs`
-continues to store mutable PostgreSQL rows. That wiring is the next slice.
+The API can now verify these envelopes at `POST /manifests/verify`
+(`routes/manifests.rs`), and `GET /spatial/cell`/`GET /spatial/cover` expose the
+quadtree primitives. It does **not** yet emit or persist signed envelopes;
+`routes/manifests.rs` continues to store mutable PostgreSQL rows, and the scene
+request path does not derive cells from camera bounds. That persistence and
+wiring is the next slice.
 
 ---
 
@@ -497,11 +507,13 @@ sequenceDiagram
 | `routes/derived.rs` (derived_jobs, processing_key dedup) | Derived-job reuse pattern for component reuse | `derived_job_leases` migration (0042) now adds worker lease/claim with expired-lease recovery |
 | `routes/reconstruction.rs` (jobs, drafts, anchor) | Component submission baseline | Multi-provider retrieval now via `routes/runtime.rs` (`/runtime/assets` with fallback) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No synchronized 3D scene assembly |
-| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | No hierarchical spatial index service yet; quadtree cells exist in `terra-geo` but are not wired into this route |
+| `routes/spatial.rs` (`/parcels/near`, zones) | Spatial query baseline | Proximity query unchanged; adds `GET /spatial/cell` + `/spatial/cover` over the `terra-geo` quadtree, but scene requests do not use cells yet |
 | `routes/geo.rs` (`nearest-roads`, `pois`, `buildings`, `stats`) | Geo read model | No 3D mesh retrieval, no LOD streaming |
 | `terra-core/geo-engine` (`canonical.rs`, `reach.rs`, `graph.rs`, `osm.rs`) | Geometry digest, sealed-road reach | No component storage or scene graph |
-| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — deterministic quadtree discovery cells, covering queries | Not yet wired into API/scene requests; S2/H3 adapter deferred |
-| `terra-core/geo-engine/src/manifest.rs` | **New (2026-11-13)** — content-addressed, Ed25519-signed manifest payloads and object references | API still stores unsigned mutable rows; no content-addressed retrieval endpoint yet |
+| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — deterministic quadtree discovery cells, covering queries | S2/H3 adapter deferred; scene request path still uses manifests/PostGIS |
+| `terra-core/geo-engine/src/manifest.rs` | **New (2026-11-13)** — content-addressed, Ed25519-signed manifest payloads and object references | API verifies envelopes but does not sign/persist them or serve content-addressed storage yet |
+| `api/src/routes/spatial.rs` | **New (2026-11-13)** — `GET /spatial/cell`, `GET /spatial/cover` | Stateless discovery primitives; no camera-bound integration |
+| `api/src/routes/manifests.rs` | **New (2026-11-13)** — `POST /manifests/verify` | Stateless verification; no signing-key custody or signed persistence |
 | Frontend `lod.ts` (`LOD_LEVELS`, `LOD_TARGET_HEIGHT`) | LOD level definitions | `lodFromHeight` + `TIER_SETTINGS.buildingCap` + `selectBuildingsForTier` now drive progressive tier loading |
 | Frontend `cesiumTerrain.ts` | Terrain loading with retry | Single terrain provider; provider discovery + fallback now live in `routes/providers.rs` + `runtime.ts` |
 | `api/src/routes/manifests.rs` + migration 0036 | **New (2026-11-02)** — World Representation Manifest router | — |
@@ -509,6 +521,7 @@ sequenceDiagram
 | `terra-web/src/lib/runtime.ts` (505 lines) + `runtime.test.ts` (322 lines) | **New (2026-11-02/03)** — frontend runtime client (manifest resolver, scene graph, LOD 0–4, provider fallback) | — |
 
 The specification is implemented, and the quadtree discovery index plus signed
-manifest format now exist as tested `terra-geo` libraries. Remaining work is
+manifest format now exist as tested `terra-geo` libraries, with read-only API
+endpoints for cell lookup, covering, and envelope verification. Remaining work is
 service integration (persist/serve signatures and content addresses, derive
 cells from camera bounds) and live-cluster verification (B6 devnet funding).

@@ -121,10 +121,11 @@ For every view request, the runtime calculates:
 - Required LOD.
 - Expected data size, priority, network and memory constraints.
 
-The discovery partition now exists: `terra-geo` `QuadCell`/`covering_cells`
-converts a bounds rectangle into deterministic `q/{level}/{x}/{y}` cells.
-The runtime client does not call it yet; the API scene path still resolves
-objects through manifests/PostGIS rather than a quadtree lookup.
+The discovery partition exists: `terra-geo` `QuadCell`/`covering_cells`
+converts a bounds rectangle into deterministic `q/{level}/{x}/{y}` cells, and
+the API exposes `GET /spatial/cell` + `GET /spatial/cover`. The runtime client
+does not call these yet; the API scene path still resolves objects through
+manifests/PostGIS rather than a quadtree lookup.
 
 The system should support both **geographic tile retrieval** and
 **direct object/component retrieval**.
@@ -223,13 +224,15 @@ The data model must remain consistent even when rendering quality differs.
 | `cesiumTerrain.ts` (single terrain provider + retry) | Terrain loading pattern | Provider discovery + fallback now live via `routes/providers.rs` + `runtime.ts`; single terrain provider remains |
 | `story/roads.ts` (`buildRoadRoute`, `snapToRoadNetwork`) | Client-side routing baseline | Server-side `/geo/route` absent (Q-007 closed as sufficient) |
 | `routes/stories.rs` (`/replay`, `/replay.geojson`, `/schema/replay`) | Read-only replay baseline | No progressive 3D streaming |
-| `routes/spatial.rs` (`/parcels/near`) | Spatial query baseline | No hierarchical tiles, no object streaming; quadtree cells exist in `terra-geo` but are not used by this route |
+| `routes/spatial.rs` (`/parcels/near`) | Spatial query baseline | No hierarchical tiles, no object streaming; adds stateless `/spatial/cell` + `/spatial/cover` endpoints, but scene requests do not use cells yet |
 | `routes/geo.rs` (nearest-roads, pois, buildings, stats) | Geo read model | No 3D mesh retrieval, no LOD streaming |
-| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — quadtree discovery cells and covering queries | Not yet wired into scene requests; S2/H3 tile adapter deferred |
+| `terra-core/geo-engine/src/spatial_index.rs` | **New (2026-11-13)** — quadtree discovery cells and covering queries | S2/H3 tile adapter deferred; not yet in scene requests |
+| `api/src/routes/spatial.rs` (new endpoints) | **New (2026-11-13)** — `GET /spatial/cell`, `GET /spatial/cover` | Stateless discovery primitives; no runtime-client integration |
 | `api/src/routes/runtime.rs` + migrations 0039/0043 | **New (2026-11-02)** — `/runtime/scene/{id}/{lod}`, `/runtime/assets/{id}` (provider fallback), `/runtime/lod` (LOD 0–4), `/runtime/cache` | — |
 | `api/src/routes/providers.rs` + migration 0037 | **New (2026-11-02)** — provider discovery + fallback + replication | — |
 | `terra-web/src/lib/runtime.ts` + `runtime.test.ts` | **New (2026-11-02/03)** — frontend runtime client: LOD 0–4, provider fallback, asset retrieval, validation-state tracking | — |
 
 The specification is implemented. Remaining work is the spatial tiling / 3D
-Tiles pipeline, wiring the quadtree discovery index into scene requests,
-frustum/occlusion culling, and live-cluster verification (B6 devnet funding).
+Tiles pipeline, using the quadtree discovery endpoints in scene requests,
+persisting/serving signed content-addressed manifests, frustum/occlusion
+culling, and live-cluster verification (B6 devnet funding).

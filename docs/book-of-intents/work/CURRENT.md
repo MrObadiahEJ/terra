@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-13 (committed `db22de0`; sprints 001–032 delivered).
-Sprint notes for 025–032 are in `sprints/025-*.md` … `sprints/032-*.md`.
+Last reconciled: 2026-11-13 (committed `496ec49`; sprints 001–033 delivered).
+Sprint notes for 025–033 are in `sprints/025-*.md` … `sprints/033-*.md`.
 
 ## Active intents
 
@@ -51,6 +51,7 @@ Sprint notes for 025–032 are in `sprints/025-*.md` … `sprints/032-*.md`.
 | Sprint 030 — Google-Earth-style immersive atlas | **done & deployed (2026-11-12)** | commits `48286af` (immersive chrome + camera-preserving 2D↔3D + dock HUD + swipe sheet), `d2d3d25` (satellite default) and `cd93c25` (fullscreen guard); files `GlobePage.tsx`, `AtlasSearchPill.tsx`, `Sidenav.tsx`, `TerraGlobe.tsx`, `Navbar.tsx`, `index.css`, four locales, README; live <https://mrobadiahej.github.io/terra/> on Pages runs `43289772629` + `43290890798` + `43292573392`; viewport sweep 360×640 … 1920×1080 and 844×390 with no horizontal overflow; tsc clean, vitest **83/83**, build:check PASS (entry 300.2 / initial 305.5 / Cesium 1098.5 / total 1866.7 kB gz); sprints/030 |
 | Sprint 031 — RFC-016 registry dispatch repair | **done & committed (2026-11-12)** | `41fe53d` re-exports the eleven generated `__client_accounts_*` modules at the crate root with `#[doc(hidden)] pub(crate)`; `3a6c0a1` rustfmt for `security.rs` + its tests; `cargo check -p terra-registry` passes (33.6 s) and `cargo fmt --check` clean; A37 remains `2 – IMPLEMENTED, NOT FULLY VERIFIED` (no BPF tests, not deployed); sprints/031 |
 | Sprint 032 — Spatial index decision + signed content-addressed manifests | **done & committed (2026-11-13)** | `db22de0` adds `geo-engine/src/spatial_index.rs` (EPSG:4326 quadtree, `q/level/x/y` IDs, covering with 65,536-cell cap) and `manifest.rs` (`terra.manifest/v1` payload, SHA-256 content addresses, Ed25519 domain-separated signatures, object/component references, bounds/LOD/validation invariants); ADR-020 records quadtree-now/S2-H3-later/octree-BVH-for-3D; `40b6633` rustfmt for `component_package.rs`; `cargo test -p terra-geo --lib` **48 passed, 2 ignored** (15 new), `cargo check -p terra-geo` and `cargo fmt --check` pass; API integration still outstanding; sprints/032 |
+| Sprint 033 — API discovery cells + signed manifest verification | **done & committed (2026-11-13, `496ec49`)** | `GET /spatial/cell` + `GET /spatial/cover` expose the quadtree without DB access; `POST /manifests/verify` validates `terra.manifest/v1` envelopes (payload invariants, publisher key, Ed25519 signature, content address) without persisting; `cargo check -p terra-api` passes (5m08s); `cargo test -p terra-api endpoint` **6 passed** (133 filtered); rustfmt clean; signed persistence, content-addressed retrieval, signing-key custody and scene-path cell use remain; sprints/033 |
 
 ## Known blockers
 
@@ -80,11 +81,11 @@ Sprint notes for 025–032 are in `sprints/025-*.md` … `sprints/032-*.md`.
 3. **Stage 4 (research-gated)** — after Q-003/Q-004/Q-005 resolve: implement
    institutional identity (REQ-020), residency credential (REQ-021), lien
    encumbrance (REQ-022).
-4. **Wire the spatial index + signed manifests into the API** — the tested
-   library foundation landed in Sprint 032 (`spatial_index.rs`, `manifest.rs`,
-   ADR-020). Next: derive quadtree cells from scene/query bounds, emit/verify
-   signed `terra.manifest/v1` envelopes, serve content addresses, and persist
-   signatures. This is local work and does not need SOL.
+4. **Persist signed manifests + serve content-addressed retrieval** — the
+   quadtree endpoints and stateless `POST /manifests/verify` landed in Sprint
+   033. Next: choose signing-key custody, add publisher/signature/content-address
+   persistence, expose content-addressed retrieval, and use cells in scene
+   requests. This is local work and does not need SOL.
 5. **Frustum/occlusion culling + screen-space error LOD** — specified in
    Chapter 13, not yet coded.
 

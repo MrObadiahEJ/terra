@@ -261,8 +261,11 @@ and level *n* has `2^n × 2^n` cells, capped at level 30. Point lookup uses
 adapter; manifest cell IDs remain opaque strings so an adapter can be added
 without rewriting stored references. Octree/BVH remains the 3D-volume and
 component-culling structure. Manifests are immutable artifacts: identity is
-SHA-256 over the exact serialized payload bytes, and authenticity is Ed25519
-over `terra.manifest.signature.v1\0 || payload_digest`. Manifest objects bind
+SHA-256 over the canonical payload bytes (`ManifestPayload::to_bytes`; fixed
+schema order, no insignificant whitespace), and authenticity is Ed25519 over
+`terra.manifest.signature.v1\0 || payload_digest`. Parsing re-serializes the
+payload before hashing and verifying, so formatting differences are tolerated
+while semantic changes are rejected. Manifest objects bind
 object/component versions, component content digests, storage references,
 bounds, LODs (0–4), and validation state; object bounds must lie inside the
 manifest's region cell. Retrieval verifies content bytes before parsing or

@@ -2,6 +2,29 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 033: API quadtree discovery + signed manifest verification
+
+- **`GET /spatial/cell?lon=&lat=&level=`** (`496ec49`): returns the stable
+  quadtree cell and bounds; defaults to level 12, rejects invalid coordinates
+  or levels with `400`. No database access.
+- **`GET /spatial/cover?min_lon=&min_lat=&max_lon=&max_lat=&level=`**
+  (`496ec49`): returns ordered intersecting cells, defaults to level 10, and
+  enforces the library's 65,536-cell cap.
+- **`POST /manifests/verify`** (`496ec49`): validates a `terra.manifest/v1`
+  envelope (payload invariants, publisher key, Ed25519 signature, canonical
+  content address) and returns the address/region/version/object count. It
+  persists nothing and needs no signing key.
+- **Verified:** `cargo check -p terra-api` passes (5 m 08 s);
+  `cargo test -p terra-api endpoint` **6 passed** (133 filtered; 4 cell/cover +
+  2 manifest tests); `cargo test -p terra-geo --lib` still 48/48 (+2 ignored);
+  rustfmt clean on changed files. Full API suite and BPF/SBF not run.
+- **Still missing:** signing-key custody, signed persistence, content-addressed
+  retrieval/storage, scene-path cell use, and live-cluster verification (B6).
+  C4/C5 stay `3 – PARTIALLY IMPLEMENTED`; B16 stays `2`.
+- Evidence: `sprints/033-api-discovery-and-manifest-verification.md`; Chapter
+  12 §12.8/§12.13; Chapter 13 §13.3/§13.8; Chapter 14; REQ-027;
+  `IMPLEMENTATION_STATUS.md` B16/B20/C4/C5; `work/CURRENT.md`; `CHANGELOG.md`.
+
 ## 2026-11-13 — Sprint 032: spatial index decision + signed content-addressed manifests
 
 - **ADR-020:** control-plane 2D discovery uses a deterministic **quadtree over

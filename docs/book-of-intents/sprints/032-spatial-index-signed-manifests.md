@@ -26,9 +26,10 @@ authenticity real — not just documented.
   not change stored manifest references because cell IDs stay opaque strings.
 - **3D lookup:** octree/BVH remains the structure for buildings, point clouds,
   and component-level culling. The quadtree is not a 3D index.
-- **Manifest identity:** SHA-256 of the exact serialized payload bytes
-  (`sha256:<hex>`). Retrieval can ask for that address, hash the received bytes,
-  then parse.
+- **Manifest identity:** SHA-256 of the canonical payload bytes
+  (`ManifestPayload::to_bytes`; fixed schema order, no insignificant
+  whitespace). Parsing re-serializes the payload before hashing/verifying, so
+  formatting differences are tolerated but semantic changes are rejected.
 - **Manifest authenticity:** Ed25519 signature over
   `terra.manifest.signature.v1\0 || payload_digest`, with the publisher key
   carried as a 32-byte hex string. Signing the digest avoids a JSON

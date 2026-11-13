@@ -54,16 +54,18 @@ against a live cluster (B6).
 | Code area | Change | Evidence |
 |---|---|---|
 | `terra-core/api/migrations/0036_world_manifests.sql` | `world_manifests` (region, version, parent/neighbor manifests) + `manifest_objects` (object_id, component version, assembly version, storage reference, LODs, validation state, access rules) | — |
-| `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert) | API 133/133 |
+| `terra-core/api/src/routes/manifests.rs` | `POST /manifests`, `GET /manifests/{id}` (with objects), `GET /manifests` (list by region), `PUT /manifests/{id}/objects` (upsert), `POST /manifests/verify` (signed envelope) | 6 targeted API tests, 2026-11-13 |
+| `terra-core/api/src/routes/spatial.rs` | `GET /spatial/cell` + `GET /spatial/cover` over the quadtree | 4 targeted API tests, 2026-11-13 |
 | `terra-core/geo-engine/src/spatial_index.rs` | Quadtree discovery cells (`q/level/x/y`), point/parent/children, conservative covering (ADR-020) | geo 48/48 (+2 ignored), 2026-11-13 |
 | `terra-core/geo-engine/src/manifest.rs` | `terra.manifest/v1` content-addressed payloads, Ed25519 signatures, object/component references and validation | geo 48/48 (+2 ignored), 2026-11-13 |
 | `terra-web/src/lib/runtime.ts` | Manifest resolver + scene graph manager + LOD 0–4 + provider fallback | vitest 83/83 |
 
 ### Still to do
 
-- Wire the quadtree discovery cells into API partition/scene queries and persist
-  signed `terra.manifest/v1` envelopes (the library exists; no service endpoint
-  yet).
+- Persist signed `terra.manifest/v1` envelopes and expose content-addressed
+  retrieval; the stateless verification endpoint exists, but the database still
+  stores unsigned mutable rows.
+- Use the quadtree discovery endpoints in the scene/partition path.
 - Cache invalidation propagation on manifest version change.
 - Live-cluster manifest version transition (B6).
 
@@ -99,10 +101,11 @@ exist and pass local suites; not yet exercised against a live cluster (B6).
 
 ### Still to do
 
-- Serve and persist the content-addressed signed manifests implemented in
-  `geo-engine/src/manifest.rs` (no API endpoint yet).
+- Persist signed manifests and serve their content addresses (the library and
+  stateless `POST /manifests/verify` exist; no storage/signing endpoint yet).
 - Frustum culling, occlusion culling, screen-space error LOD.
-- Wire quadtree cells into scene requests.
+- Use `GET /spatial/cell` + `/spatial/cover` in scene requests and the runtime
+  client.
 - Live-cluster multi-provider retrieval + provider failover (B6).
 
 ### Acceptance evidence
@@ -162,10 +165,13 @@ All of the above is implemented and passes local suites. The remaining non-fundi
 items are:
 
 - Spatial index design decision — **done** (ADR-020: quadtree for control-plane
-  discovery; S2/H3 deferred to visualization tiles); API wiring remains.
+  discovery; S2/H3 deferred to visualization tiles); `GET /spatial/cell` +
+  `/spatial/cover` are live, scene-path wiring remains.
 - Manifest architecture founder decision — documented, pending.
-- Content-addressed retrieval + signed manifests — **library done** (Sprint 032:
-  `geo-engine/src/manifest.rs`); API persistence/serving remains.
+- Content-addressed retrieval + signed manifests — **library + stateless
+  verification done** (Sprint 032/033: `geo-engine/src/manifest.rs`,
+  `POST /manifests/verify`); signed persistence/content-addressed storage
+  remains.
 - Frustum/occlusion culling + screen-space error LOD — specified, not coded.
 - Reconstruction-task economic model — founder decision pending.
 
