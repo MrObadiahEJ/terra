@@ -12,6 +12,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use terra_geo::SignedManifest;
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -20,6 +21,7 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_manifest).get(list_manifests))
+        .route("/verify", post(verify_manifest))
         .route("/{id}", get(get_manifest))
         .route("/{id}/objects", put(update_manifest_objects))
 }
@@ -143,6 +145,37 @@ pub async fn create_manifest(
 }
 
 // ---------------------------------------------------------------------------
+// POST /manifests/verify — content-addressed, signed manifest verification
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct VerifyManifestResponse {
+    pub valid: bool,
+    pub content_address: String,
+    pub region_id: String,
+    pub version: u32,
+    pub object_count: usize,
+}
+
+/// Verify a `terra.manifest/v1` envelope: payload invariants, Ed25519
+/// signature, publisher key, and content address. This is the control-plane
+/// counterpart to data-plane digest checks; it does not persist anything.
+pub async fn verify_manifest(
+    Json(manifest): Json<SignedManifest>,
+) -> Result<Json<VerifyManifestResponse>, AppError> {
+    let address = manifest
+        .verify()
+        .map_err(|e| AppError::bad_request(format!("invalid signed manifest: {e}")))?;
+    Ok(Json(VerifyManifestResponse {
+        valid: true,
+        content_address: address.to_string(),
+        region_id: manifest.payload.region_id.clone(),
+        version: manifest.payload.version,
+        object_count: manifest.payload.objects.len(),
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // GET /manifests/{id}
 // ---------------------------------------------------------------------------
 
@@ -173,10 +206,7 @@ pub async fn get_manifest(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?;
 
-    Ok(Json(ManifestWithObjects {
-        manifest,
-        objects,
-    }))
+    Ok(Json(ManifestWithObjects { manifest, objects }))
 }
 
 #[derive(Debug, Serialize)]
@@ -200,7 +230,8 @@ pub async fn list_manifests(
     let limit = params.limit.min(500);
     let rows: Vec<ManifestRow> = match &params.region_id {
         Some(rid) => sqlx::query_as::<_, ManifestRow>(
-            format!("{LIST_MANIFESTS} WHERE region_id = $1 ORDER BY version DESC LIMIT $2").as_str(),
+            format!("{LIST_MANIFESTS} WHERE region_id = $1 ORDER BY version DESC LIMIT $2")
+                .as_str(),
         )
         .bind(rid)
         .bind(limit as i64)
@@ -229,11 +260,12 @@ pub async fn update_manifest_objects(
     Json(req): Json<UpdateManifestObjectsRequest>,
 ) -> Result<Json<Vec<ManifestObjectRow>>, AppError> {
     // Verify manifest exists.
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM world_manifests WHERE id = $1)")
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| AppError::internal(format!("exists check failed: {e}")))?;
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM world_manifests WHERE id = $1)")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("exists check failed: {e}")))?;
     if !exists {
         return Err(AppError::not_found(format!("manifest {id} not found")));
     }
@@ -242,8 +274,14 @@ pub async fn update_manifest_objects(
     let mut updated = Vec::with_capacity(req.objects.len());
     for obj in &req.objects {
         let lods = obj.available_lods.clone().unwrap_or_default();
-        let validation = obj.validation_state.clone().unwrap_or_else(|| "pending".into());
-        let access = obj.access_requirements.clone().unwrap_or(serde_json::json!({}));
+        let validation = obj
+            .validation_state
+            .clone()
+            .unwrap_or_else(|| "pending".into());
+        let access = obj
+            .access_requirements
+            .clone()
+            .unwrap_or(serde_json::json!({}));
         let history = obj.update_history.clone().unwrap_or(serde_json::json!([]));
 
         let row = sqlx::query_as::<_, ManifestObjectRow>(
@@ -287,4 +325,56 @@ pub async fn update_manifest_objects(
     }
 
     Ok(Json(updated))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::SigningKey;
+    use terra_geo::{
+        ContentAddress, GeoBounds, ManifestObject, ManifestPayload, QuadCell, ValidationState,
+    };
+
+    fn signed_manifest() -> SignedManifest {
+        let cell = QuadCell::from_point(11.5, 3.85, 8).unwrap();
+        let object = ManifestObject {
+            object_id: "parcel-1".to_string(),
+            component_version_id: "parcel-1-v1".to_string(),
+            assembly_version_id: None,
+            content: ContentAddress::of(b"component-bytes"),
+            storage_reference: "ipfs://bafy-parcel-1".to_string(),
+            bounds: GeoBounds::new(11.49, 3.84, 11.51, 3.86).unwrap(),
+            available_lods: vec![0, 1, 2],
+            validation_state: ValidationState::TechnicallyValid,
+        };
+        let payload = ManifestPayload::new(
+            "cm-centre",
+            "Centre, Cameroon",
+            cell,
+            1,
+            vec![object],
+            1_700_000_000,
+        );
+        SignedManifest::sign(payload, &SigningKey::from_bytes(&[7u8; 32])).unwrap()
+    }
+
+    #[tokio::test]
+    async fn verify_endpoint_accepts_signed_manifest() {
+        let manifest = signed_manifest();
+        let expected = manifest.content_address().unwrap().to_string();
+        let Json(resp) = verify_manifest(Json(manifest)).await.unwrap();
+        assert!(resp.valid);
+        assert_eq!(resp.region_id, "cm-centre");
+        assert_eq!(resp.version, 1);
+        assert_eq!(resp.object_count, 1);
+        assert_eq!(resp.content_address, expected);
+    }
+
+    #[tokio::test]
+    async fn verify_endpoint_rejects_tampered_manifest() {
+        let mut manifest = signed_manifest();
+        manifest.payload.version = 2;
+        let err = verify_manifest(Json(manifest)).await.unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
 }

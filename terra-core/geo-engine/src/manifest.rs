@@ -2,17 +2,19 @@
 //! (Chapter 12 §12.2/§12.8, ADR-020).
 //!
 //! A manifest is an immutable, versioned artifact. Its identity is the
-//! SHA-256 digest of the exact serialized payload bytes; its authenticity is
-//! an Ed25519 signature over that digest, domain-separated by
+//! SHA-256 digest of the canonical payload bytes (`ManifestPayload::to_bytes`,
+//! fixed schema field order and no insignificant whitespace); its authenticity
+//! is an Ed25519 signature over that digest, domain-separated by
 //! [`MANIFEST_SIGNATURE_DOMAIN`]. Retrieval can therefore be content-addressed:
-//! the caller asks for `sha256:<digest>`, hashes the received bytes, and only
-//! then parses or trusts the manifest.
+//! the caller asks for `sha256:<digest>`, checks the canonical payload bytes,
+//! and only then trusts the manifest.
 //!
-//! The signature covers the payload digest, not a re-canonicalized JSON form.
-//! Publishers sign what they publish; verifiers verify the bytes they
-//! received. This avoids a cross-language JSON canonicalization dependency
-//! while preserving the rule that a changed payload can never keep the same
-//! content address or signature.
+//! The signature covers the **canonical payload serialization**, not an
+//! arbitrary received encoding. Parsing re-serializes the payload to those
+//! canonical bytes before hashing and verifying, so formatting differences are
+//! tolerated while any semantic change is rejected. This avoids a
+//! cross-language JSON canonicalization dependency while preserving the rule
+//! that changed content can never keep the same address or signature.
 //!
 //! Manifest objects reference component versions, a content digest for the
 //! component package bytes, a data-plane storage reference, bounds, available
