@@ -116,13 +116,12 @@ pub fn validate(pkg: &ComponentPackage) -> Result<()> {
 
     // Rule 7 — Provenance completeness.
     let is_ai_kind = pkg.provenance_classification == "reconstructed" && pkg.confidence.is_some();
-    if is_ai_kind {
-        if pkg.reconstruction_engine_id.is_empty()
+    if is_ai_kind
+        && (pkg.reconstruction_engine_id.is_empty()
             || pkg.reconstruction_engine_version.is_empty()
-            || pkg.confidence.map_or(true, |c| !(0.0..=1.0).contains(&c))
-        {
-            bail!(ConformanceError::ProvenanceIncomplete);
-        }
+            || pkg.confidence.is_none_or(|c| !(0.0..=1.0).contains(&c)))
+    {
+        bail!(ConformanceError::ProvenanceIncomplete);
     }
 
     // Rule 8 — Privacy.
@@ -192,10 +191,10 @@ fn bounding_encloses(bv: &BoundingVolume, extent: &Value) -> bool {
     );
     let bv_min = &bv.min;
     let bv_max = &bv.max;
-    let blon = bv_min.get(0).copied().unwrap_or(f64::NEG_INFINITY);
+    let blon = bv_min.first().copied().unwrap_or(f64::NEG_INFINITY);
     let blat = bv_min.get(1).copied().unwrap_or(f64::NEG_INFINITY);
     let bzmin = bv_min.get(2).copied().unwrap_or(f64::NEG_INFINITY);
-    let tlon = bv_max.get(0).copied().unwrap_or(f64::INFINITY);
+    let tlon = bv_max.first().copied().unwrap_or(f64::INFINITY);
     let tlat = bv_max.get(1).copied().unwrap_or(f64::INFINITY);
     let tzmax = bv_max.get(2).copied().unwrap_or(f64::INFINITY);
     min_lon >= blon
@@ -207,16 +206,16 @@ fn bounding_encloses(bv: &BoundingVolume, extent: &Value) -> bool {
 }
 
 /// Extract lon/lat/z extremes from a GeoJSON coordinates value.
-fn coord_extremes(
-    coords: &Value,
-) -> (
+type CoordExtremes = (
     Option<f64>,
     Option<f64>,
     Option<f64>,
     Option<f64>,
     Option<f64>,
     Option<f64>,
-) {
+);
+
+fn coord_extremes(coords: &Value) -> CoordExtremes {
     let mut min_lon: Option<f64> = None;
     let mut min_lat: Option<f64> = None;
     let mut min_z: Option<f64> = None;
@@ -246,7 +245,7 @@ where
             // A position: [lon, lat, z?]
             if arr.len() >= 2 {
                 if let (Some(Value::Number(lon)), Some(Value::Number(lat))) =
-                    (arr.get(0), arr.get(1))
+                    (arr.first(), arr.get(1))
                 {
                     if let Some(ln) = lon.as_f64() {
                         if let Some(la) = lat.as_f64() {
@@ -279,10 +278,7 @@ where
 /// Check that access_policy is consistent with privacy_classification.
 fn is_access_policy_consistent(_policy: &Value, _classification: &str) -> bool {
     // access_policy must be a non-null object when privacy is restricted/private.
-    match _policy {
-        Value::Object(_) => true,
-        _ => false,
-    }
+    matches!(_policy, Value::Object(_))
 }
 
 #[cfg(test)]

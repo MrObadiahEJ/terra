@@ -189,10 +189,6 @@ struct ManifestObjectForScene {
 // GET /runtime/scene/{manifest_id}
 // ---------------------------------------------------------------------------
 
-const MANIFEST_OBJECTS_FOR_SCENE: &str = "SELECT id, manifest_id, object_id, \
-    component_version_id, storage_reference, validation_state, \
-    available_lods, spatial_extent FROM manifest_objects WHERE manifest_id = $1 ORDER BY object_id";
-
 const INSERT_SCENE_GRAPH: &str = "INSERT INTO scene_graphs (manifest_id, region_id, \
     lod_level, node_count, status) VALUES ($1, $2, $3, $4, $5) \
     RETURNING id, manifest_id, region_id, lod_level, node_count, status, created_at";
@@ -246,7 +242,7 @@ async fn resolve_scene_internal(
          AND $2 = ANY(available_lods) ORDER BY object_id",
     )
     .bind(manifest_id)
-    .bind(lod as i32)
+    .bind(lod)
     .fetch_all(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("objects query failed: {e}")))?;
@@ -293,17 +289,6 @@ async fn resolve_scene_internal(
     }
 
     Ok(Json(SceneWithNodes { scene, nodes }))
-}
-
-#[derive(Debug, Serialize, sqlx::FromRow)]
-struct AssemblyObjectRow {
-    pub id: Uuid,
-    pub manifest_id: Uuid,
-    pub object_id: String,
-    pub component_version_id: String,
-    pub storage_reference: String,
-    pub validation_state: String,
-    pub available_lods: Vec<i32>,
 }
 
 // ---------------------------------------------------------------------------

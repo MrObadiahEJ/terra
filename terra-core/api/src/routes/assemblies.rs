@@ -317,8 +317,8 @@ pub async fn add_assembly_object(
     .bind(&req.object_id)
     .bind(&req.component_version_id)
     .bind(&req.relationship_type)
-    .bind(&serde_json::to_value(&req.transform).unwrap_or(serde_json::Value::Null))
-    .bind(&serde_json::to_value(&req.position_in_assembly).unwrap_or(serde_json::Value::Null))
+    .bind(serde_json::to_value(&req.transform).unwrap_or(serde_json::Value::Null))
+    .bind(serde_json::to_value(&req.position_in_assembly).unwrap_or(serde_json::Value::Null))
     .fetch_one(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("insert failed: {e}")))?;

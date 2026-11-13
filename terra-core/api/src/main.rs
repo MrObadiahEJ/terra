@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::extract::Request;
-use axum::http::{HeaderValue, Method};
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::routing::get;
@@ -88,9 +88,10 @@ async fn main() -> Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
         .layer(RequestBodyLimitLayer::new(config.max_body_bytes))
-        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
-            config.request_timeout_secs,
-        )))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            std::time::Duration::from_secs(config.request_timeout_secs),
+        ))
         .with_state(AppState {
             pool,
             geo,

@@ -10,7 +10,7 @@
 //!   POST   /assignments/{job_id}/complete    mark an assignment complete with resource receipt
 
 use axum::extract::{Path, Query, State};
-use axum::routing::{get, post, put};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
