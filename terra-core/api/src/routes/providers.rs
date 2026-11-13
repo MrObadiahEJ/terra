@@ -267,7 +267,9 @@ pub async fn create_replica(
     .await
     .map_err(|e| AppError::internal(format!("provider check failed: {e}")))?;
     if !exists {
-        return Err(AppError::not_found(format!("active provider {provider_id} not found")));
+        return Err(AppError::not_found(format!(
+            "active provider {provider_id} not found"
+        )));
     }
 
     let row = sqlx::query_as::<_, ReplicaRow>(

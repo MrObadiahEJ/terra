@@ -88,7 +88,9 @@ async fn main() -> Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(middleware::from_fn(security_headers))
         .layer(RequestBodyLimitLayer::new(config.max_body_bytes))
-        .layer(TimeoutLayer::new(std::time::Duration::from_secs(config.request_timeout_secs)))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+            config.request_timeout_secs,
+        )))
         .with_state(AppState {
             pool,
             geo,
@@ -115,14 +117,12 @@ async fn main() -> Result<()> {
 /// context to third parties (`no-referrer`), or exercise browser capabilities
 /// the product does not use (`Permissions-Policy`). The API surface is JSON-only
 /// (plus multipart evidence/OSM ingest), so no Content-Security-Policy applies.
-async fn security_headers(
-    req: Request,
-    next: Next,
-) -> Response {
+async fn security_headers(req: Request, next: Next) -> Response {
     let mut response = next.run(req).await;
-    response
-        .headers_mut()
-        .insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    response.headers_mut().insert(
+        "x-content-type-options",
+        HeaderValue::from_static("nosniff"),
+    );
     response
         .headers_mut()
         .insert("x-frame-options", HeaderValue::from_static("DENY"));

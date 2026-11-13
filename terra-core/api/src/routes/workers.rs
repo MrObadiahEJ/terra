@@ -88,9 +88,9 @@ pub struct CompleteAssignmentRequest {
 // Validate a resource usage receipt: must be a JSON object with numeric,
 // non-negative values for cpu_seconds, gpu_seconds, storage_mb, bandwidth_mb.
 fn validate_resource_receipt(receipt: &serde_json::Value) -> Result<(), AppError> {
-    let obj = receipt.as_object().ok_or_else(|| {
-        AppError::bad_request("resource_receipt must be a JSON object")
-    })?;
+    let obj = receipt
+        .as_object()
+        .ok_or_else(|| AppError::bad_request("resource_receipt must be a JSON object"))?;
     let allowed_keys = [
         "cpu_seconds",
         "gpu_seconds",
@@ -163,7 +163,8 @@ pub async fn list_workers(
     let limit = params.limit.min(500);
     let rows: Vec<WorkerRow> = match &params.status {
         Some(s) => sqlx::query_as::<_, WorkerRow>(
-            format!("{WORKERS_SELECT} WHERE status = $1 ORDER BY last_heartbeat_at DESC LIMIT $2").as_str(),
+            format!("{WORKERS_SELECT} WHERE status = $1 ORDER BY last_heartbeat_at DESC LIMIT $2")
+                .as_str(),
         )
         .bind(s)
         .bind(limit as i64)

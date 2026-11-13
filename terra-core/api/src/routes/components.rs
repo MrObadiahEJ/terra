@@ -290,7 +290,9 @@ pub async fn list_components(
             let Some(signed) = signed else {
                 return false;
             };
-            signed.verify_wallet(wallet, "GET", "/api/v1/components").is_ok()
+            signed
+                .verify_wallet(wallet, "GET", "/api/v1/components")
+                .is_ok()
                 && wallet_authorized(&row.access_policy, wallet)
         })
         .collect();
