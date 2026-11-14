@@ -76,9 +76,17 @@ pub struct SubmitComponent {
 
 pub async fn submit_component(
     State(state): State<AppState>,
+    auth: SignedRequest,
     Json(input): Json<SubmitComponent>,
 ) -> Result<(axum::http::StatusCode, Json<ComponentRow>), AppError> {
     let pkg = &input.package;
+
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state
+        .api_authority
+        .0
+        .ok_or_else(|| AppError::unauthorized("API authority not configured"))?;
+    auth.verify(&key, "POST", "/api/v1/components")?;
 
     // RFC-015 §4 conformance (rules 2–8). Rule 1 (digest integrity) needs the
     // artifact bytes; those are checked when the artifact is uploaded, where
@@ -581,7 +589,7 @@ mod tests {
     use super::*;
     use crate::auth::ApiAuthority;
     use crate::storage::StorageBackend;
-    use ed25519_dalek::{Signer, SigningKey};
+    use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
     use std::sync::Arc;
     use terra_geo::component_package::BoundingVolume;
 
@@ -648,6 +656,27 @@ mod tests {
         }
     }
 
+    /// Create a properly signed `SignedRequest` for `submit_component`.
+    /// The signature covers `POST\n/api/v1/components\n{body_hash}\n{timestamp}`
+    /// so that `auth.verify` succeeds against the matching authority key.
+    fn signed_submit_request(pkg: &ComponentPackage) -> SignedRequest {
+        let signing_key = SigningKey::from_bytes(&[13u8; 32]);
+        let verify_key = VerifyingKey::from(&signing_key);
+        let _ = verify_key; // used by test state's ApiAuthority(Some(...))
+
+        let pkg_json = serde_json::to_string(pkg).unwrap();
+        let body_hash = format!("{:x}", Sha256::digest(pkg_json.as_bytes()));
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload = format!("POST\n/api/v1/components\n{body_hash}\n{timestamp}");
+        let signature = signing_key.sign(payload.as_bytes());
+
+        SignedRequest {
+            signature,
+            timestamp,
+            body_hash_hex: body_hash,
+        }
+    }
+
     fn artifact_headers(content_type: &str) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -670,7 +699,9 @@ mod tests {
         let state = AppState {
             pool: pool.clone(),
             geo: None,
-            api_authority: ApiAuthority(None),
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -679,10 +710,13 @@ mod tests {
 
         let mut pkg = base_package();
         pkg.component_id = format!("comp-artifact-{}", Uuid::new_v4());
-        let (status, Json(row)) =
-            submit_component(State(state.clone()), Json(SubmitComponent { package: pkg }))
-                .await
-                .unwrap();
+        let (status, Json(row)) = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent { package: pkg }),
+        )
+        .await
+        .unwrap();
         assert_eq!(status, StatusCode::CREATED);
 
         let bytes = Bytes::from_static(b"glTF artifact bytes");
@@ -769,7 +803,9 @@ mod tests {
         let state = AppState {
             pool: pool.clone(),
             geo: None,
-            api_authority: ApiAuthority(None),
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -777,11 +813,14 @@ mod tests {
         };
 
         let mut pkg = base_package();
-        pkg.component_id = format!("comp-artifact-digest-{}", Uuid::new_v4());
-        let (_, Json(row)) =
-            submit_component(State(state.clone()), Json(SubmitComponent { package: pkg }))
-                .await
-                .unwrap();
+        pkg.component_id = format!("comp-artifact-{}", Uuid::new_v4());
+        let (status, Json(row)) = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent { package: pkg }),
+        )
+        .await
+        .unwrap();
 
         let mut headers = artifact_headers("model/gltf-binary");
         headers.insert(
@@ -822,7 +861,9 @@ mod tests {
         let state = AppState {
             pool: pool.clone(),
             geo: None,
-            api_authority: ApiAuthority(None),
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -831,10 +872,13 @@ mod tests {
 
         let mut pkg = base_package();
         pkg.component_id = format!("comp-artifact-id-text-{}", Uuid::new_v4());
-        let (_, Json(row)) =
-            submit_component(State(state.clone()), Json(SubmitComponent { package: pkg }))
-                .await
-                .unwrap();
+        let (_, Json(row)) = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent { package: pkg }),
+        )
+        .await
+        .unwrap();
         assert_eq!(row.component_id, pkg.component_id);
 
         let bytes = Bytes::from_static(b"glTF artifact bytes");
