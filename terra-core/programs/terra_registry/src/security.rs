@@ -429,6 +429,20 @@ pub struct FinalizeDecision<'info> {
         bump,
     )]
     pub request: Account<'info, SecurityRequest>,
+    /// Privacy state for the subject, written when the decision is finalized.
+    /// PDA: ["privacy_state", subject, version]
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + PrivacyState::INIT_SPACE,
+        seeds = [
+            b"privacy_state",
+            request.subject.as_ref(),
+            &[1], // initial privacy state version
+        ],
+        bump,
+    )]
+    pub privacy_state: Account<'info, PrivacyState>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -579,7 +593,7 @@ pub fn submit_security_request(
     );
 
     sr.requester = ctx.accounts.requester.key();
-    sr.subject = Pubkey::default(); // filled by specific request types
+    sr.subject = ctx.accounts.requester.key(); // self-submission by default
     sr.nonce = nonce;
     sr.request_type = request_type;
     sr.description = description;
@@ -819,6 +833,7 @@ pub fn finalize_decision(
     let case = &mut ctx.accounts.case;
     let decision = &mut ctx.accounts.decision;
     let request = &mut ctx.accounts.request;
+    let privacy_state = &mut ctx.accounts.privacy_state;
     let now = Clock::get()?.unix_timestamp;
 
     require!(
@@ -851,6 +866,16 @@ pub fn finalize_decision(
     decision.restriction_scope = request.jurisdiction;
     decision.decided_at = now;
     decision.decided_by = case.key();
+
+    // Write the PrivacyState account for the subject.
+    privacy_state.subject = request.subject;
+    privacy_state.version = 1;
+    privacy_state.state = decision.state;
+    privacy_state.remedy = decision.remedy;
+    privacy_state.restriction_request = Some(request.key());
+    privacy_state.expires_at = decision.expires_at;
+    privacy_state.created_at = now;
+    privacy_state.updated_at = now;
 
     request.status = if upheld {
         request_status::APPROVED

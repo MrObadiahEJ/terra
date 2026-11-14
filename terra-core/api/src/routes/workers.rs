@@ -15,6 +15,7 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::auth::SignedRequest;
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -320,9 +321,16 @@ pub async fn list_worker_assignments(
 
 pub async fn complete_assignment(
     State(state): State<AppState>,
+    auth: SignedRequest,
     Path(job_id): Path<String>,
     Json(req): Json<CompleteAssignmentRequest>,
 ) -> Result<Json<AssignmentRow>, AppError> {
+    // Ed25519 signature verification — fail-closed when authority is not configured.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", &format!("/assignments/{job_id}/complete"))?;
+
     // Validate the resource receipt if one was provided, before writing.
     if let Some(ref receipt) = req.resource_receipt {
         validate_resource_receipt(receipt)?;
