@@ -16,6 +16,22 @@ Format: date · version · what changed · evidence/why. Append-only.
 - Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
   warnings` clean; `cargo fmt --all --check` clean
 
+## 2026-11-14 — Sprint 051: Security hardening — submit_component auth, SecurityRequest.subject, PrivacyState writes, complete_assignment auth
+
+- **`terra-core/api/src/routes/components.rs`**: `submit_component` requires
+  `auth: SignedRequest` and verifies the Ed25519 signature against
+  `API_AUTHORITY_PUBKEY` before inserting a component package (Sprint 050 fix
+  carried into this sprint's commit set).
+- **`terra-core/programs/terra_registry/src/security.rs`**: `SecurityRequest.subject`
+  now set to `requester.key()` on `submit_security_request` (was `Pubkey::default()`);
+  `finalize_decision` now writes a `PrivacyState` account for the subject with
+  `state`, `remedy`, and `restriction_request` fields.
+- **`terra-core/api/src/routes/workers.rs`**: `complete_assignment` now requires
+  `auth: SignedRequest` and verifies the Ed25519 signature against
+  `API_AUTHORITY_PUBKEY` (fail-closed).
+- Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
+  warnings` clean; `cargo fmt --all --check` clean
+
 ## 2026-11-13 — Sprint 049: SDK standard shift — terra-identity + terra-registry SDKs declared + RFC protocol alignment
 
 - **`terra-core/programs/terra_identity/src/lib.rs`**: new `sdk_meta` module declaring the Terra

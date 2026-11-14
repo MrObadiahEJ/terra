@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-14 (committed `da4d219`; sprints 001–049 delivered:
+Last reconciled: 2026-11-14 (committed `90b76d3`; sprints 001–051 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
@@ -11,7 +11,8 @@ directives RFC-014 economics + RFC-017 secure evidence intake, 047 UUID/
 component_id artifact-retrieval fix, 048 SDK standard shift — terra-geo
 SDK v0.1.0 declared + RFC-015/protocol alignment, 049 SDK standard shift —
 terra-identity + terra-registry SDKs declared + RFC protocol alignment,
-050 submit_component auth fix).
+050 submit_component auth fix, 051 security hardening — SecurityRequest.subject,
+PrivacyState writes, complete_assignment auth).
 Sprint notes for 025–048 are in `sprints/025-*.md` … `sprints/048-*.md`.
 Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
 
@@ -109,15 +110,13 @@ Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
    (REQ-021), lien encumbrance (REQ-022). Q-005 keeps REQ-023 hard-gated; no code
    before written legal research.
 
-3. **RFC-016 Phase 2+ code** — unblocked agent work: `SecurityRequest.subject`,
-   `PrivacyState` writes on finalize, provider proof-of-possession, client-side
-   digest verification vs signed manifest, `POST /components` auth,
-   `complete_assignment` auth. **UUID/component_id fallback mismatch — done
-   (Sprint 047):** `GET /components/{id}/artifact` now accepts `Path<String>`
-   instead of `Path<Uuid>`; a text `component_id` is resolved to the package
-   UUID via `SELECT id FROM component_packages WHERE component_id = $1`.
-   Frontend `fetchComponentArtifact(componentId)` passes the text component_id
-   as-is and it resolves correctly.
+3. **RFC-016 Phase 2+ code** — remaining item: **provider proof-of-possession
+   audits** (unblocked agent work). Completed this sprint:
+   `SecurityRequest.subject` set to requester key on `submit_security_request`
+   (was `Pubkey::default()`); `PrivacyState` written on `finalize_decision`
+   (new `privacy_state` PDA in `FinalizeDecision` context); `submit_component`
+   requires signed auth (Sprint 050); `complete_assignment` requires signed
+   auth (Sprint 051).
 
 4. **Data-plane component artifact storage** — **done (Sprint 037)**: component
    bytes stored under their SHA-256 content address (`migration 0045` +
