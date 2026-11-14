@@ -7,6 +7,7 @@
 - **Status:** Implemented (dispute.rs; unique-validator sets enforced on file_dispute)
 - **Created:** 2026-09-02
 - **Supersedes:** None
+- **SDK:** `terra-registry` crate — canonical implementation of Dispute, Parcel, Rights PDAs; see `programs/terra_registry/src/lib.rs` (`sdk_meta`)
 
 ## 2. Summary
 

@@ -2,6 +2,31 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-13 — Sprint 049: SDK standard shift — terra-identity + terra-registry SDKs declared + RFC protocol alignment
+
+- **`terra-core/programs/terra_identity/src/lib.rs`**: new `sdk_meta` module declaring the Terra
+  Identity SDK (`terra-identity` v0.1.0) identity per directive §3 / §12 — SDK
+  name, version, capabilities (identity-binding, succession, guardianship),
+  schema versions (RFC-006, Identity PDA v1, Succession PDA v1), direct crate
+  dependencies (anchor-lang), security assumptions, upgrade/migration behavior;
+  unit test `sdk_metadata_is_well_formed`
+- **`terra-core/programs/terra_registry/src/lib.rs`**: new `sdk_meta` module
+  declaring the Terra Registry SDK (`terra-registry` v0.1.0) identity per
+  directive §3 / §12 — SDK name, version, capabilities (parcel registry, rights
+  model RRR, time-bound rights, validator registry, derived jobs, security),
+  schema versions (RFC-007, RFC-008, Parcel PDA v1, Rights PDA v1, Succession
+  PDA v1), direct crate dependencies (anchor-lang), security assumptions,
+  upgrade/migration behavior; unit test `sdk_metadata_is_well_formed`
+- **`docs/rfc-006-cross-border-identity-bridge-protocol.md`**: §1 references
+  `terra-identity` SDK as canonical Identity account implementation
+- **`docs/rfc-007-dispute-resolution-parcel-freeze-protocol.md`**: §1 references
+  `terra-registry` SDK as canonical Dispute/Parcel/Rights PDA implementation
+- **`docs/rfc-008-parcel-subdivision-amalgamation-protocol.md`**: §1 references
+  `terra-registry` SDK as canonical Parcel/Rights/SubdivisionRecord PDA implementation
+- Verified: `cargo check -p terra-registry -p terra-identity` clean;
+  `cargo clippy -p terra-registry -p terra-identity -- -D warnings` clean;
+  `cargo fmt -p terra-registry -p terra-identity -- --check` clean
+
 ## 2026-11-13 — Sprint 048: SDK standard shift — terra-geo SDK v0.1.0 declared + RFC-015/protocol alignment
 
 - **`terra-core/geo-engine/src/lib.rs`**: new `sdk_meta` module declaring the Terra

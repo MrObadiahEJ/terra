@@ -7,6 +7,7 @@
 - **Status:** Implemented (subdivision.rs end-to-end)
 - **Created:** 2026-09-03
 - **Supersedes:** None
+- **SDK:** `terra-registry` crate — canonical implementation of Parcel, Rights, SubdivisionRecord PDAs; see `programs/terra_registry/src/lib.rs` (`sdk_meta`)
 - **Amended (2026-09-25, RFC-012 legacy sweep):** the on-chain surveyor gate no longer uses the parcel `Attestation` account. `subdivide_parcel` now requires a **VERIFIED `SUBDIVISION` claim** (arg `claim_id`); the `Attestation` account and the `attest` / `rotate_validators` / `register_document` / `migrate_attestations` / `migrate_attestation_to_claim` instructions were hard-removed from `terra_registry`. `SubdivisionRecord` stores `survey_claim` (claim PDA key) instead of `surveyor_attestation`, and its `attestations_migrated` field was removed. Sections below that describe attestation-scoped migration (§4.3, §5.5, §6.4, §7.1 steps 4/5/8, §14.10) are updated in place or marked historical.
 
 ## 2. Summary

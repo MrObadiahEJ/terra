@@ -8180,3 +8180,93 @@ mod prep_hook_tests {
         assert!(!is_session_recorder(opener, stranger, &registry));
     }
 }
+
+// ---------------------------------------------------------------------------
+// SDK metadata (directive §3 / §12): declares the Terra Registry SDK
+// identity, capabilities, schema versions, dependencies, security
+// assumptions, and upgrade behavior so the SDK is an explicit, versioned
+// standard rather than an implicit crate.
+// ---------------------------------------------------------------------------
+pub mod sdk_meta {
+    //! Metadata describing the `terra-registry` SDK standard.
+
+    /// SDK crate name.
+    pub fn sdk_name() -> &'static str {
+        "terra-registry"
+    }
+    /// SDK crate version (semver).
+    pub fn sdk_version() -> &'static str {
+        env!("CARGO_PKG_VERSION")
+    }
+
+    /// Capabilities exposed by this SDK module.
+    pub fn sdk_capabilities() -> &'static [&'static str] {
+        &[
+            "parcel registry: register/transfer parcels, parcel state machine",
+            "rights model: grant/revoke/renew conditional rights (RRR)",
+            "time-bound rights: expiration warning, grace period, lazy sweep",
+            "validator registry: nominations, endorsements, pause, capabilities",
+            "derived jobs: lease/claim, expired-lease recovery",
+            "security: fraud governance, review cases, privacy requests",
+        ]
+    }
+
+    /// Protocol schemas implemented by this SDK, with versions.
+    pub fn sdk_schema_versions() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("RFC-007 Dispute Resolution & Parcel Freeze", "1.0"),
+            ("RFC-008 Subdivision / Amalgamation", "1.0"),
+            ("Parcel PDA schema", "1"),
+            ("Rights PDA schema", "1"),
+            ("Succession PDA schema", "1"),
+        ]
+    }
+
+    /// Direct crate dependencies.
+    pub fn sdk_dependencies() -> &'static [(&'static str, &'static str)] {
+        &[("anchor-lang", "0.30")]
+    }
+
+    /// Security assumptions made by this SDK.
+    pub fn sdk_security_assumptions() -> &'static [&'static str] {
+        &[
+            "Parcel PDA carries no ownership; ownership is the canonical Rights PDA.",
+            "Rights state transitions require validator endorsement where required.",
+            "Emergency freeze is time-boxed and requires court order scope.",
+        ]
+    }
+
+    /// Upgrade / migration behavior.
+    pub fn sdk_upgrade_migration() -> &'static str {
+        "Schema versions are additive. PDA seeds ([b\"parcel\", id], \
+         [b\"rights\", parcel, nonce], [b\"succession\", id, successor]) are stable. \
+         New instruction accounts are appended, never replaced. A change to one \
+         SDK module does not force any other module or application to upgrade \
+         (directive §4)."
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn sdk_metadata_is_well_formed() {
+            assert!(!sdk_name().is_empty());
+            assert!(!sdk_version().is_empty());
+            assert!(!sdk_capabilities().is_empty());
+            assert!(!sdk_schema_versions().is_empty());
+            assert!(!sdk_security_assumptions().is_empty());
+            assert!(!sdk_upgrade_migration().is_empty());
+            for (name, version) in sdk_schema_versions() {
+                assert!(!name.is_empty());
+                assert!(!version.is_empty());
+            }
+            assert!(sdk_capabilities()
+                .iter()
+                .any(|c| c.contains("parcel registry")));
+            assert!(sdk_schema_versions()
+                .iter()
+                .any(|(n, _)| n == "RFC-007 Dispute Resolution & Parcel Freeze"));
+        }
+    }
+}

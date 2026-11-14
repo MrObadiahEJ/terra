@@ -8,6 +8,7 @@
 - **Created:** 2026-09-03
 - **Target Phase:** 7 (Regional Expansion) at earliest
 - **Supersedes:** None
+- **SDK:** `terra-identity` crate — canonical implementation of Identity account (`bind_identity`, succession, guardianship); see `programs/terra_identity/src/lib.rs` (`sdk_meta`)
 
 ## 2. Summary
 
