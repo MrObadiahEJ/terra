@@ -2,6 +2,26 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-14 — Sprint 052: Proof-of-possession for component artifact replicas
+
+- **`terra-core/api/migrations/0046_provider_proof_of_possession.sql`** (new): adds
+  `last_challenge` (TEXT) and `last_proof_at` (TIMESTAMPTZ) columns to
+  `provider_replicas` for content-addressed artifact proof-of-possession
+  (RFC-017 §2)
+- **`terra-core/api/src/routes/providers.rs`**: adds
+  `POST /providers/{id}/replicas/{replica_id}/challenge` — generates and stores
+  a random challenge for a replica provider; and
+  `POST /providers/{id}/replicas/{replica_id}/prove` — verifies
+  `SHA-256(challenge + content_address)` proof submitted by the provider,
+  updating `last_proof_at` on success
+- **`terra-core/api/src/routes/components.rs`**: `upload_component_artifact`
+  now verifies the uploaded content address against the component's declared
+  `geometry_digest` (RFC-015 rule 1: digest integrity at upload time); public
+  component artifact uploads now require signed authentication (no public
+  write)
+- Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
+  warnings` clean; `cargo fmt --all --check` clean
+
 ## 2026-11-14 — Sprint 050: Fix submit_component auth (REQ-026/B15)
 
 - **`terra-core/api/src/routes/components.rs`**: `submit_component` now requires

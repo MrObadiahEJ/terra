@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-14 (committed `90b76d3`; sprints 001–051 delivered:
+Last reconciled: 2026-11-14 (committed `fbd9ac1`; sprints 001–052 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
@@ -12,9 +12,9 @@ component_id artifact-retrieval fix, 048 SDK standard shift — terra-geo
 SDK v0.1.0 declared + RFC-015/protocol alignment, 049 SDK standard shift —
 terra-identity + terra-registry SDKs declared + RFC protocol alignment,
 050 submit_component auth fix, 051 security hardening — SecurityRequest.subject,
-PrivacyState writes, complete_assignment auth).
-Sprint notes for 025–048 are in `sprints/025-*.md` … `sprints/048-*.md`.
-Sprint notes for 025–046 are in `sprints/025-*.md` … `sprints/046-*.md`.
+PrivacyState writes, complete_assignment auth, 052 proof-of-possession for
+component artifact replicas + geometry_digest verification at upload).
+Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
 
 ## Active intents
 
