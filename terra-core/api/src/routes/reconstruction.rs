@@ -383,8 +383,8 @@ pub struct AnchorAccounts {
 
 #[derive(Debug, Serialize)]
 pub struct AnchorArgs {
-    /// Hex `terra-geom-v1` digest of the draft's geometry (the same value
-    /// stored in `geometry_hash`; see `terra_geo::canonical`).
+    /// Hex `terra-geom-v2` digest of the draft's geometry (the same value
+    /// stored in `geometry_hash`; see `terra_geo::canonical3d`).
     pub geometry_hash: String,
     pub source: u8,
     pub dimension: u8,
@@ -516,12 +516,12 @@ async fn build_draft_geometry(
     }
 }
 
-/// Deterministic `terra-geom-v1` geometry digest (RFC-013 §9 Q4). Independent
+/// Deterministic `terra-geom-v2` geometry digest (RFC-013 §9 Q4). Independent
 /// of JSON key order, whitespace, coordinate precision, ring start/orientation
 /// and multi-geometry ordering, so any implementation agrees on one hash for
-/// the same geometry. See `terra_geo::canonical`.
+/// the same geometry. See `terra_geo::canonical3d`.
 fn canonical_geometry_hash(geojson: &str) -> Result<String, AppError> {
-    terra_geo::geometry_digest_hex(geojson)
+    terra_geo::geometry_digest_hex_v2(geojson)
         .map_err(|e| AppError::bad_request(format!("invalid draft geometry: {e}")))
 }
 

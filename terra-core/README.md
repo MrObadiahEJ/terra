@@ -244,9 +244,9 @@ Immutable audit entries for tracking system events.
 | terra-identity integration | 23 | BPF happy paths + guard rails |
 | terra-registry integration | 307 | Full instruction matrix (~7 min) |
 | terra-api | 111 | Route validation + storage helpers |
-| terra-geo | 12 | Graph reachability + `terra-geom-v1` canonical digest (1 ignored vector-regen) |
+| terra-geo | 12 | Graph reachability + `terra-geom-v2` canonical digest (1 ignored vector-regen) |
 
-Verified on `dev` (2026-10-16, RFC-013 Phase C + `terra-geom-v1`): registry lib
+Verified on `dev` (2026-10-16, RFC-013 Phase C + `terra-geom-v2`): registry lib
 153/153, identity lib 6/6, rfc012 21/21, API 111/111, geo 12/12 (+1 ignored),
 registry BPF suite 307/307, identity BPF 23/23, `cargo fmt` + `clippy -- -D
 warnings` clean (CI invocation), checked-in IDL matches source at

@@ -175,7 +175,7 @@ Three layers, organized around **ISO 19152 (LADM)** concepts:
   and `zone_parcel_counts` views, `/spatial/*` radius/zone endpoints.
 - **Geo engine** — `terra-core/geo-engine` (`terra-geo`): pure-Rust OSM road
   graph + Dijkstra/BFS reachability + domain-separated canonical digests
-  anchored on-chain — `access_hash` (road reachability) and the `terra-geom-v1`
+  anchored on-chain — `access_hash` (road reachability) and the `terra-geom-v2`
   geometry digest ([`docs/canonical-geometry-digest.md`](docs/canonical-geometry-digest.md)).
 - **Frontend** — `terra-web`: React 19 + Vite + CesiumJS globe + Leaflet map, pnpm,
   typed API client (`src/lib/api.ts`) covering backend routes.

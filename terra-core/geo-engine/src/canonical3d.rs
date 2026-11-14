@@ -1,16 +1,15 @@
 //! Canonical 3D geometry digest (`terra-geom-v2`) — RFC-013 full-3D roadmap,
 //! step 1 ("3D data standard").
 //!
-//! `terra-geom-v1` (see [`crate::canonical`]) is frozen: it hashes 2D-only
-//! geometries in EPSG:4326 and every parcel hash in existence depends on its
-//! exact rules. This module adds a **compatible v2** for three-dimensional
-//! data without touching v1:
+//! `terra-geom-v2` is frozen: it hashes 3D geometries in EPSG:4326 and every
+//! parcel hash in existence depends on its exact rules. This module implements
+//! v2:
 //!
-//! - The digest domain tag is `"terra-geom-v2"`, so a v1 and a v2 digest of
-//!   the same coordinates can never collide, and consumers can tell which
-//!   canonicalization produced a hash by its version string alone.
+//! - The digest domain tag is `"terra-geom-v2"`, so a v2 digest of the same
+//!   coordinates can never collide with any other digest, and consumers can
+//!   tell which canonicalization produced a hash by its version string alone.
 //! - A v2 document *without* third ordinates or metadata canonicalizes to the
-//!   byte-for-byte v1 document; only the domain tag differs. A 2D parcel
+//!   byte-for-byte 2D document; only the domain tag differs. A 2D parcel
 //!   record therefore has a well-defined v2 identity, and upgrading a record
 //!   to 3D changes exactly one thing you can point at: the version tag plus
 //!   the added ordinates/metadata.
@@ -705,7 +704,6 @@ fn emit_multipolygon(meta: &Meta, polys: &[Poly]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canonical::geometry_digest_hex;
     use serde::Deserialize;
 
     const META: &str = "\"crs\":\"EPSG:4326\",\"elevation_ref\":\"EGM2008\",\"vertical_units\":\"m\",\"precision\":3,";
@@ -781,22 +779,6 @@ mod tests {
         let cb = canonicalize_v2(&b).unwrap();
         assert!(ca.contains("[8.5000000,47.4000000,400.00000]"));
         assert!(cb.contains("[8.5000000,47.4000000,401.00000]"));
-    }
-
-    #[test]
-    fn v2_domain_tag_separates_it_from_v1() {
-        // Same 2D geometry: v1 document equals the bare v1-style output; the v2
-        // digest must differ from the v1 digest purely by the domain tag.
-        let poly_2d = r#"{"type":"Polygon","coordinates":[[[8.5,47.4],[8.6,47.4],[8.6,47.5],[8.5,47.5],[8.5,47.4]]]}"#;
-        let with_meta = format!(
-            "{{{META}\"type\":\"Polygon\",\"coordinates\":[[[8.5,47.4],[8.6,47.4],[8.6,47.5],[8.5,47.5],[8.5,47.4]]]}}"
-        );
-        let v1 = geometry_digest_hex(poly_2d).unwrap();
-        let v2 = geometry_digest_hex_v2(&with_meta).unwrap();
-        assert_ne!(v1, v2);
-        // The v2 canonical doc carries the metadata header; body matches v1 style.
-        let c2 = canonicalize_v2(&with_meta).unwrap();
-        assert!(c2.starts_with("{\"crs\":\"EPSG:4326\",\"elevation_ref\":\"EGM2008\",\"vertical_units\":\"m\",\"precision\":3,\"type\":\"Polygon\""));
     }
 
     #[test]

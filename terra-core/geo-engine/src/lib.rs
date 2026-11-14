@@ -8,12 +8,10 @@
 //! - Version: `0.1.0`
 //! - Protocol schemas implemented:
 //!   - RFC-015 (Spatial Component Package)
-//!   - terra-geom-v1 (2D geometry digest)
 //!   - terra-geom-v2 (3D geometry digest)
 //!   - `terra.manifest/v1` (signed content-addressed manifests)
 //! - Module capabilities:
-//!   - `canonical` / `canonical3d`: geometry canonicalization + digest
-//!     (terra-geom-v1 / terra-geom-v2)
+//!   - `canonical3d`: geometry canonicalization + digest (terra-geom-v2)
 //!   - `component_package`: RFC-015 Spatial Component Package + conformance
 //!     validator (`validate`, `validate_with_geometry`)
 //!   - `manifest`: content-addressed signed manifests
@@ -33,7 +31,6 @@
 //! module or application to upgrade.
 
 pub mod access;
-pub mod canonical;
 pub mod canonical3d;
 pub mod component_package;
 pub mod graph;
@@ -44,7 +41,6 @@ pub mod reach;
 pub mod spatial_index;
 
 pub use access::{nearest_road_access, road_access_along_boundary, AccessPoint};
-pub use canonical::{canonicalize as canonicalize_geometry, geometry_digest, geometry_digest_hex};
 pub use canonical3d::{
     canonicalize_v2 as canonicalize_geometry_v2, geometry_digest_hex_v2, geometry_digest_v2,
     GEOMETRY_DIGEST_VERSION_V2,
@@ -89,7 +85,7 @@ pub mod sdk_meta {
     /// Capabilities exposed by this SDK module.
     pub fn sdk_capabilities() -> &'static [&'static str] {
         &[
-            "geometry-digest: terra-geom-v1 (2D), terra-geom-v2 (3D)",
+            "geometry-digest: terra-geom-v2 (3D)",
             "component-package-conformance: RFC-015 Spatial Component Package",
             "signed-manifest: terra.manifest/v1 (ContentAddress, ManifestPayload, SignedManifest)",
             "quadtree-discovery: ADR-020 global-discovery cells (q/level/x/y)",
@@ -101,7 +97,6 @@ pub mod sdk_meta {
     pub fn sdk_schema_versions() -> &'static [(&'static str, &'static str)] {
         &[
             ("RFC-015 Spatial Component Package", "1.0"),
-            ("terra-geom-v1 geometry digest", "1"),
             ("terra-geom-v2 geometry digest", "2"),
             ("terra.manifest/v1 signed manifest", "1"),
         ]
@@ -160,10 +155,7 @@ pub mod sdk_meta {
             assert!(sdk_capabilities()
                 .iter()
                 .any(|c| c.contains("component-package-conformance")));
-            // terra-geom-v1 and terra-geom-v2 are both declared.
-            assert!(sdk_schema_versions()
-                .iter()
-                .any(|(n, _)| *n == "terra-geom-v1 geometry digest"));
+            // terra-geom-v2 geometry digest is declared.
             assert!(sdk_schema_versions()
                 .iter()
                 .any(|(n, _)| *n == "terra-geom-v2 geometry digest"));

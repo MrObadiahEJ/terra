@@ -158,7 +158,6 @@ Component Registry (Chapter 11 §11.3).
 | `GeometryVersion` (`spatial_asset.rs`, `append_geometry_version`) | On-chain version anchor for `geometry_digest` | No off-chain package submission or conformance check |
 | `routes/reconstruction.rs` (`jobs`, `complete → draft → anchor`) | Single-worker reconstruction flow baseline | No multi-worker package submission, no engine negotiation, no assembly |
 | `task_economics.rs` (`FeePolicy`, `CoverageIncentive`, `TaskEscrow`, `RewardAllocation`) | Payment/subsidy primitives | Applies to verification tasks, not reconstruction tasks; needs new task types |
-| `canonical.rs` (`terra-geom-v1`) | 2D geometry digest baseline | Rejects 3D ordinates; no 3D digest canonicalization in production code |
 | `geo-engine/src/canonical3d.rs` (`terra-geom-v2`, SDK `terra-geo` v0.1.0) | 3D geometry digest canonicalization, conformance input | Production (merged); `geo-engine` exports `geometry_digest_v2` / `geometry_digest_hex_v2` |
 | `geo-engine/src/component_package.rs` (`terra-geo` SDK v0.1.0) | RFC-015 Spatial Component Package + conformance validator (`validate`, `validate_with_geometry`) | None — SDK is the canonical implementation |
 | `routes/reconstruction.rs` (`jobs`, `complete → draft → anchor`) | Single-worker reconstruction flow baseline | No multi-worker package submission, no engine negotiation, no assembly |
@@ -171,8 +170,8 @@ Component Registry (Chapter 11 §11.3).
 The canonical implementation of RFC-015 is the **Terra Geo SDK** (`terra-geo` crate, version `0.1.0`, located at `terra-core/geo-engine/`). The SDK declares itself per directive §3 / §12:
 
 - SDK name: `terra-geo`, version `0.1.0`
-- Capabilities: geometry canonicalization + digest (terra-geom-v1 / terra-geom-v2); RFC-015 Spatial Component Package conformance validator (`validate`, `validate_with_geometry`); content-addressed signed manifests (`ContentAddress`, `ManifestPayload`, `SignedManifest`); quadtree global-discovery partitions (ADR-020); spatial access, road graph, OSM data, POIs, reachability
-- Schema versions implemented: RFC-015 (1.0), terra-geom-v1 (1), terra-geom-v2 (2), terra.manifest/v1 (1)
+- Capabilities: geometry canonicalization + digest (terra-geom-v2 (3D)); RFC-015 Spatial Component Package conformance validator (`validate`, `validate_with_geometry`); content-addressed signed manifests (`ContentAddress`, `ManifestPayload`, `SignedManifest`); quadtree global-discovery partitions (ADR-020); spatial access, road graph, OSM data, POIs, reachability
+- Schema versions implemented: RFC-015 (1.0), terra-geom-v2 (2), terra.manifest/v1 (1)
 - Security assumptions: content-addressed artifact storage (SHA-256); Ed25519 domain-separated signatures; digest integrity verified before trust
 - Upgrade/migration: schema versions are additive; digest algorithm versions are declared per-artifact (`digest_algorithm_version`) and never silently changed
 

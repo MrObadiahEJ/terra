@@ -185,6 +185,10 @@ accounts are Phase E (see below).
    published vectors in
    [`docs/canonical-geometry-digest.md`](canonical-geometry-digest.md); reference
    implementation `terra-core/geo-engine/src/canonical.rs`.
+   **Removed (2026-11-14):** `terra-geom-v1` has been removed from the project;
+   `terra-geom-v2` (implemented in `geo-engine/src/canonical3d.rs` and exported by
+   the `terra-geo` SDK v0.1.0) is the current digest. `canonical-geometry-digest.md`
+   documents v2 only.
 5. Snapshot semantics: does `SpatialSnapshot` copy indexes at time T, or is a
    version-range query enough?
 

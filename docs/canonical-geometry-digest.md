@@ -1,9 +1,9 @@
-# Canonical geometry digest (`terra-geom-v1`)
+# Canonical geometry digest (`terra-geom-v2`)
 
-**Status:** implemented on `dev` (2026-10-16) — resolves [RFC-013 §9 open question 4](rfc-013-spatial-intelligence-pipeline.md#9-open-questions-phase-b)
-**Reference implementation:** `terra-core/geo-engine/src/canonical.rs` (`terra-geo` crate)
+**Status:** implemented on `dev` (2026-10-16, original v1; v1 removed 2026-11-14) — resolves [RFC-013 §9 open question 4](rfc-013-spatial-intelligence-pipeline.md#9-open-questions-phase-b)
+**Reference implementation:** `terra-core/geo-engine/src/canonical3d.rs` (`terra-geo` crate)
 **Consumers:** `terra-api` `POST /reconstruction/drafts` (`canonical_geometry_hash`), any validator or external service re-deriving the digest from the stored document
-**Published vectors:** `terra-core/geo-engine/testdata/geometry_digest_v1.json`
+**Published vectors:** `terra-core/geo-engine/testdata/geometry_digest_v2.json`
 
 ---
 
@@ -18,26 +18,24 @@ this: the same parcel encoded with a different key order, ring start, ring
 orientation, coordinate precision or multi-geometry ordering would produce a
 different hash, and two honest implementations would disagree on-chain.
 
-`terra-geom-v1` defines a canonical form such that the digest is a pure function
+`terra-geom-v2` defines a canonical form such that the digest is a pure function
 of the **geometry**, independent of the JSON encoding.
 
-> Before this change, `canonical_geometry_hash` was `hex(SHA-256(geojson_bytes))`
-> over the raw `ST_AsGeoJSON` output — a hash of an encoding, not of a geometry.
-> The name promised canonicalization the code did not perform; this document and
-> `canonical.rs` close that gap.
+> **Note:** `terra-geom-v1` (2D-only digest) was removed from the project on
+> 2026-11-14. Only `terra-geom-v2` (3D geometry digest) is maintained.
 
 ## 2. Digest recipe
 
 ```
-digest = SHA-256( "terra-geom-v1" ‖ canonical_geojson )
+digest = SHA-256( "terra-geom-v2" ‖ canonical_geojson )
 ```
 
-- `"terra-geom-v1"` is a domain-separation **and** version tag, hashed ahead of
+- `"terra-geom-v2"` is a domain-separation **and** version tag, hashed ahead of
   the document (mirroring the evidence-stack / `access_digest` construction in
-  `geo-engine/src/reach.rs`). A future `terra-geom-v2` coexists without ambiguity
+  `geo-engine/src/reach.rs`). A future `terra-geom-v3` coexists without ambiguity
   because the tag is part of the preimage.
 - `canonical_geojson` is the UTF-8 canonical document described in §3.
-- The digest is returned as 32 bytes; `geometry_digest_hex` renders lowercase hex
+- The digest is returned as 32 bytes; `geometry_digest_hex_v2` renders lowercase hex
   (64 characters) for `AnchorArgs.geometry_hash`.
 
 ## 3. Canonical form
@@ -54,7 +52,8 @@ anything other than 4326 / CRS84 is rejected; a missing member is assumed 4326
 
 ### 3.2 Coordinates
 
-- **2D only.** A third ordinate (altitude) is rejected.
+- Coordinates may have 2 or 3 ordinates (longitude, latitude, optional
+  elevation). Third ordinates are preserved in the canonical output.
 - Quantized to `1e-7` degrees (≈ 1.1 cm at the equator), **rounded
   half-away-from-zero**, stored as signed integers internally.
 - Emitted with exactly **seven fractional digits**, fixed-point (never scientific
@@ -102,8 +101,8 @@ For geometries `A`, `B`:
    the quantization step, a shell/hole added, a different CRS) changes the
    digest.
 
-These are asserted in `canonical.rs` tests and frozen against the vectors in
-`testdata/geometry_digest_v1.json` (`published_vectors_match`).
+These are asserted in `canonical3d.rs` tests and frozen against the vectors in
+`testdata/geometry_digest_v2.json` (`published_vectors_match`).
 
 ## 5. Versioning
 
@@ -116,7 +115,7 @@ cd terra-core
 cargo test -p terra-geo regenerate_vectors -- --ignored --nocapture
 ```
 
-and update the `expected` digests in `testdata/geometry_digest_v1.json`. The file
+and update the `expected` digests in `testdata/geometry_digest_v2.json`. The file
 is the cross-implementation contract: a non-Rust implementation is correct when
 it reproduces every vector.
 
@@ -125,4 +124,4 @@ it reproduces every vector.
 - `MultiPoint` is canonicalized (sorted, de-duplicated) but has no published
   vector yet; add one when a producer emits it.
 - Precision is a fixed `1e-7` for all geometry types; if survey-grade input needs
-  finer resolution, that is a `v2` decision, not a local one.
+  finer resolution, that is a `v3` decision, not a local one.
