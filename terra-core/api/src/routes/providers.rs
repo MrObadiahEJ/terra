@@ -11,6 +11,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -21,6 +22,14 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_provider).get(list_providers))
         .route("/{id}", get(get_provider))
         .route("/{id}/replicas", post(create_replica).get(list_replicas))
+        .route(
+            "/{provider_id}/replicas/{replica_id}/challenge",
+            post(challenge_replica),
+        )
+        .route(
+            "/{provider_id}/replicas/{replica_id}/prove",
+            post(prove_replica),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -320,4 +329,96 @@ pub async fn list_replicas(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?;
 
     Ok(Json(rows))
+}
+
+// ---------------------------------------------------------------------------
+// POST /providers/{id}/replicas/{replica_id}/challenge
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct ChallengeResponse {
+    pub challenge: String,
+}
+
+pub async fn challenge_replica(
+    State(state): State<AppState>,
+    Path((_provider_id, replica_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<ChallengeResponse>, AppError> {
+    // Verify replica exists.
+    let _replica: (Uuid,) = sqlx::query_as("SELECT id FROM provider_replicas WHERE id = $1")
+        .bind(replica_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("query failed: {e}")))?
+        .ok_or_else(|| AppError::not_found(format!("replica {replica_id} not found")))?;
+
+    // Generate a random challenge.
+    let challenge = Uuid::new_v4().to_string();
+
+    // Store the challenge and clear any previous proof timestamp.
+    sqlx::query(
+        "UPDATE provider_replicas SET last_challenge = $1, last_proof_at = NULL WHERE id = $2",
+    )
+    .bind(&challenge)
+    .bind(replica_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("store challenge failed: {e}")))?;
+
+    Ok(Json(ChallengeResponse { challenge }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /providers/{id}/replicas/{replica_id}/prove
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct ProveRequest {
+    pub proof: String,
+}
+
+pub async fn prove_replica(
+    State(state): State<AppState>,
+    Path((_provider_id, replica_id)): Path<(Uuid, Uuid)>,
+    Json(req): Json<ProveRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Verify replica exists and has a pending challenge.
+    let (content_address, last_challenge): (String, Option<String>) = sqlx::query_as(
+        "SELECT content_address, last_challenge FROM provider_replicas WHERE id = $1",
+    )
+    .bind(replica_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("query failed: {e}")))?
+    .ok_or_else(|| AppError::not_found(format!("replica {replica_id} not found")))?;
+
+    let challenge = last_challenge
+        .ok_or_else(|| AppError::bad_request("no pending challenge; call /challenge first"))?;
+
+    // Compute expected proof: SHA-256(challenge + content_address).
+    let expected_proof = format!(
+        "{:x}",
+        Sha256::digest(format!("{challenge}{content_address}").as_bytes())
+    );
+
+    if req.proof != expected_proof {
+        return Err(AppError::bad_request(
+            "proof does not match expected digest",
+        ));
+    }
+
+    // Update last_proof_at and clear the challenge.
+    sqlx::query(
+        "UPDATE provider_replicas SET last_proof_at = now(), last_challenge = NULL WHERE id = $1",
+    )
+    .bind(replica_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("update failed: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "verified",
+        "replica_id": replica_id,
+        "proven_at": chrono::Utc::now(),
+    })))
 }

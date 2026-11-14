@@ -280,6 +280,15 @@ pub async fn upload_component_artifact(
         &format!("/api/v1/components/{id}/artifact"),
     )?;
 
+    // Even for public components, artifact upload requires authentication.
+    // enforce_component_access returns Ok(()) for public components without
+    // checking the signature; verify it here so only authenticated callers
+    // can upload artifact bytes.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "PUT", &format!("/api/v1/components/{id}/artifact"))?;
+
     // Verify the signed body hash matches the actual request body so that a
     // captured signature cannot be replayed with a swapped body.
     let mut hasher = Sha256::new();
@@ -296,6 +305,16 @@ pub async fn upload_component_artifact(
     }
 
     let content_address = ContentAddress::of(&body).to_string();
+
+    // If the component already declares a geometry_digest, verify the
+    // uploaded bytes match it. This enforces RFC-015 rule 1 (digest
+    // integrity): the digest declared at component submission must match
+    // the actual artifact bytes.
+    if !component.geometry_digest.is_empty() && component.geometry_digest != content_address {
+        return Err(AppError::bad_request(
+            "geometry_digest does not match uploaded artifact bytes",
+        ));
+    }
 
     if let Some(declared) = headers
         .get("x-content-sha256")
