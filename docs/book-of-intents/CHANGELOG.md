@@ -2,6 +2,20 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-14 — Sprint 050: Fix submit_component auth (REQ-026/B15)
+
+- **`terra-core/api/src/routes/components.rs`**: `submit_component` now requires
+  `auth: SignedRequest` and verifies the Ed25519 signature against
+  `API_AUTHORITY_PUBKEY` before inserting a component package. Previously any
+  caller could submit a component without authentication (B15 gap).
+- Added `signed_submit_request()` test helper that constructs a properly signed
+  `SignedRequest` (SHA-256 body hash + Ed25519 signature over
+  `POST\n/api/v1/components\n{body_hash}\n{timestamp}`).
+- Updated all 3 `submit_component` test call sites to pass the signed request
+  and use `ApiAuthority(Some(key))`.
+- Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
+  warnings` clean; `cargo fmt --all --check` clean
+
 ## 2026-11-13 — Sprint 049: SDK standard shift — terra-identity + terra-registry SDKs declared + RFC protocol alignment
 
 - **`terra-core/programs/terra_identity/src/lib.rs`**: new `sdk_meta` module declaring the Terra
