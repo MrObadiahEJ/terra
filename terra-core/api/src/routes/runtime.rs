@@ -109,6 +109,7 @@ pub struct SceneNodeRow {
     pub visibility: String,
     pub loading_state: String,
     pub validation_state: String,
+    pub spatial_extent: serde_json::Value,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -129,6 +130,10 @@ pub struct AssetRetrieval {
     pub reliability_score: f64,
     pub global_transform: Option<serde_json::Value>,
     pub crs: Option<String>,
+    /// SHA-256 of the raw artifact bytes (`sha256:<hex>`), from the Terra
+    /// data-plane copy when available, otherwise the provider-declared
+    /// replica checksum. `None` means the client cannot verify the bytes.
+    pub content_address: Option<String>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -142,6 +147,7 @@ pub struct AssetRetrievalRow {
     pub reliability_score: f64,
     pub global_transform: Option<serde_json::Value>,
     pub crs: Option<String>,
+    pub content_address: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,7 +180,7 @@ pub async fn list_lod_levels(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
-struct ManifestObjectForScene {
+pub struct ManifestObjectForScene {
     pub id: Uuid,
     pub manifest_id: Uuid,
     pub object_id: String,
@@ -189,15 +195,11 @@ struct ManifestObjectForScene {
 // GET /runtime/scene/{manifest_id}
 // ---------------------------------------------------------------------------
 
-const INSERT_SCENE_GRAPH: &str = "INSERT INTO scene_graphs (manifest_id, region_id, \
-    lod_level, node_count, status) VALUES ($1, $2, $3, $4, $5) \
-    RETURNING id, manifest_id, region_id, lod_level, node_count, status, created_at";
-
-fn normalize_validation_state(state: &str) -> &str {
+fn normalize_validation_state(state: &str) -> String {
     match state {
-        "missing" => "missing",
-        "independently_valid" => "independently_valid",
-        _ => "preliminary",
+        "missing" => "missing".to_string(),
+        "independently_valid" => "independently_valid".to_string(),
+        _ => "preliminary".to_string(),
     }
 }
 
@@ -218,7 +220,7 @@ pub async fn resolve_scene_at_lod(
     resolve_scene_internal(&state, manifest_id, lod).await
 }
 
-async fn resolve_scene_internal(
+pub async fn resolve_scene_internal(
     state: &AppState,
     manifest_id: Uuid,
     lod: i32,
@@ -235,9 +237,10 @@ async fn resolve_scene_internal(
         .ok_or_else(|| AppError::not_found(format!("manifest {manifest_id} not found")))?;
 
     // Get objects for this manifest at this LOD (filter by available_lods contains lod).
+    // Read-only: scene-graph resolution must not write on GET.
     let objects = sqlx::query_as::<_, ManifestObjectForScene>(
         "SELECT id, manifest_id, object_id, component_version_id, \
-         storage_reference, validation_state, available_lods \
+         storage_reference, validation_state, available_lods, spatial_extent \
          FROM manifest_objects WHERE manifest_id = $1 \
          AND $2 = ANY(available_lods) ORDER BY object_id",
     )
@@ -247,45 +250,39 @@ async fn resolve_scene_internal(
     .await
     .map_err(|e| AppError::internal(format!("objects query failed: {e}")))?;
 
-    // Create scene graph.
-    let scene = sqlx::query_as::<_, SceneGraphRow>(INSERT_SCENE_GRAPH)
-        .bind(manifest_id)
-        .bind(&region_id)
-        .bind(lod)
-        .bind(objects.len() as i32)
-        .bind(if objects.is_empty() {
+    // Build scene graph row without inserting (read-only resolve).
+    let scene = SceneGraphRow {
+        id: manifest_id,
+        manifest_id,
+        region_id,
+        lod_level: lod,
+        node_count: objects.len() as i32,
+        status: if objects.is_empty() {
             "incomplete"
         } else {
             "ready"
-        })
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| AppError::internal(format!("scene graph insert failed: {e}")))?;
+        }
+        .to_string(),
+        created_at: chrono::Utc::now(),
+    };
 
-    // Create scene nodes.
+    // Build scene nodes read-only (no INSERT into scene_nodes).
     let mut nodes = Vec::with_capacity(objects.len());
     for obj in &objects {
-        let node = sqlx::query_as::<_, SceneNodeRow>(
-            r#"
-            INSERT INTO scene_nodes (
-                scene_graph_id, object_id, component_version_id, parent_node_id,
-                transform, lod_level, visibility, loading_state, validation_state
-            )
-            VALUES ($1, $2, $3, NULL, NULL, $4, 'visible', 'pending', $5)
-            RETURNING id, scene_graph_id, object_id, component_version_id,
-                      parent_node_id, transform, lod_level, visibility,
-                      loading_state, validation_state, created_at
-            "#,
-        )
-        .bind(scene.id)
-        .bind(&obj.object_id)
-        .bind(&obj.component_version_id)
-        .bind(lod)
-        .bind(normalize_validation_state(&obj.validation_state))
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|e| AppError::internal(format!("node insert failed: {e}")))?;
-        nodes.push(node);
+        nodes.push(SceneNodeRow {
+            id: Uuid::new_v4(),
+            scene_graph_id: manifest_id,
+            object_id: obj.object_id.clone(),
+            component_version_id: obj.component_version_id.clone(),
+            parent_node_id: None,
+            transform: None,
+            lod_level: lod,
+            visibility: "visible".into(),
+            loading_state: "pending".into(),
+            validation_state: normalize_validation_state(&obj.validation_state),
+            spatial_extent: obj.spatial_extent.clone(),
+            created_at: chrono::Utc::now(),
+        });
     }
 
     Ok(Json(SceneWithNodes { scene, nodes }))
@@ -295,12 +292,20 @@ async fn resolve_scene_internal(
 // GET /runtime/assets/{component_id}
 // ---------------------------------------------------------------------------
 
+/// `GET /api/v1/runtime/assets/{component_id}/{component_version}`
+///
+/// Returns up to `MAX_REPLICAS` ranked provider retrievals so the client can
+/// fall back through them if the first choice is unreachable. Each retrieval
+/// carries the component's raw-artifact content address (SHA-256 of the bytes),
+/// preferring Terra's own data-plane record over the provider-declared replica
+/// checksum, so a client can reject bytes that do not match — a trust anchor
+/// that does not depend on the provider telling the truth at retrieval time.
 pub async fn retrieve_asset(
     State(state): State<AppState>,
     Path((component_id, component_version)): Path<(String, String)>,
     auth: OptionalSignedRequest,
     headers: axum::http::HeaderMap,
-) -> Result<Json<AssetRetrieval>, AppError> {
+) -> Result<Json<Vec<AssetRetrieval>>, AppError> {
     let privacy: Option<(String, serde_json::Value)> = sqlx::query_as(
         "SELECT privacy_classification, access_policy \
          FROM component_packages \
@@ -324,46 +329,56 @@ pub async fn retrieve_asset(
         )?;
     }
 
-    let row = sqlx::query_as::<_, AssetRetrievalRow>(
+    const MAX_REPLICAS: i64 = 5;
+    let rows = sqlx::query_as::<_, AssetRetrievalRow>(
         r#"
         SELECT pr.component_id, pr.component_version, sp.id as provider_id, \
                sp.name as provider_name, pr.storage_reference, \
                pr.latency_ms, sp.reliability_score,
-               cp.global_transform, cp.crs
+               cp.global_transform, cp.crs,
+               COALESCE(ca.content_address, pr.checksum) as content_address
         FROM provider_replicas pr
         JOIN storage_providers sp ON sp.id = pr.provider_id
         LEFT JOIN component_packages cp
           ON cp.component_id = pr.component_id
          AND cp.component_version = pr.component_version
+        LEFT JOIN component_artifacts ca
+          ON ca.component_package_id = cp.id
         WHERE pr.component_id = $1 AND pr.component_version = $2 \
           AND pr.is_available = true AND sp.is_active = true
-        ORDER BY sp.reliability_score DESC, pr.latency_ms ASC NULLS LAST
-        LIMIT 1
+        ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
+        LIMIT $3
         "#,
     )
     .bind(&component_id)
     .bind(&component_version)
-    .fetch_optional(&state.pool)
+    .bind(MAX_REPLICAS)
+    .fetch_all(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("asset query failed: {e}")))?;
 
-    let row = row.ok_or_else(|| {
-        AppError::not_found(format!(
+    if rows.is_empty() {
+        return Err(AppError::not_found(format!(
             "no available replica for component {component_id} version {component_version}"
-        ))
-    })?;
+        )));
+    }
 
-    Ok(Json(AssetRetrieval {
-        component_id: row.component_id,
-        component_version: row.component_version,
-        provider_id: row.provider_id,
-        provider_name: row.provider_name,
-        storage_reference: row.storage_reference,
-        latency_ms: row.latency_ms,
-        reliability_score: row.reliability_score,
-        global_transform: row.global_transform,
-        crs: row.crs,
-    }))
+    Ok(Json(
+        rows.into_iter()
+            .map(|row| AssetRetrieval {
+                component_id: row.component_id,
+                component_version: row.component_version,
+                provider_id: row.provider_id,
+                provider_name: row.provider_name,
+                storage_reference: row.storage_reference,
+                latency_ms: row.latency_ms,
+                reliability_score: row.reliability_score,
+                global_transform: row.global_transform,
+                crs: row.crs,
+                content_address: row.content_address,
+            })
+            .collect(),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -416,4 +431,177 @@ pub struct CacheRow {
     pub cached_at: chrono::DateTime<chrono::Utc>,
     pub last_accessed_at: chrono::DateTime<chrono::Utc>,
     pub access_count: i32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::ApiAuthority;
+    use crate::storage::StorageBackend;
+    use serde_json::json;
+    use sqlx::PgPool;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    fn test_state(pool: PgPool) -> AppState {
+        let dir = tempdir().expect("temp storage dir");
+        // Leak the tempdir for the duration of the test process; these tests
+        // only exercise read paths that do not touch storage.
+        let root = dir.keep();
+        AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            storage: Arc::new(StorageBackend::Local { root }),
+            zk: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn scene_resolution_is_read_only_and_returns_spatial_extent() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed runtime scene test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let manifest_id = Uuid::new_v4();
+        let region_id = format!("runtime-region-{}", Uuid::new_v4());
+        let extent = json!({
+            "type": "Polygon",
+            "coordinates": [[
+                [8.5, 47.4], [8.6, 47.4], [8.6, 47.5], [8.5, 47.5], [8.5, 47.4]
+            ]]
+        });
+
+        sqlx::query(
+            "INSERT INTO world_manifests (id, region_id, region_name, version) \
+             VALUES ($1, $2, $3, 1)",
+        )
+        .bind(manifest_id)
+        .bind(&region_id)
+        .bind("Runtime Test Region")
+        .execute(&pool)
+        .await
+        .expect("insert manifest");
+
+        sqlx::query(
+            "INSERT INTO manifest_objects (manifest_id, object_id, component_version_id, \
+             spatial_extent, storage_reference, available_lods, validation_state) \
+             VALUES ($1, $2, $3, $4, $5, '{0}', 'technically_valid')",
+        )
+        .bind(manifest_id)
+        .bind("object-runtime-1")
+        .bind("component-runtime-1@v1")
+        .bind(&extent)
+        .bind("https://storage.example.com/runtime.glb")
+        .execute(&pool)
+        .await
+        .expect("insert manifest object");
+
+        let before: i64 = sqlx::query_scalar("SELECT count(*) FROM scene_graphs")
+            .fetch_one(&pool)
+            .await
+            .expect("count scene graphs before");
+        let before_nodes: i64 = sqlx::query_scalar("SELECT count(*) FROM scene_nodes")
+            .fetch_one(&pool)
+            .await
+            .expect("count scene nodes before");
+
+        let Json(scene) = resolve_scene_internal(&state, manifest_id, 0)
+            .await
+            .expect("resolve scene");
+
+        assert_eq!(scene.scene.manifest_id, manifest_id);
+        assert_eq!(scene.scene.region_id, region_id);
+        assert_eq!(scene.nodes.len(), 1);
+        assert_eq!(scene.nodes[0].object_id, "object-runtime-1");
+        assert_eq!(scene.nodes[0].spatial_extent, extent);
+        assert_eq!(scene.nodes[0].validation_state, "preliminary");
+
+        let after: i64 = sqlx::query_scalar("SELECT count(*) FROM scene_graphs")
+            .fetch_one(&pool)
+            .await
+            .expect("count scene graphs after");
+        let after_nodes: i64 = sqlx::query_scalar("SELECT count(*) FROM scene_nodes")
+            .fetch_one(&pool)
+            .await
+            .expect("count scene nodes after");
+        assert_eq!(before, after, "GET must not insert scene graphs");
+        assert_eq!(before_nodes, after_nodes, "GET must not insert scene nodes");
+
+        sqlx::query("DELETE FROM world_manifests WHERE id = $1")
+            .bind(manifest_id)
+            .execute(&pool)
+            .await
+            .expect("clean up manifest");
+    }
+
+    #[tokio::test]
+    async fn asset_retrieval_returns_ranked_replicas_with_content_address() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed runtime asset test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let provider_uuid = Uuid::new_v4();
+        let provider_key = format!("runtime-provider-{}", Uuid::new_v4());
+        let component_id = format!("runtime-component-{}", Uuid::new_v4());
+        let checksum = format!("sha256:{}", "ab".repeat(32));
+
+        sqlx::query(
+            "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, reliability_score) \
+             VALUES ($1, $2, $3, 'object_storage', $4, 0.9)",
+        )
+        .bind(provider_uuid)
+        .bind(&provider_key)
+        .bind("Runtime Test Provider")
+        .bind("https://provider.example.com")
+        .execute(&pool)
+        .await
+        .expect("insert provider");
+
+        sqlx::query(
+            "INSERT INTO provider_replicas (provider_id, component_id, component_version, \
+             storage_reference, version, checksum, latency_ms) \
+             VALUES ($1, $2, 'v1', $3, 'v1', $4, 42)",
+        )
+        .bind(provider_uuid)
+        .bind(&component_id)
+        .bind("https://provider.example.com/component.glb")
+        .bind(&checksum)
+        .execute(&pool)
+        .await
+        .expect("insert replica");
+
+        let Json(assets) = retrieve_asset(
+            State(state.clone()),
+            Path((component_id.clone(), "v1".to_string())),
+            OptionalSignedRequest(None),
+            axum::http::HeaderMap::new(),
+        )
+        .await
+        .expect("retrieve asset");
+
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0].component_id, component_id);
+        assert_eq!(assets[0].provider_name, "Runtime Test Provider");
+        assert_eq!(
+            assets[0].content_address.as_deref(),
+            Some(checksum.as_str())
+        );
+
+        sqlx::query("DELETE FROM storage_providers WHERE id = $1")
+            .bind(provider_uuid)
+            .execute(&pool)
+            .await
+            .expect("clean up provider");
+    }
 }

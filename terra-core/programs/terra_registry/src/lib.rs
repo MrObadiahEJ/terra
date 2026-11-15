@@ -8266,7 +8266,7 @@ pub mod sdk_meta {
                 .any(|c| c.contains("parcel registry")));
             assert!(sdk_schema_versions()
                 .iter()
-                .any(|(n, _)| n == "RFC-007 Dispute Resolution & Parcel Freeze"));
+                .any(|(n, _)| *n == "RFC-007 Dispute Resolution & Parcel Freeze"));
         }
     }
 }

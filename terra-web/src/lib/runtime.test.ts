@@ -9,6 +9,7 @@ import {
   runtimeLodFromHeight,
   fetchAssetWithFallback,
   fetchComponentArtifact,
+  fetchComponentAsset,
   getQuadCell,
   getQuadCover,
   type AssetRetrieval,
@@ -29,6 +30,7 @@ describe('rankProviders', () => {
     reliability_score: 0.9,
     global_transform: null,
     crs: null,
+    content_address: null,
   }
 
   it('sorts by highest reliability first', () => {
@@ -214,6 +216,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.99,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
       {
         component_id: 'c1',
@@ -225,6 +228,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.1,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)
@@ -244,6 +248,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.99,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
       {
         component_id: 'c1',
@@ -255,6 +260,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.5,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)
@@ -277,6 +283,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.99,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
       {
         component_id: 'c1',
@@ -288,6 +295,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.5,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
     ]
     await expect(fetchAssetWithFallback(retrievals)).rejects.toThrow()
@@ -305,6 +313,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.1,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
       {
         component_id: 'c1',
@@ -316,6 +325,7 @@ describe('fetchAssetWithFallback', () => {
         reliability_score: 0.99,
         global_transform: null,
         crs: null,
+        content_address: null,
       },
     ]
     const data = await fetchAssetWithFallback(retrievals)
@@ -401,6 +411,22 @@ describe('fetchComponentArtifact', () => {
     )
 
     await expect(fetchComponentArtifact('comp-001')).rejects.toThrow(/404/)
+  })
+
+  it('rejects a response with no x-content-sha256 header', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { 'Content-Type': 'model/gltf-binary' },
+        }),
+      ) as unknown as typeof fetch,
+    )
+
+    await expect(fetchComponentArtifact('comp-001')).rejects.toThrow(
+      /missing x-content-sha256/,
+    )
   })
 })
 
@@ -526,5 +552,186 @@ describe('getQuadCover', () => {
     await expect(
       getQuadCover({ min_lon: 0, min_lat: 0, max_lon: 1, max_lat: 1 }),
     ).rejects.toThrow(/500/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fetchComponentAsset — content-address verification + provider fallback
+// ---------------------------------------------------------------------------
+
+describe('fetchComponentAsset', () => {
+  const correctData = new Uint8Array([1, 2, 3, 4, 5])
+  const tamperedData = new Uint8Array([9, 9, 9, 9, 9])
+
+  const baseRetrieval: AssetRetrieval = {
+    component_id: 'comp-001',
+    component_version: 'v1',
+    provider_id: 'p1',
+    provider_name: 'Provider A',
+    storage_reference: 'https://storage.example.com/component.glb',
+    latency_ms: 50,
+    reliability_score: 0.9,
+    global_transform: null,
+    crs: null,
+    content_address: null,
+  }
+
+  const jsonResponse = (body: unknown): Response =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+  const byteResponse = (
+    data: Uint8Array,
+    headers: Record<string, string> = {},
+  ): Response =>
+    new Response(data.buffer as ArrayBuffer, { status: 200, headers })
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    clearComponentCache()
+  })
+
+  it('serves verified bytes when the digest matches', async () => {
+    const hash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${hash}` },
+      {
+        ...baseRetrieval,
+        provider_id: 'p2',
+        provider_name: 'Provider B',
+        latency_ms: 200,
+        content_address: `sha256:${hash}`,
+      },
+    ]
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        calls.push(url)
+        return url.includes('/runtime/assets/')
+          ? jsonResponse(retrievals)
+          : byteResponse(correctData)
+      }) as unknown as typeof fetch,
+    )
+
+    const result = await fetchComponentAsset('comp-001', 'v1')
+    expect(new Uint8Array(result.data)).toEqual(correctData)
+    expect(result.retrieval.provider_id).toBe('p1')
+    expect(calls).toEqual([
+      expect.stringContaining('/runtime/assets/comp-001/v1'),
+      'https://storage.example.com/component.glb',
+    ])
+  })
+
+  it('falls through to the next provider when bytes are tampered', async () => {
+    const hash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      {
+        ...baseRetrieval,
+        provider_name: 'Provider A',
+        content_address: `sha256:${hash}`,
+      },
+      {
+        ...baseRetrieval,
+        provider_id: 'p2',
+        provider_name: 'Provider B',
+        storage_reference: 'https://storage-b.example.com/component.glb',
+        latency_ms: 200,
+        content_address: `sha256:${hash}`,
+      },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        return url.includes('storage-b.example.com')
+          ? byteResponse(correctData)
+          : byteResponse(tamperedData)
+      }) as unknown as typeof fetch,
+    )
+
+    const result = await fetchComponentAsset('comp-001', 'v1')
+    expect(result.retrieval.provider_id).toBe('p2')
+    expect(new Uint8Array(result.data)).toEqual(correctData)
+  })
+
+  it('skips providers that declare no content address', async () => {
+    const artifactData = new Uint8Array([7, 8, 9])
+    const artifactHash = await sha256Hex(artifactData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: null },
+    ]
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        calls.push(url)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        if (url.includes('/components/comp-001/artifact')) {
+          return byteResponse(artifactData, {
+            'x-content-sha256': `sha256:${artifactHash}`,
+          })
+        }
+        throw new Error(`unexpected fetch: ${url}`)
+      }) as unknown as typeof fetch,
+    )
+
+    const result = await fetchComponentAsset('comp-001', 'v1')
+    expect(result.retrieval.provider_name).toBe('data-plane')
+    expect(new Uint8Array(result.data)).toEqual(artifactData)
+    expect(calls.some((url) => url.includes('storage.example.com'))).toBe(false)
+  })
+
+  it('falls back to the data-plane artifact when every provider fails', async () => {
+    const artifactData = new Uint8Array([7, 8, 9])
+    const artifactHash = await sha256Hex(artifactData)
+    const expectedHash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${expectedHash}` },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        if (url.includes('/components/comp-001/artifact')) {
+          return byteResponse(artifactData, {
+            'x-content-sha256': `sha256:${artifactHash}`,
+          })
+        }
+        return byteResponse(tamperedData)
+      }) as unknown as typeof fetch,
+    )
+
+    const result = await fetchComponentAsset('comp-001', 'v1')
+    expect(result.retrieval.provider_name).toBe('data-plane')
+    expect(new Uint8Array(result.data)).toEqual(artifactData)
+  })
+
+  it('reports both failures when no provider verifies and the artifact is unavailable', async () => {
+    const expectedHash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${expectedHash}` },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        if (url.includes('/components/')) {
+          return new Response('not found', { status: 404, statusText: 'Not Found' })
+        }
+        return byteResponse(tamperedData)
+      }) as unknown as typeof fetch,
+    )
+
+    await expect(fetchComponentAsset('comp-001', 'v1')).rejects.toThrow(
+      /digest mismatch[\s\S]*404/,
+    )
   })
 })

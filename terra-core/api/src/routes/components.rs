@@ -88,10 +88,37 @@ pub async fn submit_component(
         .ok_or_else(|| AppError::unauthorized("API authority not configured"))?;
     auth.verify(&key, "POST", "/api/v1/components")?;
 
-    // RFC-015 §4 conformance (rules 2–8). Rule 1 (digest integrity) needs the
-    // artifact bytes; those are checked when the artifact is uploaded, where
-    // the raw SHA-256 content address is computed and recorded.
+    // RFC-015 §4 conformance (rules 2–8). Rule 1 (digest integrity) requires
+    // the geometry document and is enforced by `validate_with_geometry` where
+    // that document is available; the raw-artifact endpoint records a SHA-256
+    // content address of the uploaded bytes, which is a different value.
     validate(pkg).map_err(|e| AppError::bad_request(e.to_string()))?;
+
+    // Reject application-layer provenance at the protocol boundary. RFC-015
+    // §3 admits imported/observed/surveyed/reconstructed/inferred/
+    // manually_corrected component packages; simulated/designed/proposed
+    // content belongs in an app overlay, not in the component registry.
+    // See docs/app-overlay-anchoring.md.
+    const PROHIBITED_PROVENANCE: &[&str] = &[
+        "simulated",
+        "designed",
+        "proposed",
+        "speculative",
+        "ai-generated-world",
+        "ai_generated",
+        "ai_generated_world",
+    ];
+    if PROHIBITED_PROVENANCE
+        .iter()
+        .any(|p| pkg.provenance_classification.eq_ignore_ascii_case(p))
+    {
+        return Err(AppError::bad_request(
+            "provenance_classification declares application-layer simulated/\
+             designed/proposed content. RFC-015 component packages describe \
+             evidence-backed spatial components; publish creative content as \
+             an app overlay (see docs/app-overlay-anchoring.md).",
+        ));
+    }
 
     let row = sqlx::query_as::<_, ComponentRow>(
         r#"
@@ -260,17 +287,42 @@ async fn fetch_artifact(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))
 }
 
+/// Resolve a path identifier to a package UUID.
+///
+/// Accepts either the internal UUID or the human-readable `component_id`
+/// (TRI v1 data-plane addressing). UUID-shaped identifiers always resolve as
+/// UUIDs, so a component_id that looks like a UUID cannot shadow another
+/// package.
+async fn resolve_package_id(state: &AppState, id: &str) -> Result<Uuid, AppError> {
+    if let Ok(uuid) = id.parse::<Uuid>() {
+        return Ok(uuid);
+    }
+
+    let row: Option<(Uuid,)> =
+        sqlx::query_as("SELECT id FROM component_packages WHERE component_id = $1")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("query failed: {e}")))?;
+
+    row.map(|(uuid,)| uuid)
+        .ok_or_else(|| AppError::not_found(format!("component {id} not found")))
+}
+
 /// `PUT /api/v1/components/{id}/artifact` — raw body upload. The optional
 /// `X-Content-SHA256` header lets the client declare the expected digest; a
 /// mismatch is rejected before storage.
 pub async fn upload_component_artifact(
     State(state): State<AppState>,
-    Path(id): Path<Uuid>,
+    Path(id): Path<String>,
     auth: SignedRequest,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<ArtifactUploadResponse>), AppError> {
-    let component = fetch_component(&state, id).await?;
+    // The artifact endpoint is addressed by component_id (human-readable
+    // identifier) or by the internal UUID, per the TRI v1 data-plane contract.
+    let package_id = resolve_package_id(&state, &id).await?;
+    let component = fetch_component(&state, package_id).await?;
     enforce_component_access(
         &component.privacy_classification,
         &component.access_policy,
@@ -304,17 +356,12 @@ pub async fn upload_component_artifact(
         return Err(AppError::bad_request("empty artifact"));
     }
 
+    // Note: `component.geometry_digest` is the canonical geometry digest
+    // (terra-geom-v2) of the geometry document, not a digest of these raw
+    // artifact bytes (GLB, point cloud, …). RFC-015 rule 1 is therefore
+    // checked where the geometry document is available
+    // (`validate_with_geometry`), not here.
     let content_address = ContentAddress::of(&body).to_string();
-
-    // If the component already declares a geometry_digest, verify the
-    // uploaded bytes match it. This enforces RFC-015 rule 1 (digest
-    // integrity): the digest declared at component submission must match
-    // the actual artifact bytes.
-    if !component.geometry_digest.is_empty() && component.geometry_digest != content_address {
-        return Err(AppError::bad_request(
-            "geometry_digest does not match uploaded artifact bytes",
-        ));
-    }
 
     if let Some(declared) = headers
         .get("x-content-sha256")
@@ -356,7 +403,7 @@ pub async fn upload_component_artifact(
          RETURNING component_package_id, content_address, storage_ref, \
          content_type, size_bytes",
     )
-    .bind(id)
+    .bind(package_id)
     .bind(&content_address)
     .bind(&stored.storage_ref)
     .bind(&stored.backend_name)
@@ -369,7 +416,7 @@ pub async fn upload_component_artifact(
     match inserted {
         Some(record) => Ok((StatusCode::CREATED, Json(artifact_response(record, true)))),
         None => {
-            let existing = fetch_artifact(&state, id).await?.ok_or_else(|| {
+            let existing = fetch_artifact(&state, package_id).await?.ok_or_else(|| {
                 AppError::internal("artifact insert conflicted but no row was found")
             })?;
             if existing.content_address != content_address {
@@ -394,24 +441,7 @@ pub async fn get_component_artifact(
     auth: OptionalSignedRequest,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    let package_id = match id.parse::<Uuid>() {
-        Ok(uuid) => uuid,
-        Err(_) => {
-            // Treat `id` as a component_id text; look up the package UUID.
-            let row: Option<(Uuid,)> =
-                sqlx::query_as("SELECT id FROM component_packages WHERE component_id = $1")
-                    .bind(&id)
-                    .fetch_optional(&state.pool)
-                    .await
-                    .map_err(|e| AppError::internal(format!("query failed: {e}")))?;
-            match row {
-                Some((uuid,)) => uuid,
-                None => {
-                    return Err(AppError::not_found(format!("component {id} not found")));
-                }
-            }
-        }
-    };
+    let package_id = resolve_package_id(&state, &id).await?;
 
     let component = fetch_component(&state, package_id).await?;
     enforce_component_access(
@@ -420,7 +450,7 @@ pub async fn get_component_artifact(
         auth.0.as_ref(),
         &headers,
         "GET",
-        &format!("/api/v1/components/{package_id}/artifact"),
+        &format!("/api/v1/components/{id}/artifact"),
     )?;
 
     let artifact = fetch_artifact(&state, package_id)
@@ -666,12 +696,18 @@ mod tests {
         }
     }
 
-    fn signed_request() -> SignedRequest {
+    /// Create a `SignedRequest` for an artifact upload at `id` covering the
+    /// exact body bytes (the upload handler verifies the body hash).
+    fn signed_upload_request(id: &str, body: &[u8]) -> SignedRequest {
         let key = SigningKey::from_bytes(&[13u8; 32]);
+        let body_hash_hex = format!("{:x}", Sha256::digest(body));
+        let timestamp = chrono::Utc::now().timestamp();
+        let payload =
+            format!("PUT\n/api/v1/components/{id}/artifact\n{body_hash_hex}\n{timestamp}");
         SignedRequest {
-            signature: key.sign(b"artifact-test"),
-            timestamp: 0,
-            body_hash_hex: String::new(),
+            signature: key.sign(payload.as_bytes()),
+            timestamp,
+            body_hash_hex,
         }
     }
 
@@ -740,10 +776,11 @@ mod tests {
 
         let bytes = Bytes::from_static(b"glTF artifact bytes");
         let expected = ContentAddress::of(&bytes).to_string();
+        let upload_id = row.id.to_string();
         let (status, Json(first)) = upload_component_artifact(
             State(state.clone()),
-            Path(row.id),
-            signed_request(),
+            Path(upload_id.clone()),
+            signed_upload_request(&upload_id, &bytes),
             artifact_headers("model/gltf-binary"),
             bytes.clone(),
         )
@@ -755,8 +792,8 @@ mod tests {
 
         let (status, Json(second)) = upload_component_artifact(
             State(state.clone()),
-            Path(row.id),
-            signed_request(),
+            Path(upload_id.clone()),
+            signed_upload_request(&upload_id, &bytes),
             artifact_headers("model/gltf-binary"),
             bytes.clone(),
         )
@@ -767,7 +804,7 @@ mod tests {
 
         let response = get_component_artifact(
             State(state.clone()),
-            Path(row.id),
+            Path(row.id.to_string()),
             OptionalSignedRequest(None),
             HeaderMap::new(),
         )
@@ -791,12 +828,13 @@ mod tests {
             .unwrap();
         assert_eq!(body.as_ref(), bytes.as_ref());
 
+        let different = Bytes::from_static(b"different artifact");
         let err = upload_component_artifact(
             State(state.clone()),
-            Path(row.id),
-            signed_request(),
+            Path(upload_id.clone()),
+            signed_upload_request(&upload_id, &different),
             artifact_headers("model/gltf-binary"),
-            Bytes::from_static(b"different artifact"),
+            different,
         )
         .await
         .unwrap_err();
@@ -833,7 +871,7 @@ mod tests {
 
         let mut pkg = base_package();
         pkg.component_id = format!("comp-artifact-{}", Uuid::new_v4());
-        let (status, Json(row)) = submit_component(
+        let (_, Json(row)) = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
             Json(SubmitComponent { package: pkg }),
@@ -849,12 +887,14 @@ mod tests {
                 .parse()
                 .unwrap(),
         );
+        let upload_id = row.id.to_string();
+        let body = Bytes::from_static(b"actual artifact");
         let err = upload_component_artifact(
             State(state.clone()),
-            Path(row.id),
-            signed_request(),
+            Path(upload_id.clone()),
+            signed_upload_request(&upload_id, &body),
             headers,
-            Bytes::from_static(b"actual artifact"),
+            body,
         )
         .await
         .unwrap_err();
@@ -891,6 +931,7 @@ mod tests {
 
         let mut pkg = base_package();
         pkg.component_id = format!("comp-artifact-id-text-{}", Uuid::new_v4());
+        let pkg_component_id = pkg.component_id.clone();
         let (_, Json(row)) = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
@@ -898,14 +939,16 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(row.component_id, pkg.component_id);
+        assert_eq!(row.component_id, pkg_component_id);
 
         let bytes = Bytes::from_static(b"glTF artifact bytes");
         let _content_address = ContentAddress::of(&bytes).to_string();
+        // Upload by component_id TEXT as well, so both directions of the
+        // data-plane address contract are exercised.
         let _ = upload_component_artifact(
             State(state.clone()),
-            Path(row.id),
-            signed_request(),
+            Path(pkg_component_id.clone()),
+            signed_upload_request(&pkg_component_id, &bytes),
             artifact_headers("model/gltf-binary"),
             bytes.clone(),
         )
@@ -932,6 +975,56 @@ mod tests {
 
         sqlx::query("DELETE FROM component_packages WHERE id = $1")
             .bind(row.id)
+            .execute(&pool)
+            .await
+            .expect("clean up test component");
+    }
+
+    #[tokio::test]
+    async fn submit_component_rejects_simulated_provenance() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed provenance test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        let mut pkg = base_package();
+        pkg.component_id = format!("comp-provenance-{}", Uuid::new_v4());
+        pkg.provenance_classification = "simulated".into();
+        let pkg_component_id = pkg.component_id.clone();
+
+        let result = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent { package: pkg }),
+        )
+        .await;
+
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            AppError::BadRequest(msg) => {
+                assert!(msg.contains("simulated"));
+                assert!(msg.contains("app-overlay-anchoring.md"));
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
+
+        sqlx::query("DELETE FROM component_packages WHERE component_id LIKE $1")
+            .bind(&pkg_component_id)
             .execute(&pool)
             .await
             .expect("clean up test component");

@@ -1161,9 +1161,9 @@ mod tests {
         // The hash anchored on-chain must be reproducible from the geometry
         // alone: ring start, orientation and coordinate precision do not change
         // it; a real geometry change does.
-        let base = r#"{"type":"Polygon","coordinates":[[[8.5,47.4],[8.6,47.4],[8.6,47.5],[8.5,47.5],[8.5,47.4]]]}"#;
-        let variant = r#"{"coordinates":[[[8.60000000,47.50000000],[8.50000000,47.50000000],[8.50000000,47.40000000],[8.60000000,47.40000000],[8.60000000,47.50000000]]],"type":"Polygon"}"#;
-        let shifted = r#"{"type":"Polygon","coordinates":[[[8.51,47.4],[8.61,47.4],[8.61,47.5],[8.51,47.5],[8.51,47.4]]]}"#;
+        let base = r#"{"type":"Polygon","crs":{"type":"name","properties":{"name":"EPSG:4326"}},"elevation_ref":"EGM2008","vertical_units":"m","precision":6,"coordinates":[[[8.5,47.4,0.0],[8.6,47.4,0.0],[8.6,47.5,0.0],[8.5,47.5,0.0],[8.5,47.4,0.0]]]}"#;
+        let variant = r#"{"type":"Polygon","crs":{"type":"name","properties":{"name":"EPSG:4326"}},"elevation_ref":"EGM2008","vertical_units":"m","precision":6,"coordinates":[[[8.60000000,47.50000000,0.0],[8.50000000,47.50000000,0.0],[8.50000000,47.40000000,0.0],[8.60000000,47.40000000,0.0],[8.60000000,47.50000000,0.0]]]}"#;
+        let shifted = r#"{"type":"Polygon","crs":{"type":"name","properties":{"name":"EPSG:4326"}},"elevation_ref":"EGM2008","vertical_units":"m","precision":6,"coordinates":[[[8.51,47.4,0.0],[8.61,47.4,0.0],[8.61,47.5,0.0],[8.51,47.5,0.0],[8.51,47.4,0.0]]]}"#;
 
         let a = canonical_geometry_hash(base).unwrap();
         assert_eq!(a.len(), 64);

@@ -52,6 +52,12 @@ export interface AssetRetrieval {
   reliability_score: number
   global_transform: any | null
   crs: string | null
+  /**
+   * SHA-256 of the raw artifact bytes (`sha256:<hex>`), if the API knows it.
+   * The client must verify fetched bytes against this value; `null` means the
+   * provider's bytes cannot be trusted.
+   */
+  content_address: string | null
 }
 
 export interface LodLevel {
@@ -180,6 +186,15 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
   ).join('')
+}
+
+/** Normalize `sha256:<hex>` / `<hex>` to lowercase hex, or null if invalid. */
+function normalizeContentAddress(address: string | null | undefined): string | null {
+  if (!address) return null
+  const hex = address.startsWith('sha256:')
+    ? address.slice('sha256:'.length)
+    : address
+  return /^[0-9a-f]{64}$/i.test(hex) ? hex.toLowerCase() : null
 }
 
 export async function leaseDerivedJob(
@@ -319,19 +334,51 @@ export async function fetchComponentAsset(
   const cached = getCachedAsset(componentId, componentVersion)
   if (cached) {
     // Return cached data with an empty retrieval (transform not cached)
-    return { data: cached, retrieval: { component_id: componentId, component_version: componentVersion, provider_id: '', provider_name: '', storage_reference: '', latency_ms: null, reliability_score: 0, global_transform: null, crs: null } }
+    return { data: cached, retrieval: { component_id: componentId, component_version: componentVersion, provider_id: '', provider_name: '', storage_reference: '', latency_ms: null, reliability_score: 0, global_transform: null, crs: null, content_address: null } }
   }
 
   try {
-    const retrieval = await request<AssetRetrieval>(
+    // The API returns a ranked list; accept a single object too so this
+    // client keeps working against an older runtime build.
+    const response = await request<AssetRetrieval[] | AssetRetrieval>(
       `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
         componentVersion,
       )}`,
     )
+    const retrievals = Array.isArray(response) ? response : [response]
 
-    const data = await fetchAssetWithFallback([retrieval])
-    setCachedAsset(componentId, componentVersion, data)
-    return { data, retrieval }
+    if (retrievals.length === 0) {
+      throw new Error(`no providers for component ${componentId} version ${componentVersion}`)
+    }
+
+    // Try each ranked retrieval; verify fetched bytes against the content
+    // address Terra recorded for the raw artifact. A provider that cannot
+    // provide an address is skipped: unverifiable bytes are not trusted.
+    let lastError: unknown = null
+    for (const retrieval of rankProviders(retrievals)) {
+      try {
+        const expected = normalizeContentAddress(retrieval.content_address)
+        if (!expected) {
+          throw new Error(
+            `provider ${retrieval.provider_name || retrieval.provider_id} has no content address`,
+          )
+        }
+        const res = await fetch(retrieval.storage_reference)
+        if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
+        const data = await res.arrayBuffer()
+        const actual = await sha256Hex(new Uint8Array(data))
+        if (actual !== expected) {
+          throw new Error(
+            `content digest mismatch: expected ${expected}, got ${actual}`,
+          )
+        }
+        setCachedAsset(componentId, componentVersion, data)
+        return { data, retrieval }
+      } catch (err) {
+        lastError = err
+      }
+    }
+    throw lastError ?? new Error(`no provider could serve ${componentId}`)
   } catch (providerErr) {
     // Fallback: the component package may store its artifact directly with
     // the data plane (`GET /components/{id}/artifact`), which is content-
@@ -352,6 +399,7 @@ export async function fetchComponentAsset(
           reliability_score: 1,
           global_transform: null,
           crs: null,
+          content_address: artifact.contentAddress,
         },
       }
     } catch (artifactErr) {
@@ -392,16 +440,17 @@ export async function fetchComponentArtifact(
   }
   const declared = res.headers.get('x-content-sha256') ?? ''
   const data = await res.arrayBuffer()
-  if (declared) {
-    const hex = await sha256Hex(new Uint8Array(data))
-    const expected = declared.startsWith('sha256:')
-      ? declared.slice('sha256:'.length)
-      : declared
-    if (hex !== expected) {
-      throw new Error(
-        `component artifact digest mismatch: expected ${expected}, got ${hex}`,
-      )
-    }
+  if (!declared) {
+    throw new Error('component artifact missing x-content-sha256 header')
+  }
+  const hex = await sha256Hex(new Uint8Array(data))
+  const expected = declared.startsWith('sha256:')
+    ? declared.slice('sha256:'.length)
+    : declared
+  if (hex !== expected) {
+    throw new Error(
+      `component artifact digest mismatch: expected ${expected}, got ${hex}`,
+    )
   }
   return {
     data,
