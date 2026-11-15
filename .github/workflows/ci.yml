@@ -41,21 +41,10 @@ jobs:
         run: cargo test -p terra-identity --lib
         working-directory: terra-core
 
-      - name: RFC-016 security tests
-        run: cargo test -p terra-registry --test security
-        working-directory: terra-core
-
-      - name: RFC-012 structural tests
-        run: cargo test -p terra-registry --test rfc012_structure
-        working-directory: terra-core
-
-      - name: Geo engine tests
-        run: cargo test -p terra-geo
-        working-directory: terra-core
-
-      # R-008: the integration suites load prebuilt `.so` artifacts and refuse
-      # to run against a stale build. Build them in CI, then run the full BPF
-      # suite (307 tests) — the same gate used locally.
+      # R-008: the ProgramTest-based suites load prebuilt `.so` artifacts and
+      # refuse to run against a stale build. Build them in CI before the
+      # security suite and the full BPF suite (307 tests) — the same gate used
+      # locally.
       # Pin the toolchain to the 3.1.x line that matches `solana-program-test`
       # in Cargo.lock: artifacts built by a newer (SBPF v3) toolchain are
       # rejected by the pinned runtime ("Unsupported program id"). Bump both
@@ -70,6 +59,18 @@ jobs:
           mkdir -p target/deploy
           cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml --sbf-out-dir "$PWD/target/deploy"
           cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml --sbf-out-dir "$PWD/target/deploy"
+        working-directory: terra-core
+
+      - name: RFC-016 security tests
+        run: cargo test -p terra-registry --test security
+        working-directory: terra-core
+
+      - name: RFC-012 structural tests
+        run: cargo test -p terra-registry --test rfc012_structure
+        working-directory: terra-core
+
+      - name: Geo engine tests
+        run: cargo test -p terra-geo
         working-directory: terra-core
 
       - name: BPF integration tests
