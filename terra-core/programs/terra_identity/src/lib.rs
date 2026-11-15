@@ -315,7 +315,7 @@ pub mod sdk_meta {
                 .any(|c| c.contains("identity-binding")));
             assert!(sdk_schema_versions()
                 .iter()
-                .any(|(n, _)| n == "RFC-006 Cross-Border Identity Bridge"));
+                .any(|(n, _)| *n == "RFC-006 Cross-Border Identity Bridge"));
         }
     }
 }

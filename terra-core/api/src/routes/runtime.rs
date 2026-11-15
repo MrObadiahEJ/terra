@@ -332,8 +332,8 @@ pub async fn retrieve_asset(
     const MAX_REPLICAS: i64 = 5;
     let rows = sqlx::query_as::<_, AssetRetrievalRow>(
         r#"
-        SELECT pr.component_id, pr.component_version, sp.id as provider_id, \
-               sp.name as provider_name, pr.storage_reference, \
+        SELECT pr.component_id, pr.component_version, sp.id as provider_id,
+               sp.name as provider_name, pr.storage_reference,
                pr.latency_ms, sp.reliability_score,
                cp.global_transform, cp.crs,
                COALESCE(ca.content_address, pr.checksum) as content_address
@@ -344,7 +344,7 @@ pub async fn retrieve_asset(
          AND cp.component_version = pr.component_version
         LEFT JOIN component_artifacts ca
           ON ca.component_package_id = cp.id
-        WHERE pr.component_id = $1 AND pr.component_version = $2 \
+        WHERE pr.component_id = $1 AND pr.component_version = $2
           AND pr.is_available = true AND sp.is_active = true
         ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
         LIMIT $3
