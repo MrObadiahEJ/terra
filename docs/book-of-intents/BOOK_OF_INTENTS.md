@@ -150,7 +150,7 @@ chapters (02, 06, 08, 15) are founder-review-gated research specifications.
 **What does Terra already have?**
 - On-chain: parcel registry + transfer (RRR rights-as-PDA), vault shard protocol, escrow settlement, dispute lifecycle, staking/slashing, validator registry + profiles + reputation, verification sessions/claims/attestations, evidence manifests, ZK ownership proofs (Groth16, ceremony tooling absent), time-bound credentials, cross-border identity, world registry (249 ISO codes), spatial assets + versioned geometry + spatial snapshots, 3D model registration, subdivision/amalgamation/succession/forfeiture, identity program (bind/succession/guardianship). All `IMPLEMENTED AND VERIFIED` (A1–A21), 307 BPF tests, local-only (never on devnet).
 - Backend API: ~26 routers including reconstruction, derived compute, stories (replay/GeoJSON/schema), spatial, geo, evidence, ZK, tx. `IMPLEMENTED AND VERIFIED` (B1–B5, B8–B13), API 133/133. Derived compute dedup cache (`processing_key` UNIQUE, recursive-CTE invalidation) is a cache, not a fact. Privileged endpoints fail-closed on Ed25519 signature (R-016/R-017 fixed). AI provenance fields on geometry drafts (REQ-024/R-014).
-- Geo-engine: sealed-road reachability (Dijkstra), canonical 2D geometry digest `terra-geom-v1` (frozen), OSM road-graph structures (partial — no server-side route), nearest-roads/pois/buildings/stats. C1 verified, C2 verified, C3 partial.
+- Geo-engine: sealed-road reachability (Dijkstra), canonical geometry digest `terra-geom-v2` (v1 removed Sprint 053), OSM road-graph structures (partial — no server-side route), nearest-roads/pois/buildings/stats. C1 verified, C2 verified, C3 partial.
 - Frontend: Cesium globe + Leaflet fallback, story engine (timeline/roads/demo/export), video export, road-graph navigation client-side, i18n, LOD_LEVELS (8 levels), terrain loading with retry, bundle discipline gate. D1–D11 verified, vitest 65/65.
 
 **What is currently missing?**
@@ -161,14 +161,14 @@ chapters (02, 06, 08, 15) are founder-review-gated research specifications.
 - Provider discovery and storage-node fallback (no central geometry repository).
 - 3D geometry digest `terra-geom-v2` — **integrated** (Sprint 025, 2026-11-02,
   ADR-016 resolved): `geo-engine/src/canonical3d.rs`, consumed by the RFC-015
-  conformance validator. `terra-geom-v1` stays frozen for existing 2D parcel
-  hashes.
+  conformance validator. `terra-geom-v1` was removed in Sprint 053; existing
+  2D parcel hashes remain historical values only.
 - Reconstruction marketplace: task manifests, offers/bids, scheduling, escrow, settlement (task_economics applies to verification tasks only).
 - Coverage investment program, jurisdictional profiles.
 - On-chain institutional identity (`register_institutional_identity`), residency credential, lien encumbrance (all `SPECIFIED ONLY`, founder-gated).
 
 **What is incorrectly described or implemented?**
-- `terra-geom-v2`/`canonical3d.rs` is integrated (ADR-016, Sprint 025); `terra-geom-v1` remains frozen for existing 2D parcel hashes. Do not treat the v1 digest as the 3D component digest.
+- `terra-geom-v2`/`canonical3d.rs` is the only canonical digest (ADR-016, Sprint 025; `terra-geom-v1` removed Sprint 053). Do not treat historical v1 values as the 3D component digest.
 - `ThreeDModel` registration ≠ verified physical object; `GeometryDraft` ≠ complete 3D representation; anchor_prep builds a transaction but never executed on devnet.
 - `task_economics.rs` reward/escrow applies to verification tasks, not reconstruction; it is not a reconstruction marketplace.
 - A registered model reference on-chain is not a reconstruction engine; a Cesium globe displaying a model is not a distributed synchronized rendering runtime.
@@ -194,8 +194,8 @@ Stage 1 is complete (constitution, derived compute, external replay, verificatio
 - Mainnet (Stage 5) — founder decision only (Q-006), after devnet soak, adversarial slashing simulation, external security review, mirror audit tooling.
 - `terra-geom-v2` — **integrated** (ADR-016 resolved, Sprint 025, 2026-11-02):
   production 3D digest path in `geo-engine/src/canonical3d.rs`, consumed by the
-  RFC-015 conformance validator. `terra-geom-v1` stays frozen for existing 2D
-  parcel hashes.
+  RFC-015 conformance validator. `terra-geom-v1` was removed in Sprint 053;
+  existing 2D parcel hashes remain historical values only.
 - A reconstruction marketplace before task_economics primitives are extended to reconstruction task types.
 - Any feature that blurs protocol results with legal title/ownership (RISK R-005).
 

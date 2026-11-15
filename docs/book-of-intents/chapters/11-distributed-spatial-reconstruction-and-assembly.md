@@ -16,7 +16,8 @@ Chapter 3, Chapter 12, Chapter 13.
 Terra today can record a spatial asset and append geometry versions on-chain
 (`SpatialAsset`, `GeometryVersion`), track 3D model references (`ThreeDModel`),
 run a single reconstruction API (`POST /api/v1/reconstruction/jobs`), and
-compute a canonical 2D geometry digest (`terra-geom-v1`). It **cannot** yet:
+compute a canonical geometry digest (`terra-geom-v2`; the 2D `terra-geom-v1`
+was removed in Sprint 053). It **cannot** yet:
 
 - accept independently produced components from multiple reconstruction engines,
 - verify that separate components describe the same physical object,
@@ -59,7 +60,7 @@ Every independently produced component must be delivered through a versioned
 | `component_type` | e.g. `footprint`, `roof`, `facade`, `terrain`, `interior` |
 | `geometry_artifact` | Off-chain model file (mesh, point cloud, BIM footprint) |
 | `format` + `format_version` | e.g. `glb/2.0`, `copc/1.0`, `ifc/4.3`, `geojson/1.0` |
-| `geometry_digest` + `digest_algorithm_version` | `terra-geom-v1` (2D) or `terra-geom-v2` (3D) |
+| `geometry_digest` + `digest_algorithm_version` | `terra-geom-v2` (3D); `terra-geom-v1` (2D) removed, historical values only |
 | `crs` | Horizontal CRS (EPSG:4326) |
 | `elevation_ref` | `EGM2008` / `WGS84-ELLIPSOID` / `local` / `unknown` |
 | `vertical_units` | `m` / `ft` |
@@ -86,7 +87,7 @@ and its package must pass the RFC-015 conformance test.
 The canonical implementation of the RFC-015 conformance validator is the
 **Terra Geo SDK** (`terra-geo` crate, version `0.1.0`, at
 `terra-core/geo-engine/`), which declares its capabilities, schema versions
-(RFC-015, terra-geom-v1/v2, terra.manifest/v1), dependencies, security
+(RFC-015, terra-geom-v2, terra.manifest/v1), dependencies, security
 assumptions, and upgrade behavior per directive §3 / §12. Workers and tools
 that implement RFC-015 should use this SDK as the reference implementation.
 
@@ -213,7 +214,7 @@ flowchart TD
 | Reconstruction API (`jobs`, `lease`, `complete`, `draft`, `anchor`) | Single-worker reconstruction flow | Multi-worker submission now supported via `POST /components`; worker registration + assignment via `routes/workers.rs` (Stage 5) |
 | `task_economics.rs` (`FeePolicy`, `CoverageIncentive`, `TaskEscrow`, `RewardAllocation`) | Payment/subsidy primitives | Applies to verification tasks; reconstruction task types still not implemented (founder decision pending) |
 | `routing.rs` (nine-factor, seeded randomness) | Provider selection primitives | Needs reconstruction-task routing and capability gating |
-| `canonical.rs` (`terra-geom-v1`, 2D digest) | 2D geometry digest baseline | 3D digest now implemented: `geo-engine/src/canonical3d.rs` (`terra-geom-v2`); ADR-016 integrate-or-deprecate decision recorded |
+| `canonical3d.rs` (`terra-geom-v2`, 3D digest) | Canonical geometry digest | Only digest in use; `terra-geom-v1` (2D) removed in Sprint 053, existing v1 values are historical anchors only |
 | `component_package.rs` (`validate`, `ComponentPackage`, RFC-015 conformance test) | **New (2026-11-02)** — RFC-015 conformance validator | — |
 | `api/src/routes/components.rs` (`POST /components`, `GET /components/{id}`, `GET /components`) | **New (2026-11-02)** — component submission + conformance-validation middleware | — |
 | `api/src/routes/assemblies.rs` (`POST /assemblies`, `GET /assemblies/{id}`, conflict detection) | **New (2026-11-02)** — assembly registration + alignment | — |

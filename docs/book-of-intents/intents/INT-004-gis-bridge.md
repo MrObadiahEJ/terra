@@ -27,7 +27,7 @@ that friction.
 **Exists (`IMPLEMENTED AND VERIFIED` pieces):**
 - Sealed-road reachability via Dijkstra — `terra-core/geo-engine/src/reach.rs`
   (O(1) sealed checks; Dijkstra to nearest sealed vertex); geo suite ≥ 6.
-- Canonical geometry digest `terra-geom-v1` — commit `775e20a`;
+- Canonical geometry digest `terra-geom-v2` — v1 baseline commit `775e20a`, v1 removed in Sprint 053;
   `docs/canonical-geometry-digest.md`.
 - PostGIS mirror surface — ~25 API routers (`routes/mod.rs`); migrations
   0004/0017/0030; API suite.

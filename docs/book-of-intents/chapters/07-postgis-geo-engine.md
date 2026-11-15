@@ -29,7 +29,7 @@ stays verifiable against on-chain commitments (ADR-003).
 | PostGIS architecture | migrations `0017_postgis_architecture.sql`, `0004`, `0030` |
 | Geo endpoints | `routes/geo.rs`: `nearest-roads`, `pois`, `buildings`, `stats` (L88–93) |
 | Sealed-road reachability (Dijkstra) | `geo-engine/src/reach.rs` — O(1) per-vertex sealed checks; Dijkstra to nearest sealed vertex |
-| Canonical geometry digest | `terra-geom-v1` (commit `775e20a`); `docs/canonical-geometry-digest.md` |
+| Canonical geometry digest | `terra-geom-v2` (v1 removed Sprint 053); `docs/canonical-geometry-digest.md`; `geo-engine/src/canonical3d.rs` |
 | Client-side road-graph routing | `terra-web/src/story/roads.ts` (`parseRoadSegments`, `snapToRoadNetwork`, `buildRoadGraph`, `routeOnRoads`, `buildRoadRoute`); vitest roads suite |
 
 ## 7.4 The honest gaps (`PARTIALLY IMPLEMENTED`)

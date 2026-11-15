@@ -53,7 +53,7 @@ Each component must have:
 | Coordinates | CRS (EPSG:4326), elevation reference, vertical units |
 | Transform | Local-to-global transform matrix |
 | Provenance | Imported/observed/surveyed/reconstructed/inferred |
-| Geometry hash | terra-geom-v1 or terra-geom-v2 digest |
+| Geometry hash | `terra-geom-v2` digest (v1 removed Sprint 053) |
 | Accuracy/uncertainty | Expected geometric error in vertical units |
 | Storage reference | Retrieval URI (object storage) |
 

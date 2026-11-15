@@ -6,11 +6,11 @@
   (`api/src/routes/components.rs` + migrations 0035/0041). Not yet exercised
   against a live cluster — B6 devnet funding blocks that.
 - **Depends on:** RFC-012 (architecture contract), RFC-013 (spatial intelligence
-  pipeline, `terra-geom-v1` digest), Chapter 11 (distributed reconstruction &
+  pipeline, `terra-geom-v2` digest), Chapter 11 (distributed reconstruction &
   assembly), Chapter 12 (world runtime & synchronized rendering),
   Chapter 13 (global spatial data delivery & progressive visualization).
 - **Implements:** REQ-026 (distributed spatial component package & assembly).
-- **Related:** `docs/canonical-geometry-digest.md` (`terra-geom-v1`),
+- **Related:** `docs/canonical-geometry-digest.md` (`terra-geom-v2`; v1 removed),
   `docs/book-of-intents/chapters/11-distributed-spatial-reconstruction-and-assembly.md`,
   `docs/book-of-intents/chapters/12-world-runtime-and-synchronized-rendering.md`.
 
@@ -90,8 +90,8 @@ package. The package is a JSON document with the following fields:
 | `geometry_artifact` | string (URI) | yes | Off-chain model file URI (mesh, point cloud, BIM footprint) |
 | `format` | string | yes | MIME/type + version, e.g. `model/gltf-binary;version=2.0`, `application/vnd.cesium+json;version=1.0` |
 | `format_version` | string | yes | Format schema version |
-| `geometry_digest` | string (hex-64) | yes | `terra-geom-v1` (2D) or `terra-geom-v2` (3D) canonical digest |
-| `digest_algorithm_version` | string | yes | `terra-geom-v1` or `terra-geom-v2` |
+| `geometry_digest` | string (hex-64) | yes | `terra-geom-v2` (3D) canonical digest; v1 values are historical only |
+| `digest_algorithm_version` | string | yes | `terra-geom-v2` (v1 removed Sprint 053) |
 | `crs` | string | yes | Horizontal CRS, normalized to `EPSG:4326` (RFC 7946 / CRS 84 aliases accepted) |
 | `elevation_ref` | string | yes | `EGM2008` (geoid MSL), `WGS84-ELLIPSOID` (GNSS ellipsoid height), `local` (site-relative), `unknown` |
 | `vertical_units` | string | yes | `m` (metres) or `ft` (feet) |
@@ -127,7 +127,7 @@ An engine is **not** Terra-compatible merely because it exports a GLB or
 GeoJSON file. A package passes conformance only if:
 
 1. **Digest integrity:** `geometry_digest` equals the canonical digest
-   (`terra-geom-v1` or `terra-geom-v2`) computed over the geometry in
+   (`terra-geom-v2`; v1 was removed) computed over the geometry in
    `geometry_artifact`, using the declared `digest_algorithm_version`.
 2. **CRS validity:** `crs` normalizes to `EPSG:4326`; other horizontal CRSes are
    rejected.

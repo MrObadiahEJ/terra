@@ -2,6 +2,39 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-15 — Sprint 054: Runtime trust anchoring, data-plane addressing, CI repair
+
+- **CI repair:** migration `0046` used `//` comments, which PostgreSQL rejects;
+  the registry SDK test compared `&&str == str`. Both fixed. CI had been red
+  since Sprint 048.
+- **`components.rs`:** removed Sprint 052's invalid comparison of the canonical
+  `geometry_digest` with the raw artifact SHA-256; added `resolve_package_id`
+  so artifact PUT and GET accept `component_id` text or UUID; private artifact
+  auth now signs the path actually requested; upload tests sign the exact body.
+- **`runtime.rs`:** `GET /runtime/assets/{id}/{version}` returns up to five
+  ranked replicas with `content_address` (Terra `component_artifacts` first,
+  provider `checksum` fallback); scene resolution is read-only and now selects
+  `spatial_extent`; added two DB-gated tests.
+- **`terra-web/src/lib/runtime.ts`:** client verifies fetched provider bytes
+  against `content_address`, skips providers with no address, falls back to the
+  data-plane artifact, and requires `x-content-sha256` on artifact responses.
+- **Protocol boundary:** `POST /components` rejects simulated/designed/proposed/
+  speculative provenance; added ADR-024 and `docs/app-overlay-anchoring.md`.
+- Verified locally: API **151**, registry **154**, vitest **126**, tsc/fmt/
+  clippy clean (DB-backed tests skip without `DATABASE_URL`). Commit
+  `1a35af6`; CI run: pending.
+
+## 2026-11-14 — Sprint 053: Remove `terra-geom-v1`, keep only `terra-geom-v2`
+
+- Deleted `geo-engine/src/canonical.rs` (v1) and its re-exports; `sdk_meta`,
+  RFC-013/RFC-015, `canonical-geometry-digest.md`, READMEs and status registers
+  now name `terra-geom-v2` only. `reconstruction.rs` uses
+  `geometry_digest_hex_v2`; migration 0035 remains as an applied historical
+  record.
+- Commit `9f05f83`. Gate: workspace check/clippy/fmt clean; `terra-geo` lib
+  42 passed. CI run `43630959959` exposed the migration and registry test
+  failures repaired in Sprint 054.
+
 ## 2026-11-14 — Sprint 052: Proof-of-possession for component artifact replicas
 
 - **`terra-core/api/migrations/0046_provider_proof_of_possession.sql`** (new): adds
@@ -21,6 +54,11 @@ Format: date · version · what changed · evidence/why. Append-only.
   write)
 - Verified: `cargo check --workspace` clean; `cargo clippy --workspace -- -D
   warnings` clean; `cargo fmt --all --check` clean
+- **Correction (Sprint 054):** the `geometry_digest` comparison was invalid —
+  it is the canonical geometry digest, not the SHA-256 of raw artifact bytes.
+  The check was removed; `validate_with_geometry` remains the rule-1 gate.
+  The claim that frontend verification anchored to a signed manifest was also
+  overstated; Sprint 054 adds recorded-content-address verification.
 
 ## 2026-11-14 — Sprint 050: Fix submit_component auth (REQ-026/B15)
 

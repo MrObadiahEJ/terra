@@ -11,9 +11,10 @@ for institutional identity / residency / liens (Chapters 2, 6, 8).
 
 **Evidence:** RFC-013 Phases C/D/E; `spatial_asset.rs`, `three_d_model.rs`,
 `spatial_snapshot.rs`; migrations 0029–0043; stage3 BPF suites; commit
-`775e20a` (`terra-geom-v1` digest, 2D, frozen); `geo-engine/src/canonical3d.rs`
-(`terra-geom-v2` digest, 3D, **integrated** Sprint 025 per ADR-016); the
-RFC-015 conformance validator in `geo-engine/src/component_package.rs`.
+`775e20a` (`terra-geom-v1` 2D digest; removed 2026-11-14, Sprint 053);
+`geo-engine/src/canonical3d.rs` (`terra-geom-v2` digest, 3D, the only digest in
+use); the RFC-015 conformance validator in
+`geo-engine/src/component_package.rs`.
 
 **See:** Chapter 11 (Distributed Spatial Reconstruction and Assembly), Chapter
 12 (World Runtime and Synchronized Spatial Rendering), Chapter 13 (Global
@@ -54,7 +55,7 @@ into one synchronized, progressively visualized world representation (Chapters
 | 3D model registration with format label | `register_3d_model`, `verify_3d_model` (`three_d_model.rs` L121–190) |
 | Spatial snapshots | `create_spatial_snapshot` (`spatial_snapshot.rs` L107) |
 | Elevation envelope rules | `elevation_range_ok` / `elevation_none_is_zero` / `elevation_matches_dimension` / `dimension_within_asset` (`spatial_asset.rs` L179–246); version dimension ≤ asset dimension |
-| Canonical geometry digest | `terra-geom-v1` (commit `775e20a`); `docs/canonical-geometry-digest.md`; `terra-core/geo-engine/src/canonical.rs` |
+| Canonical geometry digest | `terra-geom-v2`; `docs/canonical-geometry-digest.md`; `terra-core/geo-engine/src/canonical3d.rs` (v1 removed in Sprint 053) |
 | BPF lifecycle tests | `stage3_spatial_asset_lifecycle`, `stage3_geometry_version_verification`, `stage3_evidence_linked_geometry`, `stage3_geometry_quorum_config`, `stage3_3d_model_lifecycle`, `stage3_spatial_snapshot_lifecycle` |
 | Off-chain mirror | migration `0030_spatial_accounts_mirror.sql`; `/spatial-accounts/*` REST |
 
@@ -63,11 +64,12 @@ under documented normalization rules. It does **not** prove the real-world
 boundary is correct — that remains a verification-consensus question (Chapter 1
 §1.3).
 
-**3D digest status:** `terra-geom-v1` is frozen and 2D-only (rejects third
-ordinates) — it remains the digest for all existing parcel hashes. `terra-geom-v2`
-(`geo-engine/src/canonical3d.rs`, 3D, requires `elevation_ref`, `vertical_units`,
-`precision`) was **integrated into production** in Sprint 025 (2026-11-02) per
-ADR-016 and is the digest consumed by the RFC-015 conformance validator
+**3D digest status:** `terra-geom-v2` (`geo-engine/src/canonical3d.rs`, 3D,
+requires `elevation_ref`, `vertical_units`, `precision`) was **integrated into
+production** in Sprint 025 (2026-11-02) per ADR-016 and is the only digest
+consumed by the RFC-015 conformance validator. `terra-geom-v1` (2D) was removed
+in Sprint 053 (2026-11-14); existing v1 values remain historical on-chain
+anchors but no code path recomputes them
 (`geo-engine/src/component_package.rs`). It is additive, not a replacement:
 v1 parcel hashes are unaffected.
 
@@ -142,19 +144,20 @@ Do not assume every spatial object is a simple parent of another object:
 - **Horizontal CRS:** EPSG:4326 (`x` = longitude, `y` = latitude). Other
   horizontal CRSes are rejected.
 - **2D quantization:** `1e-7` degrees (~1.1 cm at the equator), rounded
-  half-away-from-zero. Third ordinates are rejected by `terra-geom-v1`.
+  half-away-from-zero. The removed 2D-only digest rejected third ordinates;
+  the current `terra-geom-v2` path accepts explicit 3D ordinates.
 - **Ring normalization:** consecutive duplicate vertices removed; closing
   vertex implicit; degenerate rings dropped; RFC 7946 orientation (exterior
   counter-clockwise, holes clockwise); rings rotated to start at the
   lexicographically smallest `(lon, lat)` vertex; children sorted and
   de-duplicated.
-- **3D extension:** `terra-geom-v2` (experimental, `terra-3d-spatial-pipeline`
-  branch) adds `crs`, `elevation_ref` (`EGM2008` / `WGS84-ELLIPSOID` / `local`
-  / `unknown`), `vertical_units` (`m` / `ft`), `precision`, and optional third
-  ordinates quantized to `1e-5` units. Domain-separated from v1 so digests
-  cannot collide.
-- **Do not use a 2D geometry digest for arbitrary 3D models.** Keep
-  `terra-geom-v1` stable for existing parcel hashes.
+- **3D extension:** `terra-geom-v2` (production since Sprint 025) adds `crs`,
+  `elevation_ref` (`EGM2008` / `WGS84-ELLIPSOID` / `local` / `unknown`),
+  `vertical_units` (`m` / `ft`), `precision`, and optional third ordinates
+  quantized to `1e-5` units. It is domain-separated from the removed v1
+  (`terra-geom-v1`) so digests cannot collide.
+- **Do not use a 2D geometry digest for arbitrary 3D models.** The 2D v1
+  digest was removed in Sprint 053; existing v1 hashes are historical only.
 - **Local frames:** local ENU coordinate frames where applicable, with an
   explicit local-to-global transform stored per component.
 

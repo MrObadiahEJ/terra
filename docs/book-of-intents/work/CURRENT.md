@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-14 (committed `fbd9ac1`; sprints 001–052 delivered:
+Last reconciled: 2026-11-15 (committed `9f05f83`; sprints 001–053 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
@@ -13,8 +13,12 @@ SDK v0.1.0 declared + RFC-015/protocol alignment, 049 SDK standard shift —
 terra-identity + terra-registry SDKs declared + RFC protocol alignment,
 050 submit_component auth fix, 051 security hardening — SecurityRequest.subject,
 PrivacyState writes, complete_assignment auth, 052 proof-of-possession for
-component artifact replicas + geometry_digest verification at upload).
-Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
+component artifact replicas, 053 terra-geom-v1 removed (v2 only).
+Sprint 054 — runtime content-address verification, artifact addressing,
+read-only scene resolution, CI repair — is implemented in the working tree;
+CI verification is pending. Sprint notes for 025–054 are in
+`sprints/025-*.md` … `sprints/054-*.md` (043/044/046 notes remain to be
+backfilled from their commits).
 
 ## Active intents
 
@@ -30,7 +34,7 @@ Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
 | Work item | State | Evidence |
 |---|---|---|
 | RFC-014 Phases 01–03 (story engine, road-graph navigation + version provenance, export refinements) | **done & committed** | commits `c9faf54`, `54ad2bd`, `0f0cc2e` + fixes `b464cdb`, `a2b2afe`, `11be94c`, `ae20af8`; vitest 44/44 (2026-10-31) |
-| Canonical geometry digest `terra-geom-v1` | **done & committed** | commit `775e20a`; `docs/canonical-geometry-digest.md` |
+| Canonical geometry digest (`terra-geom-v2`; v1 removed Sprint 053) | **done & committed** | v1 baseline commit `775e20a`; v2 in `geo-engine/src/canonical3d.rs`; `docs/canonical-geometry-digest.md` |
 | Book of Intents constitution (this directory) | **v0.1.0 delivered & committed** | commit `6be7c91`; sprint 002; CHANGELOG |
 | RFC-014 Phase 04 — incremental derived compute (REQ-019) | **done & committed (`ad5a069`)** | migration 0033 + `routes/derived.rs`; API **117/117** at the time (7 derived tests); live smoke **16/16**; reconstruction: 2 drafts → 1 ledger row, equal hashes; sprints/003 |
 | R-016 — verify signatures on privileged endpoints | **done (2026-11-02)** | 8 handlers now `auth.verify(…)` fail-closed (derived + reconstruction); live: unsigned 401, wrong key 401, authority key 200; sprints/004 |
@@ -72,6 +76,8 @@ Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
 | Worker identity takeover fix (`workers.rs` ON CONFLICT wallet overwrite) | **done & committed** | `register_worker` no longer overwrites `wallet_address` on `ON CONFLICT (worker_id)` — a worker's wallet is set once at creation and cannot be hijacked by re-registering under a different wallet. Closes REQ-038 identity-takeover vector. | `cargo check -p terra-api` clean; `cargo clippy -- -D warnings` clean; `cargo fmt --check` clean |
 | Sprint 044 — Open questions → ratifiable decisions (Q-001–Q-006, Q-008–Q-018) | **done & committed** | `OPEN_QUESTIONS.md` rewritten: each blocker now a *decision proposed* with default recommendation, external grounding, and exit criterion. Q-001 devnet funding reframed as 3 tracks ($0 local validator/Surfpool, faucet rotation, shrink rent). Q-003 sunset bootstrap council w/ vLEI/DNSSEC evidence. Q-004 selective-disclosure VC + EUDI path. Q-005 keeps hard gate (protocol ≠ issuer). Q-006 7-point mainnet checklist. Q-008–Q-018 agent-research answers with code-vs-design split. | `sprints/044-open-questions-decisions.md` |
 | Sprint 045 — Terra Atlas frontend (investor-facing planetary observation surface) | **done & committed** | `AtlasPage` + glass window system (Asset Inspector 3DGS splat, Wallet/Rights simulated panel, Layers, Provenance, InvestorTour); lazy-loaded per route (Cesium out of initial graph); design tokens (violet accent, gradient mesh, glass panels); demo splat `demo-house.splat` (2.5 kB) labeled synthetic; i18n keys en/fr/ru/zh; verified: tsc clean, eslint clean, vitest 120/120, build:check PASS (entry 308.8 kB gz ≤ 360, Cesium lazy 1098.5 kB ≤ 1200, total 1882.8 kB gz ≤ 1900). Published at https://mrobadiahej.github.io/terra/atlas | `sprints/045-terra-atlas-frontend.md` |
+| Sprint 053 — Remove `terra-geom-v1`, keep only `terra-geom-v2` | **done & committed (`9f05f83`)** | deleted `geo-engine/src/canonical.rs` and re-exports; `sdk_meta` and all docs now name v2 only; `reconstruction.rs` uses `geometry_digest_hex_v2`; migration 0035 left as historical record; commit gate: workspace check/clippy/fmt clean, `terra-geo` lib 42 passed; CI exposed two latent failures (migration 0046 `//` comments, registry SDK `&&str == str`), fixed in Sprint 054 | `sprints/053-remove-terra-geom-v1.md` |
+| Sprint 054 — Runtime trust anchoring + data-plane addressing + CI repair | **implemented & committed (`1a35af6`); CI verification pending** | removed Sprint 052's invalid `geometry_digest`/artifact-hash comparison; `resolve_package_id` makes PUT/GET artifact endpoints accept `component_id` or UUID; `GET /runtime/assets/...` returns ≤5 ranked replicas with raw-artifact `content_address` (`component_artifacts` → `provider_replicas.checksum`); client verifies SHA-256, skips unverifiable providers, falls back, requires `x-content-sha256`; scene GET is read-only and now selects `spatial_extent`; provenance guard + ADR-024 + `docs/app-overlay-anchoring.md`; local: API **151**, registry **154**, vitest **126**, tsc/fmt/clippy clean (DB tests skip without `DATABASE_URL`) | `sprints/054-runtime-trust-anchoring.md` |
 
 ## Known blockers
 
@@ -110,24 +116,29 @@ Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
    (REQ-021), lien encumbrance (REQ-022). Q-005 keeps REQ-023 hard-gated; no code
    before written legal research.
 
-3. **RFC-016 Phase 2+ code** — remaining item: **provider proof-of-possession
-   audits** (unblocked agent work). Completed this sprint:
-   `SecurityRequest.subject` set to requester key on `submit_security_request`
-   (was `Pubkey::default()`); `PrivacyState` written on `finalize_decision`
-   (new `privacy_state` PDA in `FinalizeDecision` context); `submit_component`
-   requires signed auth (Sprint 050); `complete_assignment` requires signed
-   auth (Sprint 051).
+3. **RFC-016 Phase 2+ code** — **provider proof-of-possession audits done
+   (Sprint 052)**; no remaining unblocked code item in this set. Related
+   fixes: `SecurityRequest.subject` set to requester key on
+   `submit_security_request` (was `Pubkey::default()`); `PrivacyState` written
+   on `finalize_decision` (new `privacy_state` PDA in `FinalizeDecision`
+   context); `submit_component` requires signed auth (Sprint 050);
+   `complete_assignment` requires signed auth (Sprint 051). BPF/SBF coverage
+   still runs only in CI; devnet deployment remains Q-001-gated.
 
-4. **Data-plane component artifact storage** — **done (Sprint 037)**: component
-   bytes stored under their SHA-256 content address (`migration 0045` +
-   `PUT/GET /components/{id}/artifact` + `store_content_addressed`), served with
-   client-side digest re-verification, and wired as a frontend fallback in
-   `fetchComponentAsset`. **Quadtree discovery cells derived from camera bounds
-   in GlobePage scene requests (Sprint 038):** `cameraViewBounds` + `getQuadCover`
-   are called from `GlobePage`'s camera-moved effect; the resulting cover cells
-   are passed to `TerraGlobe`, which coarsely culls runtime nodes whose
-   `spatial_extent` does not intersect a cover cell. Remaining: expose the
-   package UUID through scene nodes so `fetchComponentArtifact` is automatic.
+4. **Data-plane component artifact storage** — **done (Sprint 037; hardened
+   Sprint 054)**: component bytes stored under their SHA-256 content address
+   (`migration 0045` + `PUT/GET /components/{id}/artifact` +
+   `store_content_addressed`); both verbs accept `component_id` or UUID;
+   retrieval re-hashes stored bytes; `fetchComponentAsset` verifies provider
+   bytes against the API-recorded raw-artifact content address (Sprint 054).
+   **Quadtree discovery cells derived from camera bounds in GlobePage scene
+   requests (Sprint 038):** `cameraViewBounds` + `getQuadCover` are called from
+   `GlobePage`'s camera-moved effect; the resulting cover cells are passed to
+   `TerraGlobe`, which coarsely culls runtime nodes whose `spatial_extent` does
+   not intersect a cover cell. Remaining: expose the package UUID/content
+   address through scene nodes so `fetchComponentArtifact` is automatic, and
+   anchor scene resolution to stored signed manifests rather than mutable
+   `world_manifests` rows.
 
 5. **Frustum/occlusion culling + screen-space error LOD** — **done (Sprint 039),
    wired into GlobePage (Sprint 040):** `screenSpaceError`,
@@ -159,9 +170,9 @@ Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
 7. **SDK standard shift (code + docs, Sprint 048):**
    `terra-core/geo-engine/src/lib.rs` adds an `sdk_meta` module declaring the
    Terra Geo SDK (`terra-geo` v0.1.0) identity per directive §3 / §12:
-   capabilities (geometry digest terra-geom-v1/v2, RFC-015 component-package
+   capabilities (geometry digest terra-geom-v2, RFC-015 component-package
    conformance, signed manifests, quadtree discovery), schema versions
-   (RFC-015, terra-geom-v1/v2, terra.manifest/v1), direct crate dependencies,
+   (RFC-015, terra-geom-v2, terra.manifest/v1), direct crate dependencies,
    security assumptions, and upgrade/migration behavior. Unit test
    `sdk_meta::tests::sdk_metadata_is_well_formed` verifies the declaration.
    RFC-015 §5 names `terra-geo` SDK v0.1.0 as the canonical RFC-015 conformance
@@ -171,3 +182,12 @@ Sprint notes for 025–052 are in `sprints/025-*.md` … `sprints/052-*.md`.
    cargo check --workspace clean; clippy --workspace -- -D warnings clean;
    fmt --all --check clean; cargo test -p terra-geo --lib 49 passed.
 
+
+8. **Runtime signed-manifest path (next unblocked code slice, partially open):**
+   Sprint 054 made provider bytes verifiable and fixed scene resolution
+   (read-only, `spatial_extent` present), but `GET /runtime/scene/...` still
+   reads mutable `world_manifests` rows. The next slice is to resolve scenes
+   from stored signed envelopes (`signed_manifests`) or to bind each runtime
+   manifest to a signed content address, then expose that address on scene
+   nodes. Exit criteria: a client can reject a scene whose objects do not match
+   a publisher-signed manifest; DB-backed test covers the signed path.

@@ -196,7 +196,7 @@ items are:
 | Derived compute | `routes/derived.rs` (processing_key dedup, recursive-CTE invalidation) | IMPLEMENTED AND VERIFIED | Yes — dedup pattern for component packages; now with lease/claim (0042) |
 | Task economics | `task_economics.rs` (FeePolicy, CoverageIncentive, TaskEscrow, RewardAllocation) | IMPLEMENTED AND VERIFIED | Partial — verification tasks only; needs reconstruction task types |
 | Routing | `routing.rs` (nine-factor, seeded randomness) | IMPLEMENTED AND VERIFIED | Partial — needs reconstruction-task routing |
-| Geo-engine | `canonical.rs` (terra-geom-v1, 2D), `canonical3d.rs` (terra-geom-v2, 3D), `reach.rs`, `graph.rs`, `osm.rs`, `component_package.rs` | IMPLEMENTED / PARTIAL | Yes — 2D + 3D digest baseline; component package validator |
+| Geo-engine | `canonical3d.rs` (terra-geom-v2, 3D), `reach.rs`, `graph.rs`, `osm.rs`, `component_package.rs` | IMPLEMENTED / PARTIAL | Yes — canonical 3D digest (v1 removed Sprint 053); component package validator |
 | Frontend | `lod.ts` (LOD_LEVELS, lodFromHeight, TIER_SETTINGS, selectBuildingsForTier), `cesiumTerrain.ts`, `runtime.ts` (manifest resolver, scene graph, LOD 0–4, provider fallback), story engine | IMPLEMENTED AND VERIFIED | Partial — LOD defined + progressive tier loading implemented; no spatial tiling/3D Tiles/frustum culling |
 | API routers | 37 routers in `routes/mod.rs` | IMPLEMENTED AND VERIFIED | Yes — add new routers as needed |
 | Migrations | 0001–0043 chain | IMPLEMENTED AND VERIFIED | Yes — add component/manifest/provider/runtime/worker migrations |

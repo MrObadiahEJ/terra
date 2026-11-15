@@ -46,7 +46,7 @@ column dropped off-chain; holder sourced from `parcel_ownership`.
 `0025_parcel_ownership_rrr.sql` header comments; `grant_right` family.
 
 ## ADR-005 — Canonical geometry digest `terra-geom-v1`
-**Date:** commit `775e20a` · **Status:** Accepted
+**Date:** commit `775e20a` · **Status:** Superseded by ADR-016; v1 removed 2026-11-14 (Sprint 053)
 **Context:** Fragmented 3D reconstruction data must be committed to on-chain
 without claiming real-world correctness.
 **Decision:** SHA-256 over canonicalized exact GeoJSON bytes under documented
@@ -183,6 +183,10 @@ existing 2D parcel hashes — v2 is additive, not a replacement.
 **Alternatives:** merge immediately (rejected at Sprint 024: branch was behind on
 all constitution/auth/derived work); adopt v2 as the only digest (rejected: breaks
 existing hashes).
+**Update (2026-11-14, Sprint 053):** `terra-geom-v1` was removed from the
+codebase; every live consumer already used v2. Existing v1 digest values remain
+valid historical on-chain anchors but cannot be recomputed. `terra-geom-v2` is
+the only canonical digest.
 **Consequences:** v2 is backward-compatible and version-gated; any future v2
 change must not invalidate existing v1 parcel digests. **Evidence:**
 `geo-engine/src/canonical3d.rs`, `geo-engine/src/component_package.rs`; Chapter 3
@@ -360,3 +364,29 @@ borne risk); multi-provider + proof-of-possession is planned (Q-008).
 
 
 
+
+## ADR-024 — Protocol components are evidence-backed; creative content is an app overlay
+**Date:** 2026-11-15 · **Status:** Accepted (implemented at the API boundary)
+**Context:** The directive requires Terra to support creative construction —
+proposed, designed, simulated and assembled objects — while also distinguishing
+observed, measured, inferred, simulated, designed and proposed content. A single
+component registry mixing all of these would let authored fiction inherit the
+trust and validation state of evidence-backed components.
+**Decision:** `POST /api/v1/components` accepts only RFC-015 §3 provenance
+values (`imported`, `observed`, `surveyed`, `reconstructed`, `inferred`,
+`manually_corrected`). `simulated`, `designed`, `proposed`, `speculative` and
+AI-world labels are rejected with `400`; such content is published as an
+application overlay (`terra.app-overlay/v1`) anchored by reference to a parcel,
+component, geometry version or signed-manifest content address, never merged
+into the protocol object. Overlays must declare mode, author, anchor and a
+disclosure, and must not inherit the anchored object's trust state.
+**Alternatives:** allow all provenance values in the registry (rejected: trust
+laundering; RFC-015 already excludes them); add an on-chain overlay instruction
+(rejected: overlays are app data; no consensus need); reject AI-assisted
+reconstruction entirely (rejected: directive explicitly supports memory/AI
+reconstruction with provenance).
+**Consequences:** creative apps need their own overlay storage and labeling;
+protocol queries remain a trustworthy record of evidence-bearing components.
+**Evidence:** `docs/app-overlay-anchoring.md`,
+`terra-core/api/src/routes/components.rs` (provenance guard + test),
+`terra-core/geo-engine/src/component_package.rs` (RFC-015 conformance).

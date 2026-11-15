@@ -9,10 +9,10 @@ Navigation only; never a state store. Current phase derives from evidence in
 - [TERRA_VISION.md](TERRA_VISION.md) — authoritative vision
 - [TERRA_PROTOCOL_DIRECTIVE.md](TERRA_PROTOCOL_DIRECTIVE.md) — long-term protocol architecture, Terra File `.terra` package & Rust-first SDK (`SPECIFIED ONLY`)
 - [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) — evidence register
-- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-040
-- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…019
-- [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…018
-- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…026
+- [REQUIREMENTS_TRACEABILITY.md](REQUIREMENTS_TRACEABILITY.md) — REQ-001…REQ-052
+- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md) — ADR-001…024
+- [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — Q-001…Q-031
+- [RISK_REGISTER.md](RISK_REGISTER.md) — R-001…R-032
 - [RESEARCH_REFERENCES.md](RESEARCH_REFERENCES.md) — sources & dates
 - [ROADMAP.md](ROADMAP.md) — Stages 0–5
 - [CHANGELOG.md](CHANGELOG.md) — Book history
@@ -94,3 +94,21 @@ Stage 3.
 - [sprints/034-ci-format-and-clippy-gates.md](sprints/034-ci-format-and-clippy-gates.md) — workspace formatting + clippy cleanup with no behavior changes; 139 API tests, 48 geo tests
 - [sprints/035-signed-manifest-persistence.md](sprints/035-signed-manifest-persistence.md) — immutable signed-envelope storage and retrieval by content address (ADR-021); 142 API tests
 - [sprints/036-signed-manifest-discovery.md](sprints/036-signed-manifest-discovery.md) — region/cell discovery over stored signed envelopes; 143 API tests
+- [sprints/037-data-plane-component-artifacts.md](sprints/037-data-plane-component-artifacts.md) — content-addressed component artifact storage, self-verifying retrieval, frontend fallback
+- [sprints/038-quadtree-discovery-client.md](sprints/038-quadtree-discovery-client.md) — quadtree discovery cells from camera bounds; coarse scene-node culling
+- [sprints/039-frustum-culling-sse-lod.md](sprints/039-frustum-culling-sse-lod.md) — frustum/occlusion culling and screen-space-error LOD
+- [sprints/040-viewport-globe-wiring.md](sprints/040-viewport-globe-wiring.md) — viewport culling/LOD wired into GlobePage
+- [sprints/041-terra-protocol-directive.md](sprints/041-terra-protocol-directive.md) — Terra File protocol architecture directive (`SPECIFIED ONLY`)
+- [sprints/042-p0-security-trust-chain-fixes.md](sprints/042-p0-security-trust-chain-fixes.md) — P0 security/trust-chain fixes (review pipeline, appeals, emergency lift, body hash)
+- [sprints/043-worker-identity-takeover-fix.md](sprints/043-worker-identity-takeover-fix.md) — worker wallet binding can no longer be overwritten on re-registration
+- [sprints/044-open-questions-decisions.md](sprints/044-open-questions-decisions.md) — open questions converted to ratifiable decisions with exit criteria
+- [sprints/045-terra-atlas-frontend.md](sprints/045-terra-atlas-frontend.md) — Terra Atlas investor-facing planetary observation surface
+- [sprints/046-protocol-architecture-directives.md](sprints/046-protocol-architecture-directives.md) — RFC-014 economics + RFC-017 secure evidence intake; registers extended
+- [sprints/047-uuid-component-id-artifact-fix.md](sprints/047-uuid-component-id-artifact-fix.md) — artifact retrieval by UUID/component_id
+- [sprints/048-sdk-standard-shift.md](sprints/048-sdk-standard-shift.md) — Terra Geo SDK v0.1.0 declaration + RFC-015/protocol alignment
+- [sprints/049-sdk-standard-shift-identity-registry.md](sprints/049-sdk-standard-shift-identity-registry.md) — Terra Identity + Registry SDK declarations + RFC alignment
+- [sprints/050-submit-component-auth.md](sprints/050-submit-component-auth.md) — `submit_component` requires signed auth
+- [sprints/051-security-hardening.md](sprints/051-security-hardening.md) — `SecurityRequest.subject`, `PrivacyState` writes, `complete_assignment` auth
+- [sprints/052-proof-of-possession.md](sprints/052-proof-of-possession.md) — provider proof-of-possession for component artifact replicas
+- [sprints/053-remove-terra-geom-v1.md](sprints/053-remove-terra-geom-v1.md) — `terra-geom-v1` removed; only `terra-geom-v2` remains
+- [sprints/054-runtime-trust-anchoring.md](sprints/054-runtime-trust-anchoring.md) — runtime content-address verification, artifact addressing, read-only scenes, CI repair

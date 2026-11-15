@@ -38,6 +38,12 @@ component artifact bytes they claim to store.
   `enforce_component_access` returned `Ok(())` for public components without
   checking the signature
 
+> **Correction (Sprint 054):** the `geometry_digest` comparison above was
+> invalid. `geometry_digest` is the canonical `terra-geom-v2` digest of the
+> geometry document, not the SHA-256 of raw artifact bytes (GLB, point cloud).
+> The comparison was removed; RFC-015 rule 1 is enforced by
+> `validate_with_geometry` where the geometry document is available.
+
 ## Verification
 
 | Check | Result |
@@ -54,5 +60,8 @@ source compilation verified via `cargo check`.
 - **Provider proof-of-possession audits** — DONE (this sprint)
 - Client-side digest verification vs signed manifest — frontend
   `fetchComponentAsset` already performs SHA-256 re-verification against
-  `x-content-sha256` header (Sprint 047/050)
+  `x-content-sha256` header (Sprint 047/050). This is server-declared, not a
+  signed-manifest trust anchor; Sprint 054 adds verification against the
+  runtime's recorded content address and leaves the signed-manifest scene path
+  open.
 - No remaining unblocked code work in CURRENT.md item 3

@@ -11,7 +11,7 @@ source is not listed here, the Book does not rely on it.
 | --- | --- |
 | `docs/VISION.md` | Canonical state transition; Stage 3 status; domain framing |
 | `docs/rfc-003` … `docs/rfc-013` (vault shard, escrow, staking/slashing, cross-border, disputes, subdivision, time-bound credentials, guardian recovery, ZK ownership, global trust architecture, spatial pipeline) | Feature specs backing ADRs A3–A11, REQ-001…REQ-017 |
-| `docs/canonical-geometry-digest.md` | terra-geom-v1 normalization rules (ADR-005) |
+| `docs/canonical-geometry-digest.md` | terra-geom-v2 normalization rules (ADR-005/ADR-016; v1 removed) |
 | `docs/remaining-accounts-matrix.md` | Account coverage audit |
 | Source under `terra-core/programs/`, `terra-core/api/`, `terra-core/geo-engine/`, `terra-web/src/` | All IMPLEMENTATION_STATUS rows |
 | Commit history to `775e20a` | Dates/evidence for ADRs and sprints |
