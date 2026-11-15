@@ -33,6 +33,13 @@ export interface SceneNodeRow {
   visibility: string
   loading_state: string
   validation_state: 'missing' | 'preliminary' | 'independently_valid'
+  /**
+   * SHA-256 content address of the component package bytes, as recorded in the
+   * publisher-signed manifest that grounded this scene. `null` when the scene
+   * was resolved from mutable manifest_objects rows (legacy path) and the bytes
+   * cannot be tied to a signed manifest.
+   */
+  content_address: string | null
   created_at: string
   spatial_extent: any
 }

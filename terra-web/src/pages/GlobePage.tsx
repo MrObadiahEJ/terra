@@ -1537,6 +1537,14 @@ export default function GlobePage() {
                         <span className={`runtime-node-state runtime-state-${node.loading_state}`}>
                           {node.loading_state}
                         </span>
+                        <span
+                          className="runtime-node-addr"
+                          title={node.content_address ?? t('contentAddressLegacy')}
+                        >
+                          {node.content_address
+                            ? `${t('contentAddressSigned')}: ${node.content_address.slice(0, 16)}…`
+                            : t('contentAddressLegacy')}
+                        </span>
                         <button
                           className="btn btn-ghost px-1.5 py-0.5 text-[10px]"
                           onClick={() => fetchComponent(node)}

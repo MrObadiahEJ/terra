@@ -5232,6 +5232,16 @@ header .wallet-adapter-button {
 .runtime-state-loaded { color: #047857; border-color: color-mix(in srgb, #047857 40%, var(--border)); }
 .runtime-state-loading { color: #b45309; border-color: color-mix(in srgb, #b45309 40%, var(--border)); }
 .runtime-state-failed { color: #b91c1c; border-color: color-mix(in srgb, #b91c1c 40%, var(--border)); }
+.runtime-node-addr {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .runtime-fetched {
   padding: 6px 8px;
   border-radius: 8px;

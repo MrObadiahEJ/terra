@@ -15,6 +15,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use terra_geo::{ContentAddress, SignedManifest, ValidationState};
 use uuid::Uuid;
 
 use super::components::enforce_component_access;
@@ -110,6 +111,11 @@ pub struct SceneNodeRow {
     pub loading_state: String,
     pub validation_state: String,
     pub spatial_extent: serde_json::Value,
+    /// SHA-256 content address of the component package bytes, as recorded in
+    /// the publisher-signed manifest that grounded this scene. `None` when the
+    /// scene was resolved from mutable `manifest_objects` rows (legacy path)
+    /// and the bytes cannot be tied to a signed manifest.
+    pub content_address: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -220,58 +226,66 @@ pub async fn resolve_scene_at_lod(
     resolve_scene_internal(&state, manifest_id, lod).await
 }
 
-pub async fn resolve_scene_internal(
+/// Fetch a stored signed envelope by content address, deserialize it, and
+/// re-verify the signature. Returns the manifest only if the stored bytes still
+/// match their canonical content address. Shared by `GET /manifests/signed/{address}`
+/// and signed scene resolution.
+async fn load_verified_signed_manifest(
     state: &AppState,
-    manifest_id: Uuid,
-    lod: i32,
-) -> Result<Json<SceneWithNodes>, AppError> {
-    // Verify manifest exists and get its region.
-    let manifest_region: Option<(Uuid, String)> =
-        sqlx::query_as("SELECT id, region_id FROM world_manifests WHERE id = $1")
-            .bind(manifest_id)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| AppError::internal(format!("manifest query failed: {e}")))?;
-
-    let (_, region_id) = manifest_region
-        .ok_or_else(|| AppError::not_found(format!("manifest {manifest_id} not found")))?;
-
-    // Get objects for this manifest at this LOD (filter by available_lods contains lod).
-    // Read-only: scene-graph resolution must not write on GET.
-    let objects = sqlx::query_as::<_, ManifestObjectForScene>(
-        "SELECT id, manifest_id, object_id, component_version_id, \
-         storage_reference, validation_state, available_lods, spatial_extent \
-         FROM manifest_objects WHERE manifest_id = $1 \
-         AND $2 = ANY(available_lods) ORDER BY object_id",
+    address: &ContentAddress,
+) -> Result<SignedManifest, AppError> {
+    let envelope = sqlx::query_scalar::<_, serde_json::Value>(
+        "SELECT envelope FROM signed_manifests WHERE content_address = $1 \
+         ORDER BY publisher LIMIT 1",
     )
-    .bind(manifest_id)
-    .bind(lod)
-    .fetch_all(&state.pool)
+    .bind(address.to_string())
+    .fetch_optional(&state.pool)
     .await
-    .map_err(|e| AppError::internal(format!("objects query failed: {e}")))?;
+    .map_err(|e| AppError::internal(format!("query signed manifest failed: {e}")))?
+    .ok_or_else(|| AppError::not_found(format!("signed manifest {address} not found")))?;
 
-    // Build scene graph row without inserting (read-only resolve).
-    let scene = SceneGraphRow {
-        id: manifest_id,
-        manifest_id,
-        region_id,
-        lod_level: lod,
-        node_count: objects.len() as i32,
-        status: if objects.is_empty() {
-            "incomplete"
-        } else {
-            "ready"
-        }
-        .to_string(),
-        created_at: chrono::Utc::now(),
-    };
+    let manifest: SignedManifest = serde_json::from_value(envelope)
+        .map_err(|e| AppError::internal(format!("stored envelope is malformed: {e}")))?;
+    let actual = manifest
+        .verify()
+        .map_err(|e| AppError::internal(format!("stored envelope failed verification: {e}")))?;
+    if actual != *address {
+        return Err(AppError::internal(
+            "stored envelope content address does not match its key",
+        ));
+    }
+    Ok(manifest)
+}
 
-    // Build scene nodes read-only (no INSERT into scene_nodes).
-    let mut nodes = Vec::with_capacity(objects.len());
-    for obj in &objects {
+/// Build scene nodes from a verified signed manifest payload. Objects are
+/// grounded in the publisher's signature: each node carries the object's
+/// content address so clients can reject bytes that do not match.
+fn build_scene_nodes_from_signed(
+    scene_graph_id: Uuid,
+    lod: i32,
+    manifest: &SignedManifest,
+) -> Vec<SceneNodeRow> {
+    let mut nodes = Vec::with_capacity(manifest.payload.objects.len());
+    for obj in &manifest.payload.objects {
+        let validation_state = match obj.validation_state {
+            ValidationState::Pending => "pending",
+            ValidationState::TechnicallyValid => "technically_valid",
+            ValidationState::IndependentlyValid => "independently_valid",
+            ValidationState::Rejected => "rejected",
+        };
+        let extent = serde_json::json!({
+            "type": "Polygon",
+            "coordinates": [[
+                [obj.bounds.min_lon, obj.bounds.min_lat],
+                [obj.bounds.max_lon, obj.bounds.min_lat],
+                [obj.bounds.max_lon, obj.bounds.max_lat],
+                [obj.bounds.min_lon, obj.bounds.max_lat],
+                [obj.bounds.min_lon, obj.bounds.min_lat],
+            ]]
+        });
         nodes.push(SceneNodeRow {
             id: Uuid::new_v4(),
-            scene_graph_id: manifest_id,
+            scene_graph_id,
             object_id: obj.object_id.clone(),
             component_version_id: obj.component_version_id.clone(),
             parent_node_id: None,
@@ -279,11 +293,100 @@ pub async fn resolve_scene_internal(
             lod_level: lod,
             visibility: "visible".into(),
             loading_state: "pending".into(),
-            validation_state: normalize_validation_state(&obj.validation_state),
-            spatial_extent: obj.spatial_extent.clone(),
+            validation_state: validation_state.to_string(),
+            spatial_extent: extent,
+            content_address: Some(obj.content.to_string()),
             created_at: chrono::Utc::now(),
         });
     }
+    nodes
+}
+
+// ---------------------------------------------------------------------------
+// GET /runtime/scene/{manifest_id}
+// ---------------------------------------------------------------------------
+
+pub async fn resolve_scene_internal(
+    state: &AppState,
+    manifest_id: Uuid,
+    lod: i32,
+) -> Result<Json<SceneWithNodes>, AppError> {
+    // Verify manifest exists and get its region, plus any signed-envelope
+    // binding that grounds this scene in a publisher-signed manifest.
+    let manifest_row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, region_id, signed_content_address FROM world_manifests WHERE id = $1",
+    )
+    .bind(manifest_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("manifest query failed: {e}")))?;
+
+    let (_, region_id, signed_content_address) = manifest_row
+        .ok_or_else(|| AppError::not_found(format!("manifest {manifest_id} not found")))?;
+
+    // Signed path: resolve from the re-verified publisher-signed envelope.
+    // Fail closed — a bound manifest whose envelope is missing or no longer
+    // verifies yields an error, never a silent fall back to mutable rows.
+    let nodes = match signed_content_address {
+        Some(address) => {
+            let address = address.parse::<ContentAddress>().map_err(|e| {
+                AppError::bad_request(format!("invalid signed content address: {e}"))
+            })?;
+            let manifest = load_verified_signed_manifest(state, &address).await?;
+            build_scene_nodes_from_signed(manifest_id, lod, &manifest)
+        }
+        None => {
+            // Legacy path: read objects from mutable manifest_objects rows.
+            // Read-only: scene-graph resolution must not write on GET.
+            let objects = sqlx::query_as::<_, ManifestObjectForScene>(
+                "SELECT id, manifest_id, object_id, component_version_id, \
+                 storage_reference, validation_state, available_lods, spatial_extent \
+                 FROM manifest_objects WHERE manifest_id = $1 \
+                 AND $2 = ANY(available_lods) ORDER BY object_id",
+            )
+            .bind(manifest_id)
+            .bind(lod)
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("objects query failed: {e}")))?;
+
+            let mut nodes = Vec::with_capacity(objects.len());
+            for obj in &objects {
+                nodes.push(SceneNodeRow {
+                    id: Uuid::new_v4(),
+                    scene_graph_id: manifest_id,
+                    object_id: obj.object_id.clone(),
+                    component_version_id: obj.component_version_id.clone(),
+                    parent_node_id: None,
+                    transform: None,
+                    lod_level: lod,
+                    visibility: "visible".into(),
+                    loading_state: "pending".into(),
+                    validation_state: normalize_validation_state(&obj.validation_state),
+                    spatial_extent: obj.spatial_extent.clone(),
+                    content_address: None,
+                    created_at: chrono::Utc::now(),
+                });
+            }
+            nodes
+        }
+    };
+
+    // Build scene graph row without inserting (read-only resolve).
+    let scene = SceneGraphRow {
+        id: manifest_id,
+        manifest_id,
+        region_id,
+        lod_level: lod,
+        node_count: nodes.len() as i32,
+        status: if nodes.is_empty() {
+            "incomplete"
+        } else {
+            "ready"
+        }
+        .to_string(),
+        created_at: chrono::Utc::now(),
+    };
 
     Ok(Json(SceneWithNodes { scene, nodes }))
 }
@@ -438,10 +541,41 @@ mod tests {
     use super::*;
     use crate::auth::ApiAuthority;
     use crate::storage::StorageBackend;
+    use ed25519_dalek::SigningKey;
     use serde_json::json;
     use sqlx::PgPool;
     use std::sync::Arc;
     use tempfile::tempdir;
+    use terra_geo::{
+        ContentAddress, GeoBounds, ManifestObject, ManifestPayload, QuadCell, ValidationState,
+    };
+
+    /// Builds a publisher-signed manifest with one object for `region_id`,
+    /// signed with a fixed test key. The region id is unique per call so the
+    /// test is safe to run in parallel with other tests touching `cm-centre`.
+    fn signed_test_manifest(region_id: &str) -> SignedManifest {
+        let cell = QuadCell::from_point(11.5, 3.85, 8).unwrap();
+        let bounds = GeoBounds::new(11.49, 3.84, 11.51, 3.86).unwrap();
+        let object = ManifestObject {
+            object_id: "parcel-1".to_string(),
+            component_version_id: "parcel-1-v1".to_string(),
+            assembly_version_id: None,
+            content: ContentAddress::of(b"component-bytes-parcel-1"),
+            storage_reference: "https://storage.example.com/parcel-1.glb".to_string(),
+            bounds,
+            available_lods: vec![0, 1, 2],
+            validation_state: ValidationState::TechnicallyValid,
+        };
+        let payload = ManifestPayload::new(
+            region_id,
+            "Signed Test Region",
+            cell,
+            1,
+            vec![object],
+            1_700_000_000,
+        );
+        SignedManifest::sign(payload, &SigningKey::from_bytes(&[7u8; 32])).unwrap()
+    }
 
     fn test_state(pool: PgPool) -> AppState {
         let dir = tempdir().expect("temp storage dir");
@@ -603,5 +737,125 @@ mod tests {
             .execute(&pool)
             .await
             .expect("clean up provider");
+    }
+
+    #[tokio::test]
+    async fn resolve_scene_grounded_in_signed_manifest() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed signed scene test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let region_id = format!("cm-centre-{}", Uuid::new_v4());
+        let manifest = signed_test_manifest(&region_id);
+        let address = manifest.content_address().unwrap().to_string();
+
+        let envelope = serde_json::to_value(&manifest).expect("serialize signed manifest");
+        sqlx::query(
+            "INSERT INTO signed_manifests (content_address, publisher, region_id, region_name, \
+             version, region_cell, signature, envelope) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        )
+        .bind(&address)
+        .bind(&manifest.publisher)
+        .bind(&manifest.payload.region_id)
+        .bind(&manifest.payload.region_name)
+        .bind(i64::from(manifest.payload.version))
+        .bind(manifest.payload.region_cell.to_string())
+        .bind(&manifest.signature)
+        .bind(envelope)
+        .execute(&pool)
+        .await
+        .expect("insert signed manifest");
+
+        let manifest_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO world_manifests (id, region_id, region_name, version, signed_content_address) \
+             VALUES ($1, $2, $3, 1, $4)",
+        )
+        .bind(manifest_id)
+        .bind(&manifest.payload.region_id)
+        .bind("Signed Test Region")
+        .bind(&address)
+        .execute(&pool)
+        .await
+        .expect("insert world manifest");
+
+        let Json(scene) = resolve_scene_internal(&state, manifest_id, 0)
+            .await
+            .expect("resolve scene");
+
+        assert_eq!(scene.scene.manifest_id, manifest_id);
+        assert_eq!(scene.scene.region_id, region_id);
+        assert_eq!(scene.nodes.len(), 1);
+        assert_eq!(scene.nodes[0].object_id, "parcel-1");
+        assert_eq!(scene.nodes[0].component_version_id, "parcel-1-v1");
+        assert_eq!(
+            scene.nodes[0].content_address,
+            Some(ContentAddress::of(b"component-bytes-parcel-1").to_string())
+        );
+        assert_eq!(scene.nodes[0].validation_state, "technically_valid");
+        assert_eq!(scene.nodes[0].loading_state, "pending");
+
+        let extent: serde_json::Value = serde_json::json!({
+            "type": "Polygon",
+            "coordinates": [[
+                [11.49, 3.84], [11.51, 3.84], [11.51, 3.86], [11.49, 3.86], [11.49, 3.84],
+            ]]
+        });
+        assert_eq!(scene.nodes[0].spatial_extent, extent);
+
+        sqlx::query("DELETE FROM world_manifests WHERE id = $1")
+            .bind(manifest_id)
+            .execute(&pool)
+            .await
+            .expect("clean up manifest");
+        sqlx::query("DELETE FROM signed_manifests WHERE content_address = $1")
+            .bind(&address)
+            .execute(&pool)
+            .await
+            .expect("clean up signed manifest");
+    }
+
+    #[tokio::test]
+    async fn resolve_scene_bound_to_missing_envelope_errors() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed signed scene test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let manifest_id = Uuid::new_v4();
+        let region_id = format!("cm-centre-{}", Uuid::new_v4());
+        let address = format!("sha256:{}", "00".repeat(32));
+        sqlx::query(
+            "INSERT INTO world_manifests (id, region_id, region_name, version, signed_content_address) \
+             VALUES ($1, $2, $3, 1, $4)",
+        )
+        .bind(manifest_id)
+        .bind(&region_id)
+        .bind("Signed Test Region")
+        .bind(&address)
+        .execute(&pool)
+        .await
+        .expect("insert world manifest");
+
+        let err = resolve_scene_internal(&state, manifest_id, 0)
+            .await
+            .expect_err("bound manifest with no envelope must fail closed");
+        assert!(matches!(err, AppError::NotFound(_)));
+
+        sqlx::query("DELETE FROM world_manifests WHERE id = $1")
+            .bind(manifest_id)
+            .execute(&pool)
+            .await
+            .expect("clean up manifest");
     }
 }

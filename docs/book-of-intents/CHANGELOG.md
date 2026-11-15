@@ -2,6 +2,27 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-15 — Sprint 055: Runtime scene resolution grounded in signed manifests
+
+- **`api/migrations/0047_runtime_signed_manifest_binding.sql`:** adds nullable
+  `signed_content_address` to `world_manifests`, binding a runtime manifest to a
+  verified publisher-signed `terra.manifest/v1` envelope in `signed_manifests`.
+- **`api/src/routes/runtime.rs`:** `GET /runtime/scene/{manifest_id}` resolves
+  from the re-verified signed envelope when a binding exists (fail-closed: a
+  missing or unverifiable bound envelope is an error, never a silent fall back
+  to mutable rows); each scene node carries the object's `content_address`; the
+  legacy `manifest_objects` path remains for unbound manifests. Extracted
+  `load_verified_signed_manifest` shared with `GET /manifests/signed/{address}`.
+  Scene resolution stays read-only (no `scene_graphs`/`scene_nodes` writes on
+  GET).
+- **`terra-web/src/lib/runtime.ts`:** `SceneNodeRow` carries `content_address`.
+- New DB-gated tests: `resolve_scene_grounded_in_signed_manifest` (scene nodes
+  match the signed payload with content addresses) and
+  `resolve_scene_bound_to_missing_envelope_errors` (fail-closed).
+- Verified locally: API **153** (incl. the 2 new signed-scene tests), registry
+  **154**, vitest **126**, tsc/fmt/clippy clean, frontend build:check within
+  budget. Commits pending (working tree).
+
 ## 2026-11-15 — Sprint 054: Runtime trust anchoring, data-plane addressing, CI repair
 
 - **CI repair:** migration `0046` used `//` comments, which PostgreSQL rejects;

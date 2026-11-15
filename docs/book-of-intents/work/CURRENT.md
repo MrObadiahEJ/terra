@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-15 (committed `4ed19ab`; sprints 001–054 delivered:
+Last reconciled: 2026-11-15 (committed `4ed19ab`; sprints 001–055 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
@@ -16,8 +16,10 @@ PrivacyState writes, complete_assignment auth, 052 proof-of-possession for
 component artifact replicas, 053 terra-geom-v1 removed (v2 only), 054 runtime
 content-address verification, artifact addressing, read-only scene resolution
 and CI repair (`1a35af6`, `71637e3`, `f5a993a`, `4ed19ab`; CI green
-`43770888271`). Sprint notes for 025–054 are in `sprints/025-*.md` …
-`sprints/054-*.md`.
+`43770888271`), **055 runtime scene resolution grounded in signed manifests
+(migration 0047 `signed_content_address`, fail-closed, `content_address` per
+scene node; API 153/153 with 2 new DB-gated tests)**. Sprint notes for
+025–055 are in `sprints/025-*.md` … `sprints/055-*.md`.
 
 ## Active intents
 
@@ -182,11 +184,6 @@ and CI repair (`1a35af6`, `71637e3`, `f5a993a`, `4ed19ab`; CI green
    fmt --all --check clean; cargo test -p terra-geo --lib 49 passed.
 
 
-8. **Runtime signed-manifest path (next unblocked code slice, partially open):**
-   Sprint 054 made provider bytes verifiable and fixed scene resolution
-   (read-only, `spatial_extent` present), but `GET /runtime/scene/...` still
-   reads mutable `world_manifests` rows. The next slice is to resolve scenes
-   from stored signed envelopes (`signed_manifests`) or to bind each runtime
-   manifest to a signed content address, then expose that address on scene
-   nodes. Exit criteria: a client can reject a scene whose objects do not match
-   a publisher-signed manifest; DB-backed test covers the signed path.
+8. **Runtime signed-manifest path — done (Sprint 055).** `GET /runtime/scene/{manifest_id}` now resolves from a bound verified signed envelope: `world_manifests.signed_content_address` (migration 0047) binds a manifest to a `signed_manifests` envelope; resolution re-verifies the envelope, fails closed when the bound envelope is missing or unverifiable, builds scene nodes from the signed payload, and exposes each object's `content_address` on the node so clients can reject mismatching bytes. Unbound manifests keep the legacy `manifest_objects` path. Exit criteria met: scene grounding is publisher-signed (`api/src/routes/runtime.rs` `load_verified_signed_manifest` + `build_scene_nodes_from_signed`) and DB-backed tests cover the signed path (`resolve_scene_grounded_in_signed_manifest`, `resolve_scene_bound_to_missing_envelope_errors`, API 153/153).
+
+   With this done there is no remaining unblocked code item in the current set; what follows is founder/Q-001-gated (Stage 2 devnet) or founder-decision-gated (Stage 4 research) work.
