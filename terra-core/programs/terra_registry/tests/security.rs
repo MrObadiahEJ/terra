@@ -303,7 +303,7 @@ async fn submit_jurisdictional_restriction_ok() {
     data.extend_from_slice(&borsh_ser(&"Court order to restrict access".to_string()));
     data.extend_from_slice(&[remedy_type::RESTRICT_ACCESS]);
     data.extend_from_slice(&[85, 83]); // US
-    data.extend_from_slice(&[1, 0, 0, 0, 0, 0, 0, 0]); // expiry = 1_000_000 as i64 LE
+    data.extend_from_slice(&borsh_ser(&Some(1_000_000i64)));
 
     let ix = Instruction {
         program_id: PROGRAM_ID,
