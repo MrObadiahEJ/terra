@@ -1,6 +1,6 @@
 # Sprint 054: Runtime trust anchoring, data-plane addressing, CI repair
 
-**Date:** 2026-11-15 · **Status:** implemented & committed (`1a35af6`); CI verification pending
+**Date:** 2026-11-15 · **Status:** done & committed (`1a35af6`; follow-ups `71637e3`, `f5a993a`, `4ed19ab`; docs `448b3ad`); CI green `43770888271`
 **Local gates:** `cargo fmt --all -- --check` clean; `cargo check -p terra-api`
 clean; `cargo test -p terra-api` **151 passed** (DB-backed tests skipped
 locally); `cargo test -p terra-registry --lib` **154 passed**;
@@ -14,6 +14,11 @@ errors in `runtime.ts`.
 1. CI was red from Sprint 048 onward. Run `43630959959` failed on a registry
    SDK assertion (`&&str == str`) and on migration `0046` (invalid `//` SQL
    comments), which prevented the API test job from reaching the test suite.
+   Fixing those exposed four more latent failures that had been hidden behind
+   the first red job: the same `&&str == str` assertion in `terra-identity`,
+   literal backslashes in the raw runtime asset SQL, a ProgramTest security
+   suite running before the SBF artifacts were built, and an 8-byte encoding of
+   a Borsh `Option<i64>` in the jurisdictional-restriction test.
 2. Sprint 042 tracked the gap: *"Client never verifies fetched bytes against
    signed manifest content address."* Sprint 052 claimed frontend verification,
    but it verified only the server-provided `x-content-sha256` header of the
@@ -31,8 +36,16 @@ errors in `runtime.ts`.
 ### CI repair
 
 - `migrations/0046_provider_proof_of_possession.sql`: `//` → `--` comments.
-- `programs/terra_registry/src/lib.rs`: dereference the SDK schema name before
-  comparing (`*n == "…"`).
+- `programs/terra_registry/src/lib.rs` and `programs/terra_identity/src/lib.rs`:
+  dereference the SDK schema name before comparing (`*n == "…"`).
+- `routes/runtime.rs`: the asset query was a raw string but kept `\` line
+  continuations from the normal-string form, so PostgreSQL received literal
+  backslashes and rejected the statement.
+- `.github/workflows/ci.yml`: build the SBF artifacts before the RFC-016
+  security suite; `ProgramTest` loads `target/deploy/terra_registry.so`, which
+  previously existed only after the later BPF-build step (or in a warm cache).
+- `programs/terra_registry/tests/security.rs`: encode `expires_at` with
+  `borsh_ser(&Some(1_000_000i64))` (1 tag + 8 bytes), not 8 bytes total.
 
 ### Artifact integrity and addressing (`components.rs`)
 
@@ -104,8 +117,18 @@ errors in `runtime.ts`.
 | `vitest run` | **126 passed** (was 120) |
 | eslint (`runtime.ts`, `runtime.test.ts`) | 8 pre-existing `no-explicit-any` errors in `runtime.ts`; no new errors |
 
-DB-backed CI job (PostgreSQL + `sqlx migrate run`) must still confirm the new
-runtime tests and the repaired migration. CI run ID: pending.
+**CI run `43770888271` (2026-11-15): all jobs green.**
+
+| CI suite | Result |
+| --- | --- |
+| API (PostgreSQL + migrations) | **151 passed** — includes the two DB-backed runtime tests and the repaired migration |
+| Registry lib | **154 passed** |
+| Identity lib | **7 passed** |
+| RFC-016 security | **9 passed** |
+| RFC-012 structural | **21 passed** |
+| Geo engine | **42 passed** |
+| BPF integration | **307 passed** |
+| Frontend | tsc, vitest **126**, build + bundle budget green |
 
 ## What is still missing
 

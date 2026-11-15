@@ -5,8 +5,11 @@ Format: date · version · what changed · evidence/why. Append-only.
 ## 2026-11-15 — Sprint 054: Runtime trust anchoring, data-plane addressing, CI repair
 
 - **CI repair:** migration `0046` used `//` comments, which PostgreSQL rejects;
-  the registry SDK test compared `&&str == str`. Both fixed. CI had been red
-  since Sprint 048.
+  the registry and identity SDK tests compared `&&str == str`; the runtime
+  asset SQL kept literal `\` continuations; the ProgramTest security suite ran
+  before the SBF artifacts were built; and the jurisdictional-restriction test
+  Borsh-encoded `Option<i64>` in 8 bytes instead of 9. All fixed — CI had been
+  red since Sprint 048.
 - **`components.rs`:** removed Sprint 052's invalid comparison of the canonical
   `geometry_digest` with the raw artifact SHA-256; added `resolve_package_id`
   so artifact PUT and GET accept `component_id` text or UUID; private artifact
@@ -21,8 +24,11 @@ Format: date · version · what changed · evidence/why. Append-only.
 - **Protocol boundary:** `POST /components` rejects simulated/designed/proposed/
   speculative provenance; added ADR-024 and `docs/app-overlay-anchoring.md`.
 - Verified locally: API **151**, registry **154**, vitest **126**, tsc/fmt/
-  clippy clean (DB-backed tests skip without `DATABASE_URL`). Commit
-  `1a35af6`; CI run: pending.
+  clippy clean (DB-backed tests skip without `DATABASE_URL`). Commits
+  `1a35af6`, `448b3ad`, `71637e3`, `f5a993a`, `4ed19ab`; CI run
+  `43770888271` green — API **151** (PostgreSQL + migrations), registry
+  **154**, identity **7**, RFC-016 security **9**, RFC-012 **21**, geo
+  **42**, BPF integration **307**, frontend tsc/vitest **126**/build green.
 
 ## 2026-11-14 — Sprint 053: Remove `terra-geom-v1`, keep only `terra-geom-v2`
 

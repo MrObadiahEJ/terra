@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-15 (committed `9f05f83`; sprints 001–053 delivered:
+Last reconciled: 2026-11-15 (committed `4ed19ab`; sprints 001–054 delivered:
 037 data-plane component artifact storage, 038 quadtree discovery client,
 039 frustum/occlusion culling + screen-space-error LOD, 040 viewport/globe
 wiring, 041 Terra File protocol architecture directive, 042 P0 security &
@@ -13,12 +13,11 @@ SDK v0.1.0 declared + RFC-015/protocol alignment, 049 SDK standard shift —
 terra-identity + terra-registry SDKs declared + RFC protocol alignment,
 050 submit_component auth fix, 051 security hardening — SecurityRequest.subject,
 PrivacyState writes, complete_assignment auth, 052 proof-of-possession for
-component artifact replicas, 053 terra-geom-v1 removed (v2 only).
-Sprint 054 — runtime content-address verification, artifact addressing,
-read-only scene resolution, CI repair — is implemented in the working tree;
-CI verification is pending. Sprint notes for 025–054 are in
-`sprints/025-*.md` … `sprints/054-*.md` (043/044/046 notes remain to be
-backfilled from their commits).
+component artifact replicas, 053 terra-geom-v1 removed (v2 only), 054 runtime
+content-address verification, artifact addressing, read-only scene resolution
+and CI repair (`1a35af6`, `71637e3`, `f5a993a`, `4ed19ab`; CI green
+`43770888271`). Sprint notes for 025–054 are in `sprints/025-*.md` …
+`sprints/054-*.md`.
 
 ## Active intents
 
@@ -77,7 +76,7 @@ backfilled from their commits).
 | Sprint 044 — Open questions → ratifiable decisions (Q-001–Q-006, Q-008–Q-018) | **done & committed** | `OPEN_QUESTIONS.md` rewritten: each blocker now a *decision proposed* with default recommendation, external grounding, and exit criterion. Q-001 devnet funding reframed as 3 tracks ($0 local validator/Surfpool, faucet rotation, shrink rent). Q-003 sunset bootstrap council w/ vLEI/DNSSEC evidence. Q-004 selective-disclosure VC + EUDI path. Q-005 keeps hard gate (protocol ≠ issuer). Q-006 7-point mainnet checklist. Q-008–Q-018 agent-research answers with code-vs-design split. | `sprints/044-open-questions-decisions.md` |
 | Sprint 045 — Terra Atlas frontend (investor-facing planetary observation surface) | **done & committed** | `AtlasPage` + glass window system (Asset Inspector 3DGS splat, Wallet/Rights simulated panel, Layers, Provenance, InvestorTour); lazy-loaded per route (Cesium out of initial graph); design tokens (violet accent, gradient mesh, glass panels); demo splat `demo-house.splat` (2.5 kB) labeled synthetic; i18n keys en/fr/ru/zh; verified: tsc clean, eslint clean, vitest 120/120, build:check PASS (entry 308.8 kB gz ≤ 360, Cesium lazy 1098.5 kB ≤ 1200, total 1882.8 kB gz ≤ 1900). Published at https://mrobadiahej.github.io/terra/atlas | `sprints/045-terra-atlas-frontend.md` |
 | Sprint 053 — Remove `terra-geom-v1`, keep only `terra-geom-v2` | **done & committed (`9f05f83`)** | deleted `geo-engine/src/canonical.rs` and re-exports; `sdk_meta` and all docs now name v2 only; `reconstruction.rs` uses `geometry_digest_hex_v2`; migration 0035 left as historical record; commit gate: workspace check/clippy/fmt clean, `terra-geo` lib 42 passed; CI exposed two latent failures (migration 0046 `//` comments, registry SDK `&&str == str`), fixed in Sprint 054 | `sprints/053-remove-terra-geom-v1.md` |
-| Sprint 054 — Runtime trust anchoring + data-plane addressing + CI repair | **implemented & committed (`1a35af6`); CI verification pending** | removed Sprint 052's invalid `geometry_digest`/artifact-hash comparison; `resolve_package_id` makes PUT/GET artifact endpoints accept `component_id` or UUID; `GET /runtime/assets/...` returns ≤5 ranked replicas with raw-artifact `content_address` (`component_artifacts` → `provider_replicas.checksum`); client verifies SHA-256, skips unverifiable providers, falls back, requires `x-content-sha256`; scene GET is read-only and now selects `spatial_extent`; provenance guard + ADR-024 + `docs/app-overlay-anchoring.md`; local: API **151**, registry **154**, vitest **126**, tsc/fmt/clippy clean (DB tests skip without `DATABASE_URL`) | `sprints/054-runtime-trust-anchoring.md` |
+| Sprint 054 — Runtime trust anchoring + data-plane addressing + CI repair | **done & committed (`1a35af6`, follow-ups `71637e3`/`f5a993a`/`4ed19ab`); CI green `43770888271`** | removed Sprint 052's invalid `geometry_digest`/artifact-hash comparison; `resolve_package_id` makes PUT/GET artifact endpoints accept `component_id` or UUID; `GET /runtime/assets/...` returns ≤5 ranked replicas with raw-artifact `content_address` (`component_artifacts` → `provider_replicas.checksum`); client verifies SHA-256, skips unverifiable providers, falls back, requires `x-content-sha256`; scene GET is read-only and now selects `spatial_extent`; provenance guard + ADR-024 + `docs/app-overlay-anchoring.md`; local: API **151**, registry **154**, vitest **126**, tsc/fmt/clippy clean (DB tests skip without `DATABASE_URL`) | `sprints/054-runtime-trust-anchoring.md` |
 
 ## Known blockers
 
