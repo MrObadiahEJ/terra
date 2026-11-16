@@ -36,6 +36,9 @@ tmp/screenshots/
 *.log
 *.tmp
 
+# --- Surfpool local state ---
+**/.surfpool/
+
 # --- OSM dataset downloads ---
 **/*.osm.pbf
 **/*.osm

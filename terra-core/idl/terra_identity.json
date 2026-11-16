@@ -1,0 +1,1290 @@
+{
+  "address": "HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p",
+  "metadata": {
+    "name": "terra_identity_program",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Terra Identity program — PEOPLE domain (identity, succession, guardianship)"
+  },
+  "instructions": [
+    {
+      "name": "bind_identity",
+      "discriminator": [
+        233,
+        223,
+        188,
+        85,
+        140,
+        1,
+        204,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "identity_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "identity_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "recovery",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "cancel_succession",
+      "discriminator": [
+        206,
+        172,
+        126,
+        132,
+        252,
+        50,
+        143,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "Succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "Succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_succession",
+      "discriminator": [
+        90,
+        253,
+        80,
+        136,
+        147,
+        71,
+        124,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "Succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "Succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "endorse_succession",
+      "discriminator": [
+        70,
+        125,
+        62,
+        184,
+        108,
+        245,
+        74,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "succession.identity",
+                "account": "Succession"
+              },
+              {
+                "kind": "account",
+                "path": "succession.successor",
+                "account": "Succession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "validator",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute_revoke_guardianship",
+      "discriminator": [
+        119,
+        219,
+        6,
+        116,
+        49,
+        3,
+        167,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_owner",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "request_court_guardianship",
+      "discriminator": [
+        161,
+        23,
+        136,
+        8,
+        139,
+        232,
+        131,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity"
+              },
+              {
+                "kind": "arg",
+                "path": "successor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "successor",
+          "type": "pubkey"
+        },
+        {
+          "name": "grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "required_validations",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        },
+        {
+          "name": "case_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "scope_notes",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "request_succession",
+      "discriminator": [
+        239,
+        203,
+        74,
+        151,
+        24,
+        159,
+        159,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "succession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  99,
+                  99,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity"
+              },
+              {
+                "kind": "arg",
+                "path": "successor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "successor",
+          "type": "pubkey"
+        },
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "required_validations",
+          "type": "u8"
+        },
+        {
+          "name": "validators",
+          "type": {
+            "array": [
+              "pubkey",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_guardianship",
+      "discriminator": [
+        168,
+        87,
+        239,
+        39,
+        65,
+        0,
+        155,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "identity",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "identity.identity_hash",
+                "account": "Identity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "revoker",
+          "signer": true
+        },
+        {
+          "name": "new_owner"
+        }
+      ],
+      "args": [
+        {
+          "name": "new_owner",
+          "type": "pubkey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Identity",
+      "discriminator": [
+        58,
+        132,
+        5,
+        12,
+        176,
+        164,
+        85,
+        112
+      ]
+    },
+    {
+      "name": "Succession",
+      "discriminator": [
+        51,
+        87,
+        221,
+        243,
+        105,
+        19,
+        68,
+        109
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CourtGuardianshipRequested",
+      "discriminator": [
+        140,
+        90,
+        60,
+        187,
+        33,
+        145,
+        99,
+        93
+      ]
+    },
+    {
+      "name": "GuardianshipRevocationRequested",
+      "discriminator": [
+        78,
+        209,
+        237,
+        197,
+        250,
+        152,
+        126,
+        7
+      ]
+    },
+    {
+      "name": "GuardianshipRevoked",
+      "discriminator": [
+        128,
+        41,
+        40,
+        28,
+        37,
+        45,
+        126,
+        221
+      ]
+    },
+    {
+      "name": "IdentityBound",
+      "discriminator": [
+        183,
+        169,
+        144,
+        11,
+        110,
+        67,
+        103,
+        46
+      ]
+    },
+    {
+      "name": "SuccessionCancelled",
+      "discriminator": [
+        67,
+        67,
+        101,
+        243,
+        100,
+        8,
+        158,
+        53
+      ]
+    },
+    {
+      "name": "SuccessionClaimed",
+      "discriminator": [
+        27,
+        211,
+        3,
+        154,
+        93,
+        191,
+        66,
+        212
+      ]
+    },
+    {
+      "name": "SuccessionEndorsed",
+      "discriminator": [
+        207,
+        163,
+        114,
+        67,
+        56,
+        134,
+        119,
+        241
+      ]
+    },
+    {
+      "name": "SuccessionRequested",
+      "discriminator": [
+        212,
+        119,
+        41,
+        85,
+        179,
+        61,
+        206,
+        98
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "EmptyIdentityHash",
+      "msg": "Identity hash is required"
+    },
+    {
+      "code": 6001,
+      "name": "EmptyRecovery",
+      "msg": "Recovery wallet is required"
+    },
+    {
+      "code": 6002,
+      "name": "EmptySuccessor",
+      "msg": "Successor wallet is required"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidSuccessionKind",
+      "msg": "Invalid succession kind"
+    },
+    {
+      "code": 6004,
+      "name": "SuccessorIsOwner",
+      "msg": "Successor must differ from the current owner"
+    },
+    {
+      "code": 6005,
+      "name": "NotAuthorized",
+      "msg": "Not authorized to perform this action"
+    },
+    {
+      "code": 6006,
+      "name": "NotValidator",
+      "msg": "Signing wallet is not a declared validator for this succession"
+    },
+    {
+      "code": 6007,
+      "name": "ValidatorOwnsAsset",
+      "msg": "A validator cannot be the owner of the asset being validated"
+    },
+    {
+      "code": 6008,
+      "name": "SuccessionAlreadyEffective",
+      "msg": "Succession has already become effective"
+    },
+    {
+      "code": 6009,
+      "name": "ValidationLimitReached",
+      "msg": "No more validators may endorse this succession (limit reached)"
+    },
+    {
+      "code": 6010,
+      "name": "NotSuccessor",
+      "msg": "Only the named successor may claim this succession"
+    },
+    {
+      "code": 6011,
+      "name": "SuccessionNotYetEffective",
+      "msg": "Succession is not yet effective"
+    },
+    {
+      "code": 6012,
+      "name": "InsufficientValidations",
+      "msg": "Succession requires validator endorsements before it can be claimed"
+    },
+    {
+      "code": 6013,
+      "name": "AttestationMismatch",
+      "msg": "Attestation does not belong to this parcel"
+    },
+    {
+      "code": 6014,
+      "name": "IdentityMismatch",
+      "msg": "Identity owner does not match the parcel owner"
+    },
+    {
+      "code": 6015,
+      "name": "NotOwner",
+      "msg": "Only the current owner can perform this action"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidThreshold",
+      "msg": "Required threshold exceeds the number of validators"
+    },
+    {
+      "code": 6017,
+      "name": "EmptyCaseHash",
+      "msg": "Court case hash is required"
+    },
+    {
+      "code": 6018,
+      "name": "NotesTooLong",
+      "msg": "Notes exceed the maximum length of 128"
+    },
+    {
+      "code": 6019,
+      "name": "GuardianshipGraceTooShort",
+      "msg": "Guardianship grace period is below the 90-day minimum"
+    },
+    {
+      "code": 6020,
+      "name": "GuardianshipThresholdTooLow",
+      "msg": "Guardianship requires at least 3 validator endorsements"
+    },
+    {
+      "code": 6021,
+      "name": "NoProposalFound",
+      "msg": "No proposal found"
+    },
+    {
+      "code": 6022,
+      "name": "GuardianshipAlreadyActive",
+      "msg": "A revocation request is already pending for this identity"
+    },
+    {
+      "code": 6023,
+      "name": "SettlementNotYetEffective",
+      "msg": "Settlement not yet effective"
+    },
+    {
+      "code": 6024,
+      "name": "ParcelDataTooShort",
+      "msg": "Parcel account data is too short for deserialization"
+    },
+    {
+      "code": 6025,
+      "name": "ParcelDeserializeFailed",
+      "msg": "Failed to deserialize parcel account data"
+    },
+    {
+      "code": 6026,
+      "name": "ParcelOwnerMismatch",
+      "msg": "Parcel owner does not match the identity owner"
+    },
+    {
+      "code": 6027,
+      "name": "AlreadyEndorsed",
+      "msg": "This validator has already endorsed this succession"
+    },
+    {
+      "code": 6028,
+      "name": "DuplicateValidator",
+      "msg": "Duplicate validator in the declared validator set"
+    }
+  ],
+  "types": [
+    {
+      "name": "CourtGuardianshipRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          },
+          {
+            "name": "case_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "scope_notes",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianshipRevocationRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "requested_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "revoke_after",
+            "type": "i64"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GuardianshipRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_guardian",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "revoked_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "block_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Identity",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recovery",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel_count",
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "pending_revocation",
+            "type": "bool"
+          },
+          {
+            "name": "pending_new_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "revoke_after",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IdentityBound",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "identity_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "recovery",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Succession",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "requested_at",
+            "type": "i64"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          },
+          {
+            "name": "grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "validations_count",
+            "type": "u8"
+          },
+          {
+            "name": "validators",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "endorsers",
+            "docs": [
+              "Tracks which validators have endorsed. Each validator can endorse at most once."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          },
+          {
+            "name": "endorsers_count",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SuccessionCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SuccessionClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SuccessionEndorsed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "validator",
+            "type": "pubkey"
+          },
+          {
+            "name": "validations_count",
+            "type": "u8"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SuccessionRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "identity",
+            "type": "pubkey"
+          },
+          {
+            "name": "successor",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "count",
+            "type": "u8"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

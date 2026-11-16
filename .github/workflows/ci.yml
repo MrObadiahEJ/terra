@@ -61,6 +61,18 @@ jobs:
           cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml --sbf-out-dir "$PWD/target/deploy"
         working-directory: terra-core
 
+      # Sprint A: the lifecycle smoke runs the exact .so artifacts built here
+      # against Surfpool in the `localnet-e2e` job.
+      - name: Upload program artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: program-artifacts
+          path: |
+            terra-core/target/deploy/terra_registry.so
+            terra-core/target/deploy/terra_identity.so
+          if-no-files-found: error
+          retention-days: 3
+
       - name: RFC-016 security tests
         run: cargo test -p terra-registry --test security
         working-directory: terra-core
@@ -75,6 +87,45 @@ jobs:
 
       - name: BPF integration tests
         run: cargo test -p terra-registry --test integration -- --test-threads=1
+        working-directory: terra-core
+
+  localnet-e2e:
+    name: Localnet Lifecycle E2E (Surfpool)
+    runs-on: ubuntu-latest
+    needs: lib-tests
+    env:
+      SURFPOOL_VERSION: "1.7.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: terra-core/package-lock.json
+
+      - name: Install test dependencies
+        run: npm ci
+        working-directory: terra-core
+
+      - name: Download program artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: program-artifacts
+          path: terra-core/target/deploy
+
+      # Surfpool runs a local Surfnet without AVX. Instant deployment comes
+      # from the committed runbook (`runbooks/deployment/main.tx`).
+      - name: Install Surfpool
+        run: |
+          curl -sSfL -o /tmp/surfpool.tar.gz \
+            "https://github.com/solana-foundation/surfpool/releases/download/v${SURFPOOL_VERSION}/surfpool-linux-x64.tar.gz"
+          tar -xzf /tmp/surfpool.tar.gz -C /tmp
+          sudo install /tmp/surfpool /usr/local/bin/surfpool
+          surfpool --version
+
+      - name: Run lifecycle smoke
+        run: ./scripts/run-localnet-e2e.sh
         working-directory: terra-core
 
   api-tests:

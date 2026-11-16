@@ -1,4 +1,4 @@
-.PHONY: build test test-ts test-fast lint ci prune deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-ts test-localnet-e2e test-fast lint ci prune deploy deploy-devnet deploy-mainnet clean idl
 
 # Build all programs
 build:
@@ -13,6 +13,12 @@ test:
 # with the program deployed via `make deploy-localnet`.
 test-ts:
 	./node_modules/.bin/ts-mocha -p tsconfig.json tests/terra_registry.ts
+
+# Sprint A lifecycle smoke on a local Surfnet (no AVX required).
+# Needs: npm install, target/deploy/*.so (anchor build or CI artifacts),
+# committed idl/*.json. Starts and stops Surfpool itself.
+test-localnet-e2e:
+	./scripts/run-localnet-e2e.sh
 
 # Run lint checks
 lint:
@@ -74,10 +80,12 @@ prune:
 # Generate IDLs only (-o JSON → target/idl; workspace `anchor build`
 # pulls host-only deps via api/geo members and can fail on getrandom/SBF)
 idl:
-	mkdir -p target/idl
+	mkdir -p target/idl idl
 	anchor idl build --skip-lint -p terra_registry -o target/idl/terra_registry.json
 	anchor idl build --skip-lint -p terra_identity -o target/idl/terra_identity.json
-	@ls -lh target/idl/*.json
+	cp target/idl/terra_registry.json idl/terra_registry.json
+	cp target/idl/terra_identity.json idl/terra_identity.json
+	@ls -lh idl/*.json
 
 # Deploy to devnet
 deploy-devnet:
