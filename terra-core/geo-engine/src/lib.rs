@@ -54,8 +54,8 @@ pub use manifest::{
 pub use osm::{read_osm_pbf, BuildingFootprint, OsmData, Poi, RoadWay};
 pub use poi::{pois_near, pois_within};
 pub use reach::{
-    access_digest, analyze, encode_metrics, is_sealed_highway, NetworkGraph, ReachabilityReport,
-    FLAG_ROAD_ACCESS, ROAD_ACCESS_THRESHOLD_M,
+    access_digest, analyze, encode_metrics, is_sealed_highway, route_between, NetworkGraph,
+    ReachabilityReport, Route, FLAG_ROAD_ACCESS, ROAD_ACCESS_THRESHOLD_M,
 };
 pub use sdk_meta::{
     sdk_capabilities, sdk_name, sdk_schema_versions, sdk_security_assumptions,

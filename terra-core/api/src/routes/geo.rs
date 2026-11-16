@@ -6,6 +6,7 @@ use axum::{Json, Router};
 use geo::{Coord, Distance, Haversine, Intersects, Point, Polygon, Rect};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use terra_geo::route_between;
 
 use crate::error::AppError;
 use crate::state::{AppState, GeoData};
@@ -72,6 +73,24 @@ fn default_building_limit() -> usize {
     500
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RouteParams {
+    pub from_lon: f64,
+    pub from_lat: f64,
+    pub to_lon: f64,
+    pub to_lat: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RouteView {
+    /// Ordered [lon, lat] coordinate pairs along the shortest road path.
+    pub geometry: Vec<[f64; 2]>,
+    /// Total network distance in metres.
+    pub distance_m: f64,
+    /// Road segment ids traversed, in order.
+    pub segment_ids: Vec<i64>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct BuildingFootprintView {
     pub osm_id: i64,
@@ -90,6 +109,7 @@ pub fn router() -> Router<AppState> {
         .route("/nearest-roads", get(nearest_roads))
         .route("/pois", get(pois))
         .route("/buildings", get(buildings))
+        .route("/route", get(route))
         .route("/stats", get(stats))
 }
 
@@ -218,6 +238,31 @@ async fn pois(
         })
         .collect();
     Ok(Json(hits))
+}
+
+async fn route(
+    State(state): State<AppState>,
+    Query(params): Query<RouteParams>,
+) -> Result<Json<RouteView>, AppError> {
+    let geo = geo(&state)?;
+    let network = terra_geo::NetworkGraph::build(&geo.graph);
+    let route = route_between(
+        &network,
+        Coord {
+            x: params.from_lon,
+            y: params.from_lat,
+        },
+        Coord {
+            x: params.to_lon,
+            y: params.to_lat,
+        },
+    )
+    .ok_or_else(|| AppError::bad_request("no road path between the given coordinates"))?;
+    Ok(Json(RouteView {
+        geometry: route.geometry.into_iter().map(|c| [c.x, c.y]).collect(),
+        distance_m: route.distance_m,
+        segment_ids: route.segment_ids,
+    }))
 }
 
 async fn stats(State(state): State<AppState>) -> Result<Json<Value>, AppError> {

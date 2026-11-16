@@ -3,13 +3,17 @@ use geo::{Coord, Haversine, Length, LineString, Rect};
 
 use crate::osm::{OsmData, RoadWay};
 
-/// A single linear road segment with resolved coordinates.
+/// A single linear road segment with resolved coordinates and node topology.
 #[derive(Debug, Clone)]
 pub struct RoadSegment {
     pub id: i64,
     pub name: Option<String>,
     pub highway: String,
     pub oneway: bool,
+    /// OSM node id at the start of the segment (from the way's first node ref).
+    pub from_node_id: i64,
+    /// OSM node id at the end of the segment (from the way's last node ref).
+    pub to_node_id: i64,
     pub line: LineString<f64>,
     pub length_m: f64,
 }
@@ -61,11 +65,16 @@ fn build_segment(way: &RoadWay, data: &OsmData) -> Option<RoadSegment> {
     let line = LineString::new(coords);
     let length_m = line.length::<Haversine>();
 
+    let from_node_id = *way.nodes.first()?;
+    let to_node_id = *way.nodes.last()?;
+
     Some(RoadSegment {
         id: way.id,
         name: way.name.clone(),
         highway: way.highway.clone(),
         oneway: way.oneway,
+        from_node_id,
+        to_node_id,
         line,
         length_m,
     })

@@ -35,6 +35,8 @@ pub const FLAG_ROAD_ACCESS: u16 = 1 << 5;
 /// straight polyline pieces, so true network distances can be computed.
 pub struct NetworkGraph {
     adjacency: Vec<Vec<(usize, f64)>>,
+    /// Vertex coordinates, indexed by vertex id.
+    vertices: Vec<Coord<f64>>,
     /// Global vertex ids belonging to each road segment.
     segment_vertices: Vec<Vec<usize>>,
     /// Precomputed set of vertices touching at least one sealed segment.
@@ -94,6 +96,7 @@ impl NetworkGraph {
 
         NetworkGraph {
             adjacency,
+            vertices,
             segment_vertices,
             sealed_vertices,
         }
@@ -358,6 +361,118 @@ pub fn encode_metrics(report: &ReachabilityReport) -> Vec<u8> {
     out
 }
 
+/// A route between two points on the road network, computed by Dijkstra.
+#[derive(Debug, Clone)]
+pub struct Route {
+    /// Ordered coordinates along the shortest road path.
+    pub geometry: Vec<Coord<f64>>,
+    /// Total network distance in metres.
+    pub distance_m: f64,
+    /// Road segment ids traversed, in order.
+    pub segment_ids: Vec<i64>,
+}
+
+/// Snap a coordinate to the nearest road network vertex. Returns the vertex
+/// index and the snapped coordinate.
+fn snap_to_vertex(network: &NetworkGraph, point: Coord<f64>) -> Option<(usize, Coord<f64>)> {
+    let pt = geo::Point::new(point.x, point.y);
+    let mut best: Option<(f64, usize)> = None;
+    for (v, &coord) in network.vertices.iter().enumerate() {
+        let d = Haversine::distance(pt, geo::Point::new(coord.x, coord.y));
+        if best.map(|(bd, _)| d < bd).unwrap_or(true) {
+            best = Some((d, v));
+        }
+    }
+    best.map(|(_, v)| (v, network.vertices[v]))
+}
+
+/// Compute the shortest road path between two coordinates using Dijkstra over
+/// the road network graph. Returns `None` if either point cannot be snapped to
+/// the network or no path exists.
+pub fn route_between(network: &NetworkGraph, from: Coord<f64>, to: Coord<f64>) -> Option<Route> {
+    let (from_v, from_coord) = snap_to_vertex(network, from)?;
+    let (to_v, to_coord) = snap_to_vertex(network, to)?;
+
+    let n = network.vertices.len();
+    let mut dist: Vec<Option<f64>> = vec![None; n];
+    let mut prev: Vec<Option<usize>> = vec![None; n];
+    let mut heap = BinaryHeap::new();
+
+    dist[from_v] = Some(0.0);
+    heap.push(HeapEntry { d: 0.0, v: from_v });
+
+    while let Some(HeapEntry { d, v }) = heap.pop() {
+        if dist[v].map(|cur| cur < d).unwrap_or(true) {
+            continue;
+        }
+        if v == to_v {
+            break;
+        }
+        for &(w, wl) in &network.adjacency[v] {
+            let nd = d + wl;
+            if dist[w].map(|cur| cur <= nd).unwrap_or(false) {
+                continue;
+            }
+            dist[w] = Some(nd);
+            prev[w] = Some(v);
+            heap.push(HeapEntry { d: nd, v: w });
+        }
+    }
+
+    let total = dist[to_v]?;
+    // Reconstruct vertex path from `to_v` back to `from_v`.
+    let mut path_vertices: Vec<usize> = Vec::new();
+    let mut cur: Option<usize> = Some(to_v);
+    while let Some(v) = cur {
+        path_vertices.push(v);
+        cur = prev[v];
+    }
+    path_vertices.reverse();
+
+    // Build geometry: interpolate from the snapped `from` point to the first
+    // path vertex, then along all path vertices, then to the snapped `to` point.
+    let mut geometry: Vec<Coord<f64>> = Vec::with_capacity(path_vertices.len() + 2);
+    geometry.push(from_coord);
+    for &v in &path_vertices {
+        if geometry.last() != Some(&network.vertices[v]) {
+            geometry.push(network.vertices[v]);
+        }
+    }
+    if geometry.last() != Some(&to_coord) {
+        geometry.push(to_coord);
+    }
+
+    // Collect segment ids along the path by matching consecutive vertices to
+    // segments that contain both.
+    let mut segment_ids: Vec<i64> = Vec::new();
+    for w in 0..path_vertices.len().saturating_sub(1) {
+        let a = path_vertices[w];
+        let b = path_vertices[w + 1];
+        let found = network
+            .segment_vertices
+            .iter()
+            .enumerate()
+            .find_map(|(si, ids)| {
+                if ids.contains(&a) && ids.contains(&b) {
+                    Some(si as i64)
+                } else {
+                    None
+                }
+            });
+        if let Some(id) = found {
+            if segment_ids.last() != Some(&id) {
+                segment_ids.push(id);
+            }
+        }
+    }
+
+    Some(Route {
+        geometry,
+        distance_m: total,
+        segment_ids,
+    })
+}
+
 /// Canonical payload binding parcel identity + flags + reachability metrics
 /// into a single verifiable digest.
 pub fn access_digest(parcel_id: &[u8; 32], flags: u16, metrics: &[u8]) -> [u8; 32] {
@@ -381,6 +496,8 @@ mod tests {
             name: Some("Main St".into()),
             highway: "primary".into(),
             oneway: false,
+            from_node_id: 100,
+            to_node_id: 101,
             line: line_string![
                 (x: 10.0, y: 0.0),
                 (x: 11.0, y: 0.0)
@@ -392,6 +509,8 @@ mod tests {
             name: Some("Private Track".into()),
             highway: "track".into(),
             oneway: false,
+            from_node_id: 101,
+            to_node_id: 102,
             line: line_string![
                 (x: 11.0, y: 0.0),
                 (x: 12.0, y: 0.0)
@@ -492,5 +611,62 @@ mod tests {
         );
         // It really is 32 bytes of sha-256 entropy, not a placeholder.
         assert!(!canonical.iter().all(|b| *b == 0));
+    }
+
+    #[test]
+    fn route_between_connected_vertices() {
+        let graph = sample_graph();
+        let network = NetworkGraph::build(&graph);
+
+        // From vertex at (10.0, 0.0) to vertex at (12.0, 0.0) via (11.0, 0.0).
+        let route = route_between(
+            &network,
+            Coord { x: 10.0, y: 0.0 },
+            Coord { x: 12.0, y: 0.0 },
+        )
+        .expect("route should exist");
+
+        assert!(!route.geometry.is_empty());
+        assert_eq!(route.geometry.first(), Some(&Coord { x: 10.0, y: 0.0 }));
+        assert_eq!(route.geometry.last(), Some(&Coord { x: 12.0, y: 0.0 }));
+        assert!(route.distance_m > 0.0);
+        assert!(route.segment_ids.len() >= 1);
+    }
+
+    #[test]
+    fn route_between_snaps_to_nearest_vertex() {
+        let graph = sample_graph();
+        let network = NetworkGraph::build(&graph);
+
+        // Slightly off the exact vertex should still snap and route.
+        let route = route_between(
+            &network,
+            Coord {
+                x: 10.001,
+                y: 0.001,
+            },
+            Coord {
+                x: 11.999,
+                y: 0.001,
+            },
+        )
+        .expect("route should exist after snapping");
+
+        assert!(route.distance_m > 0.0);
+        assert_eq!(route.geometry.first().unwrap().x, 10.0);
+        assert_eq!(route.geometry.last().unwrap().x, 12.0);
+    }
+
+    #[test]
+    fn route_between_no_path_returns_none() {
+        let graph = RoadGraph::default();
+        let network = NetworkGraph::build(&graph);
+
+        let route = route_between(
+            &network,
+            Coord { x: 10.0, y: 0.0 },
+            Coord { x: 12.0, y: 0.0 },
+        );
+        assert!(route.is_none());
     }
 }
