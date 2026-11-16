@@ -39,6 +39,7 @@ pub struct TableAudit {
     pub total_rows: i64,
     pub hashed_rows: i64,
     pub unhashed_rows: i64,
+    pub unverified_rows: i64,
     pub drifted_rows: i64,
     pub anchored_rows: i64,
     pub unanchored_rows: i64,
@@ -78,6 +79,7 @@ async fn audit(
     if parcel_audit.drifted_rows > 0
         || parcel_audit.unhashed_rows > 0
         || parcel_audit.unanchored_rows > 0
+        || parcel_audit.unverified_rows > 0
     {
         ok = false;
     }
@@ -86,7 +88,10 @@ async fn audit(
     // --- rights ---
     let rights_audit = audit_rights(&state, limit).await?;
     total_drifted += rights_audit.drifted_rows;
-    if rights_audit.drifted_rows > 0 || rights_audit.unhashed_rows > 0 {
+    if rights_audit.drifted_rows > 0
+        || rights_audit.unhashed_rows > 0
+        || rights_audit.unverified_rows > 0
+    {
         ok = false;
     }
     tables.push(rights_audit);
@@ -94,7 +99,7 @@ async fn audit(
     // --- spatial_assets_onchain ---
     let sa_audit = audit_spatial_assets(&state, limit).await?;
     total_drifted += sa_audit.drifted_rows;
-    if sa_audit.drifted_rows > 0 || sa_audit.unhashed_rows > 0 {
+    if sa_audit.drifted_rows > 0 || sa_audit.unhashed_rows > 0 || sa_audit.unverified_rows > 0 {
         ok = false;
     }
     tables.push(sa_audit);
@@ -102,7 +107,7 @@ async fn audit(
     // --- geometry_versions_onchain ---
     let gv_audit = audit_geometry_versions(&state, limit).await?;
     total_drifted += gv_audit.drifted_rows;
-    if gv_audit.drifted_rows > 0 || gv_audit.unhashed_rows > 0 {
+    if gv_audit.drifted_rows > 0 || gv_audit.unhashed_rows > 0 || gv_audit.unverified_rows > 0 {
         ok = false;
     }
     tables.push(gv_audit);
@@ -110,7 +115,7 @@ async fn audit(
     // --- three_d_models_onchain ---
     let td_audit = audit_three_d_models(&state, limit).await?;
     total_drifted += td_audit.drifted_rows;
-    if td_audit.drifted_rows > 0 || td_audit.unhashed_rows > 0 {
+    if td_audit.drifted_rows > 0 || td_audit.unhashed_rows > 0 || td_audit.unverified_rows > 0 {
         ok = false;
     }
     tables.push(td_audit);
@@ -118,7 +123,7 @@ async fn audit(
     // --- spatial_snapshots_onchain ---
     let ss_audit = audit_spatial_snapshots(&state, limit).await?;
     total_drifted += ss_audit.drifted_rows;
-    if ss_audit.drifted_rows > 0 || ss_audit.unhashed_rows > 0 {
+    if ss_audit.drifted_rows > 0 || ss_audit.unhashed_rows > 0 || ss_audit.unverified_rows > 0 {
         ok = false;
     }
     tables.push(ss_audit);
@@ -143,6 +148,10 @@ async fn audit_parcels(state: &AppState, limit: usize) -> Result<TableAudit, App
             .await?;
     let anchored: i64 =
         sqlx::query_scalar("SELECT count(*) FROM parcels WHERE onchain_id IS NOT NULL")
+            .fetch_one(&state.pool)
+            .await?;
+    let unverified: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM parcels WHERE chain_verified = FALSE")
             .fetch_one(&state.pool)
             .await?;
 
@@ -176,15 +185,31 @@ async fn audit_parcels(state: &AppState, limit: usize) -> Result<TableAudit, App
     .fetch_one(&state.pool)
     .await?;
 
+    // Unverified rows: not yet confirmed by the indexer against the chain.
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM parcels \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "parcels".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: anchored,
         unanchored_rows: unanchored,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 
@@ -194,6 +219,10 @@ async fn audit_rights(state: &AppState, limit: usize) -> Result<TableAudit, AppE
         .await?;
     let hashed: i64 =
         sqlx::query_scalar("SELECT count(*) FROM rights WHERE mirror_hash IS NOT NULL")
+            .fetch_one(&state.pool)
+            .await?;
+    let unverified: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM rights WHERE chain_verified = FALSE")
             .fetch_one(&state.pool)
             .await?;
 
@@ -210,21 +239,36 @@ async fn audit_rights(state: &AppState, limit: usize) -> Result<TableAudit, AppE
                  coalesce(notes, '') || '|' || \
                  coalesce(to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), '') || '|' || \
                  coalesce(to_char(expires_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), ''), 'sha256'), 'hex') \
+          LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM rights \
+         WHERE chain_verified = FALSE \
          LIMIT $1",
     )
     .bind(limit as i32)
     .fetch_all(&state.pool)
     .await?;
 
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "rights".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: 0,
         unanchored_rows: 0,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 
@@ -234,6 +278,11 @@ async fn audit_spatial_assets(state: &AppState, limit: usize) -> Result<TableAud
         .await?;
     let hashed: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM spatial_assets_onchain WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM spatial_assets_onchain WHERE chain_verified = FALSE",
     )
     .fetch_one(&state.pool)
     .await?;
@@ -260,15 +309,30 @@ async fn audit_spatial_assets(state: &AppState, limit: usize) -> Result<TableAud
     .fetch_all(&state.pool)
     .await?;
 
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM spatial_assets_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "spatial_assets_onchain".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: 0,
         unanchored_rows: 0,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 
@@ -278,6 +342,11 @@ async fn audit_geometry_versions(state: &AppState, limit: usize) -> Result<Table
         .await?;
     let hashed: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM geometry_versions_onchain WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM geometry_versions_onchain WHERE chain_verified = FALSE",
     )
     .fetch_one(&state.pool)
     .await?;
@@ -311,15 +380,30 @@ async fn audit_geometry_versions(state: &AppState, limit: usize) -> Result<Table
     .fetch_all(&state.pool)
     .await?;
 
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM geometry_versions_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "geometry_versions_onchain".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: 0,
         unanchored_rows: 0,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 
@@ -329,6 +413,11 @@ async fn audit_three_d_models(state: &AppState, limit: usize) -> Result<TableAud
         .await?;
     let hashed: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM three_d_models_onchain WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM three_d_models_onchain WHERE chain_verified = FALSE",
     )
     .fetch_one(&state.pool)
     .await?;
@@ -356,15 +445,30 @@ async fn audit_three_d_models(state: &AppState, limit: usize) -> Result<TableAud
     .fetch_all(&state.pool)
     .await?;
 
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM three_d_models_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "three_d_models_onchain".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: 0,
         unanchored_rows: 0,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 
@@ -374,6 +478,11 @@ async fn audit_spatial_snapshots(state: &AppState, limit: usize) -> Result<Table
         .await?;
     let hashed: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM spatial_snapshots_onchain WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM spatial_snapshots_onchain WHERE chain_verified = FALSE",
     )
     .fetch_one(&state.pool)
     .await?;
@@ -402,15 +511,30 @@ async fn audit_spatial_snapshots(state: &AppState, limit: usize) -> Result<Table
     .fetch_all(&state.pool)
     .await?;
 
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM spatial_snapshots_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
     Ok(TableAudit {
         table: "spatial_snapshots_onchain".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,
-        drifted_rows: drifted.len() as i64,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
         anchored_rows: 0,
         unanchored_rows: 0,
-        drift: drifted,
+        drift: all_drift,
     })
 }
 

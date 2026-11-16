@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod error;
 mod geoutil;
+mod indexer;
 mod routes;
 mod state;
 mod storage;
@@ -81,6 +82,14 @@ async fn main() -> Result<()> {
             .allow_headers([axum::http::header::CONTENT_TYPE])
     };
 
+    let state = AppState {
+        pool,
+        geo,
+        api_authority: auth::ApiAuthority(config.api_authority_pubkey),
+        storage,
+        zk,
+    };
+
     let app: Router = Router::new()
         .route("/health", get(routes::health::health))
         .nest("/api/v1", routes::router())
@@ -92,13 +101,15 @@ async fn main() -> Result<()> {
             StatusCode::REQUEST_TIMEOUT,
             std::time::Duration::from_secs(config.request_timeout_secs),
         ))
-        .with_state(AppState {
-            pool,
-            geo,
-            api_authority: auth::ApiAuthority(config.api_authority_pubkey),
-            storage,
-            zk,
-        });
+        .with_state(state.clone());
+
+    // Sprint C: start the chain indexer as a background task.
+    let rpc_url = config.rpc_url.clone();
+    tokio::spawn(async move {
+        if let Err(err) = indexer::run_indexer(rpc_url, Arc::new(state)).await {
+            tracing::error!("chain indexer stopped: {err}");
+        }
+    });
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

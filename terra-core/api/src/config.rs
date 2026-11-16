@@ -12,6 +12,8 @@ pub struct Config {
     /// only (safest default); `*` restores the old permissive behavior for
     /// local development behind a gateway.
     pub cors_allowed_origins: Vec<String>,
+    /// Solana RPC URL for the chain indexer (Sprint C). Defaults to localnet.
+    pub rpc_url: String,
     /// Ed25519 public key (base58) that may sign privileged requests.
     /// When absent, privileged endpoints reject all callers (fail-closed).
     pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
@@ -73,6 +75,8 @@ impl Config {
                     ]
                 }),
             api_authority_pubkey,
+            rpc_url: std::env::var("TERRA_RPC_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string()),
         })
     }
 }
