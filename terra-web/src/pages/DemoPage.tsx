@@ -140,6 +140,7 @@ export default function DemoPage() {
   const [sceneWebglError, setSceneWebglError] = useState<string | null>(null)
   const [view, setView] = useState<'events' | 'viz'>('viz')
   const tlRef = useRef<HTMLDivElement | null>(null)
+  const [mapResizeKey, setMapResizeKey] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -504,18 +505,41 @@ export default function DemoPage() {
                     offChainParcels={sceneParcels}
                     roads={[]}
                     pois={[]}
+                    buildings={[]}
+                    plannedRoads={[]}
                     drawing={false}
+                    drawKind="parcel"
                     drawVertices={[]}
                     onDrawVertexAdd={() => undefined}
                     onDrawFinish={() => undefined}
                     onParcelClick={setSelectedSceneParcelId}
+                    onBuildingClick={() => undefined}
+                    highlightParcelId={selectedSceneParcelId}
+                    highlightBuildingId={null}
                     viewMode={sceneView}
+                    collapsibleHud
                     focus={sceneFocus}
                     basemap="imagery"
+                    resizeKey={mapResizeKey}
+                    graphicsTier="high"
+                    autoTier
+                    showLabels={sceneView === '3d'}
+                    onCameraMoved={() => undefined}
+                    onMapZoom={() => undefined}
                     onWebGLStatus={(error) => {
                       setSceneWebglError(error)
                       if (error) setSceneView('2d')
                     }}
+                    onFps={() => undefined}
+                    onTierCapped={() => undefined}
+                    onTerrainStatus={() => undefined}
+                    tilesetUrl={null}
+                    runtimeNodes={[]}
+                    coverCells={null}
+                    fetchedNodeIds={[]}
+                    fetchedAssets={new Map()}
+                    onFetchComponent={() => undefined}
+                    viewCommand={null}
                   />
                 )}
                 {phase >= 0 && spatial.stage && (
