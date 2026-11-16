@@ -1,7 +1,8 @@
 # INT-004 — Bridged GIS interoperability
 
-**Status:** `PARTIALLY IMPLEMENTED` (see
-[IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) B1, B7, C1–C3)
+**Status:** `PARTIALLY IMPLEMENTED` — all code gaps closed; only Q-008
+(storage independence / IPFS mirror) remains, founder/Q-gated. See
+[IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) B1, B7, C1–C3.
 **Chapter:** [7 — PostGIS Mirror & Geo-Engine](../chapters/07-postgis-geo-engine.md) *(planned)*
 
 ## Desired outcome
@@ -36,10 +37,13 @@ that friction.
   road network, but the graph is built **in the browser**, not served by the API.
 
 **Missing (`PARTIALLY IMPLEMENTED` gap):**
-- Server-side two-point routing (`GET /geo/route`) — not implemented; open
-  question Q-007.
-- `graph.rs` `RoadSegment` carries LineString geometry without node-id topology
-  for server-side pathfinding.
-- Per-row mirror hash anchoring — not implemented (RISK R-004).
+- Server-side two-point routing (`GET /geo/route`) — implemented
+  (`geo-engine/src/reach.rs` `route_between` Dijkstra; API
+  `routes/geo.rs`); Q-007 resolved.
+- `graph.rs` `RoadSegment` node-id topology (`from_node_id`/`to_node_id`) +
+  A→B Dijkstra with tests — implemented; Q-007 resolved.
+- Per-row mirror hash anchoring — implemented (migration 0048 + triggers +
+  `GET /mirror/audit`); closes RISK R-004.
 - IPFS mirror (migration 0018) — partial (B7); storage independence pending
-  (Q-008).
+  (Q-008, founder/Q-gated; default decision is N-of-M + proofs, not IPFS
+  vs providers).
