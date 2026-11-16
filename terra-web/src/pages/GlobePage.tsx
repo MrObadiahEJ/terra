@@ -26,6 +26,7 @@ import {
 import {
   resolveSceneAtLod,
   fetchComponentAsset,
+  getCachedAsset,
   createManifest,
   listManifests,
   getQuadCover,
@@ -377,6 +378,7 @@ export default function GlobePage() {
   const [sceneError, setSceneError] = useState<string | null>(null)
   const [sceneResolving, setSceneResolving] = useState(false)
   const [assetFetching, setAssetFetching] = useState<string | null>(null) // component_id in flight
+  const [fetchingAll, setFetchingAll] = useState(false) // batch fetch in flight
   const [fetchedAsset, setFetchedAsset] = useState<{
     componentId: string
     componentVersion: string
@@ -392,6 +394,18 @@ export default function GlobePage() {
     crs: string | null
   }>>(new Map())
   const [fetchedNodeIds, setFetchedNodeIds] = useState<string[]>([])
+  // Scene summary stats for the MVP header bar: total nodes, how many are
+  // fetched, and how many are grounded in a signed manifest (content-addressed).
+  const sceneSummary = useMemo(() => {
+    const nodes = sceneGraph?.nodes ?? []
+    const fetchedSet = new Set(fetchedNodeIds)
+    const signedCount = nodes.filter((n) => n.content_address).length
+    return {
+      total: nodes.length,
+      fetched: nodes.filter((n) => fetchedSet.has(n.object_id)).length,
+      signed: signedCount,
+    }
+  }, [sceneGraph, fetchedNodeIds])
   // Distributed runtime: current manifest for the camera's region
   const [currentManifest, setCurrentManifest] = useState<ManifestRow | null>(null)
   const [currentRegion, setCurrentRegion] = useState<string | null>(null)
@@ -708,6 +722,59 @@ export default function GlobePage() {
     },
     [],
   )
+
+  // Batch-fetch every unfetched node in the resolved scene, one at a time so
+  // the browser never stalls on concurrent large GLB downloads. Each fetch
+  // verifies the content address before trusting the bytes.
+  const fetchAll = useCallback(async () => {
+    const nodes = sceneGraph?.nodes ?? []
+    const fetchedSet = new Set(fetchedNodeIds)
+    const todo = nodes.filter((n) => !fetchedSet.has(n.object_id))
+    if (todo.length === 0) return
+    setFetchingAll(true)
+    try {
+      for (const node of todo) {
+        try {
+          const { data, retrieval } = await fetchComponentAsset(
+            node.object_id,
+            node.component_version_id,
+          )
+          setFetchedAssets((prev) => {
+            const next = new Map(prev)
+            next.set(node.object_id, {
+              data,
+              transform: retrieval.global_transform,
+              crs: retrieval.crs,
+            })
+            return next
+          })
+          setFetchedNodeIds((prev) =>
+            prev.includes(node.object_id) ? prev : [...prev, node.object_id],
+          )
+        } catch (err) {
+          // One node failing must not abort the whole batch; record and continue.
+          console.warn(`Failed to fetch ${node.object_id}:`, err)
+        }
+      }
+      // Surface the last successfully fetched asset in the summary banner.
+      const last = todo[todo.length - 1]
+      if (last) {
+        const cached = getCachedAsset(last.object_id, last.component_version_id)
+        if (cached) {
+          setFetchedAsset({
+            componentId: last.object_id,
+            componentVersion: last.component_version_id,
+            sizeBytes: cached.byteLength,
+            data: cached,
+            transform: null,
+            crs: null,
+          })
+        }
+      }
+    } finally {
+      setFetchingAll(false)
+    }
+  }, [sceneGraph, fetchedNodeIds])
   useEffect(() => {
     const timer = window.setTimeout(() => {
       refreshBuildings(lastCamRef.current, resolvedTier, layers.buildings)
@@ -1491,6 +1558,30 @@ export default function GlobePage() {
                       {currentManifest.region_name} v{currentManifest.version}
                     </span>
                     <span className="runtime-region">{currentRegion}</span>
+                    <div className="runtime-summary">
+                      <span className="runtime-summary-chip">
+                        {sceneSummary.total} {t('sceneNodesLabelShort', {
+                          n: sceneSummary.total,
+                        })}
+                      </span>
+                      <span className="runtime-summary-chip">
+                        {sceneSummary.fetched} fetched
+                      </span>
+                      <span className="runtime-summary-chip runtime-summary-chip-signed">
+                        {sceneSummary.signed} signed
+                      </span>
+                      {sceneSummary.total > 0 &&
+                        sceneSummary.fetched < sceneSummary.total && (
+                          <button
+                            className="btn btn-ghost px-2 py-1 text-[10px]"
+                            onClick={fetchAll}
+                            disabled={fetchingAll || sceneResolving}
+                            title={t('fetchAllTitle')}
+                          >
+                            {fetchingAll ? '…' : t('fetchAllAction')}
+                          </button>
+                        )}
+                    </div>
                     <button
                       className="btn btn-ghost px-2 py-1 text-[10px]"
                       onClick={() => setCurrentManifest(null)}
@@ -1550,11 +1641,15 @@ export default function GlobePage() {
                           onClick={() => fetchComponent(node)}
                           disabled={
                             assetFetching === node.component_version_id ||
+                            fetchingAll ||
                             node.loading_state !== 'pending'
                           }
                           title={t('fetchAssetTitle')}
                         >
-                          {assetFetching === node.component_version_id ? '…' : t('fetchAction')}
+                          {assetFetching === node.component_version_id ||
+                          fetchingAll
+                            ? '…'
+                            : t('fetchAction')}
                         </button>
                       </div>
                     ))}

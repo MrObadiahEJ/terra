@@ -5242,6 +5242,25 @@ header .wallet-adapter-button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.runtime-summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 10px;
+  font-size: 10px;
+}
+.runtime-summary-chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.runtime-summary-chip-signed {
+  color: #047857;
+  border-color: color-mix(in srgb, #047857 40%, var(--border));
+}
 .runtime-fetched {
   padding: 6px 8px;
   border-radius: 8px;
