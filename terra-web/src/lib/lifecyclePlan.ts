@@ -30,7 +30,7 @@ export function bytes(...parts: (Uint8Array | number[])[]): Uint8Array {
 export async function digest(parts: (Uint8Array | string)[]): Promise<Uint8Array> {
   const chunks = parts.map((p) => (typeof p === 'string' ? new TextEncoder().encode(p) : p))
   const input = bytes(...chunks)
-  const hash = await crypto.subtle.digest('SHA-256', input)
+  const hash = await crypto.subtle.digest('SHA-256', input as BufferSource)
   return new Uint8Array(hash)
 }
 

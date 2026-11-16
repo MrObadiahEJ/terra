@@ -88,7 +88,8 @@ function programFor(connection: Connection, wallet: AnchorWallet): Program<Terra
 }
 
 function reader<T>(program: Program<TerraRegistry>, name: string): AccountReader<T> {
-  return (program.account as unknown as Record<string, AccountReader<T>>)[name]
+  const acct = (program as any).account[name]
+  return acct as AccountReader<T>
 }
 
 async function sendTransaction(
@@ -185,6 +186,7 @@ interface StepState {
   pdas: LifecyclePdas
   operators: OperatorKeypairs
   txs: LifecycleTx[]
+  allTxs: Partial<Record<LifecycleStepId, LifecycleTx[]>>
 }
 
 async function deriveOperatorKeys(seed: string) {
@@ -853,7 +855,7 @@ async function proofStep(state: StepState): Promise<LifecycleProof> {
       dispute: state.pdas.dispute.toBase58(),
     },
     accounts,
-    transactions: state.progress.txs,
+    transactions: state.allTxs,
   }
 }
 
@@ -875,6 +877,7 @@ export async function runLifecycleStep(
     pdas,
     operators,
     txs: [],
+    allTxs: context.progress.txs,
   }
 
   switch (step) {

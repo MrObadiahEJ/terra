@@ -147,8 +147,10 @@ function useWalletView(): WalletView {
     }
     return {
       publicKey: effectivePublicKey,
-      signTransaction: activeSignTransaction,
-      signAllTransactions: activeSignAllTransactions,
+      signTransaction: ((tx: Transaction) =>
+        activeSignTransaction(tx as Transaction)) as AnchorWallet['signTransaction'],
+      signAllTransactions: ((txs: Transaction[]) =>
+        activeSignAllTransactions(txs as Transaction[])) as AnchorWallet['signAllTransactions'],
     }
   }, [effectivePublicKey, activeSignTransaction, activeSignAllTransactions])
 
