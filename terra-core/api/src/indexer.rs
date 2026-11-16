@@ -8,7 +8,7 @@
 //!
 //! The indexer runs as a background tokio task spawned from `main.rs`.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -236,44 +236,84 @@ async fn upsert_parcel(
         .map(|b| format!("{b:02x}"))
         .collect();
 
-    sqlx::query(
-        r#"
-        INSERT INTO parcels (
-            id, name, status, onchain_id, geometry_hash,
-            infrastructure_flags, rights_count, access_hash,
-            created_at, updated_at, chain_verified, chain_slot, chain_signature
-        ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, TRUE, $11, $12
-        )
-        ON CONFLICT (onchain_id) DO UPDATE SET
-            name = EXCLUDED.name,
-            status = EXCLUDED.status,
-            geometry_hash = EXCLUDED.geometry_hash,
-            infrastructure_flags = EXCLUDED.infrastructure_flags,
-            rights_count = EXCLUDED.rights_count,
-            access_hash = EXCLUDED.access_hash,
-            updated_at = EXCLUDED.updated_at,
-            chain_verified = TRUE,
-            chain_slot = EXCLUDED.chain_slot,
-            chain_signature = EXCLUDED.chain_signature
-        "#,
+    // Check whether the row already exists (onchain_id is the natural key).
+    let exists: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM parcels WHERE onchain_id = $1",
     )
-    .bind(id_hex)
-    .bind(&parcel.name)
-    .bind(parcel.status as i16)
     .bind(&pubkey_str)
-    .bind(&geometry_hash_hex)
-    .bind(parcel.infrastructure_flags as i16)
-    .bind(parcel.rights_count as i16)
-    .bind(&access_hash_hex)
-    .bind(parcel.created_at)
-    .bind(parcel.updated_at)
-    .bind(0i64) // chain_slot
-    .bind("") // chain_signature
-    .execute(&state.pool)
+    .fetch_optional(&state.pool)
     .await
-    .with_context(|| format!("upsert parcel {pubkey}"))?;
+    .map_err(|e| {
+        warn!("check existing parcel {pubkey} failed: {e:?}");
+        anyhow::anyhow!("check existing parcel {pubkey}: {e}")
+    })?;
+
+    if exists.is_some() {
+        sqlx::query(
+            r#"
+            UPDATE parcels SET
+                name = $1,
+                status = $2,
+                geometry = ST_GeomFromGeoJSON('{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}'),
+                geometry_hash = $3,
+                infrastructure_flags = $4,
+                rights_count = $5,
+                access_hash = $6,
+                updated_at = to_timestamp($7::double precision),
+                chain_verified = TRUE,
+                chain_slot = $8,
+                chain_signature = $9
+            WHERE onchain_id = $10
+            "#,
+        )
+        .bind(&parcel.name)
+        .bind(format!("{}", parcel.status))
+        .bind(&geometry_hash_hex)
+        .bind(parcel.infrastructure_flags as i16)
+        .bind(parcel.rights_count as i16)
+        .bind(&access_hash_hex)
+        .bind(parcel.updated_at as f64)
+        .bind(0i64) // chain_slot
+        .bind("") // chain_signature
+        .bind(&pubkey_str)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("update parcel {pubkey} failed: {e:?}");
+            anyhow::anyhow!("update parcel {pubkey}: {e}")
+        })?;
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO parcels (
+                id, name, status, geometry, onchain_id, geometry_hash,
+                infrastructure_flags, rights_count, access_hash,
+                created_at, updated_at, chain_verified, chain_slot, chain_signature
+            ) VALUES (
+                $1, $2, $3, ST_GeomFromGeoJSON('{"type":"Polygon","coordinates":[[[0,0],[0,0],[0,0]]]}'), $4, $5, $6, $7, $8,
+                to_timestamp($9::double precision), to_timestamp($10::double precision), TRUE, $11, $12
+            )
+            "#,
+        )
+        .bind(id_hex)
+        .bind(&parcel.name)
+        .bind(format!("{}", parcel.status))
+        .bind(&pubkey_str)
+        .bind(&geometry_hash_hex)
+        .bind(parcel.infrastructure_flags as i16)
+        .bind(parcel.rights_count as i16)
+        .bind(&access_hash_hex)
+        .bind(parcel.created_at as f64)
+        .bind(parcel.updated_at as f64)
+        .bind(0i64) // chain_slot
+        .bind("") // chain_signature
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("insert parcel {pubkey} failed: {e:?}");
+            anyhow::anyhow!("insert parcel {pubkey}: {e}")
+        })?;
+    }
 
     Ok(())
 }
