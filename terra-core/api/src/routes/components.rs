@@ -22,7 +22,7 @@ use crate::auth::{OptionalSignedRequest, SignedRequest};
 use crate::error::AppError;
 use crate::state::AppState;
 
-use terra_geo::component_package::{validate, ComponentPackage};
+use terra_geo::component_package::{validate_with_geometry, ComponentPackage};
 use terra_geo::ContentAddress;
 
 pub fn router() -> Router<AppState> {
@@ -72,6 +72,12 @@ pub struct ComponentRow {
 pub struct SubmitComponent {
     #[serde(flatten)]
     pub package: ComponentPackage,
+    /// Optional GeoJSON geometry document. When provided, RFC-015 rule 1
+    /// (digest integrity) is verified at submit time by recomputing the
+    /// canonical terra-geom-v2 digest and comparing it to `geometry_digest`.
+    /// When omitted, only structural rules 2–8 are checked (previous behavior).
+    #[serde(default)]
+    pub geometry: Option<String>,
 }
 
 pub async fn submit_component(
@@ -88,11 +94,12 @@ pub async fn submit_component(
         .ok_or_else(|| AppError::unauthorized("API authority not configured"))?;
     auth.verify(&key, "POST", "/api/v1/components")?;
 
-    // RFC-015 §4 conformance (rules 2–8). Rule 1 (digest integrity) requires
-    // the geometry document and is enforced by `validate_with_geometry` where
-    // that document is available; the raw-artifact endpoint records a SHA-256
-    // content address of the uploaded bytes, which is a different value.
-    validate(pkg).map_err(|e| AppError::bad_request(e.to_string()))?;
+    // RFC-015 §4 conformance. Rule 1 (digest integrity) is checked when the
+    // caller submits the geometry document inline; otherwise only structural
+    // rules 2–8 are validated (the digest can be verified later once the
+    // geometry document is available).
+    validate_with_geometry(pkg, input.geometry.as_deref())
+        .map_err(|e| AppError::bad_request(e.to_string()))?;
 
     // Reject application-layer provenance at the protocol boundary. RFC-015
     // §3 admits imported/observed/surveyed/reconstructed/inferred/
@@ -768,7 +775,10 @@ mod tests {
         let (status, Json(row)) = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
-            Json(SubmitComponent { package: pkg }),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: None,
+            }),
         )
         .await
         .unwrap();
@@ -874,7 +884,10 @@ mod tests {
         let (_, Json(row)) = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
-            Json(SubmitComponent { package: pkg }),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: None,
+            }),
         )
         .await
         .unwrap();
@@ -935,7 +948,10 @@ mod tests {
         let (_, Json(row)) = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
-            Json(SubmitComponent { package: pkg }),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: None,
+            }),
         )
         .await
         .unwrap();
@@ -1010,7 +1026,10 @@ mod tests {
         let result = submit_component(
             State(state.clone()),
             signed_submit_request(&pkg),
-            Json(SubmitComponent { package: pkg }),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: None,
+            }),
         )
         .await;
 
@@ -1028,5 +1047,127 @@ mod tests {
             .execute(&pool)
             .await
             .expect("clean up test component");
+    }
+
+    #[tokio::test]
+    async fn submit_component_verifies_geometry_digest_match() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed geometry digest test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        let mut pkg = base_package();
+        pkg.component_id = format!("comp-digest-match-{}", Uuid::new_v4());
+        // This GeoJSON matches pkg.geometry_digest ("0e5ac8e4…6674").
+        pkg.geometry_artifact = "https://storage.example.com/roof.geojson".into();
+        let geometry = serde_json::json!({
+            "crs": "EPSG:4326",
+            "elevation_ref": "EGM2008",
+            "vertical_units": "m",
+            "precision": 3,
+            "type": "Point",
+            "coordinates": [8.5, 47.4, 400]
+        });
+
+        let result = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: Some(geometry.to_string()),
+            }),
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "matching geometry digest should be accepted"
+        );
+        let (_status, Json(row)) = result.unwrap();
+        assert_eq!(
+            row.geometry_digest,
+            "0e5ac8e42361d78feabaedf8aa9dbb5173285f879f40e9fb2cf93f2943146674"
+        );
+
+        sqlx::query("DELETE FROM component_packages WHERE id = $1")
+            .bind(row.id)
+            .execute(&pool)
+            .await
+            .expect("clean up test component");
+    }
+
+    #[tokio::test]
+    async fn submit_component_rejects_geometry_digest_mismatch() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed geometry digest mismatch test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
+                &[13u8; 32],
+            )))),
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        let mut pkg = base_package();
+        pkg.component_id = format!("comp-digest-mismatch-{}", Uuid::new_v4());
+        // This GeoJSON has all required fields but different coordinates, so
+        // its canonical digest won't match pkg.geometry_digest.
+        let geometry = serde_json::json!({
+            "crs": "EPSG:4326",
+            "elevation_ref": "EGM2008",
+            "vertical_units": "m",
+            "precision": 3,
+            "type": "Point",
+            "coordinates": [9.9, 9.9, 999.0]
+        });
+
+        let result = submit_component(
+            State(state.clone()),
+            signed_submit_request(&pkg),
+            Json(SubmitComponent {
+                package: pkg,
+                geometry: Some(geometry.to_string()),
+            }),
+        )
+        .await;
+
+        assert!(
+            result.is_err(),
+            "mismatching geometry digest should be rejected"
+        );
+        match result.err().unwrap() {
+            AppError::BadRequest(msg) => {
+                assert!(
+                    msg.contains("digest integrity"),
+                    "unexpected message: {msg}"
+                );
+            }
+            other => panic!("expected BadRequest, got {:?}", other),
+        }
     }
 }
