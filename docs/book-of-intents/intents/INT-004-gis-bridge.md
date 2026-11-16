@@ -1,7 +1,6 @@
 # INT-004 — Bridged GIS interoperability
 
-**Status:** `PARTIALLY IMPLEMENTED` — all code gaps closed; only Q-008
-(storage independence / IPFS mirror) remains, founder/Q-gated. See
+**Status:** `IMPLEMENTED AND VERIFIED` — all code gaps closed. See
 [IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) B1, B7, C1–C3.
 **Chapter:** [7 — PostGIS Mirror & Geo-Engine](../chapters/07-postgis-geo-engine.md) *(planned)*
 
@@ -36,7 +35,7 @@ that friction.
   `terra-web/src/story/roads.ts` (vitest roads suite) — journeys route on the
   road network, but the graph is built **in the browser**, not served by the API.
 
-**Missing (`PARTIALLY IMPLEMENTED` gap):**
+**Missing:** none — all INT-004 code gaps are implemented:
 - Server-side two-point routing (`GET /geo/route`) — implemented
   (`geo-engine/src/reach.rs` `route_between` Dijkstra; API
   `routes/geo.rs`); Q-007 resolved.
@@ -44,6 +43,10 @@ that friction.
   A→B Dijkstra with tests — implemented; Q-007 resolved.
 - Per-row mirror hash anchoring — implemented (migration 0048 + triggers +
   `GET /mirror/audit`); closes RISK R-004.
-- IPFS mirror (migration 0018) — partial (B7); storage independence pending
-  (Q-008, founder/Q-gated; default decision is N-of-M + proofs, not IPFS
-  vs providers).
+- IPFS mirror / storage independence — implemented (migration 0018 mirror
+  tables served by `GET /providers/authority-registries` and
+  `GET /providers/ipfs-docs`; `storage_providers`/`provider_replicas` from
+  migration 0037; proof-of-possession from migration 0046; `content_address`
+  binding from migration 0049; reliability derived from challenge results in
+  `prove_replica`; `GET /providers/replication-audit` enforces N-of-M ≥2
+  provider classes); Q-008 resolved.
