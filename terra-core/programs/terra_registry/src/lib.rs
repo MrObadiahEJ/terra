@@ -1995,19 +1995,19 @@ pub mod terra_registry {
 
     /// Register an off-chain 3D model claim against an anchored geometry
     /// version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain
-    /// geometry, only hash + storage pointer).
+    /// geometry, only hash + h3_index).
     #[allow(clippy::too_many_arguments)]
     pub fn register_3d_model(
         ctx: Context<Register3DModel>,
         model_hash: [u8; 32],
-        storage_reference: String,
+        h3_index: u64,
         model_format: u8,
         geometry_version: u32,
     ) -> Result<()> {
         three_d_model::register_3d_model(
             ctx,
             model_hash,
-            storage_reference,
+            h3_index,
             model_format,
             geometry_version,
         )
@@ -2112,11 +2112,22 @@ pub mod terra_registry {
 
     pub fn submit_verification_attestation(
         ctx: Context<SubmitVerificationAttestation>,
-        result: u8,
-        confidence: u8,
-        signature_hash: [u8; 32],
+        vc_type: String,
+        credential_subject: Pubkey,
+        issuance_date: i64,
+        expiration_date: i64,
+        sd_jwt_digest: [u8; 32],
+        selective_disclosure: bool,
     ) -> Result<()> {
-        verification::attestation::submit_attestation(ctx, result, confidence, signature_hash)
+        verification::attestation::submit_attestation(
+            ctx,
+            vc_type,
+            credential_subject,
+            issuance_date,
+            expiration_date,
+            sd_jwt_digest,
+            selective_disclosure,
+        )
     }
 
     pub fn verify_claim(ctx: Context<VerifyClaim>) -> Result<()> {
@@ -2441,6 +2452,7 @@ pub mod terra_registry {
         candidates: Vec<Pubkey>,
         chosen: Pubkey,
         competitor_count: u16,
+        vrf_randomness: [u8; 32],
     ) -> Result<()> {
         routing::route_task(
             ctx,
@@ -2449,6 +2461,7 @@ pub mod terra_registry {
             candidates,
             chosen,
             competitor_count,
+            vrf_randomness,
         )
     }
 
@@ -5466,7 +5479,7 @@ pub struct AddEvidenceArtifact<'info> {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-#[instruction(task_id: [u8; 32], req_index: u8, _candidates: Vec<Pubkey>, _chosen: Pubkey, _competitor_count: u16)]
+#[instruction(task_id: [u8; 32], req_index: u8, _candidates: Vec<Pubkey>, _chosen: Pubkey, _competitor_count: u16, _vrf_randomness: [u8; 32])]
 pub struct RouteTask<'info> {
     #[account(
         init,
@@ -6778,8 +6791,11 @@ pub struct VerificationAttestationSubmitted {
     pub claim: Pubkey,
     pub attestation: Pubkey,
     pub validator: Pubkey,
-    pub result: u8,
-    pub confidence: u8,
+    pub credential_subject: Pubkey,
+    pub vc_type: String,
+    pub issuance_date: i64,
+    pub expiration_date: i64,
+    pub sd_jwt_digest: [u8; 32],
     pub attestation_count: u8,
     pub required: u8,
 }
@@ -7847,6 +7863,14 @@ pub enum TerraError {
     // P0-6: canonical attestation digest
     #[msg("Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence")]
     AttestationDigestMismatch,
+
+    // Intent 2: W3C VC + SD-JWT
+    #[msg("VC type exceeds maximum length")]
+    VcTypeTooLong,
+    #[msg("VC issuance_date must not be after expiration_date")]
+    InvalidVcValidity,
+    #[msg("SD-JWT digest does not match the canonical digest over VC fields")]
+    SdJwtDigestMismatch,
 
     // P1: unique validator sets
     #[msg("Duplicate validator in the declared validator set")]

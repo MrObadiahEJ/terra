@@ -15,6 +15,12 @@ export function u32le(n: number): Uint8Array {
   return out
 }
 
+export function u64le(n: number): Uint8Array {
+  const out = new Uint8Array(8)
+  new DataView(out.buffer).setBigUint64(0, BigInt(n), true)
+  return out
+}
+
 export function bytes(...parts: (Uint8Array | number[])[]): Uint8Array {
   const chunks = parts.map((p) => (p instanceof Uint8Array ? p : Uint8Array.from(p)))
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0))
@@ -35,20 +41,24 @@ export async function digest(parts: (Uint8Array | string)[]): Promise<Uint8Array
 }
 
 /** Exact attestation preimage from `verification/attestation.rs`. */
-export async function attestationDigest(
+export async function sdJwtDigest(
   claim: PublicKey,
   validator: PublicKey,
   observation: PublicKey,
-  result: number,
-  confidence: number,
+  credentialSubject: PublicKey,
+  vcType: string,
+  issuanceDate: number,
+  expirationDate: number,
 ): Promise<Uint8Array> {
   return digest([
-    'terra:attestation:v1',
+    'terra:vc:sd-jwt:v1',
     claim.toBuffer(),
     validator.toBuffer(),
     observation.toBuffer(),
-    u8(result),
-    u8(confidence),
+    credentialSubject.toBuffer(),
+    new TextEncoder().encode(vcType),
+    u64le(issuanceDate),
+    u64le(expirationDate),
   ])
 }
 

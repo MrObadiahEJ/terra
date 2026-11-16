@@ -11,6 +11,7 @@ const AtlasPage = lazy(() => import('./components/atlas/AtlasPage'))
 const DemoPage = lazy(() => import('./pages/DemoPage'))
 const LabPage = lazy(() => import('./pages/LabPage'))
 const LandDetailPage = lazy(() => import('./pages/LandDetailPage'))
+const MvpFlowPage = lazy(() => import('./pages/MvpFlowPage'))
 const NetworkPage = lazy(() => import('./pages/NetworkPage'))
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
@@ -93,6 +94,7 @@ function App() {
               <Route path="/lab/land" element={<LandDetailPage />} />
               <Route path="/lab" element={<LabPage />} />
               <Route path="/demo" element={<DemoPage />} />
+              <Route path="/mvp" element={<MvpFlowPage />} />
               <Route path="/network" element={<NetworkPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
               <Route path="/status" element={<StatusPage />} />

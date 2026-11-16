@@ -14,7 +14,7 @@ import { TERRA_CLUSTER, TERRA_PROGRAM_ID } from './constants'
 import idl from '../idl/terra_registry.json'
 import type { TerraRegistry } from '../idl/terraRegistry'
 import {
-  attestationDigest,
+  sdJwtDigest,
   deriveLifecycleIds,
   deriveLifecyclePdas,
   deriveOperatorKeypairs,
@@ -425,15 +425,24 @@ async function attestationsStep(state: StepState): Promise<void> {
     ['validator-two', state.operators.validatorTwo],
   ] as const) {
     if (await attestations.fetchNullable(state.pdas.attestation(validator.publicKey))) continue
-    const signature = await attestationDigest(
+    const sd_jwt_digest = await sdJwtDigest(
       state.pdas.claim,
       validator.publicKey,
       state.pdas.observation(validator.publicKey),
-      0, // CONFIRMED
-      95,
+      state.pdas.claim,
+      'VerificationAttestation',
+      1_700_000_000,
+      1_800_000_000,
     )
     const ix = await state.program.methods
-      .submitVerificationAttestation(0, 95, Array.from(signature))
+      .submitVerificationAttestation(
+        'VerificationAttestation',
+        state.pdas.claim,
+        new BN(1_700_000_000),
+        new BN(1_800_000_000),
+        Array.from(sd_jwt_digest),
+        false,
+      )
       .accounts({
         attestation: state.pdas.attestation(validator.publicKey),
         claim: state.pdas.claim,
@@ -568,7 +577,14 @@ async function taskStep(state: StepState): Promise<void> {
   let assignment = await assignments.fetchNullable(assignmentPda)
   if (!assignment) {
     const ix = await state.program.methods
-      .routeTask(Array.from(state.ids.taskId), 0, [validator.publicKey], validator.publicKey, 1)
+      .routeTask(
+        Array.from(state.ids.taskId),
+        0,
+        [validator.publicKey],
+        validator.publicKey,
+        1,
+        new Uint8Array(32), // vrf_randomness — Switchboard VRF / Pyth Entropy off-chain
+      )
       .accounts({
         assignment: assignmentPda,
         task: state.pdas.task,

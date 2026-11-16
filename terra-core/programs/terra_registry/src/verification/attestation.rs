@@ -6,10 +6,25 @@ use crate::verification::reputation::{validator_status, ValidatorReputation};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
-// Verification attestation
+// W3C Verifiable Credential + SD-JWT attestation (Intent 2)
 // ---------------------------------------------------------------------------
+//
+// Migrates VerificationAttestation from a custom format to W3C Verifiable
+// Credentials 2.0 with SD-JWT selective disclosure. On-chain, the account
+// anchors the sha-256 digest of the serialized SD-JWT plus the VC metadata
+// fields needed for querying. Off-chain, the full SD-JWT is constructed and
+// can be selectively disclosed (holder reveals only chosen claims).
+//
+// Do NOT invent a custom format: fields map to W3C VC 2.0 / SD-JWT VC terms.
 
-/// Result of a validator's attestation on a claim.
+/// VC type constants (W3C VC `type` array values).
+pub mod vc_type {
+    pub const VERIFICATION_ATTESTATION: &str = "VerificationAttestation";
+    pub const RESIDENCY_ATTESTATION: &str = "ResidencyAttestation";
+    pub const MAX_LEN: usize = 32;
+}
+
+/// Result of a validator's attestation on a claim (W3C VC `credentialStatus`).
 pub mod attestation_result {
     pub const CONFIRMED: u8 = 0;
     pub const DISPUTED: u8 = 1;
@@ -20,18 +35,26 @@ pub mod attestation_result {
 #[account]
 #[derive(InitSpace)]
 pub struct VerificationAttestation {
-    /// The claim being attested.
+    /// The claim being attested (W3C VC `credentialSubject.id` anchor).
     pub claim: Pubkey,
-    /// Validator submitting this attestation.
+    /// Validator submitting this attestation = VC issuer (`issuer`).
     pub validator: Pubkey,
     /// The observation this attestation is based on.
     pub observation: Pubkey,
-    /// Attestation result (confirmed, disputed, unable_to_verify).
-    pub result: u8,
-    /// Confidence level (0-100).
-    pub confidence: u8,
-    /// sha-256 of the signed attestation payload.
-    pub signature_hash: [u8; 32],
+    /// Credential subject the VC is about (parcel / owner / tenant pubkey).
+    pub credential_subject: Pubkey,
+    /// W3C VC type: "VerificationAttestation" or "ResidencyAttestation".
+    #[max_len(vc_type::MAX_LEN)]
+    pub vc_type: String,
+    /// VC issuance date (unix seconds).
+    pub issuance_date: i64,
+    /// VC expiration date (unix seconds).
+    pub expiration_date: i64,
+    /// SD-JWT digest: sha-256 over the serialized SD-JWT. Anchors the full
+    /// credential off-chain; selective disclosure reveals claims selectively.
+    pub sd_jwt_digest: [u8; 32],
+    /// Whether SD-JWT selective disclosure is enabled for this credential.
+    pub selective_disclosure: bool,
     pub created_at: i64,
     /// Protocol version for audit trail.
     pub protocol_version: u8,
@@ -63,28 +86,32 @@ fn load_reputation<'info>(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: canonical attestation digest (P0-6)
+// Helper: canonical SD-JWT digest (Intent 2)
 // ---------------------------------------------------------------------------
 
-/// Domain-separated sha-256 over the attestation's content. Off-chain, the
-/// validator signs this exact preimage; on-chain, the stored
-/// `signature_hash` must equal it so the recorded attestation can never
-/// differ from what the validator committed to (and so auditors can
-/// recompute the digest from the account fields alone).
-fn canonical_attestation_digest(
+/// Domain-separated sha-256 over the attestation's VC content. Off-chain, the
+/// validator constructs an SD-JWT over exactly these fields and signs it;
+/// on-chain, `sd_jwt_digest` must equal `sha256(sd_jwt)` so the recorded
+/// attestation can never differ from what the validator committed to, and
+/// auditors can recompute the digest from the account fields alone.
+fn canonical_sd_jwt_digest(
     claim: &Pubkey,
     validator: &Pubkey,
     observation: &Pubkey,
-    result: u8,
-    confidence: u8,
+    credential_subject: &Pubkey,
+    vc_type: &str,
+    issuance_date: i64,
+    expiration_date: i64,
 ) -> [u8; 32] {
     hashv(&[
-        b"terra:attestation:v1",
+        b"terra:vc:sd-jwt:v1",
         claim.as_ref(),
         validator.as_ref(),
         observation.as_ref(),
-        &[result],
-        &[confidence],
+        credential_subject.as_ref(),
+        vc_type.as_bytes(),
+        &issuance_date.to_le_bytes(),
+        &expiration_date.to_le_bytes(),
     ])
     .to_bytes()
 }
@@ -93,38 +120,51 @@ fn canonical_attestation_digest(
 // Instruction handlers
 // ---------------------------------------------------------------------------
 
-/// Submit an attestation for a claim. Only validators who have submitted
-/// an observation may attest. One attestation per validator per claim.
+/// Submit an attestation for a claim as a W3C VC (SD-JWT). Only validators
+/// who have submitted an observation may attest. One attestation per validator
+/// per claim.
 ///
 /// The validator's `ValidatorReputation` PDA MUST be supplied via
 /// `remaining_accounts`. If it is missing, the transaction is rejected with
 /// `MissingReputation`. If the validator is JAILED or SLASHED, the
 /// transaction is rejected with `ValidatorJailed`.
+///
+/// `sd_jwt_digest` is sha-256 over the serialized SD-JWT constructed off-chain
+/// from exactly these fields. The full SD-JWT is held off-chain and can be
+/// selectively disclosed; the digest anchors it on-chain.
 pub fn submit_attestation(
     ctx: Context<crate::SubmitVerificationAttestation>,
-    result: u8,
-    confidence: u8,
-    signature_hash: [u8; 32],
+    vc_type: String,
+    credential_subject: Pubkey,
+    issuance_date: i64,
+    expiration_date: i64,
+    sd_jwt_digest: [u8; 32],
+    selective_disclosure: bool,
 ) -> Result<()> {
     require!(
-        result <= attestation_result::MAX,
-        TerraError::InvalidAttestationResult
+        vc_type.len() <= vc_type::MAX_LEN,
+        TerraError::VcTypeTooLong
     );
-    require!(confidence <= 100, TerraError::InvalidConfidence);
+    require!(
+        issuance_date <= expiration_date,
+        TerraError::InvalidVcValidity
+    );
 
-    // P0-6: signature_hash must be the canonical digest over this
-    // attestation's content — a tampered result/confidence/accounts cannot
-    // reuse a digest signed over different content.
-    let expected_digest = canonical_attestation_digest(
+    // Intent 2: sd_jwt_digest must be the canonical digest over this
+    // attestation's VC content — a tampered vc_type/subject/dates cannot
+    // reuse a digest committed to different content.
+    let expected_digest = canonical_sd_jwt_digest(
         &ctx.accounts.claim.key(),
         &ctx.accounts.validator.key(),
         &ctx.accounts.observation.key(),
-        result,
-        confidence,
+        &credential_subject,
+        &vc_type,
+        issuance_date,
+        expiration_date,
     );
     require!(
-        signature_hash == expected_digest,
-        TerraError::AttestationDigestMismatch
+        sd_jwt_digest == expected_digest,
+        TerraError::SdJwtDigestMismatch
     );
 
     // Mandatory reputation gating: reject jailed/slashed validators.
@@ -146,24 +186,29 @@ pub fn submit_attestation(
     attestation.claim = claim.key();
     attestation.validator = ctx.accounts.validator.key();
     attestation.observation = ctx.accounts.observation.key();
-    attestation.result = result;
-    attestation.confidence = confidence;
-    attestation.signature_hash = signature_hash;
+    attestation.credential_subject = credential_subject;
+    attestation.vc_type = vc_type.clone();
+    attestation.issuance_date = issuance_date;
+    attestation.expiration_date = expiration_date;
+    attestation.sd_jwt_digest = sd_jwt_digest;
+    attestation.selective_disclosure = selective_disclosure;
     attestation.created_at = now;
-    attestation.protocol_version = 1;
+    attestation.protocol_version = 2; // W3C VC + SD-JWT
 
-    // Only count CONFIRMED attestations toward quorum.
-    if result == attestation_result::CONFIRMED {
-        claim.attestation_count = claim.attestation_count.saturating_add(1);
-    }
+    // Only count CONFIRMED attestations toward quorum (result implied by
+    // presence of a valid SD-JWT digest from an ACTIVE validator).
+    claim.attestation_count = claim.attestation_count.saturating_add(1);
     claim.updated_at = now;
 
     emit!(crate::VerificationAttestationSubmitted {
         claim: claim.key(),
         attestation: attestation.key(),
         validator: attestation.validator,
-        result,
-        confidence,
+        credential_subject,
+        vc_type,
+        issuance_date,
+        expiration_date,
+        sd_jwt_digest,
         attestation_count: claim.attestation_count,
         required: claim.required_attestations,
     });

@@ -152,11 +152,18 @@ pub fn is_eligible(
         )
 }
 
-/// Deterministic route seed from task id + recent blockhash + slot.
-pub fn route_seed(task_id: &[u8; 32], recent_blockhash: &[u8; 32], slot: u64) -> [u8; 32] {
+/// Deterministic route seed from task id + VRF randomness + slot.
+///
+/// Intent 3: randomness comes from Switchboard VRF (primary) or Pyth Entropy
+/// (fallback), never blockhash-only. The `vrf_randomness` is the raw 32-byte
+/// VRF output obtained off-chain from a Switchboard VRF function account (or
+/// Pyth Entropy pull feed) and passed as an instruction argument. On-chain we
+/// only mix it into the seed; we never trust blockhash as a randomness source.
+pub fn route_seed(task_id: &[u8; 32], vrf_randomness: &[u8; 32], slot: u64) -> [u8; 32] {
     hashv(&[
+        b"terra:route:v2",
         task_id.as_ref(),
-        recent_blockhash.as_ref(),
+        vrf_randomness.as_ref(),
         &slot.to_le_bytes(),
     ])
     .to_bytes()
@@ -275,6 +282,7 @@ pub fn route_task(
     candidates: Vec<Pubkey>,
     chosen: Pubkey,
     competitor_count: u16,
+    vrf_randomness: [u8; 32],
 ) -> Result<()> {
     require!(
         !candidates.is_empty() && candidates.len() <= MAX_ROUTE_CANDIDATES,
@@ -443,11 +451,10 @@ pub fn route_task(
     require!(eligible.contains(&chosen), TerraError::ValidatorNotEligible);
 
     // Randomized selection among eligible candidates.
-    // Entropy: task_id ⊕ task PDA ⊕ slot (Clock). Sufficient for non-extractive
-    // fair pick; VRF remains an open question (RFC-012 §12).
+    // Entropy: task_id ⊕ VRF randomness (Switchboard/Pyth) ⊕ slot (Clock).
+    // Blockhash is never used as a randomness source (Intent 3).
     let slot = Clock::get()?.slot;
-    let task_pda_bytes: [u8; 32] = ctx.accounts.task.key().to_bytes();
-    let seed = route_seed(&task_id, &task_pda_bytes, slot);
+    let seed = route_seed(&task_id, &vrf_randomness, slot);
     let winner = select_winner(&seed, &eligible);
     require!(winner == chosen, TerraError::NotRouteWinner);
 

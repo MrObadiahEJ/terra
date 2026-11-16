@@ -245,8 +245,54 @@ fn verification_attestation_pda(claim: &Pubkey, validator: &Pubkey) -> (Pubkey, 
     )
 }
 
-/// Mirror of the program's canonical attestation digest (P0-6).
-/// `signature_hash` in the instruction data must equal this value.
+/// Mirror of the program's canonical SD-JWT digest (Intent 2).
+/// `sd_jwt_digest` in the instruction data must equal this value.
+fn sd_jwt_digest(
+    claim: &Pubkey,
+    validator: &Pubkey,
+    observation: &Pubkey,
+    credential_subject: &Pubkey,
+    vc_type: &str,
+    issuance_date: i64,
+    expiration_date: i64,
+) -> [u8; 32] {
+    solana_program::hash::hashv(&[
+        b"terra:vc:sd-jwt:v1",
+        claim.as_ref(),
+        validator.as_ref(),
+        observation.as_ref(),
+        credential_subject.as_ref(),
+        vc_type.as_bytes(),
+        &issuance_date.to_le_bytes(),
+        &expiration_date.to_le_bytes(),
+    ])
+    .to_bytes()
+}
+
+/// Build instruction data for `submit_verification_attestation` (Intent 2:
+/// W3C VC + SD-JWT). Anchor string layout: u32 LE length + bytes.
+fn attestation_instruction_data(
+    vc_type: &str,
+    credential_subject: &Pubkey,
+    issuance_date: i64,
+    expiration_date: i64,
+    sd_jwt_digest: &[u8; 32],
+    selective_disclosure: bool,
+) -> Vec<u8> {
+    let mut d = discriminator("global", "submit_verification_attestation").to_vec();
+    d.extend_from_slice(&(vc_type.len() as u32).to_le_bytes());
+    d.extend_from_slice(vc_type.as_bytes());
+    d.extend_from_slice(credential_subject.as_ref());
+    d.extend_from_slice(&issuance_date.to_le_bytes());
+    d.extend_from_slice(&expiration_date.to_le_bytes());
+    d.extend_from_slice(sd_jwt_digest);
+    d.push(selective_disclosure as u8);
+    d
+}
+
+/// Legacy helper kept for any remaining references; computes the old custom
+/// digest. Not used by the W3C VC path.
+#[allow(dead_code)]
 fn attestation_digest(
     claim: &Pubkey,
     validator: &Pubkey,
@@ -6978,16 +7024,22 @@ async fn verification_full_e2e() {
                 AccountMeta::new_readonly(rep_a, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(95);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator_a.pubkey(),
-                    &obs_a,
-                    attestation_result::CONFIRMED,
-                    95,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator_a.pubkey(),
+                        &obs_a,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -7016,16 +7068,22 @@ async fn verification_full_e2e() {
                 AccountMeta::new_readonly(rep_b, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(88);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator_b.pubkey(),
-                    &obs_b,
-                    attestation_result::CONFIRMED,
-                    88,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator_b.pubkey(),
+                        &obs_b,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -7190,16 +7248,22 @@ async fn verify_claim_quorum_not_reached() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -7632,19 +7696,25 @@ async fn verified_claim_ok(
                     AccountMeta::new_readonly(system_program_id(), false),
                     AccountMeta::new_readonly(rep_pk, false),
                 ],
-                data: {
-                    let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                    d.push(attestation_result::CONFIRMED);
-                    d.push(confidence);
-                    d.extend_from_slice(&attestation_digest(
+            data: {
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
+                    &claim_pk,
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
                         &claim_pk,
                         &validator.pubkey(),
-                        &obs_pk,
-                        attestation_result::CONFIRMED,
-                        confidence,
-                    ));
-                    d
-                },
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
+                d
+            },
             },
         )
         .await
@@ -7860,16 +7930,22 @@ async fn challenge_file_and_vote() {
                 AccountMeta::new_readonly(rep_v1, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(95);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &v1.pubkey(),
-                    &obs_v1,
-                    attestation_result::CONFIRMED,
-                    95,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -8375,16 +8451,22 @@ async fn jailed_validator_cannot_attest() {
                 AccountMeta::new_readonly(rep_pk, false), // remaining: reputation
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -8484,16 +8566,22 @@ async fn p0_5_attestation_requires_reputation_account() {
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -8586,16 +8674,22 @@ async fn p0_5_attestation_with_active_reputation_succeeds() {
                 AccountMeta::new_readonly(rep_pk, false), // remaining: reputation
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -8605,7 +8699,7 @@ async fn p0_5_attestation_with_active_reputation_succeeds() {
 
     let att_record: VerificationAttestation = read_account(&ctx, att).await;
     assert_eq!(att_record.validator, validator.pubkey());
-    assert_eq!(att_record.result, attestation_result::CONFIRMED);
+    assert_eq!(att_record.vc_type, verification::vc_type::VERIFICATION_ATTESTATION);
     let claim: Claim = read_account(&ctx, claim_pk).await;
     assert_eq!(claim.attestation_count, 1);
 }
@@ -8714,16 +8808,22 @@ async fn p0_5_attestation_rejects_jailed_validator() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -8823,10 +8923,14 @@ async fn p0_6_attestation_rejects_non_canonical_digest() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&[42u8; 32]); // arbitrary junk, not the canonical digest
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
+                    &claim_pk,
+                    1_700_000_000,
+                    1_800_000_000,
+                    &[42u8; 32], // arbitrary junk, not the canonical SD-JWT digest
+                    false,
+                );
                 d
             },
         },
@@ -9933,16 +10037,22 @@ async fn duplicate_attestation_same_validator_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(95);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    95,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -9968,16 +10078,22 @@ async fn duplicate_attestation_same_validator_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(95);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    95,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -10133,16 +10249,22 @@ async fn observation_after_closed_session_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -10489,16 +10611,22 @@ async fn evidence_immutable_after_claim_verification() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(95);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &validator.pubkey(),
-                    &obs,
-                    attestation_result::CONFIRMED,
-                    95,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -10521,7 +10649,8 @@ async fn evidence_immutable_after_claim_verification() {
 
     // Read the attestation — should exist and be intact.
     let att_record: VerificationAttestation = read_account(&ctx, att).await;
-    assert_eq!(att_record.result, attestation_result::CONFIRMED);
+    assert_eq!(att_record.vc_type, verification::vc_type::VERIFICATION_ATTESTATION);
+    assert_eq!(att_record.selective_disclosure, false);
 
     // All records remain immutable — no status field on Evidence/Observation to change.
     let ev_after: Evidence = read_account(&ctx, ev_pk).await;
@@ -11317,16 +11446,22 @@ async fn challenge_filing_and_vote_outcome() {
                 AccountMeta::new_readonly(rep_v1, false),
             ],
             data: {
-                let mut d = discriminator("global", "submit_verification_attestation").to_vec();
-                d.push(attestation_result::CONFIRMED);
-                d.push(90);
-                d.extend_from_slice(&attestation_digest(
+                let d = attestation_instruction_data(
+                    verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
-                    &v1.pubkey(),
-                    &obs_pk,
-                    attestation_result::CONFIRMED,
-                    90,
-                ));
+                    1_700_000_000,
+                    1_800_000_000,
+                    &sd_jwt_digest(
+                        &claim_pk,
+                        &validator.pubkey(),
+                        &obs,
+                        &claim_pk,
+                        verification::vc_type::VERIFICATION_ATTESTATION,
+                        1_700_000_000,
+                        1_800_000_000,
+                    ),
+                    false,
+                );
                 d
             },
         },
@@ -25521,6 +25656,7 @@ fn route_task_data(
     candidates: &[Pubkey],
     chosen: &Pubkey,
     competitor_count: u16,
+    vrf_randomness: &[u8; 32],
 ) -> Vec<u8> {
     let mut data = discriminator("global", "route_task").to_vec();
     data.extend_from_slice(task_id);
@@ -25531,6 +25667,7 @@ fn route_task_data(
     }
     data.extend_from_slice(chosen.as_ref());
     data.extend_from_slice(&competitor_count.to_le_bytes());
+    data.extend_from_slice(vrf_randomness);
     data
 }
 
@@ -25658,7 +25795,7 @@ async fn phase6_route_single_candidate_assigns() {
     // route_task: single candidate → always wins.
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
     // remaining: profile, availability, reputation-missing (use avail as stand-in → deser fail → score 0)
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
     process(
         &mut ctx,
         &payer,
@@ -25836,7 +25973,7 @@ async fn phase6_route_guards() {
     };
 
     // Empty candidates → 6189.
-    let data = route_task_data(&task_id, 0, &[], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[], &validator.pubkey(), 1, &[0u8; 32]);
     let res = process(
         &mut ctx,
         &payer,
@@ -25851,7 +25988,7 @@ async fn phase6_route_guards() {
 
     // chosen not in candidates → 6188.
     let other = Pubkey::new_unique();
-    let data = route_task_data(&task_id, 0, &[other], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[other], &validator.pubkey(), 1, &[0u8; 32]);
     let res = process(
         &mut ctx,
         &payer,
@@ -25865,7 +26002,7 @@ async fn phase6_route_guards() {
     assert_custom_error(res, 6188, "chosen not in candidates must fail");
 
     // Wrong remaining_accounts count → 6190.
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
     let res = process(
         &mut ctx,
         &payer,
@@ -25902,7 +26039,7 @@ async fn phase6_route_guards() {
     .await
     .expect("set offline");
 
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
     let res = process(
         &mut ctx,
         &payer,
@@ -28517,7 +28654,7 @@ async fn phase10_route(
     let (assign_pk, _) = task_assignment_pda(task_id, validator);
     let (profile_pk, _) = validator_profile_pda(validator);
     let (avail_pk, _) = validator_availability_pda(validator);
-    let data = route_task_data(task_id, 0, &[*validator], validator, 1);
+    let data = route_task_data(task_id, 0, &[*validator], validator, 1, &[0u8; 32]);
     process(
         ctx,
         payer,
@@ -30564,7 +30701,7 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
     ctx.set_account(&profile_pk, &acc.into());
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
     let res = process(
         &mut ctx,
         &payer,
@@ -30864,7 +31001,7 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
     .expect("add requirement");
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1);
+    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
 
     // Attempt 1: junk restriction slot (not the canonical PDA) → hard fail.
     let res = process(
