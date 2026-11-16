@@ -224,7 +224,7 @@ BEGIN
         NEW.elevation_max_mm::text || '|' ||
         coalesce(NEW.label, '') || '|' ||
         coalesce(NEW.created_by, '') || '|' ||
-        coalesce(to_char(NEW.chain_created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z""), ''),
+        coalesce(to_char(NEW.chain_created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), ''),
         'sha256'), 'hex')
     INTO h;
     NEW.mirror_hash := h;
