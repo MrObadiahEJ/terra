@@ -112,3 +112,11 @@ Stage 3.
 - [sprints/052-proof-of-possession.md](sprints/052-proof-of-possession.md) — provider proof-of-possession for component artifact replicas
 - [sprints/053-remove-terra-geom-v1.md](sprints/053-remove-terra-geom-v1.md) — `terra-geom-v1` removed; only `terra-geom-v2` remains
 - [sprints/054-runtime-trust-anchoring.md](sprints/054-runtime-trust-anchoring.md) — runtime content-address verification, artifact addressing, read-only scenes, CI repair
+- [sprints/055-runtime-signed-manifest-scene-resolution.md](sprints/055-runtime-signed-manifest-scene-resolution.md) — scene resolution grounded in re-verified signed manifests; fail-closed binding
+- [sprints/056-sprint-a-localnet-lifecycle.md](sprints/056-sprint-a-localnet-lifecycle.md) — Surfpool localnet, committed IDLs, nine-phase lifecycle smoke, CI job
+- [sprints/057-sprint-b-real-write-path.md](sprints/057-sprint-b-real-write-path.md) — planned: delete `tx_prep`, client-side IDL writes, fix identity PDAs, Playwright loop
+- [sprints/058-sprint-c-chain-indexer.md](sprints/058-sprint-c-chain-indexer.md) — planned: chain indexer, `chain_verified` mirrors, DB-vs-chain audit
+- [sprints/059-sprint-d-devnet-hosting.md](sprints/059-sprint-d-devnet-hosting.md) — planned: devnet deploy + hosted API/PostGIS/RPC, env-driven clients, Pages
+- [sprints/060-sprint-e-routing-economics.md](sprints/060-sprint-e-routing-economics.md) — planned: staging bond, reputation throughput, candidate discovery, VRF ADR
+- [sprints/061-sprint-f-evidence-durability.md](sprints/061-sprint-f-evidence-durability.md) — planned: S3/pinning, quarantine, retention, PoP, ≥2 replicas
+- [sprints/062-sprint-g-ratified-vision.md](sprints/062-sprint-g-ratified-vision.md) — planned: ratified institutional/residency/lien features + real reconstruction hash

@@ -2,6 +2,40 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-16 — Sprint A: Surfpool localnet + full lifecycle smoke
+
+- **Committed generated IDLs** under `terra-core/idl/`:
+  `terra_registry.json` (176 instructions; sha256
+  `8ef100d7eda246ddc03eca4bb557362b33b4d2087fd5709ce101c5bb1000de8e`) and
+  `terra_identity.json` (8 instructions; sha256
+  `78f766ebbbf42869eec593951888cfad759cde4b8f78bf563f4bad5261c49865`).
+  `make idl` and `build.sh` now sync generated IDLs into the tracked `idl/`
+  directory; `build.sh` still refreshes the web copy.
+- **Surfpool runbook** (`terra-core/txtx.yml`,
+  `terra-core/runbooks/deployment/`) pins instant Surfnet deployment for local
+  and CI use. This is a Surfnet-only shortcut; the real RPC deploy path is
+  exercised on devnet in Sprint D.
+- **`terra-core/tests/localnet_e2e.ts`:** nine lifecycle phases against
+  deployed programs, built only from the IDL and client-side
+  `program.methods` — registry bootstrap; two validators with
+  profile/availability/reputation; parcel + ownership + granted USAGE right;
+  claim + evidence + two observations; two attestations + quorum verify;
+  task requirement/fee policy/quote/coverage/fund/route/result/reward;
+  spatial asset + 2-of-2 geometry verification + snapshot; sale escrow
+  create/deposit/accept + `surfnet_timeTravel` settlement; second parcel
+  dispute + two-validator freeze.
+- **`terra-core/scripts/run-localnet-e2e.sh`:** starts Surfpool offline,
+  creates an ephemeral payer/authority keypair when absent, stages IDLs, waits
+  for both program accounts, runs the smoke, dumps logs on failure, and tears
+  down.
+- **CI:** `lib-tests` uploads both SBF artifacts; new `localnet-e2e` job
+  installs pinned Surfpool 1.7.0, downloads the artifacts, and runs the same
+  script. No AVX requirement.
+- **Book:** REQ-053…REQ-059 added; sprint notes 056–062 written; CURRENT.md
+  rewritten (previous ledger archived). Verified locally: 9/9 phases passing
+  (normal HOME and clean HOME), and CI run `43855396029` is green (all five
+  jobs including Localnet Lifecycle E2E). No public-cluster claim yet.
+
 ## 2026-11-15 — Sprint 055: Runtime scene resolution grounded in signed manifests
 
 - **`api/migrations/0047_runtime_signed_manifest_binding.sql`:** adds nullable
