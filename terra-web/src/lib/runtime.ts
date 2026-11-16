@@ -333,10 +333,16 @@ export async function fetchAssetWithFallback(
  * Resolve the best provider for a component version and fetch its asset bytes.
  * Caches the result; on cache miss discovers providers via the runtime API and
  * fetches with fallback. Throws if no provider can serve the component.
+ *
+ * When `expectedContentAddress` is provided (e.g. from a publisher-signed
+ * manifest scene node), the fetched bytes are also verified against it. A
+ * digest mismatch rejects the bytes even if a provider vouches for them —
+ * the signed manifest is the source of truth for content integrity.
  */
 export async function fetchComponentAsset(
   componentId: string,
   componentVersion: string,
+  expectedContentAddress?: string | null,
 ): Promise<{ data: ArrayBuffer; retrieval: AssetRetrieval }> {
   const cached = getCachedAsset(componentId, componentVersion)
   if (cached) {
@@ -360,25 +366,43 @@ export async function fetchComponentAsset(
 
     // Try each ranked retrieval; verify fetched bytes against the content
     // address Terra recorded for the raw artifact. A provider that cannot
-    // provide an address is skipped: unverifiable bytes are not trusted.
+    // provide an address is skipped unless a signed-manifest content address
+    // is supplied — then the signed manifest is the source of truth.
     let lastError: unknown = null
     for (const retrieval of rankProviders(retrievals)) {
       try {
         const expected = normalizeContentAddress(retrieval.content_address)
-        if (!expected) {
+
+        // If the provider declares no digest and no signed-manifest fallback
+        // exists, the provider is unverifiable — skip it without fetching.
+        if (!expected && !expectedContentAddress) {
           throw new Error(
             `provider ${retrieval.provider_name || retrieval.provider_id} has no content address`,
           )
         }
+
         const res = await fetch(retrieval.storage_reference)
         if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`)
         const data = await res.arrayBuffer()
         const actual = await sha256Hex(new Uint8Array(data))
-        if (actual !== expected) {
+
+        // Provider digest check (only when the provider declares an address).
+        if (expected && actual !== expected) {
           throw new Error(
             `content digest mismatch: expected ${expected}, got ${actual}`,
           )
         }
+
+        // Signed-manifest cross-check (source of truth when provided).
+        if (expectedContentAddress) {
+          const signed = normalizeContentAddress(expectedContentAddress)
+          if (signed && actual !== signed) {
+            throw new Error(
+              `signed-manifest digest mismatch: expected ${signed}, got ${actual}`,
+            )
+          }
+        }
+
         setCachedAsset(componentId, componentVersion, data)
         return { data, retrieval }
       } catch (err) {
@@ -393,6 +417,17 @@ export async function fetchComponentAsset(
     // fallback also fails.
     try {
       const artifact = await fetchComponentArtifact(componentId)
+      // Cross-check against the signed-manifest content address when provided.
+      if (expectedContentAddress) {
+        const signed = normalizeContentAddress(expectedContentAddress)
+        const hex = await sha256Hex(new Uint8Array(artifact.data))
+        if (signed && hex !== signed) {
+          throw new Error(
+            `signed-manifest digest mismatch: expected ${signed}, got ${hex}`,
+            { cause: providerErr },
+          )
+        }
+      }
       setCachedAsset(componentId, componentVersion, artifact.data)
       return {
         data: artifact.data,

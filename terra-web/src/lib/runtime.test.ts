@@ -734,4 +734,101 @@ describe('fetchComponentAsset', () => {
       /digest mismatch[\s\S]*404/,
     )
   })
+
+  it('rejects bytes when provider digest matches but signed-manifest digest does not', async () => {
+    const correctHash = await sha256Hex(correctData)
+    const tamperedHash = await sha256Hex(tamperedData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${correctHash}` },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        return byteResponse(correctData) // provider bytes match provider digest
+      }) as unknown as typeof fetch,
+    )
+
+    // Signed manifest says tamperedHash, provider serves correctData → reject.
+    await expect(
+      fetchComponentAsset('comp-001', 'v1', `sha256:${tamperedHash}`),
+    ).rejects.toThrow(/signed-manifest digest mismatch/)
+  })
+
+  it('accepts bytes when signed-manifest digest matches even if provider address is null', async () => {
+    const hash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: null }, // provider declares no address
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        return byteResponse(correctData) // bytes match signed manifest
+      }) as unknown as typeof fetch,
+    )
+
+    const result = await fetchComponentAsset('comp-001', 'v1', `sha256:${hash}`)
+    expect(new Uint8Array(result.data)).toEqual(correctData)
+  })
+
+  it('verifies data-plane artifact against signed-manifest digest on fallback', async () => {
+    const artifactHash = await sha256Hex(correctData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${await sha256Hex(tamperedData)}` },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        if (url.includes('/components/comp-001/artifact')) {
+          return byteResponse(correctData, {
+            'x-content-sha256': `sha256:${artifactHash}`,
+          })
+        }
+        return byteResponse(tamperedData)
+      }) as unknown as typeof fetch,
+    )
+
+    // Provider digest is wrong (tamperedData hash), data-plane serves correctData
+    // matching both its own header AND the signed manifest → accept.
+    const result = await fetchComponentAsset(
+      'comp-001',
+      'v1',
+      `sha256:${artifactHash}`,
+    )
+    expect(new Uint8Array(result.data)).toEqual(correctData)
+    expect(result.retrieval.provider_name).toBe('data-plane')
+  })
+
+  it('rejects data-plane artifact when signed-manifest digest does not match', async () => {
+    const correctHash = await sha256Hex(correctData)
+    const tamperedHash = await sha256Hex(tamperedData)
+    const retrievals: AssetRetrieval[] = [
+      { ...baseRetrieval, content_address: `sha256:${correctHash}` },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/runtime/assets/')) return jsonResponse(retrievals)
+        if (url.includes('/components/comp-001/artifact')) {
+          return byteResponse(tamperedData, {
+            'x-content-sha256': `sha256:${tamperedHash}`,
+          })
+        }
+        return byteResponse(tamperedData) // provider bytes don't match correctHash
+      }) as unknown as typeof fetch,
+    )
+
+    // Provider serves correctData but its digest is tamperedHash → provider fails.
+    // Data-plane serves tamperedData with tamperedHash header → matches data-plane
+    // header but NOT the signed manifest (correctHash) → reject.
+    await expect(
+      fetchComponentAsset('comp-001', 'v1', `sha256:${correctHash}`),
+    ).rejects.toThrow(/signed-manifest digest mismatch/)
+  })
 })

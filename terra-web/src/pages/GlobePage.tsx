@@ -691,6 +691,7 @@ export default function GlobePage() {
       const { data, retrieval } = await fetchComponentAsset(
           node.object_id,
           node.component_version_id,
+          node.content_address ?? undefined,
         )
         setFetchedAsset({
           componentId: node.object_id,
@@ -738,6 +739,7 @@ export default function GlobePage() {
           const { data, retrieval } = await fetchComponentAsset(
             node.object_id,
             node.component_version_id,
+            node.content_address ?? undefined,
           )
           setFetchedAssets((prev) => {
             const next = new Map(prev)
