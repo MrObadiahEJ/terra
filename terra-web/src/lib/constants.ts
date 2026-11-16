@@ -5,14 +5,29 @@ import type { TranslationKey } from './locale'
 
 export const TERRA_PROGRAM_ID = 'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage'
 
-// Solana cluster. Terra targets Devnet for the Phase 1 MVP.
-export const TERRA_CLUSTER = 'devnet'
+// Separate on-chain program for identity / succession / guardianship.
+export const TERRA_IDENTITY_PROGRAM_ID =
+  'HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p'
+
+// Solana cluster. Terra targets Devnet for the Phase 1 MVP; the Sprint B
+// Playwright loop overrides this with VITE_TERRA_RPC_URL on a local Surfnet.
 export const TERRA_RPC_URL =
-  'https://api.devnet.solana.com'
+  import.meta.env.VITE_TERRA_RPC_URL?.trim() || 'https://api.devnet.solana.com'
+
+function clusterName(url: string): string {
+  if (/127\.0\.0\.1|localhost/.test(url)) return 'localnet'
+  if (/devnet/.test(url)) return 'devnet'
+  if (/testnet/.test(url)) return 'testnet'
+  if (/mainnet/.test(url)) return 'mainnet-beta'
+  return 'custom'
+}
+
+export const TERRA_CLUSTER = clusterName(TERRA_RPC_URL)
+export const TERRA_IS_LOCALNET = TERRA_CLUSTER === 'localnet'
 
 // Off-chain Axum API. Served through the Vite dev proxy at /api, so use a
 // relative base here. Point this at the deployed host in production.
-export const API_BASE = '/api/v1'
+export const API_BASE = import.meta.env.VITE_API_BASE?.trim() || '/api/v1'
 
 // Camera/journal target for the pilot region in Cameroon (Soa / Yaoundé area)
 // used as the default focus of the 3D globe view.

@@ -1025,6 +1025,75 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "appealDecision",
+      "discriminator": [
+        221,
+        132,
+        160,
+        155,
+        35,
+        124,
+        215,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  101,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "decision"
+              },
+              {
+                "kind": "account",
+                "path": "appellant"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "decision",
+          "writable": true
+        },
+        {
+          "name": "appellant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "appendGeometryVersion",
       "discriminator": [
         130,
@@ -1347,6 +1416,112 @@ export type TerraRegistry = {
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "assignReviewer",
+      "discriminator": [
+        50,
+        160,
+        115,
+        122,
+        102,
+        108,
+        179,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "case"
+              },
+              {
+                "kind": "account",
+                "path": "reviewer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "case",
+          "writable": true
+        },
+        {
+          "name": "reviewerReputation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reviewer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reviewer"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "assignTaskValidator",
@@ -2262,6 +2437,74 @@ export type TerraRegistry = {
       "args": [
         {
           "name": "voteChoice",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "castReviewVote",
+      "discriminator": [
+        254,
+        48,
+        70,
+        89,
+        115,
+        44,
+        253,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "case"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "case",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "vote",
           "type": "u8"
         }
       ]
@@ -3534,6 +3777,105 @@ export type TerraRegistry = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "createReviewCase",
+      "discriminator": [
+        121,
+        220,
+        97,
+        35,
+        84,
+        37,
+        58,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "reviewCase",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "createSpatialSnapshot",
@@ -4949,6 +5291,77 @@ export type TerraRegistry = {
       "args": []
     },
     {
+      "name": "emergencyProtect",
+      "discriminator": [
+        79,
+        181,
+        107,
+        189,
+        128,
+        154,
+        232,
+        103
+      ],
+      "accounts": [
+        {
+          "name": "protection",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  109,
+                  101,
+                  114,
+                  103,
+                  101,
+                  110,
+                  99,
+                  121,
+                  95,
+                  112,
+                  114,
+                  111,
+                  116,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "endorseShardRotation",
       "discriminator": [
         132,
@@ -5783,6 +6196,80 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "finalizeAppeal",
+      "discriminator": [
+        104,
+        61,
+        0,
+        86,
+        134,
+        247,
+        126,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true
+        },
+        {
+          "name": "decision",
+          "writable": true
+        },
+        {
+          "name": "reviewerReputation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "upheldAppeal",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "finalizeAppealReview",
       "discriminator": [
         175,
@@ -6045,6 +6532,146 @@ export type TerraRegistry = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "finalizeDecision",
+      "discriminator": [
+        205,
+        130,
+        118,
+        192,
+        122,
+        171,
+        224,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "decision",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  99,
+                  105,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "privacyState",
+          "docs": [
+            "Privacy state for the subject, written when the decision is finalized.",
+            "PDA: [\"privacy_state\", subject, version]"
+          ],
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "requester",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "finalizeFraudReview",
@@ -9320,6 +9947,79 @@ export type TerraRegistry = {
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "recordAuditEvent",
+      "discriminator": [
+        123,
+        52,
+        155,
+        177,
+        36,
+        174,
+        168,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "auditEvent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  100,
+                  105,
+                  116,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "entity"
+              },
+              {
+                "kind": "arg",
+                "path": "sequence"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entity"
+        },
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sequence",
+          "type": "u32"
+        },
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "reason",
+          "type": "string"
         }
       ]
     },
@@ -13613,6 +14313,106 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "submitJurisdictionalRestriction",
+      "discriminator": [
+        171,
+        42,
+        17,
+        224,
+        83,
+        106,
+        15,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "restriction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  117,
+                  114,
+                  105,
+                  115,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject",
+          "docs": [
+            "Subject being restricted"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "restrictionType",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requestedRemedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
       "name": "submitObservation",
       "discriminator": [
         109,
@@ -13891,6 +14691,199 @@ export type TerraRegistry = {
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "submitPrivacyRequest",
+      "discriminator": [
+        73,
+        68,
+        161,
+        59,
+        73,
+        89,
+        187,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "privacyRequest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  118,
+                  97,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject",
+          "docs": [
+            "Subject of the privacy request (identity, asset, document, etc.)"
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "requestType",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requestedRemedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "emergency",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "submitSecurityRequest",
+      "discriminator": [
+        151,
+        173,
+        3,
+        34,
+        245,
+        125,
+        180,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "securityRequest",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "requestType",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requestedRemedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "emergency",
+          "type": "bool"
         }
       ]
     },
@@ -16387,6 +17380,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "emergencyProtection",
+      "discriminator": [
+        172,
+        134,
+        210,
+        181,
+        140,
+        209,
+        219,
+        43
+      ]
+    },
+    {
       "name": "escrowRecord",
       "discriminator": [
         174,
@@ -16543,6 +17549,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "jurisdictionalRestrictionRequest",
+      "discriminator": [
+        41,
+        159,
+        224,
+        142,
+        146,
+        123,
+        90,
+        20
+      ]
+    },
+    {
       "name": "nullifierRecord",
       "discriminator": [
         56,
@@ -16618,6 +17637,32 @@ export type TerraRegistry = {
         244,
         214,
         75
+      ]
+    },
+    {
+      "name": "privacyRequest",
+      "discriminator": [
+        108,
+        60,
+        110,
+        140,
+        63,
+        148,
+        161,
+        86
+      ]
+    },
+    {
+      "name": "privacyState",
+      "discriminator": [
+        57,
+        131,
+        134,
+        54,
+        197,
+        203,
+        111,
+        138
       ]
     },
     {
@@ -16709,6 +17754,84 @@ export type TerraRegistry = {
         213,
         103,
         234
+      ]
+    },
+    {
+      "name": "securityAppeal",
+      "discriminator": [
+        125,
+        1,
+        36,
+        0,
+        78,
+        64,
+        143,
+        200
+      ]
+    },
+    {
+      "name": "securityAuditEvent",
+      "discriminator": [
+        20,
+        158,
+        241,
+        227,
+        102,
+        108,
+        82,
+        110
+      ]
+    },
+    {
+      "name": "securityDecision",
+      "discriminator": [
+        205,
+        222,
+        130,
+        33,
+        186,
+        126,
+        124,
+        228
+      ]
+    },
+    {
+      "name": "securityRequest",
+      "discriminator": [
+        85,
+        161,
+        107,
+        9,
+        224,
+        59,
+        84,
+        186
+      ]
+    },
+    {
+      "name": "securityReviewAssignment",
+      "discriminator": [
+        179,
+        187,
+        202,
+        26,
+        177,
+        130,
+        71,
+        17
+      ]
+    },
+    {
+      "name": "securityReviewCase",
+      "discriminator": [
+        65,
+        3,
+        209,
+        46,
+        164,
+        238,
+        0,
+        179
       ]
     },
     {
@@ -17103,6 +18226,32 @@ export type TerraRegistry = {
     }
   ],
   "events": [
+    {
+      "name": "appealDecided",
+      "discriminator": [
+        112,
+        92,
+        82,
+        213,
+        212,
+        141,
+        120,
+        215
+      ]
+    },
+    {
+      "name": "appealFiled",
+      "discriminator": [
+        87,
+        171,
+        32,
+        112,
+        254,
+        40,
+        44,
+        130
+      ]
+    },
     {
       "name": "appealReviewOpened",
       "discriminator": [
@@ -17556,6 +18705,32 @@ export type TerraRegistry = {
         119,
         229,
         206
+      ]
+    },
+    {
+      "name": "emergencyProtectionLifted",
+      "discriminator": [
+        8,
+        25,
+        61,
+        227,
+        98,
+        15,
+        1,
+        255
+      ]
+    },
+    {
+      "name": "emergencyProtectionStarted",
+      "discriminator": [
+        135,
+        38,
+        241,
+        18,
+        251,
+        104,
+        130,
+        164
       ]
     },
     {
@@ -18014,6 +19189,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "jurisdictionalRestrictionSubmitted",
+      "discriminator": [
+        203,
+        141,
+        161,
+        110,
+        179,
+        106,
+        106,
+        28
+      ]
+    },
+    {
       "name": "nominationConfirmed",
       "discriminator": [
         231,
@@ -18196,6 +19384,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "privacyRequestSubmitted",
+      "discriminator": [
+        222,
+        168,
+        148,
+        138,
+        0,
+        202,
+        0,
+        150
+      ]
+    },
+    {
       "name": "programPaused",
       "discriminator": [
         247,
@@ -18326,6 +19527,45 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "reviewCaseCreated",
+      "discriminator": [
+        241,
+        37,
+        139,
+        60,
+        39,
+        169,
+        206,
+        100
+      ]
+    },
+    {
+      "name": "reviewVoteCast",
+      "discriminator": [
+        122,
+        233,
+        219,
+        82,
+        248,
+        138,
+        100,
+        24
+      ]
+    },
+    {
+      "name": "reviewerAssigned",
+      "discriminator": [
+        167,
+        205,
+        64,
+        53,
+        179,
+        241,
+        117,
+        200
+      ]
+    },
+    {
       "name": "rewardsClaimed",
       "discriminator": [
         75,
@@ -18440,6 +19680,45 @@ export type TerraRegistry = {
         213,
         91,
         230
+      ]
+    },
+    {
+      "name": "securityAuditRecorded",
+      "discriminator": [
+        143,
+        102,
+        52,
+        5,
+        233,
+        235,
+        108,
+        58
+      ]
+    },
+    {
+      "name": "securityDecisionFinalized",
+      "discriminator": [
+        66,
+        125,
+        147,
+        203,
+        104,
+        76,
+        55,
+        125
+      ]
+    },
+    {
+      "name": "securityRequestSubmitted",
+      "discriminator": [
+        183,
+        166,
+        54,
+        157,
+        17,
+        169,
+        30,
+        19
       ]
     },
     {
@@ -20315,6 +21594,86 @@ export type TerraRegistry = {
       "code": 6246,
       "name": "invalidSnapshotLabel",
       "msg": "Snapshot label is too long"
+    },
+    {
+      "code": 6247,
+      "name": "invalidRequestDescription",
+      "msg": "Request description is too long"
+    },
+    {
+      "code": 6248,
+      "name": "invalidRemedyType",
+      "msg": "Invalid remedy type"
+    },
+    {
+      "code": 6249,
+      "name": "invalidRestrictionType",
+      "msg": "Invalid restriction type"
+    },
+    {
+      "code": 6250,
+      "name": "requestNotOpen",
+      "msg": "Request is not open"
+    },
+    {
+      "code": 6251,
+      "name": "requestExpired",
+      "msg": "Request has expired"
+    },
+    {
+      "code": 6252,
+      "name": "invalidReviewVote",
+      "msg": "Invalid review vote"
+    },
+    {
+      "code": 6253,
+      "name": "alreadyVoted",
+      "msg": "Already voted on this case"
+    },
+    {
+      "code": 6254,
+      "name": "caseAlreadyDecided",
+      "msg": "Case is already decided"
+    },
+    {
+      "code": 6255,
+      "name": "reviewerInsufficientReputation",
+      "msg": "Reviewer has insufficient reputation"
+    },
+    {
+      "code": 6256,
+      "name": "securityQuorumNotReached",
+      "msg": "Security quorum not reached"
+    },
+    {
+      "code": 6257,
+      "name": "decisionNotAppealable",
+      "msg": "Decision is not appealable"
+    },
+    {
+      "code": 6258,
+      "name": "reasonTooLong",
+      "msg": "Reason is too long"
+    },
+    {
+      "code": 6259,
+      "name": "appealAlreadyDecided",
+      "msg": "Appeal is already decided"
+    },
+    {
+      "code": 6260,
+      "name": "appealDecisionMismatch",
+      "msg": "Appeal decision account does not match appeal"
+    },
+    {
+      "code": 6261,
+      "name": "protectionAlreadyActive",
+      "msg": "Emergency protection is already active"
+    },
+    {
+      "code": 6262,
+      "name": "protectionExpired",
+      "msg": "Emergency protection has expired"
     }
   ],
   "types": [
@@ -20445,6 +21804,54 @@ export type TerraRegistry = {
           },
           {
             "name": "decidedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "appealDecided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "upheld",
+            "type": "bool"
+          },
+          {
+            "name": "resolvedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "appealFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          },
+          {
+            "name": "createdAt",
             "type": "i64"
           }
         ]
@@ -22500,6 +23907,90 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "emergencyProtection",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "lifted",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "emergencyProtectionLifted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "protection",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "liftedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "emergencyProtectionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "protection",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "equivocationReported",
       "type": {
         "kind": "struct",
@@ -24500,6 +25991,101 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "jurisdictionalRestrictionRequest",
+      "docs": [
+        "A jurisdictional restriction request from an authenticated authority.",
+        "PDA: `[\"jurisdiction\", authority, subject, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "restrictionType",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requestedRemedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "expiresAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "jurisdictionalRestrictionSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "restrictionType",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "nominationConfirmed",
       "type": {
         "kind": "struct",
@@ -25389,6 +26975,152 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "privacyRequest",
+      "docs": [
+        "A privacy protection request for a specific subject.",
+        "PDA: `[\"privacy_request\", requester, subject, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "requestType",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requestedRemedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "emergency",
+            "type": "bool"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "privacyRequestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requestType",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "privacyState",
+      "docs": [
+        "Privacy state for a subject (component, asset, document, etc.).",
+        "Versioned so consumers can tell available/restricted/superseded without",
+        "receiving protected content. PDA: `[\"privacy_state\", subject, version]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "restrictionRequest",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "programPaused",
       "type": {
         "kind": "struct",
@@ -25944,6 +27676,90 @@ export type TerraRegistry = {
       }
     },
     {
+      "name": "reviewCaseCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "committeeSize",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reviewVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          },
+          {
+            "name": "votesUpheld",
+            "type": "u8"
+          },
+          {
+            "name": "votesDismissed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reviewerAssigned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "assignment",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "assignedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "rewardAllocation",
       "docs": [
         "Distribution record for one validator's claim on a task escrow.",
@@ -26290,6 +28106,384 @@ export type TerraRegistry = {
           {
             "name": "required",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityAppeal",
+      "docs": [
+        "Appeal of a security/privacy decision.",
+        "PDA: `[\"appeal\", decision, appellant]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "resolvedAt",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityAuditEvent",
+      "docs": [
+        "Immutable audit event for security/privacy decisions.",
+        "PDA: `[\"audit_event\", entity, sequence]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityAuditRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "auditEvent",
+            "type": "pubkey"
+          },
+          {
+            "name": "entity",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityDecision",
+      "docs": [
+        "Finalized decision on a security/privacy request.",
+        "PDA: `[\"decision\", request]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "restrictionScope",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "expiresAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "decidedAt",
+            "type": "i64"
+          },
+          {
+            "name": "decidedBy",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityDecisionFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "decidedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityRequest",
+      "docs": [
+        "A security/privacy request submitted by a requester with legitimate",
+        "standing. PDA: `[\"security_request\", requester, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "requestType",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requestedRemedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "emergency",
+            "type": "bool"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityRequestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requestType",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityReviewAssignment",
+      "docs": [
+        "Reviewer assignment for a review case.",
+        "PDA: `[\"review_assignment\", case, reviewer]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "voted",
+            "type": "bool"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          },
+          {
+            "name": "votedAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "assignedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "securityReviewCase",
+      "docs": [
+        "Independent review case for a security/privacy request.",
+        "PDA: `[\"review_case\", request]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "committeeSize",
+            "type": "u8"
+          },
+          {
+            "name": "votesUpheld",
+            "type": "u8"
+          },
+          {
+            "name": "votesDismissed",
+            "type": "u8"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          },
+          {
+            "name": "finalizedAt",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
           }
         ]
       }

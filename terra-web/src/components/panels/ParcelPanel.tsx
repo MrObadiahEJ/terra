@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { PublicKey, Transaction } from '@solana/web3.js'
+import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
 import { Box, Eye, Footprints } from 'lucide-react'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
 import {
   getProgram,
+  ownershipPda,
   parcelPda,
   rightsPda,
 } from '../../lib/program'
@@ -113,9 +114,10 @@ export default function ParcelPanel({
     const to = new PublicKey(transferTo)
     const program = getProgram()
     const [pda] = parcelPda(new Uint8Array(account.id))
+    const [ownership] = ownershipPda(pda)
     const ix = await program.methods
       .transferParcel()
-      .accounts({ parcel: pda, owner: publicKey!, newOwner: to } as never)
+      .accounts({ parcel: pda, ownership, owner: publicKey!, newOwner: to } as never)
       .instruction()
     return send(new Transaction().add(ix))
   })
@@ -124,6 +126,7 @@ export default function ParcelPanel({
     const holder = new PublicKey(grantHolder)
     const program = getProgram()
     const [pda] = parcelPda(new Uint8Array(account.id))
+    const [ownership] = ownershipPda(pda)
     const [rPda] = rightsPda(new PublicKey(address), account.rightsCount)
     const ix = await program.methods
       .grantRight(
@@ -135,9 +138,10 @@ export default function ParcelPanel({
       )
       .accounts({
         parcel: pda,
+        ownership,
         rights: rPda,
         owner: publicKey!,
-        systemProgram: PublicKey.default,
+        systemProgram: SystemProgram.programId,
       } as never)
       .instruction()
     return send(new Transaction().add(ix))

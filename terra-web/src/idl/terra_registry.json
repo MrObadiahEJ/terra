@@ -1019,6 +1019,75 @@
       ]
     },
     {
+      "name": "appeal_decision",
+      "discriminator": [
+        221,
+        132,
+        160,
+        155,
+        35,
+        124,
+        215,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  101,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "decision"
+              },
+              {
+                "kind": "account",
+                "path": "appellant"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "decision",
+          "writable": true
+        },
+        {
+          "name": "appellant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "append_geometry_version",
       "discriminator": [
         130,
@@ -1341,6 +1410,112 @@
           "type": "u8"
         }
       ]
+    },
+    {
+      "name": "assign_reviewer",
+      "discriminator": [
+        50,
+        160,
+        115,
+        122,
+        102,
+        108,
+        179,
+        201
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "case"
+              },
+              {
+                "kind": "account",
+                "path": "reviewer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "case",
+          "writable": true
+        },
+        {
+          "name": "reviewer_reputation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "reviewer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reviewer"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "assign_task_validator",
@@ -2256,6 +2431,74 @@
       "args": [
         {
           "name": "vote_choice",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "cast_review_vote",
+      "discriminator": [
+        254,
+        48,
+        70,
+        89,
+        115,
+        44,
+        253,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "assignment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  97,
+                  115,
+                  115,
+                  105,
+                  103,
+                  110,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "case"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "case",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "vote",
           "type": "u8"
         }
       ]
@@ -3528,6 +3771,105 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "create_review_case",
+      "discriminator": [
+        121,
+        220,
+        97,
+        35,
+        84,
+        37,
+        58,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "review_case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        }
+      ]
     },
     {
       "name": "create_spatial_snapshot",
@@ -4943,6 +5285,77 @@
       "args": []
     },
     {
+      "name": "emergency_protect",
+      "discriminator": [
+        79,
+        181,
+        107,
+        189,
+        128,
+        154,
+        232,
+        103
+      ],
+      "accounts": [
+        {
+          "name": "protection",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  109,
+                  101,
+                  114,
+                  103,
+                  101,
+                  110,
+                  99,
+                  121,
+                  95,
+                  112,
+                  114,
+                  111,
+                  116,
+                  101,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        }
+      ]
+    },
+    {
       "name": "endorse_shard_rotation",
       "discriminator": [
         132,
@@ -5777,6 +6190,80 @@
       ]
     },
     {
+      "name": "finalize_appeal",
+      "discriminator": [
+        104,
+        61,
+        0,
+        86,
+        134,
+        247,
+        126,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "appeal",
+          "writable": true
+        },
+        {
+          "name": "decision",
+          "writable": true
+        },
+        {
+          "name": "reviewer_reputation",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "upheld_appeal",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "finalize_appeal_review",
       "discriminator": [
         175,
@@ -6039,6 +6526,146 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "finalize_decision",
+      "discriminator": [
+        205,
+        130,
+        118,
+        192,
+        122,
+        171,
+        224,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  118,
+                  105,
+                  101,
+                  119,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "decision",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  99,
+                  105,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "privacy_state",
+          "docs": [
+            "Privacy state for the subject, written when the decision is finalized.",
+            "PDA: [\"privacy_state\", subject, version]"
+          ],
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "requester",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "finalize_fraud_review",
@@ -9314,6 +9941,79 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "record_audit_event",
+      "discriminator": [
+        123,
+        52,
+        155,
+        177,
+        36,
+        174,
+        168,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "audit_event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  100,
+                  105,
+                  116,
+                  95,
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "entity"
+              },
+              {
+                "kind": "arg",
+                "path": "sequence"
+              }
+            ]
+          }
+        },
+        {
+          "name": "entity"
+        },
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sequence",
+          "type": "u32"
+        },
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "reason",
+          "type": "string"
         }
       ]
     },
@@ -13607,6 +14307,106 @@
       ]
     },
     {
+      "name": "submit_jurisdictional_restriction",
+      "discriminator": [
+        171,
+        42,
+        17,
+        224,
+        83,
+        106,
+        15,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "restriction",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  106,
+                  117,
+                  114,
+                  105,
+                  115,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject",
+          "docs": [
+            "Subject being restricted"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "restriction_type",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requested_remedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
       "name": "submit_observation",
       "discriminator": [
         109,
@@ -13885,6 +14685,199 @@
               32
             ]
           }
+        }
+      ]
+    },
+    {
+      "name": "submit_privacy_request",
+      "discriminator": [
+        73,
+        68,
+        161,
+        59,
+        73,
+        89,
+        187,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "privacy_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  118,
+                  97,
+                  99,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "account",
+                "path": "subject"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subject",
+          "docs": [
+            "Subject of the privacy request (identity, asset, document, etc.)"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "request_type",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requested_remedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "emergency",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "submit_security_request",
+      "discriminator": [
+        151,
+        173,
+        3,
+        34,
+        245,
+        125,
+        180,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "security_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  99,
+                  117,
+                  114,
+                  105,
+                  116,
+                  121,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "requester"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "requester",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u16"
+        },
+        {
+          "name": "request_type",
+          "type": "u8"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "requested_remedy",
+          "type": "u8"
+        },
+        {
+          "name": "jurisdiction",
+          "type": {
+            "array": [
+              "u8",
+              2
+            ]
+          }
+        },
+        {
+          "name": "emergency",
+          "type": "bool"
         }
       ]
     },
@@ -16381,6 +17374,19 @@
       ]
     },
     {
+      "name": "EmergencyProtection",
+      "discriminator": [
+        172,
+        134,
+        210,
+        181,
+        140,
+        209,
+        219,
+        43
+      ]
+    },
+    {
       "name": "EscrowRecord",
       "discriminator": [
         174,
@@ -16537,6 +17543,19 @@
       ]
     },
     {
+      "name": "JurisdictionalRestrictionRequest",
+      "discriminator": [
+        41,
+        159,
+        224,
+        142,
+        146,
+        123,
+        90,
+        20
+      ]
+    },
+    {
       "name": "NullifierRecord",
       "discriminator": [
         56,
@@ -16612,6 +17631,32 @@
         244,
         214,
         75
+      ]
+    },
+    {
+      "name": "PrivacyRequest",
+      "discriminator": [
+        108,
+        60,
+        110,
+        140,
+        63,
+        148,
+        161,
+        86
+      ]
+    },
+    {
+      "name": "PrivacyState",
+      "discriminator": [
+        57,
+        131,
+        134,
+        54,
+        197,
+        203,
+        111,
+        138
       ]
     },
     {
@@ -16703,6 +17748,84 @@
         213,
         103,
         234
+      ]
+    },
+    {
+      "name": "SecurityAppeal",
+      "discriminator": [
+        125,
+        1,
+        36,
+        0,
+        78,
+        64,
+        143,
+        200
+      ]
+    },
+    {
+      "name": "SecurityAuditEvent",
+      "discriminator": [
+        20,
+        158,
+        241,
+        227,
+        102,
+        108,
+        82,
+        110
+      ]
+    },
+    {
+      "name": "SecurityDecision",
+      "discriminator": [
+        205,
+        222,
+        130,
+        33,
+        186,
+        126,
+        124,
+        228
+      ]
+    },
+    {
+      "name": "SecurityRequest",
+      "discriminator": [
+        85,
+        161,
+        107,
+        9,
+        224,
+        59,
+        84,
+        186
+      ]
+    },
+    {
+      "name": "SecurityReviewAssignment",
+      "discriminator": [
+        179,
+        187,
+        202,
+        26,
+        177,
+        130,
+        71,
+        17
+      ]
+    },
+    {
+      "name": "SecurityReviewCase",
+      "discriminator": [
+        65,
+        3,
+        209,
+        46,
+        164,
+        238,
+        0,
+        179
       ]
     },
     {
@@ -17097,6 +18220,32 @@
     }
   ],
   "events": [
+    {
+      "name": "AppealDecided",
+      "discriminator": [
+        112,
+        92,
+        82,
+        213,
+        212,
+        141,
+        120,
+        215
+      ]
+    },
+    {
+      "name": "AppealFiled",
+      "discriminator": [
+        87,
+        171,
+        32,
+        112,
+        254,
+        40,
+        44,
+        130
+      ]
+    },
     {
       "name": "AppealReviewOpened",
       "discriminator": [
@@ -17550,6 +18699,32 @@
         119,
         229,
         206
+      ]
+    },
+    {
+      "name": "EmergencyProtectionLifted",
+      "discriminator": [
+        8,
+        25,
+        61,
+        227,
+        98,
+        15,
+        1,
+        255
+      ]
+    },
+    {
+      "name": "EmergencyProtectionStarted",
+      "discriminator": [
+        135,
+        38,
+        241,
+        18,
+        251,
+        104,
+        130,
+        164
       ]
     },
     {
@@ -18008,6 +19183,19 @@
       ]
     },
     {
+      "name": "JurisdictionalRestrictionSubmitted",
+      "discriminator": [
+        203,
+        141,
+        161,
+        110,
+        179,
+        106,
+        106,
+        28
+      ]
+    },
+    {
       "name": "NominationConfirmed",
       "discriminator": [
         231,
@@ -18190,6 +19378,19 @@
       ]
     },
     {
+      "name": "PrivacyRequestSubmitted",
+      "discriminator": [
+        222,
+        168,
+        148,
+        138,
+        0,
+        202,
+        0,
+        150
+      ]
+    },
+    {
       "name": "ProgramPaused",
       "discriminator": [
         247,
@@ -18320,6 +19521,45 @@
       ]
     },
     {
+      "name": "ReviewCaseCreated",
+      "discriminator": [
+        241,
+        37,
+        139,
+        60,
+        39,
+        169,
+        206,
+        100
+      ]
+    },
+    {
+      "name": "ReviewVoteCast",
+      "discriminator": [
+        122,
+        233,
+        219,
+        82,
+        248,
+        138,
+        100,
+        24
+      ]
+    },
+    {
+      "name": "ReviewerAssigned",
+      "discriminator": [
+        167,
+        205,
+        64,
+        53,
+        179,
+        241,
+        117,
+        200
+      ]
+    },
+    {
       "name": "RewardsClaimed",
       "discriminator": [
         75,
@@ -18434,6 +19674,45 @@
         213,
         91,
         230
+      ]
+    },
+    {
+      "name": "SecurityAuditRecorded",
+      "discriminator": [
+        143,
+        102,
+        52,
+        5,
+        233,
+        235,
+        108,
+        58
+      ]
+    },
+    {
+      "name": "SecurityDecisionFinalized",
+      "discriminator": [
+        66,
+        125,
+        147,
+        203,
+        104,
+        76,
+        55,
+        125
+      ]
+    },
+    {
+      "name": "SecurityRequestSubmitted",
+      "discriminator": [
+        183,
+        166,
+        54,
+        157,
+        17,
+        169,
+        30,
+        19
       ]
     },
     {
@@ -20309,6 +21588,86 @@
       "code": 6246,
       "name": "InvalidSnapshotLabel",
       "msg": "Snapshot label is too long"
+    },
+    {
+      "code": 6247,
+      "name": "InvalidRequestDescription",
+      "msg": "Request description is too long"
+    },
+    {
+      "code": 6248,
+      "name": "InvalidRemedyType",
+      "msg": "Invalid remedy type"
+    },
+    {
+      "code": 6249,
+      "name": "InvalidRestrictionType",
+      "msg": "Invalid restriction type"
+    },
+    {
+      "code": 6250,
+      "name": "RequestNotOpen",
+      "msg": "Request is not open"
+    },
+    {
+      "code": 6251,
+      "name": "RequestExpired",
+      "msg": "Request has expired"
+    },
+    {
+      "code": 6252,
+      "name": "InvalidReviewVote",
+      "msg": "Invalid review vote"
+    },
+    {
+      "code": 6253,
+      "name": "AlreadyVoted",
+      "msg": "Already voted on this case"
+    },
+    {
+      "code": 6254,
+      "name": "CaseAlreadyDecided",
+      "msg": "Case is already decided"
+    },
+    {
+      "code": 6255,
+      "name": "ReviewerInsufficientReputation",
+      "msg": "Reviewer has insufficient reputation"
+    },
+    {
+      "code": 6256,
+      "name": "SecurityQuorumNotReached",
+      "msg": "Security quorum not reached"
+    },
+    {
+      "code": 6257,
+      "name": "DecisionNotAppealable",
+      "msg": "Decision is not appealable"
+    },
+    {
+      "code": 6258,
+      "name": "ReasonTooLong",
+      "msg": "Reason is too long"
+    },
+    {
+      "code": 6259,
+      "name": "AppealAlreadyDecided",
+      "msg": "Appeal is already decided"
+    },
+    {
+      "code": 6260,
+      "name": "AppealDecisionMismatch",
+      "msg": "Appeal decision account does not match appeal"
+    },
+    {
+      "code": 6261,
+      "name": "ProtectionAlreadyActive",
+      "msg": "Emergency protection is already active"
+    },
+    {
+      "code": 6262,
+      "name": "ProtectionExpired",
+      "msg": "Emergency protection has expired"
     }
   ],
   "types": [
@@ -20439,6 +21798,54 @@
           },
           {
             "name": "decided_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AppealDecided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "upheld",
+            "type": "bool"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AppealFiled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "appeal",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
             "type": "i64"
           }
         ]
@@ -22494,6 +23901,90 @@
       }
     },
     {
+      "name": "EmergencyProtection",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "lifted",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyProtectionLifted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "protection",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "lifted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyProtectionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "protection",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "EquivocationReported",
       "type": {
         "kind": "struct",
@@ -24494,6 +25985,101 @@
       }
     },
     {
+      "name": "JurisdictionalRestrictionRequest",
+      "docs": [
+        "A jurisdictional restriction request from an authenticated authority.",
+        "PDA: `[\"jurisdiction\", authority, subject, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "restriction_type",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requested_remedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "expires_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "JurisdictionalRestrictionSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "restriction",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "restriction_type",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "NominationConfirmed",
       "type": {
         "kind": "struct",
@@ -25383,6 +26969,152 @@
       }
     },
     {
+      "name": "PrivacyRequest",
+      "docs": [
+        "A privacy protection request for a specific subject.",
+        "PDA: `[\"privacy_request\", requester, subject, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "request_type",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requested_remedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "emergency",
+            "type": "bool"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrivacyRequestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_type",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrivacyState",
+      "docs": [
+        "Privacy state for a subject (component, asset, document, etc.).",
+        "Versioned so consumers can tell available/restricted/superseded without",
+        "receiving protected content. PDA: `[\"privacy_state\", subject, version]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "restriction_request",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ProgramPaused",
       "type": {
         "kind": "struct",
@@ -25938,6 +27670,90 @@
       }
     },
     {
+      "name": "ReviewCaseCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "committee_size",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReviewVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          },
+          {
+            "name": "votes_upheld",
+            "type": "u8"
+          },
+          {
+            "name": "votes_dismissed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReviewerAssigned",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "assignment",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "assigned_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "RewardAllocation",
       "docs": [
         "Distribution record for one validator's claim on a task escrow.",
@@ -26284,6 +28100,384 @@
           {
             "name": "required",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityAppeal",
+      "docs": [
+        "Appeal of a security/privacy decision.",
+        "PDA: `[\"appeal\", decision, appellant]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "appellant",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityAuditEvent",
+      "docs": [
+        "Immutable audit event for security/privacy decisions.",
+        "PDA: `[\"audit_event\", entity, sequence]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "entity",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "reason",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityAuditRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "audit_event",
+            "type": "pubkey"
+          },
+          {
+            "name": "entity",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u32"
+          },
+          {
+            "name": "action",
+            "type": "u8"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityDecision",
+      "docs": [
+        "Finalized decision on a security/privacy request.",
+        "PDA: `[\"decision\", request]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "restriction_scope",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "expires_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "decided_at",
+            "type": "i64"
+          },
+          {
+            "name": "decided_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityDecisionFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "decision",
+            "type": "pubkey"
+          },
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": "u8"
+          },
+          {
+            "name": "decided_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityRequest",
+      "docs": [
+        "A security/privacy request submitted by a requester with legitimate",
+        "standing. PDA: `[\"security_request\", requester, nonce]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u16"
+          },
+          {
+            "name": "request_type",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "requested_remedy",
+            "type": "u8"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "emergency",
+            "type": "bool"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityRequestSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_type",
+            "type": "u8"
+          },
+          {
+            "name": "remedy",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityReviewAssignment",
+      "docs": [
+        "Reviewer assignment for a review case.",
+        "PDA: `[\"review_assignment\", case, reviewer]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "case",
+            "type": "pubkey"
+          },
+          {
+            "name": "reviewer",
+            "type": "pubkey"
+          },
+          {
+            "name": "voted",
+            "type": "bool"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          },
+          {
+            "name": "voted_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "assigned_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityReviewCase",
+      "docs": [
+        "Independent review case for a security/privacy request.",
+        "PDA: `[\"review_case\", request]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "request",
+            "type": "pubkey"
+          },
+          {
+            "name": "requester",
+            "type": "pubkey"
+          },
+          {
+            "name": "subject",
+            "type": "pubkey"
+          },
+          {
+            "name": "committee_size",
+            "type": "u8"
+          },
+          {
+            "name": "votes_upheld",
+            "type": "u8"
+          },
+          {
+            "name": "votes_dismissed",
+            "type": "u8"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          },
+          {
+            "name": "finalized_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
           }
         ]
       }

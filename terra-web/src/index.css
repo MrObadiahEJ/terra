@@ -6476,3 +6476,146 @@ body.atlas-immersive .compact-nav > summary span { display: none; }
   font-family: var(--font-mono);
   padding-top: 6px;
 }
+
+/* --- Sprint B: on-chain lifecycle panel (Protocol console) --- */
+.chain-lifecycle {
+  max-width: 1500px;
+  margin: 0 auto 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, #6bc99a 11%, transparent), transparent 30rem),
+    var(--surface);
+  box-shadow: 0 12px 35px #00000008;
+}
+.chain-lifecycle-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.chain-lifecycle-head h2 { margin: 8px 0 5px; font-size: clamp(17px, 2vw, 22px); letter-spacing: -.035em; }
+.chain-lifecycle-head p { max-width: 780px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.chain-lifecycle-head p strong { color: var(--ink); text-transform: capitalize; }
+.chain-lifecycle-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.chain-lifecycle-wallet { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.chain-lifecycle-wallet.connected { color: #2f9e68; }
+.chain-lifecycle-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.chain-lifecycle-progress { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+.chain-lifecycle-progress code { color: var(--muted); font-size: 10px; }
+.chain-lifecycle-track {
+  width: 150px;
+  height: 5px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.chain-lifecycle-track i { display: block; height: 100%; background: #52b982; transition: width .25s ease; }
+.chain-lifecycle-actions { display: flex; align-items: center; gap: 8px; }
+.chain-lifecycle-note,
+.chain-lifecycle-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.chain-lifecycle-note { border: 1px solid color-mix(in srgb, #d6a44c 35%, transparent); background: color-mix(in srgb, #d6a44c 9%, transparent); color: #8a641f; }
+.chain-lifecycle-error { border: 1px solid color-mix(in srgb, #d65b5b 35%, transparent); background: color-mix(in srgb, #d65b5b 8%, transparent); color: #a33b3b; word-break: break-word; }
+.chain-lifecycle-steps { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 0; padding: 0; list-style: none; }
+.chain-lifecycle-step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: start;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.chain-lifecycle-step.done { border-color: color-mix(in srgb, #52b982 32%, var(--border)); }
+.chain-lifecycle-step.error { border-color: color-mix(in srgb, #d65b5b 40%, var(--border)); }
+.chain-lifecycle-index {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.chain-lifecycle-step.done .chain-lifecycle-index { background: color-mix(in srgb, #52b982 16%, transparent); color: #2f8c5f; }
+.chain-lifecycle-body { min-width: 0; }
+.chain-lifecycle-title { display: flex; align-items: center; gap: 8px; }
+.chain-lifecycle-title strong { font-size: 12px; letter-spacing: -.01em; }
+.chain-lifecycle-body p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.chain-lifecycle-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.chain-lifecycle-status.done { background: color-mix(in srgb, #52b982 15%, transparent); color: #2f8c5f; }
+.chain-lifecycle-status.error { background: color-mix(in srgb, #d65b5b 13%, transparent); color: #a33b3b; }
+.chain-lifecycle-status.running { background: color-mix(in srgb, #d6a44c 14%, transparent); color: #8a641f; }
+.chain-lifecycle-txs { margin-top: 6px; }
+.chain-lifecycle-txs summary { cursor: pointer; color: var(--muted); font-size: 10px; }
+.chain-lifecycle-txs ul { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 0; padding: 0; list-style: none; }
+.chain-lifecycle-txs li { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: var(--muted); }
+.chain-lifecycle-txs code { font-size: 10px; color: var(--ink); }
+.chain-lifecycle-proof {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding: 4px 8px;
+  border: 1px dashed color-mix(in srgb, #52b982 45%, var(--border));
+  border-radius: 7px;
+  background: transparent;
+  color: #2f8c5f;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.chain-lifecycle-run { align-self: center; }
+.chain-lifecycle-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .chain-lifecycle-head, .chain-lifecycle-toolbar, .chain-lifecycle-foot { flex-direction: column; align-items: stretch; }
+  .chain-lifecycle-meta { align-items: flex-start; }
+  .chain-lifecycle-step { grid-template-columns: 28px minmax(0, 1fr); }
+  .chain-lifecycle-run { grid-column: 2; justify-self: start; }
+}

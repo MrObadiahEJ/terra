@@ -29,7 +29,6 @@ pub mod staking;
 pub mod stories;
 pub mod subdivision;
 pub mod threshold_credentials;
-pub mod tx_prep;
 pub mod vaults;
 pub mod workers;
 pub mod world_registry;
@@ -70,7 +69,6 @@ pub fn router() -> Router<AppState> {
         .nest("/reconstruction", reconstruction::router())
         .nest("/workers", workers::router())
         .nest("/derived", derived::router())
-        .nest("/tx", tx_prep::router())
         .nest("/demo", demo_scenarios::router())
         .nest("/activity", activity::router())
 }

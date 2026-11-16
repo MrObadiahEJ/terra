@@ -150,7 +150,6 @@ export const BACKEND_OPERATIONS: BackendOperation[] = [
   { id: 'evidence-list', group: 'Pilot zones & evidence', method: 'GET', path: '/evidence', summary: 'List uploaded evidence metadata' },
   { id: 'evidence-get', group: 'Pilot zones & evidence', method: 'GET', path: '/evidence/:id', summary: 'Read evidence upload metadata' },
   { id: 'evidence-upload', group: 'Pilot zones & evidence', method: 'POST', path: '/evidence/upload', summary: 'Upload evidence file as multipart form data', sensitive: true, disabledReason: 'Multipart upload is not enabled in the JSON workbench. The API route expects signed request headers; use a trusted server-side uploader until wallet-key verification is implemented.' },
-  { id: 'tx-prepare', group: 'Transaction preparation', method: 'POST', path: '/tx/prepare', summary: 'Prepare unsigned instruction payload', body: '{"type":"create_claim","parcel":"<base58>","claim_id":"<64-hex>","claim_type":0,"content_hash":"<64-hex>","required_attestations":1}', sensitive: true, disabledReason: 'Disabled: the current backend returns placeholder instruction data. Do not sign or submit its response.' },
 ]
 
 export const BACKEND_GROUPS = [...new Set(BACKEND_OPERATIONS.map((operation) => operation.group))]

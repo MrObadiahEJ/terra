@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Transaction } from '@solana/web3.js'
+import { SystemProgram, Transaction } from '@solana/web3.js'
 import { useWallet } from '../../lib/wallet'
 import { useAppStore } from '../../store/appStore'
-import { getProgram, parcelPda } from '../../lib/program'
+import { getProgram, ownershipPda, parcelPda } from '../../lib/program'
 import { api, type OffChainParcel, type ReachabilityResult } from '../../lib/api'
 import { bytesToHex } from '../../lib/codec'
 import {
@@ -191,9 +191,15 @@ export default function RegisterParcelPanel({
 
       const program = getProgram()
       const [pda] = parcelPda(id)
+      const [ownership] = ownershipPda(pda)
       const ix = await program.methods
         .registerParcel(Array.from(id), name.trim(), Array.from(geometryHash))
-        .accounts({ parcel: pda, owner: publicKey } as never)
+        .accounts({
+          parcel: pda,
+          owner: publicKey,
+          ownership,
+          systemProgram: SystemProgram.programId,
+        } as never)
         .instruction()
 
       const sig = await send(new Transaction().add(ix))

@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo } from 'react'
-import { Connection, PublicKey, Transaction } from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import {
   WalletProvider as AdapterWalletProvider,
   useWallet as useAdapterWallet,
@@ -17,6 +17,31 @@ import { setStorySigner } from '../story/api'
 // (and no react-native toolchain) are required.
 
 export const connection = new Connection(TERRA_RPC_URL, 'confirmed')
+
+// ---------------------------------------------------------------------------
+// Playwright localnet signer.
+//
+// The browser E2E has no extension wallet. When VITE_TERRA_E2E_SECRET_KEY is
+// set (development builds only) this keypair becomes the connected wallet. It
+// really signs and lands every transaction — it is an automated signer, not a
+// simulation. Production builds tree-shake the branch (`import.meta.env.DEV`
+// is statically false) and never read the variable.
+// ---------------------------------------------------------------------------
+const E2E_SECRET_KEY = import.meta.env.DEV
+  ? import.meta.env.VITE_TERRA_E2E_SECRET_KEY
+  : undefined
+
+function parseE2EKeypair(): Keypair | null {
+  if (!E2E_SECRET_KEY) return null
+  try {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(E2E_SECRET_KEY)))
+  } catch {
+    console.error('VITE_TERRA_E2E_SECRET_KEY is not a valid JSON secret key; ignoring')
+    return null
+  }
+}
+
+const e2eKeypair = parseE2EKeypair()
 
 // ---------------------------------------------------------------------------
 // Hardened, per-request sign-and-send.
@@ -86,29 +111,67 @@ function useWalletView(): WalletView {
     signMessage,
   } = useAdapterWallet()
 
+  const effectivePublicKey = e2eKeypair?.publicKey ?? publicKey
+  const effectiveConnected = e2eKeypair ? true : connected
+
+  const e2eSignTransaction = useMemo(
+    () =>
+      e2eKeypair
+        ? async (tx: Transaction): Promise<Transaction> => {
+            tx.partialSign(e2eKeypair)
+            return tx
+          }
+        : null,
+    [],
+  )
+  const e2eSignMessage = useMemo(
+    () =>
+      e2eKeypair
+        ? async (message: Uint8Array): Promise<Uint8Array> =>
+            ed25519.sign(message, e2eKeypair.secretKey.slice(0, 32))
+        : null,
+    [],
+  )
+
+  const activeSignTransaction = e2eSignTransaction ?? signTransaction
+  const activeSignAllTransactions = e2eKeypair
+    ? async (txs: Transaction[]): Promise<Transaction[]> => {
+        for (const tx of txs) tx.partialSign(e2eKeypair)
+        return txs
+      }
+    : signAllTransactions
+
   const anchorWallet = useMemo<AnchorWallet | undefined>(() => {
-    if (!publicKey || !signTransaction || !signAllTransactions) return undefined
-    return { publicKey, signTransaction, signAllTransactions }
-  }, [publicKey, signTransaction, signAllTransactions])
+    if (!effectivePublicKey || !activeSignTransaction || !activeSignAllTransactions) {
+      return undefined
+    }
+    return {
+      publicKey: effectivePublicKey,
+      signTransaction: activeSignTransaction,
+      signAllTransactions: activeSignAllTransactions,
+    }
+  }, [effectivePublicKey, activeSignTransaction, activeSignAllTransactions])
 
   const send = useMemo(
     () =>
       async (tx: Transaction): Promise<string> => {
-        if (!publicKey || !signTransaction) throw new Error('Wallet not connected')
-        return signAndSend(publicKey, signTransaction, tx)
+        if (!effectivePublicKey || !activeSignTransaction) {
+          throw new Error('Wallet not connected')
+        }
+        return signAndSend(effectivePublicKey, activeSignTransaction, tx)
       },
-    [publicKey, signTransaction],
+    [effectivePublicKey, activeSignTransaction],
   )
 
   return {
-    publicKey,
-    connected,
-    connecting,
-    disconnected: !connected,
+    publicKey: effectivePublicKey,
+    connected: effectiveConnected,
+    connecting: e2eKeypair ? false : connecting,
+    disconnected: !effectiveConnected,
     error: null,
-    walletName: wallet?.adapter.name ?? null,
+    walletName: e2eKeypair ? 'Terra local E2E signer' : wallet?.adapter.name ?? null,
     anchorWallet,
-    signMessage: signMessage ?? null,
+    signMessage: e2eSignMessage ?? signMessage ?? null,
     send,
   }
 }

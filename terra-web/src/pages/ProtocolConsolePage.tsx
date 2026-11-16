@@ -4,6 +4,7 @@ import { useWallet } from '../lib/wallet'
 import { api } from '../lib/api'
 import { BACKEND_GROUPS, BACKEND_OPERATIONS, type BackendOperation } from '../lib/backendConsole'
 import { useLocale } from '../lib/locale'
+import ChainLifecyclePanel from '../components/console/ChainLifecyclePanel'
 
 type JsonObject = Record<string, unknown>
 type ResultState = { operation: BackendOperation; value: unknown; at: number } | null
@@ -177,6 +178,8 @@ export default function ProtocolConsolePage() {
           <p>{t('consoleWarningBody')}</p>
         </div>
       </section>
+
+      <ChainLifecyclePanel />
 
       <div className="backend-console-grid">
         <aside className="backend-service-rail">
