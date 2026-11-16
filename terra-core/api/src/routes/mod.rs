@@ -15,6 +15,7 @@ pub mod geo;
 pub mod health;
 pub mod identities;
 pub mod manifests;
+pub mod mirror;
 pub mod parcels;
 pub mod pilot_zones;
 pub mod providers;
@@ -44,6 +45,7 @@ pub fn router() -> Router<AppState> {
         .nest("/authority-registry", authority_registry::router())
         .nest("/components", components::router())
         .nest("/manifests", manifests::router())
+        .nest("/mirror", mirror::router())
         .nest("/providers", providers::router())
         .nest("/runtime", runtime::router())
         .nest("/vaults", vaults::router())
