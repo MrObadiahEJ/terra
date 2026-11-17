@@ -5,6 +5,17 @@ use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
 // Storage adapter — abstracts where uploaded evidence bytes live.
+//
+// IMPORTANT: Only the local filesystem backend is currently implemented.
+// IPFS/Arweave/S3 backends are planned but not yet coded. Until a remote
+// storage backend is added, all evidence bytes live on local disk and are
+// NOT replicated. Do not deploy this backend to production without adding
+// an IPFS pinning or S3-compatible backend and enabling >=2 replicas
+// (see replication-audit endpoint in routes/mirror.rs).
+//
+// To add a new backend: add a variant to `StorageBackend`, implement
+// `store`/`store_content_addressed`/`load`, update `backend_name`, and
+// update `from_env` to select it via environment variable.
 // ---------------------------------------------------------------------------
 
 /// Where uploaded bytes are persisted.

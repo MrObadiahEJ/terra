@@ -128,6 +128,14 @@ async fn audit(
     }
     tables.push(ss_audit);
 
+    // --- verification_attestations_onchain ---
+    let va_audit = audit_verification_attestations(&state, limit).await?;
+    total_drifted += va_audit.drifted_rows;
+    if va_audit.drifted_rows > 0 || va_audit.unhashed_rows > 0 || va_audit.unverified_rows > 0 {
+        ok = false;
+    }
+    tables.push(va_audit);
+
     Ok(Json(AuditReport {
         tables,
         total_drifted,
@@ -527,6 +535,69 @@ async fn audit_spatial_snapshots(state: &AppState, limit: usize) -> Result<Table
 
     Ok(TableAudit {
         table: "spatial_snapshots_onchain".into(),
+        total_rows: total,
+        hashed_rows: hashed,
+        unhashed_rows: total - hashed,
+        unverified_rows: unverified,
+        drifted_rows: all_drift.len() as i64,
+        anchored_rows: 0,
+        unanchored_rows: 0,
+        drift: all_drift,
+    })
+}
+
+async fn audit_verification_attestations(state: &AppState, limit: usize) -> Result<TableAudit, AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM verification_attestations_onchain")
+        .fetch_one(&state.pool)
+        .await?;
+    let hashed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM verification_attestations_onchain WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM verification_attestations_onchain WHERE chain_verified = FALSE",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let drifted = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'hash-mismatch' AS kind, \
+                'stored mirror_hash does not match recomputed row hash' AS detail \
+         FROM verification_attestations_onchain \
+         WHERE mirror_hash IS NOT NULL \
+           AND mirror_hash <> encode(digest( \
+                 coalesce(claim_pubkey, '') || '|' || \
+                 coalesce(validator_pubkey, '') || '|' || \
+                 coalesce(observation_pubkey, '') || '|' || \
+                 coalesce(credential_subject, '') || '|' || \
+                 vc_type || '|' || \
+                 to_char(issuance_date, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') || '|' || \
+                 to_char(expiration_date, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') || '|' || \
+                 sd_jwt_digest || '|' || \
+                 selective_disclosure::text, 'sha256'), 'hex') \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM verification_attestations_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
+    Ok(TableAudit {
+        table: "verification_attestations_onchain".into(),
         total_rows: total,
         hashed_rows: hashed,
         unhashed_rows: total - hashed,

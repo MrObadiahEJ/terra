@@ -283,6 +283,7 @@ pub fn route_task(
     chosen: Pubkey,
     competitor_count: u16,
     vrf_randomness: [u8; 32],
+    oracle_signature: [u8; 64],
 ) -> Result<()> {
     require!(
         !candidates.is_empty() && candidates.len() <= MAX_ROUTE_CANDIDATES,
@@ -293,6 +294,24 @@ pub fn route_task(
         (1..=MAX_COMPETITOR_COUNT).contains(&competitor_count),
         TerraError::TooManyRouteCandidates
     );
+
+    // Verify VRF proof:
+    // 1. Oracle independence: oracle cannot be chosen winner, candidate, or requester.
+    let oracle_key = ctx.accounts.oracle.key();
+    require!(oracle_key != chosen, TerraError::CandidateCannotBeOracle);
+    require!(!candidates.contains(&oracle_key), TerraError::CandidateCannotBeOracle);
+    require!(oracle_key != ctx.accounts.requester.key(), TerraError::RequesterCannotBeOracle);
+
+    // 2. On-chain Ed25519 oracle signature verification over (task_id ‖ vrf_randomness).
+    let mut vrf_msg = [0u8; 64];
+    vrf_msg[..32].copy_from_slice(&task_id);
+    vrf_msg[32..].copy_from_slice(&vrf_randomness);
+    crate::zk::verify_precompiled_ed25519(
+        &ctx.accounts.instructions,
+        &oracle_key,
+        &vrf_msg,
+        &oracle_signature,
+    )?;
 
     let now = Clock::get()?.unix_timestamp;
     let t = &ctx.accounts.task;

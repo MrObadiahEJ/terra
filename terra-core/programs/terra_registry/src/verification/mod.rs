@@ -13,6 +13,7 @@ pub mod reputation;
 pub mod session;
 
 pub use attestation::*;
+pub use attestation::vc_type;
 pub use audit_trail::*;
 pub use challenge::*;
 pub use claim::*;

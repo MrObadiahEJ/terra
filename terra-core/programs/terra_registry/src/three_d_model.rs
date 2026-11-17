@@ -1,10 +1,10 @@
 //! 3D model registry (RFC-013 Phase C, RFC-012 §5 `ThreeDModel`).
 //!
 //! A `ThreeDModel` is the off-chain 3D reconstruction *claim* attached to a
-//! spatial asset — never the mesh itself (Design Rule 10): only `model_hash`
-//! (SHA-256 of the off-chain bundle, stored on Irys/Arweave) and `h3_index`
-//! (H3 cell index for spatial lookup) live on-chain. The model must derive from
-//! an already-anchored [`GeometryVersion`](crate::spatial_asset::GeometryVersion)
+//! spatial asset — never the mesh itself (Design Rule 10): only `model_hash`,
+//! a `storage_reference` (tileset URL / IPFS CID / storage key) and the
+//! geometry version it was reconstructed from. The model must derive from an
+//! already-anchored [`GeometryVersion`](crate::spatial_asset::GeometryVersion)
 //! (`geometry_version < asset.geometry_version_count`), so every reconstruction
 //! sits on top of the provenance chain instead of floating free.
 //!
@@ -13,20 +13,20 @@
 //! version; a registered validator's signature flips `verified` — claim →
 //! fact, the same split the whole protocol is built on. The off-chain API
 //! mirror (RFC-013 Phase E) exposes registered models to the globe client
-//! (Phase D), which streams the referenced Irys/Arweave bundle by content hash.
+//! (Phase D), which streams the referenced tiles.
 
 use anchor_lang::prelude::*;
 
-use crate::evidence_manifest::is_nonzero_hash;
+use crate::evidence_manifest::{is_nonzero_hash, is_valid_storage_reference};
 use crate::TerraError;
 
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
 
-/// Container format of the off-chain model bundle pinned to Irys/Arweave.
-/// `UNKNOWN` is a placeholder only — registration requires a concrete format
-/// (the globe client needs it to pick a loader).
+/// Container format of the off-chain model bundle a `storage_reference`
+/// points at. `UNKNOWN` is a placeholder only — registration requires a
+/// concrete format (the globe client needs it to pick a loader).
 pub mod model_format {
     pub const UNKNOWN: u8 = 0;
     pub const GLTF: u8 = 1;
@@ -62,11 +62,6 @@ pub struct ThreeDModelMeta {
 /// (RFC-012 §5 `ThreeDModel`).
 ///
 /// PDA: `["three_d_model", asset, model_version_le_bytes]`.
-///
-/// Intent 4: 3D blobs live off-chain on Irys/Arweave. On-chain we store only
-/// `model_hash` (content-addressed content hash of the bundle) and
-/// `h3_index` (H3 cell index for spatial lookup). No `storage_reference` URL
-/// or IPFS CID is stored on-chain.
 #[account]
 #[derive(InitSpace)]
 pub struct ThreeDModel {
@@ -79,12 +74,11 @@ pub struct ThreeDModel {
     /// Geometry version this model was reconstructed from (provenance —
     /// always < `asset.geometry_version_count` at registration time).
     pub geometry_version: u32,
-    /// SHA-256 canonical digest of the off-chain model bundle (Irys/Arweave
-    /// content address — the blob is fetched by this hash).
+    /// SHA-256 canonical digest of the off-chain model bundle.
     pub model_hash: [u8; 32],
-    /// H3 cell index for spatial lookup — the globe client resolves the
-    /// model by H3 cell + model_hash, never by a mutable URL.
-    pub h3_index: u64,
+    /// Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars.
+    #[max_len(128)]
+    pub storage_reference: String,
     /// `model_format` code of the referenced bundle.
     pub model_format: u8,
     /// Whoever paid to register this claim (permissionless).
@@ -124,18 +118,18 @@ pub fn geometry_version_exists(geometry_version: u32, cursor: u32) -> bool {
 
 /// Register an off-chain 3D model claim (permissionless rent-paid append).
 /// The entry is immutable; [`verify_3d_model`] flips `verified`.
-///
-/// Intent 4: `storage_reference` is removed — the blob lives on Irys/Arweave
-/// and is addressed by `model_hash`. `h3_index` replaces it for spatial
-/// lookup.
 pub fn register_3d_model(
     ctx: Context<crate::Register3DModel>,
     model_hash: [u8; 32],
-    h3_index: u64,
+    storage_reference: String,
     model_format_code: u8,
     geometry_version: u32,
 ) -> Result<()> {
     require!(is_nonzero_hash(&model_hash), TerraError::EmptyGeometryHash);
+    require!(
+        is_valid_storage_reference(&storage_reference),
+        TerraError::EmptyStorageReference
+    );
     require!(
         is_valid_model_format(model_format_code),
         TerraError::InvalidModelFormat
@@ -143,6 +137,9 @@ pub fn register_3d_model(
 
     let asset_pk = ctx.accounts.asset.key();
     let meta = &mut ctx.accounts.meta;
+    // Reuse path (init_if_needed): the seed re-derivation already pins the
+    // account to this asset; set the field unconditionally so a fresh init
+    // is complete too.
     meta.asset = asset_pk;
     require!(
         !model_append_would_exceed_cap(meta.count),
@@ -164,7 +161,7 @@ pub fn register_3d_model(
     model.model_version = model_version;
     model.geometry_version = geometry_version;
     model.model_hash = model_hash;
-    model.h3_index = h3_index;
+    model.storage_reference = storage_reference;
     model.model_format = model_format_code;
     model.submitted_by = ctx.accounts.payer.key();
     model.submitted_at = now;
@@ -254,9 +251,8 @@ mod tests {
         // PDA seed discriminants must never change (address stability).
         assert_eq!(b"three_d_model", b"three_d_model");
         assert_eq!(b"three_d_model_meta", b"three_d_model_meta");
-        // Account size sanity (no discriminator): fixed fields + h3_index (u64),
-        // no variable-length storage_reference.
-        let fixed = 32 + 32 + 4 + 4 + 32 + 8 + 4 + 1 + 32 + 8 + 1 + 32 + 8;
-        assert_eq!(fixed, 266);
+        // Account size sanity (no discriminator): fixed fields + 128-byte ref.
+        let fixed = 32 + 32 + 4 + 4 + 32 + 4 + 128 + 1 + 32 + 8 + 1 + 32 + 8;
+        assert_eq!(fixed, 318);
     }
 }

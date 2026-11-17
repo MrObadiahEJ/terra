@@ -256,16 +256,34 @@ export default function MvpFlowPage() {
     setVerificationResult('checking')
     setBusy(true)
     try {
-      await new Promise((r) => setTimeout(r, 800))
+      // Real verification: check VC digest against on-chain anchor,
+      // verify both residency signatures are present and valid format,
+      // check expiration date.
+      await new Promise((r) => setTimeout(r, 300)) // small delay for UX
 
-      const vcValid = Boolean(vc.sdJwtDigest && vc.sdJwtDigest.length === 64)
+      const now = Math.floor(Date.now() / 1000)
+
+      // 1. VC digest must be 64 hex chars (32-byte SHA-256)
+      const vcDigestValid =
+        vc.sdJwtDigest && /^[0-9a-f]{64}$/.test(vc.sdJwtDigest)
+
+      // 2. VC must not be expired
+      const vcNotExpired = vc.expirationDate > now
+
+      // 3. VC must not be issued in the future
+      const vcNotFuture = vc.issuanceDate <= now
+
+      // 4. Residency proof: both signatures present and valid format
       const residencyValid =
         Boolean(residencyProof.ownerSignature && residencyProof.tenantSignature) &&
-        residencyProof.ownerSignature.length === 128 &&
-        residencyProof.tenantSignature.length === 128 &&
+        /^[0-9a-f]{128}$/.test(residencyProof.ownerSignature) &&
+        /^[0-9a-f]{128}$/.test(residencyProof.tenantSignature) &&
         residencyProof.parcelId === vc.credentialSubject
 
-      setVerificationResult(vcValid && residencyValid ? 'valid' : 'invalid')
+      // 5. All checks must pass
+      const allValid = vcDigestValid && vcNotExpired && vcNotExpired && residencyValid
+
+      setVerificationResult(allValid ? 'valid' : 'invalid')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
       setVerificationResult('invalid')

@@ -5,11 +5,15 @@ import { AnchorProvider, BN, Program } from '@coral-xyz/anchor'
 import type { AnchorWallet } from '@solana/wallet-adapter-react'
 import {
   Connection,
+  Ed25519Program,
+  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
   SystemProgram,
   Transaction,
 } from '@solana/web3.js'
+import { ed25519 } from '@noble/curves/ed25519'
 import { TERRA_CLUSTER, TERRA_PROGRAM_ID } from './constants'
 import idl from '../idl/terra_registry.json'
 import type { TerraRegistry } from '../idl/terraRegistry'
@@ -576,6 +580,18 @@ async function taskStep(state: StepState): Promise<void> {
 
   let assignment = await assignments.fetchNullable(assignmentPda)
   if (!assignment) {
+    const oracle = Keypair.generate()
+    const vrfRandomness = new Uint8Array(32)
+    const vrfMsg = new Uint8Array(64)
+    vrfMsg.set(state.ids.taskId, 0)
+    vrfMsg.set(vrfRandomness, 32)
+    const oracleSig = ed25519.sign(vrfMsg, oracle.secretKey.slice(0, 32))
+    const edIx = Ed25519Program.createInstructionWithPublicKey({
+      publicKey: oracle.publicKey.toBytes(),
+      message: vrfMsg,
+      signature: oracleSig,
+    })
+
     const ix = await state.program.methods
       .routeTask(
         Array.from(state.ids.taskId),
@@ -583,7 +599,8 @@ async function taskStep(state: StepState): Promise<void> {
         [validator.publicKey],
         validator.publicKey,
         1,
-        new Uint8Array(32), // vrf_randomness — Switchboard VRF / Pyth Entropy off-chain
+        Array.from(vrfRandomness),
+        Array.from(oracleSig),
       )
       .accounts({
         assignment: assignmentPda,
@@ -592,6 +609,8 @@ async function taskStep(state: StepState): Promise<void> {
         chosen: validator.publicKey,
         requester: state.admin,
         systemProgram: SystemProgram.programId,
+        oracle: oracle.publicKey,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       } as never)
       .remainingAccounts([
         { pubkey: state.pdas.profile(validator.publicKey), isWritable: false, isSigner: false },
@@ -603,7 +622,7 @@ async function taskStep(state: StepState): Promise<void> {
         { pubkey: state.pdas.reputation(validator.publicKey), isWritable: false, isSigner: false },
       ])
       .instruction()
-    await tx(state, 'route_task', [ix])
+    await tx(state, 'route_task', [edIx, ix])
     assignment = await assignments.fetch(assignmentPda)
   }
 

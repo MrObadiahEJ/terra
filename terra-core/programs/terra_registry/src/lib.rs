@@ -1995,19 +1995,19 @@ pub mod terra_registry {
 
     /// Register an off-chain 3D model claim against an anchored geometry
     /// version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain
-    /// geometry, only hash + h3_index).
+    /// geometry, only hash + storage_reference).
     #[allow(clippy::too_many_arguments)]
     pub fn register_3d_model(
         ctx: Context<Register3DModel>,
         model_hash: [u8; 32],
-        h3_index: u64,
+        storage_reference: String,
         model_format: u8,
         geometry_version: u32,
     ) -> Result<()> {
         three_d_model::register_3d_model(
             ctx,
             model_hash,
-            h3_index,
+            storage_reference,
             model_format,
             geometry_version,
         )
@@ -2453,6 +2453,7 @@ pub mod terra_registry {
         chosen: Pubkey,
         competitor_count: u16,
         vrf_randomness: [u8; 32],
+        oracle_signature: [u8; 64],
     ) -> Result<()> {
         routing::route_task(
             ctx,
@@ -2462,6 +2463,7 @@ pub mod terra_registry {
             chosen,
             competitor_count,
             vrf_randomness,
+            oracle_signature,
         )
     }
 
@@ -5479,7 +5481,7 @@ pub struct AddEvidenceArtifact<'info> {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-#[instruction(task_id: [u8; 32], req_index: u8, _candidates: Vec<Pubkey>, _chosen: Pubkey, _competitor_count: u16, _vrf_randomness: [u8; 32])]
+#[instruction(task_id: [u8; 32], req_index: u8, _candidates: Vec<Pubkey>, _chosen: Pubkey, _competitor_count: u16, _vrf_randomness: [u8; 32], _oracle_signature: [u8; 64])]
 pub struct RouteTask<'info> {
     #[account(
         init,
@@ -5517,6 +5519,12 @@ pub struct RouteTask<'info> {
     #[account(mut)]
     pub requester: Signer<'info>,
     pub system_program: Program<'info, System>,
+    /// CHECK: Oracle authority providing the VRF randomness attestation.
+    pub oracle: UncheckedAccount<'info>,
+    /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
+    /// (must be the Instructions sysvar holding this transaction's
+    /// Ed25519 precompile attestation of the VRF randomness).
+    pub instructions: UncheckedAccount<'info>,
 }
 
 // ---------------------------------------------------------------------------
@@ -8103,6 +8111,12 @@ pub enum TerraError {
     ProtectionAlreadyActive,
     #[msg("Emergency protection has expired")]
     ProtectionExpired,
+    #[msg("Candidate validator cannot serve as VRF oracle")]
+    CandidateCannotBeOracle,
+    #[msg("Requester cannot serve as VRF oracle")]
+    RequesterCannotBeOracle,
+    #[msg("Invalid VRF oracle signature or forged randomness")]
+    InvalidVrfRandomness,
 }
 
 #[cfg(test)]
