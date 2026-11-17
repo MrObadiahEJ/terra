@@ -656,6 +656,7 @@ mod tests {
             pool,
             geo: None,
             api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
             storage: Arc::new(StorageBackend::Local { root }),
             zk: None,
         }

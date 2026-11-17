@@ -14,6 +14,7 @@ use ed25519_dalek::Verifier;
 use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tempfile::tempdir;
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -926,13 +927,14 @@ mod tests {
         .expect("insert replica");
 
         // Run the audit.
-        let dir = tempfile::tempdir().expect("temp storage dir");
+        let dir = tempdir().expect("temp storage dir");
         let state = AppState {
             pool: pool.clone(),
             geo: None,
             api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
                 &[13u8; 32],
             )))),
+            vrf_oracle_pubkey: None,
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -1056,6 +1058,7 @@ mod tests {
             api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
                 &[13u8; 32],
             )))),
+            vrf_oracle_pubkey: None,
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),

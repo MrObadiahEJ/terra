@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use hmac::Mac;
 use reqwest::multipart;
 use sha2::{Digest, Sha256};
 
@@ -27,6 +28,15 @@ pub enum StorageBackend {
     /// Pin bytes to an IPFS node via its HTTP API (e.g. http://localhost:5001).
     /// The storage_ref returned is the IPFS CID.
     Ipfs { api_url: String, gateway_url: Option<String> },
+    /// Store bytes in an S3-compatible bucket (Cloudflare R2, AWS S3, MinIO, etc.).
+    /// The storage_ref returned is the object key.
+    S3 {
+        bucket: String,
+        region: String,
+        endpoint: String,
+        access_key: String,
+        secret_key: String,
+    },
 }
 
 impl StorageBackend {
@@ -35,6 +45,7 @@ impl StorageBackend {
         match self {
             StorageBackend::Local { .. } => "local",
             StorageBackend::Ipfs { .. } => "ipfs",
+            StorageBackend::S3 { .. } => "s3",
         }
     }
 
@@ -59,22 +70,49 @@ impl StorageBackend {
             StorageBackend::Ipfs {
                 api_url,
                 gateway_url,
-            } => store_ipfs(api_url, gateway_url.as_deref(), filename, content_type, data)
-                .await
-                .map(|(storage_ref, size_bytes)| StoredArtifact {
+            } => {
+                // IPFS is inherently content-addressed; pin via store_ipfs.
+                let (storage_ref, size_bytes) =
+                    store_ipfs(api_url, gateway_url.as_deref(), filename, content_type, data)
+                        .await?;
+                Ok(StoredArtifact {
                     content_hash,
                     storage_ref,
                     size_bytes,
                     backend_name: self.backend_name().to_string(),
-                }),
+                })
+            }
+            StorageBackend::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key,
+                secret_key,
+            } => {
+                // S3 is inherently content-addressed when keyed by content hash.
+                let hex = hex::encode(content_hash);
+                let storage_ref = format!("content/sha256/{}/{}/{}", &hex[..2], &hex[2..4], hex);
+                let s3_key = storage_ref.clone();
+                let (_stored_ref, size_bytes) = store_s3(
+                    bucket, region, endpoint, access_key, secret_key,
+                    &s3_key, content_type, data,
+                )
+                .await?;
+                Ok(StoredArtifact {
+                    content_hash,
+                    storage_ref: _stored_ref,
+                    size_bytes,
+                    backend_name: self.backend_name().to_string(),
+                })
+            }
         }
-    }
+        }
 
     /// Store bytes under a content-addressed path (`content/sha256/aa/bb/<hex>`).
     /// Re-storing identical bytes is idempotent and returns the same reference.
     pub async fn store_content_addressed(
         &self,
-        _content_type: &str,
+        content_type: &str,
         data: &[u8],
     ) -> Result<StoredArtifact> {
         let content_hash: [u8; 32] = Sha256::digest(data).into();
@@ -115,6 +153,28 @@ impl StorageBackend {
                     backend_name: self.backend_name().to_string(),
                 })
             }
+            StorageBackend::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key,
+                secret_key,
+            } => {
+                // S3 is inherently content-addressed when keyed by content hash.
+                let hex = hex::encode(content_hash);
+                let storage_ref = format!("content/sha256/{}/{}/{}", &hex[..2], &hex[2..4], hex);
+                let s3_key = storage_ref.clone();
+                let (_stored_ref, size_bytes) = store_s3(
+                    bucket, region, endpoint, access_key, secret_key,
+                    &s3_key, content_type, data,
+                ).await?;
+                Ok(StoredArtifact {
+                    content_hash,
+                    storage_ref,
+                    size_bytes,
+                    backend_name: self.backend_name().to_string(),
+                })
+            }
         }
     }
 
@@ -127,6 +187,13 @@ impl StorageBackend {
                 api_url,
                 gateway_url,
             } => load_ipfs(api_url, gateway_url.as_deref(), storage_ref).await,
+            StorageBackend::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key,
+                secret_key,
+            } => load_s3(bucket, region, endpoint, access_key, secret_key, storage_ref).await,
         }
     }
 }
@@ -280,6 +347,227 @@ async fn load_ipfs(api_url: &str, gateway_url: Option<&str>, storage_ref: &str) 
     }
 
     Ok(Some(resp.bytes().await.context("reading ipfs cat bytes")?.to_vec()))
+}
+
+// ---------------------------------------------------------------------------
+// S3-compatible backend (Cloudflare R2, AWS S3, MinIO, etc.)
+//
+// Uses AWS Signature V4 for request signing. R2 is S3-compatible, so this
+// backend works with R2 endpoints as well.
+// ---------------------------------------------------------------------------
+
+fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+    type HmacSha256 = hmac::Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC key length");
+    mac.update(data);
+    mac.finalize().into_bytes().to_vec()
+}
+
+fn sha256_hex(data: &[u8]) -> String {
+    use sha2::Digest;
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
+}
+
+fn aws_signature_v4(
+    access_key: &str,
+    secret_key: &str,
+    region: &str,
+    service: &str,
+    method: &str,
+    uri: &str,
+    query: &str,
+    headers: &[(String, String)],
+    body: &[u8],
+) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before epoch")
+        .as_secs();
+    let date = time::OffsetDateTime::from_unix_timestamp(now as i64)
+        .expect("invalid unix timestamp");
+    let amz_date = format!(
+        "{:04}{:02}{:02}{:02}{:02}{:02}",
+        date.year(),
+        date.month() as u8,
+        date.day() as u8,
+        date.hour() as u8,
+        date.minute() as u8,
+        date.second() as u8,
+    );
+    let date_str = &amz_date[..8];
+
+    // Canonical request
+    let mut canonical_headers: Vec<String> = headers
+        .iter()
+        .map(|(k, v)| format!("{}:{}", k.to_lowercase(), v))
+        .collect();
+    canonical_headers.sort();
+    let canonical_headers = canonical_headers.join("\n") + "\n";
+
+    let signed_headers: String = headers
+        .iter()
+        .map(|(k, _)| k.to_lowercase())
+        .collect::<Vec<_>>()
+        .join(";");
+
+    let canonical_request = format!(
+        "{}\n{}\n{}\n{}\n{}\n{}",
+        method,
+        uri,
+        query,
+        canonical_headers,
+        signed_headers,
+        sha256_hex(body),
+    );
+
+    // String to sign
+    let credential_scope = format!("{}/{}/{}/aws4_request", date_str, region, service);
+    let string_to_sign = format!(
+        "AWS4-HMAC-SHA256\n{}\n{}\n{}",
+        amz_date,
+        credential_scope,
+        sha256_hex(canonical_request.as_bytes()),
+    );
+
+    // Signing key
+    let k_date = hmac_sha256(
+        format!("AWS4{}", secret_key).as_bytes(),
+        date_str.as_bytes(),
+    );
+    let k_region = hmac_sha256(&k_date, region.as_bytes());
+                let _k_service = hmac_sha256(&k_region, service.as_bytes());
+    let k_signing = hmac_sha256(&k_region, b"aws4_request");
+
+    let signature = hex::encode(hmac_sha256(&k_signing, string_to_sign.as_bytes()));
+
+    format!(
+        "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+        access_key, credential_scope, signed_headers, signature
+    )
+}
+
+async fn store_s3(
+    bucket: &str,
+    region: &str,
+    endpoint: &str,
+    access_key: &str,
+    secret_key: &str,
+    key: &str,
+    content_type: &str,
+    data: &[u8],
+) -> Result<(String, u64)> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
+
+    let date = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before epoch")
+        .as_secs();
+    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
+        .expect("invalid unix timestamp")
+        .format(&time::format_description::well_known::Rfc3339)
+        .expect("invalid date format");
+
+    let headers = vec![
+        ("host".to_string(), format!("{}/{}", endpoint.trim_end_matches('/'), bucket)),
+        ("x-amz-date".to_string(), amz_date.clone()),
+        ("x-amz-content-sha256".to_string(), sha256_hex(data)),
+    ];
+
+    let authorization = aws_signature_v4(
+        access_key,
+        secret_key,
+        region,
+        "s3",
+        "PUT",
+        &format!("/{}/{}", bucket, key),
+        "",
+        &headers,
+        data,
+    );
+
+    let resp = client
+        .put(&url)
+        .header("host", format!("{}/{}", endpoint.trim_end_matches('/'), bucket))
+        .header("x-amz-date", &amz_date)
+        .header("x-amz-content-sha256", sha256_hex(data))
+        .header("authorization", &authorization)
+        .header("content-type", content_type)
+        .header("content-length", data.len())
+        .body(data.to_vec())
+        .send()
+        .await
+        .context("s3 put request failed")?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("s3 put returned {status}: {body}");
+    }
+
+    let storage_ref = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
+    Ok((storage_ref, data.len() as u64))
+}
+
+async fn load_s3(
+    bucket: &str,
+    region: &str,
+    endpoint: &str,
+    access_key: &str,
+    secret_key: &str,
+    key: &str,
+) -> Result<Option<Vec<u8>>> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
+
+    let date = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before epoch")
+        .as_secs();
+    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
+        .expect("invalid unix timestamp")
+        .format(&time::format_description::well_known::Rfc3339)
+        .expect("invalid date format");
+
+    let headers = vec![
+        ("host".to_string(), format!("{}/{}", endpoint.trim_end_matches('/'), bucket)),
+        ("x-amz-date".to_string(), amz_date.clone()),
+    ];
+
+    let authorization = aws_signature_v4(
+        access_key,
+        secret_key,
+        region,
+        "s3",
+        "GET",
+        &format!("/{}/{}", bucket, key),
+        "",
+        &headers,
+        &[],
+    );
+
+    let resp = client
+        .get(&url)
+        .header("host", format!("{}/{}", endpoint.trim_end_matches('/'), bucket))
+        .header("x-amz-date", &amz_date)
+        .header("authorization", &authorization)
+        .send()
+        .await
+        .context("s3 get request failed")?;
+
+    if resp.status() == 404 {
+        return Ok(None);
+    }
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("s3 get returned {status}: {body}");
+    }
+
+    Ok(Some(resp.bytes().await.context("reading s3 bytes")?.to_vec()))
 }
 
 // ---------------------------------------------------------------------------

@@ -508,6 +508,7 @@ mod tests {
             pool: sqlx::PgPool::connect_lazy("postgres://x:x@localhost/x").unwrap(),
             geo: None,
             api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
             storage: Arc::new(StorageBackend::Local {
                 root: std::path::PathBuf::from("/tmp/terra-test-signed-manifests"),
             }),
@@ -611,6 +612,7 @@ mod tests {
             pool: pool.clone(),
             geo: None,
             api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
             storage: Arc::new(StorageBackend::Local {
                 root: std::path::PathBuf::from("/tmp/terra-test-signed-manifests"),
             }),

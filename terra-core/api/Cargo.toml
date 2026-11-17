@@ -26,6 +26,9 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 base64 = "0.22"
 bs58 = "0.5"
 sha2 = "0.10"
+hmac = "0.12"
+time = { version = "0.3", features = ["formatting"] }
+tempfile = "3"
 solana-sdk = "3"
 solana-program = "3"
 solana-account-decoder = "3"
