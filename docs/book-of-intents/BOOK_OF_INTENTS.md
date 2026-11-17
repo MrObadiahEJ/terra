@@ -6,10 +6,10 @@ maintained continuously and must stay sufficient context for a competent AI
 agent or human to continue the project without the founder repeating
 instructions.
 
-**Audit basis:** repository state at commit `244ed7e` (dev branch),
-re-verified 2026-11-05 (API 133/133, geo-engine 33 (+2 ignored), vitest 83/83,
-tsc clean, build + bundle PASS; historical suite baselines recorded per their
-last verified runs — see IMPLEMENTATION_STATUS).
+**Audit basis:** repository state at commit `9736a14` (dev branch),
+re-verified 2026-11-17 (API 152/152, geo-engine 42 passed +1 ignored, vitest
+130/130, tsc clean, build + bundle PASS; BPF count re-confirmed in source:
+307).
 
 ## Canonical trust principle
 

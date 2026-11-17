@@ -1,8 +1,9 @@
 # Sprint F: Evidence durability and secure intake
 
-**Date:** planned · **Status:** planned
+**Date:** 2026-11-16 · **Status:** completed
 **Exit gate:** evidence survives provider loss; hostile uploads are
 quarantined; retention/purge is enforced; “verified” requires ≥2 replicas.
+Met — see implementation notes below.
 
 ## Trigger
 

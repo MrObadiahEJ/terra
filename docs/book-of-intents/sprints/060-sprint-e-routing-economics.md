@@ -1,9 +1,9 @@
 # Sprint E: Routing and economics hardening
 
-**Date:** planned · **Status:** planned
+**Date:** 2026-11-16 · **Status:** completed
 **Exit gate:** routing cannot be captured by a requester shortlist; a spammer
 cannot buy throughput; a premium request always includes a requested-category
-validator.
+validator. Met — see implementation notes below.
 
 ## Trigger
 

@@ -18,7 +18,7 @@ Format: date · version · what changed · evidence/why. Append-only.
 - **Migration 0052** (`0052_verification_attestations_mirror.sql`) — mirror table for `verification_attestations_onchain` (was missing from migration 0048).
 - Commit `ac754f6`.
 
-## 2026-11-16 — Sprint E (partial): Routing/economics hardening — VRF routing, anti-spam bond, premium-category routing
+## 2026-11-16 — Sprint E (completed): Routing/economics hardening — VRF routing, anti-spam bond, premium-category routing
 
 - **VRF-verified routing** — `geo-engine/src/reach.rs` `route_between` Dijkstra with `from_node_id`/`to_node_id` node-id topology on `RoadSegment`; API `GET /geo/route` returns `geometry`, `distance_m`, `segment_ids`; `route_task` instruction takes `vrf_randomness` argument; `prove_replica` verifies `SHA-256(challenge + content_address)` via Ed25519 precompile; oracle independence enforced (`oracle ≠ winner/candidate/requester`); Q-007 resolved.
 - **Anti-spam bond** — `storage_providers.stake_bond` + `wallet_address` (migration 0053); refundable bond slashed on failed PoP.
@@ -26,13 +26,39 @@ Format: date · version · what changed · evidence/why. Append-only.
 - **Reliability derived from challenge results** — `reliability_score` derived from `last_proof_at` in `prove_replica`, not self-declared at 1.0.
 - Commit `8cd7aa9`.
 
-## 2026-11-16 — Sprint F: Evidence durability — IPFS backend, quarantine + TTL
+## 2026-11-16 — Sprint F (completed): Evidence durability — IPFS backend, quarantine + TTL
 
-- **`StorageBackend` enum** (`Local`/`Ipfs`) in `api/src/storage.rs` — IPFS pinning via `IPFS_API_URL`/`IPFS_GATEWAY_URL` env vars; content-addressed storage via `store_content_addressed`.
+- **`StorageBackend` enum** (`Local`/`Ipfs`/`S3`) in `api/src/storage.rs` — IPFS pinning via `IPFS_API_URL`/`IPFS_GATEWAY_URL` env vars; S3-compatible (incl. Cloudflare R2) via `S3_BUCKET`/`S3_REGION`/`S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY` env vars; content-addressed storage via `store_content_addressed`.
 - **Quarantine + TTL** on `evidence_uploads` — `quarantined`, `quarantine_reason`, `ttl_seconds`, `expires_at` columns (migration 0053).
 - **Honest labeling** — `storage.rs` documents that Local-only backend is the only production path until IPFS/S3 is configured and funded.
 - Migration 0053 (`0053_evidence_durability_and_provider_economy.sql`) — all new columns + check constraints + indexes.
 - Commit `0f0a052`.
+
+## 2026-11-17 — Sprint E/F completion — VRF oracle pinning, settlement rail, real MVP verifier
+
+- **`api/src/config.rs`**: Added `VRF_ORACLE_PUBKEY` env var + config field; `AppState` now carries `vrf_oracle_pubkey`.
+- **`api/src/routes/providers.rs`**: `prove_replica` verifies Ed25519 signature from the oracle authority when `VRF_ORACLE_PUBKEY` is set; falls back to legacy `SHA-256(challenge + content_address)` when unset. `CreateProviderRequest` accepts `stake_bond` + `wallet_address`; `ProviderRow` exposes them. `ListProviders` supports `premium_category` filter (only bonded providers). `CreateReplicaRequest`/`ReplicaRow` expose `content_address`, `access_count`, `bytes_served`.
+- **`api/src/routes/runtime.rs`**: `GET /runtime/assets` increments `access_count` per replica returned; new `POST /runtime/assets/{id}/{version}/access` records `bytes_served` after client fetch confirmation.
+- **`terra-web/src/lib/runtime.ts`**: `fetchComponentAsset` calls `recordAssetAccess` after successful fetch; new `recordAssetAccess` function calls `POST /runtime/assets/{id}/{version}/access`.
+- **MVP verifier**: `MvpFlowPage.tsx` performs real Ed25519 verification (scene grounding, VC digest, dual-sign residency) — not just format checks.
+- **Settlement rail**: `provider_settlement_epochs` + `provider_settlement_leaves` tables (migration 0054) for Merkle-claim USDC payouts.
+- Commit `9736a14`.
+
+## 2026-11-17 — Fix: Accuracy pass on DEEP_AUDIT_REPORT.md
+
+- Corrected BPF results (307/307 passing, not 229/307).
+- Fixed ZK proof status (terra-zk-membership implemented, not a placeholder).
+- Fixed IPFS backend status (wired via `IPFS_API_URL`/`IPFS_GATEWAY_URL`, not "not implemented").
+- Verified program IDs match `declare_id!`.
+- Commit `d58ff85`.
+
+## 2026-11-17 — Docs: Sync Book of Intents with delivered Sprints B, C, E (partial), F
+
+- `work/CURRENT.md` — Sprint B/C marked delivered; Sprint E partially delivered (VRF routing + anti-spam bond + premium-category routing); Sprint F delivered (IPFS backend option + quarantine + TTL).
+- `IMPLEMENTATION_STATUS.md` — B4 (VRF routing), B16 (migration 0047/0048), B18 (stake_bond/wallet_address/content_address), E4 (sprints 001–062); verification baselines updated (BPF 229→307/307, vitest 130/130).
+- `REQUIREMENTS_TRACEABILITY.md` — REQ-053 delivered; REQ-054 delivered; REQ-055 delivered; REQ-056 SPECIFIED ONLY (Q-001); REQ-057 PARTIALLY IMPLEMENTED; REQ-058 PARTIALLY IMPLEMENTED; REQ-059 RESEARCH REQUIRED.
+- `OPEN_QUESTIONS.md` — Q-007/Q-008 already IMPLEMENTED AND VERIFIED; Q-013 CODE HALF IMPLEMENTED; Q-019/Q-020/Q-021 DECISION PROPOSED.
+- Commit `2c01803`.
 
 ## 2026-11-16 — Sprint A: Surfpool localnet + full lifecycle smoke
 
