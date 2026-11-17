@@ -2,6 +2,38 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-16 — Sprint B: Real write path — delete `tx_prep.rs`, IDL/client `program.methods`, fix identity PDAs
+
+- **`tx_prep.rs` deleted** — all server-side placeholder transaction builders removed; every write now uses client-side IDL `program.methods` with real PDAs, discriminators and signers.
+- **Identity PDA fix** — `identityPda`/`successionPda` now derive on `terra_identity` program ID (was incorrectly on `terra_registry`).
+- **IDLs generated and synced** — `idl/terra_registry.json` (176 instructions), `idl/terra_identity.json` (8 instructions); `make idl` / `build.sh` sync generated IDLs into tracked `idl/` directory; web copy refreshed by `build.sh`.
+- **UI wired** — `/console` and parcel panels wired to the real write loop.
+- Commit `76d85df`.
+
+## 2026-11-16 — Sprint C: Chain indexer + DB-vs-chain mirror audit
+
+- **`api/src/indexer.rs`** (new) — polls `terra_registry` program accounts, decodes Anchor `Parcel` + `VerificationAttestation` accounts by discriminator, upserts mirror rows with `chain_verified=true`, `chain_slot`, `chain_signature`; spawns as background tokio task from `main.rs`.
+- **Migration 0051** (`0051_chain_verified_columns.sql`) — adds `chain_verified`/`chain_slot`/`chain_signature` to `parcels`, `rights`, `spatial_assets_onchain`, `geometry_versions_onchain`, `three_d_models_onchain`, `spatial_snapshots_onchain`.
+- **`GET /mirror/audit`** extended — covers 7 tables + `verification_attestations_onchain`, reports `unverified_rows` per table and flags `chain-unverified` drift.
+- **Migration 0052** (`0052_verification_attestations_mirror.sql`) — mirror table for `verification_attestations_onchain` (was missing from migration 0048).
+- Commit `ac754f6`.
+
+## 2026-11-16 — Sprint E (partial): Routing/economics hardening — VRF routing, anti-spam bond, premium-category routing
+
+- **VRF-verified routing** — `geo-engine/src/reach.rs` `route_between` Dijkstra with `from_node_id`/`to_node_id` node-id topology on `RoadSegment`; API `GET /geo/route` returns `geometry`, `distance_m`, `segment_ids`; `route_task` instruction takes `vrf_randomness` argument; `prove_replica` verifies `SHA-256(challenge + content_address)` via Ed25519 precompile; oracle independence enforced (`oracle ≠ winner/candidate/requester`); Q-007 resolved.
+- **Anti-spam bond** — `storage_providers.stake_bond` + `wallet_address` (migration 0053); refundable bond slashed on failed PoP.
+- **Premium-category routing** — `GET /providers` supports `premium_category` filter (only bonded providers with `stake_bond > 0`); `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes.
+- **Reliability derived from challenge results** — `reliability_score` derived from `last_proof_at` in `prove_replica`, not self-declared at 1.0.
+- Commit `8cd7aa9`.
+
+## 2026-11-16 — Sprint F: Evidence durability — IPFS backend, quarantine + TTL
+
+- **`StorageBackend` enum** (`Local`/`Ipfs`) in `api/src/storage.rs` — IPFS pinning via `IPFS_API_URL`/`IPFS_GATEWAY_URL` env vars; content-addressed storage via `store_content_addressed`.
+- **Quarantine + TTL** on `evidence_uploads` — `quarantined`, `quarantine_reason`, `ttl_seconds`, `expires_at` columns (migration 0053).
+- **Honest labeling** — `storage.rs` documents that Local-only backend is the only production path until IPFS/S3 is configured and funded.
+- Migration 0053 (`0053_evidence_durability_and_provider_economy.sql`) — all new columns + check constraints + indexes.
+- Commit `0f0a052`.
+
 ## 2026-11-16 — Sprint A: Surfpool localnet + full lifecycle smoke
 
 - **Committed generated IDLs** under `terra-core/idl/`:
