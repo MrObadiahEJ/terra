@@ -56,6 +56,10 @@ pub struct CreateProviderRequest {
     pub geographic_scope: Option<Vec<String>>,
     pub reliability_score: Option<f64>,
     pub cost_per_gb: Option<f64>,
+    /// Refundable anti-spam bond (raw units); slashed on failed PoP.
+    pub stake_bond: Option<i64>,
+    /// Wallet address for bond settlement and reward payouts.
+    pub wallet_address: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,8 +70,19 @@ pub struct CreateReplicaRequest {
     pub version: String,
     pub size_bytes: Option<i64>,
     pub checksum: Option<String>,
+    pub content_address: Option<String>,
     pub latency_ms: Option<i32>,
     pub is_available: Option<bool>,
+}
+
+/// Premium category for artifact retrieval. Providers with a stake_bond > 0
+/// are eligible for premium categories (priority retrieval, higher reward).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PremiumCategory {
+    /// Standard retrieval — any provider can serve.
+    Standard,
+    /// Premium — only bonded providers (stake_bond > 0) can serve.
+    Premium(String), // category name
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +90,9 @@ pub struct ListProvidersParams {
     pub provider_type: Option<String>,
     pub is_active: Option<bool>,
     pub region: Option<String>,
+    /// If set, only return providers eligible for this premium category
+    /// (i.e. stake_bond > 0).
+    pub premium_category: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: usize,
 }
@@ -99,6 +117,10 @@ pub struct ProviderRow {
     pub is_active: bool,
     pub reliability_score: f64,
     pub cost_per_gb: Option<f64>,
+    /// Refundable anti-spam bond (raw units); slashed on failed PoP.
+    pub stake_bond: i64,
+    /// Wallet address for bond settlement and reward payouts.
+    pub wallet_address: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -119,6 +141,10 @@ pub struct ReplicaRow {
     pub last_checked_at: chrono::DateTime<chrono::Utc>,
     pub last_challenge: Option<String>,
     pub last_proof_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Usage metering: number of times this replica has been retrieved.
+    pub access_count: i64,
+    /// Usage metering: total bytes served from this replica.
+    pub bytes_served: i64,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -134,17 +160,20 @@ pub async fn create_provider(
     let geo_scope = req.geographic_scope.unwrap_or_default();
     let reliability = req.reliability_score.unwrap_or(1.0);
     let cost = req.cost_per_gb;
+    let stake_bond = req.stake_bond.unwrap_or(0);
+    let wallet_address = req.wallet_address.clone();
 
     let row = sqlx::query_as::<_, ProviderRow>(
         r#"
         INSERT INTO storage_providers (
             provider_id, name, provider_type, base_url, capabilities,
-            geographic_scope, reliability_score, cost_per_gb
+            geographic_scope, reliability_score, cost_per_gb,
+            stake_bond, wallet_address
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id, provider_id, name, provider_type, base_url, capabilities,
                   geographic_scope, is_active, reliability_score, cost_per_gb,
-                  created_at, updated_at
+                  stake_bond, wallet_address, created_at, updated_at
         "#,
     )
     .bind(&req.provider_id)
@@ -155,6 +184,8 @@ pub async fn create_provider(
     .bind(&geo_scope)
     .bind(reliability)
     .bind(cost)
+    .bind(stake_bond)
+    .bind(&wallet_address)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("insert failed: {e}")))?;
@@ -168,16 +199,27 @@ pub async fn create_provider(
 
 const PROVIDERS_SELECT: &str = "SELECT id, provider_id, name, provider_type, \
     base_url, capabilities, geographic_scope, is_active, reliability_score, \
-    cost_per_gb, created_at, updated_at FROM storage_providers";
+    cost_per_gb, stake_bond, wallet_address, created_at, updated_at \
+    FROM storage_providers";
 
 pub async fn list_providers(
     State(state): State<AppState>,
     Query(params): Query<ListProvidersParams>,
 ) -> Result<Json<Vec<ProviderRow>>, AppError> {
     let limit = params.limit.min(500);
-    let rows: Vec<ProviderRow> = match (&params.provider_type, &params.is_active, &params.region) {
+    // Premium category filter: only bonded providers (stake_bond > 0).
+    let premium_clause = params
+        .premium_category
+        .as_ref()
+        .map(|_| " AND stake_bond > 0".to_string())
+        .unwrap_or_default();
+    let rows: Vec<ProviderRow> = match (&params.provider_type, &params.is_active, &params.region)
+    {
         (Some(t), Some(a), Some(r)) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE provider_type = $1 AND is_active = $2 AND $3 = ANY(geographic_scope) ORDER BY reliability_score DESC LIMIT $4").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE provider_type = $1 AND is_active = $2 AND $3 = ANY(geographic_scope){premium_clause} ORDER BY reliability_score DESC LIMIT $4"
+            )
+            .as_str(),
         )
         .bind(t)
         .bind(a)
@@ -187,7 +229,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (Some(t), Some(a), None) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE provider_type = $1 AND is_active = $2 ORDER BY reliability_score DESC LIMIT $3").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE provider_type = $1 AND is_active = $2{premium_clause} ORDER BY reliability_score DESC LIMIT $3"
+            )
+            .as_str(),
         )
         .bind(t)
         .bind(a)
@@ -196,7 +241,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (Some(t), None, Some(r)) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE provider_type = $1 AND $2 = ANY(geographic_scope) ORDER BY reliability_score DESC LIMIT $3").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE provider_type = $1 AND $2 = ANY(geographic_scope){premium_clause} ORDER BY reliability_score DESC LIMIT $3"
+            )
+            .as_str(),
         )
         .bind(t)
         .bind(r)
@@ -205,7 +253,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (None, Some(a), Some(r)) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE is_active = $1 AND $2 = ANY(geographic_scope) ORDER BY reliability_score DESC LIMIT $3").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE is_active = $1 AND $2 = ANY(geographic_scope){premium_clause} ORDER BY reliability_score DESC LIMIT $3"
+            )
+            .as_str(),
         )
         .bind(a)
         .bind(r)
@@ -214,7 +265,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (Some(t), None, None) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE provider_type = $1 ORDER BY reliability_score DESC LIMIT $2").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE provider_type = $1{premium_clause} ORDER BY reliability_score DESC LIMIT $2"
+            )
+            .as_str(),
         )
         .bind(t)
         .bind(limit as i64)
@@ -222,7 +276,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (None, Some(a), None) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE is_active = $1 ORDER BY reliability_score DESC LIMIT $2").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE is_active = $1{premium_clause} ORDER BY reliability_score DESC LIMIT $2"
+            )
+            .as_str(),
         )
         .bind(a)
         .bind(limit as i64)
@@ -230,7 +287,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (None, None, Some(r)) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} WHERE $1 = ANY(geographic_scope) ORDER BY reliability_score DESC LIMIT $2").as_str(),
+            format!(
+                "{PROVIDERS_SELECT} WHERE $1 = ANY(geographic_scope){premium_clause} ORDER BY reliability_score DESC LIMIT $2"
+            )
+            .as_str(),
         )
         .bind(r)
         .bind(limit as i64)
@@ -238,7 +298,10 @@ pub async fn list_providers(
         .await
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?,
         (None, None, None) => sqlx::query_as::<_, ProviderRow>(
-            format!("{PROVIDERS_SELECT} ORDER BY reliability_score DESC LIMIT $1").as_str(),
+            format!(
+                "{PROVIDERS_SELECT}{premium_clause} ORDER BY reliability_score DESC LIMIT $1"
+            )
+            .as_str(),
         )
         .bind(limit as i64)
         .fetch_all(&state.pool)
@@ -255,7 +318,8 @@ pub async fn list_providers(
 
 const PROVIDER_SELECT: &str = "SELECT id, provider_id, name, provider_type, \
     base_url, capabilities, geographic_scope, is_active, reliability_score, \
-    cost_per_gb, created_at, updated_at FROM storage_providers WHERE id = $1";
+    cost_per_gb, stake_bond, wallet_address, created_at, updated_at \
+    FROM storage_providers WHERE id = $1";
 
 pub async fn get_provider(
     State(state): State<AppState>,
@@ -298,13 +362,15 @@ pub async fn create_replica(
         r#"
         INSERT INTO provider_replicas (
             provider_id, component_id, component_version, storage_reference,
-            version, size_bytes, checksum, latency_ms, is_available
+            version, size_bytes, checksum, content_address, latency_ms,
+            is_available, access_count, bytes_served
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0)
         RETURNING id, provider_id, component_id, component_version,
                   storage_reference, version, size_bytes, checksum,
                   content_address, latency_ms, is_available,
-                  last_checked_at, last_challenge, last_proof_at, created_at
+                  last_checked_at, last_challenge, last_proof_at,
+                  access_count, bytes_served, created_at
         "#,
     )
     .bind(provider_id)
@@ -314,6 +380,7 @@ pub async fn create_replica(
     .bind(&req.version)
     .bind(req.size_bytes)
     .bind(&req.checksum)
+    .bind(&req.content_address)
     .bind(req.latency_ms)
     .bind(req.is_available.unwrap_or(true))
     .fetch_one(&state.pool)
@@ -330,7 +397,7 @@ pub async fn create_replica(
 const REPLICAS_SELECT: &str = "SELECT id, provider_id, component_id, \
     component_version, storage_reference, version, size_bytes, checksum, \
     content_address, latency_ms, is_available, last_checked_at, \
-    last_challenge, last_proof_at, created_at \
+    last_challenge, last_proof_at, access_count, bytes_served, created_at \
     FROM provider_replicas WHERE provider_id = $1 ORDER BY component_id, component_version";
 
 pub async fn list_replicas(

@@ -1,15 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use reqwest::multipart;
 use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
 // Storage adapter — abstracts where uploaded evidence bytes live.
 //
-// IMPORTANT: Only the local filesystem backend is currently implemented.
-// IPFS/Arweave/S3 backends are planned but not yet coded. Until a remote
-// storage backend is added, all evidence bytes live on local disk and are
-// NOT replicated. Do not deploy this backend to production without adding
+// IMPORTANT: Only the local filesystem backend is fully implemented.
+// IPFS pinning is wired but requires IPFS_API_URL to point at a running
+// IPFS node (local go-ipfs, Infura, Pinata, etc.). Until a remote storage
+// backend is added, all evidence bytes live on local disk and are NOT
+// replicated. Do not deploy this backend to production without adding
 // an IPFS pinning or S3-compatible backend and enabling >=2 replicas
 // (see replication-audit endpoint in routes/mirror.rs).
 //
@@ -22,6 +24,9 @@ use sha2::{Digest, Sha256};
 pub enum StorageBackend {
     /// Write files to a local directory tree.
     Local { root: PathBuf },
+    /// Pin bytes to an IPFS node via its HTTP API (e.g. http://localhost:5001).
+    /// The storage_ref returned is the IPFS CID.
+    Ipfs { api_url: String, gateway_url: Option<String> },
 }
 
 impl StorageBackend {
@@ -29,6 +34,7 @@ impl StorageBackend {
     pub fn backend_name(&self) -> &'static str {
         match self {
             StorageBackend::Local { .. } => "local",
+            StorageBackend::Ipfs { .. } => "ipfs",
         }
     }
 
@@ -48,6 +54,17 @@ impl StorageBackend {
                     content_hash,
                     storage_ref,
                     size_bytes: data.len() as u64,
+                    backend_name: self.backend_name().to_string(),
+                }),
+            StorageBackend::Ipfs {
+                api_url,
+                gateway_url,
+            } => store_ipfs(api_url, gateway_url.as_deref(), filename, content_type, data)
+                .await
+                .map(|(storage_ref, size_bytes)| StoredArtifact {
+                    content_hash,
+                    storage_ref,
+                    size_bytes,
                     backend_name: self.backend_name().to_string(),
                 }),
         }
@@ -83,6 +100,21 @@ impl StorageBackend {
                     backend_name: self.backend_name().to_string(),
                 })
             }
+            StorageBackend::Ipfs {
+                api_url,
+                gateway_url,
+            } => {
+                // IPFS is inherently content-addressed; pin via store_ipfs.
+                let (storage_ref, size_bytes) =
+                    store_ipfs(api_url, gateway_url.as_deref(), "artifact", "application/octet-stream", data)
+                        .await?;
+                Ok(StoredArtifact {
+                    content_hash,
+                    storage_ref,
+                    size_bytes,
+                    backend_name: self.backend_name().to_string(),
+                })
+            }
         }
     }
 
@@ -91,6 +123,10 @@ impl StorageBackend {
     pub async fn load(&self, storage_ref: &str) -> Result<Option<Vec<u8>>> {
         match self {
             StorageBackend::Local { root } => load_local(root, storage_ref).await,
+            StorageBackend::Ipfs {
+                api_url,
+                gateway_url,
+            } => load_ipfs(api_url, gateway_url.as_deref(), storage_ref).await,
         }
     }
 }
@@ -157,10 +193,109 @@ async fn load_local(root: &Path, storage_ref: &str) -> Result<Option<Vec<u8>>> {
 }
 
 // ---------------------------------------------------------------------------
+// IPFS backend (HTTP API)
+// ---------------------------------------------------------------------------
+
+async fn store_ipfs(
+    api_url: &str,
+    gateway_url: Option<&str>,
+    filename: &str,
+    content_type: &str,
+    data: &[u8],
+) -> Result<(String, u64)> {
+    let client = reqwest::Client::new();
+
+    // Build multipart form for IPFS /api/v0/add
+    let part = reqwest::multipart::Part::bytes(data.to_vec())
+        .file_name(filename.to_string())
+        .mime_str(content_type)
+        .expect("valid content type");
+    let form = multipart::Form::new().part("file", part);
+
+    let resp = client
+        .post(format!("{}/api/v0/add", api_url))
+        .multipart(form)
+        .send()
+        .await
+        .context("ipfs add request failed")?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("ipfs add returned {status}: {body}");
+    }
+
+    let json: serde_json::Value = resp.json().await.context("parsing ipfs add response")?;
+    let cid = json["Hash"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("ipfs add response missing Hash field"))?;
+
+    let size_bytes = json["Size"]
+        .as_u64()
+        .unwrap_or(data.len() as u64);
+
+    let storage_ref = if let Some(gw) = gateway_url {
+        format!("{}/ipfs/{}", gw.trim_end_matches('/'), cid)
+    } else {
+        format!("ipfs://{}", cid)
+    };
+
+    Ok((storage_ref, size_bytes))
+}
+
+async fn load_ipfs(api_url: &str, gateway_url: Option<&str>, storage_ref: &str) -> Result<Option<Vec<u8>>> {
+    let client = reqwest::Client::new();
+
+    // Extract CID from storage_ref (either "ipfs://<cid>" or "<gateway>/ipfs/<cid>")
+    let cid = if storage_ref.starts_with("ipfs://") {
+        storage_ref.trim_start_matches("ipfs://").to_string()
+    } else if let Some(gw) = gateway_url {
+        storage_ref.trim_start_matches(&format!("{}/ipfs/", gw.trim_end_matches('/'))).to_string()
+    } else {
+        storage_ref.to_string()
+    };
+
+    // Try gateway first for faster retrieval
+    if let Some(gw) = gateway_url {
+        let url = format!("{}/ipfs/{}", gw.trim_end_matches('/'), cid);
+        if let Ok(resp) = client.get(&url).send().await {
+            if resp.status().is_success() {
+                return Ok(Some(resp.bytes().await.context("reading ipfs gateway bytes")?.to_vec()));
+            }
+        }
+    }
+
+    // Fall back to API
+    let url = format!("{}/api/v0/cat?arg={}", api_url, cid);
+    let resp = client.get(&url).send().await.context("ipfs cat request failed")?;
+
+    if resp.status() == 404 {
+        return Ok(None);
+    }
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("ipfs cat returned {status}: {body}");
+    }
+
+    Ok(Some(resp.bytes().await.context("reading ipfs cat bytes")?.to_vec()))
+}
+
+// ---------------------------------------------------------------------------
 // Builder
 // ---------------------------------------------------------------------------
 
 pub fn from_env() -> Result<StorageBackend> {
+    // IPFS takes precedence when IPFS_API_URL is set.
+    if let Ok(api_url) = std::env::var("IPFS_API_URL") {
+        if !api_url.is_empty() {
+            let gateway_url = std::env::var("IPFS_GATEWAY_URL").ok();
+            tracing::info!(api_url = %api_url, "evidence storage: ipfs");
+            return Ok(StorageBackend::Ipfs { api_url, gateway_url });
+        }
+    }
+
     let root =
         std::env::var("EVIDENCE_STORAGE_DIR").unwrap_or_else(|_| "/tmp/terra-evidence".to_string());
     let root = PathBuf::from(root);
