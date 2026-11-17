@@ -31,6 +31,10 @@ pub fn router() -> Router<AppState> {
             "/assets/{component_id}/{component_version}",
             get(retrieve_asset),
         )
+        .route(
+            "/assets/{component_id}/{component_version}/access",
+            post(record_asset_access),
+        )
         .route("/lod", get(list_lod_levels))
         .route("/cache", post(record_cache))
 }
@@ -466,6 +470,20 @@ pub async fn retrieve_asset(
         )));
     }
 
+    // Increment access_count for each replica returned — they were served as
+    // options to the client. Bytes served is tracked separately via
+    // POST /runtime/assets/{id}/{version}/access after the client confirms
+    // successful download.
+    for row in &rows {
+        sqlx::query(
+            "UPDATE provider_replicas SET access_count = access_count + 1 WHERE id = $1",
+        )
+        .bind(row.provider_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("access count increment failed: {e}")))?;
+    }
+
     Ok(Json(
         rows.into_iter()
             .map(|row| AssetRetrieval {
@@ -521,6 +539,58 @@ pub async fn record_cache(
     .map_err(|e| AppError::internal(format!("cache insert failed: {e}")))?;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RecordAssetAccessRequest {
+    pub component_id: String,
+    pub component_version: String,
+    pub bytes_served: i64,
+}
+
+pub async fn record_asset_access(
+    State(state): State<AppState>,
+    Path((component_id, component_version)): Path<(String, String)>,
+    Json(req): Json<RecordAssetAccessRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Verify the component/version exists.
+    let exists: Option<i64> = sqlx::query_scalar(
+        "SELECT count(*) FROM provider_replicas WHERE component_id = $1 AND component_version = $2",
+    )
+    .bind(&component_id)
+    .bind(&component_version)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("replica query failed: {e}")))?;
+
+    if exists.map_or(false, |c| c == 0) {
+        return Err(AppError::not_found(format!(
+            "no replicas for component {component_id} version {component_version}"
+        )));
+    }
+
+    // Increment bytes_served for the best-ranked replica (first one returned
+    // by retrieve_asset). Since replicas are ordered by reliability_score DESC,
+    // the first one is the most likely to have been used.
+    sqlx::query(
+        "UPDATE provider_replicas SET bytes_served = bytes_served + $1 \
+         WHERE component_id = $2 AND component_version = $3 \
+         ORDER BY reliability_score DESC NULLS LAST, latency_ms ASC NULLS LAST \
+         LIMIT 1",
+    )
+    .bind(req.bytes_served)
+    .bind(&component_id)
+    .bind(&component_version)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("bytes served increment failed: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "ok",
+        "component_id": component_id,
+        "component_version": component_version,
+        "bytes_served": req.bytes_served,
+    })))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]

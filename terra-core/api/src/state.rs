@@ -13,9 +13,14 @@ pub struct AppState {
     pub pool: PgPool,
     /// Loaded OSM road network + POIs, if a PBF path is configured.
     pub geo: Option<Arc<GeoData>>,
-    /// Ed25519 authority for privileged API endpoints (reconcile, forfeiture).
-    pub api_authority: ApiAuthority,
-    /// Storage backend for evidence uploads.
+/// Ed25519 authority for privileged API endpoints (reconcile, forfeiture).
+pub api_authority: ApiAuthority,
+/// Ed25519 public key of the Switchboard/Pyth VRF oracle authority.
+/// When set, `prove_replica` verifies that the submitted proof is a valid
+/// signature from this authority; when absent, the legacy SHA-256 comparison
+/// is used for backward compatibility.
+pub vrf_oracle_pubkey: Option<ed25519_dalek::VerifyingKey>,
+/// Storage backend for evidence uploads.
     pub storage: Arc<StorageBackend>,
     /// Optional Groth16 verifier and development-only local prover.
     pub zk: Option<Arc<ZkRuntime>>,

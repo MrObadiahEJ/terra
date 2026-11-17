@@ -623,6 +623,7 @@ describe('fetchComponentAsset', () => {
     expect(calls).toEqual([
       expect.stringContaining('/runtime/assets/comp-001/v1'),
       'https://storage.example.com/component.glb',
+      expect.stringContaining('/runtime/assets/comp-001/v1/access'),
     ])
   })
 

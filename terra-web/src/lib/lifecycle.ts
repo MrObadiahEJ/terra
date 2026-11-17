@@ -21,8 +21,11 @@ import {
   sdJwtDigest,
   deriveLifecycleIds,
   deriveLifecyclePdas,
+  deriveDemoVrfOracle,
   deriveOperatorKeypairs,
   digest,
+  vrfMessage,
+  vrfOutput,
   type LifecycleIds,
   type LifecyclePdas,
   type LifecycleProgress,
@@ -186,6 +189,7 @@ interface StepState {
   connection: Connection
   wallet: AnchorWallet
   admin: PublicKey
+  seed: string
   ids: LifecycleIds
   pdas: LifecyclePdas
   operators: OperatorKeypairs
@@ -195,6 +199,45 @@ interface StepState {
 
 async function deriveOperatorKeys(seed: string) {
   return deriveOperatorKeypairs(seed)
+}
+
+/**
+ * Resolve the Ed25519 key that attests route randomness.
+ *
+ * On a real deployment this is the key allowlisted on chain by the registry
+ * admin, supplied through `VITE_TERRA_VRF_ORACLE_SECRET` (JSON secret-key
+ * array or 32-byte hex seed). Without it the demo derives a stable oracle
+ * from the lifecycle seed; the admin then pins that key in `VrfAuthority`,
+ * which is what makes a throwaway key unusable.
+ */
+async function resolveVrfOracle(seed: string): Promise<{ oracle: Keypair; demo: boolean }> {
+  const raw = (import.meta.env.VITE_TERRA_VRF_ORACLE_SECRET as string | undefined)?.trim()
+  if (raw) {
+    let bytes: Uint8Array
+    if (raw.startsWith('[')) {
+      const parsed = JSON.parse(raw) as number[]
+      if (!Array.isArray(parsed) || (parsed.length !== 64 && parsed.length !== 32)) {
+        throw new Error('VITE_TERRA_VRF_ORACLE_SECRET must be a 32/64-byte JSON array')
+      }
+      bytes = Uint8Array.from(parsed)
+    } else if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+      bytes = Uint8Array.from(raw.match(/../g)!.map((h) => parseInt(h, 16)))
+    } else {
+      throw new Error('VITE_TERRA_VRF_ORACLE_SECRET must be a JSON keypair array or 32-byte hex seed')
+    }
+    const oracle = bytes.length === 64 ? Keypair.fromSecretKey(bytes) : Keypair.fromSeed(bytes)
+    return { oracle, demo: false }
+  }
+
+  if (TERRA_CLUSTER === 'mainnet-beta') {
+    throw new Error('VITE_TERRA_VRF_ORACLE_SECRET is required on mainnet-beta')
+  }
+  console.warn(
+    '[terra] VITE_TERRA_VRF_ORACLE_SECRET is unset; using a demo VRF oracle derived from the ' +
+      'lifecycle seed. The registry admin will allowlist it on chain. Do not use this on a ' +
+      'public network.',
+  )
+  return { oracle: await deriveDemoVrfOracle(seed), demo: true }
 }
 
 async function tx(
@@ -580,12 +623,27 @@ async function taskStep(state: StepState): Promise<void> {
 
   let assignment = await assignments.fetchNullable(assignmentPda)
   if (!assignment) {
-    const oracle = Keypair.generate()
-    const vrfRandomness = new Uint8Array(32)
-    const vrfMsg = new Uint8Array(64)
-    vrfMsg.set(state.ids.taskId, 0)
-    vrfMsg.set(vrfRandomness, 32)
+    const { oracle } = await resolveVrfOracle(state.seed)
+
+    const authority = await state.program.account.vrfAuthority.fetchNullable(
+      state.pdas.vrfAuthority,
+    )
+    if (!authority || !authority.authority.equals(oracle.publicKey)) {
+      const ix = await state.program.methods
+        .initVrfAuthority(oracle.publicKey)
+        .accounts({
+          vrfAuthority: state.pdas.vrfAuthority,
+          registry: state.pdas.registry,
+          admin: state.admin,
+          systemProgram: SystemProgram.programId,
+        } as never)
+        .instruction()
+      await tx(state, 'init_vrf_authority', [ix])
+    }
+
+    const vrfMsg = await vrfMessage(state.ids.taskId)
     const oracleSig = ed25519.sign(vrfMsg, oracle.secretKey.slice(0, 32))
+    const vrfRandomness = await vrfOutput(oracle.publicKey, state.ids.taskId, oracleSig)
     const edIx = Ed25519Program.createInstructionWithPublicKey({
       publicKey: oracle.publicKey.toBytes(),
       message: vrfMsg,
@@ -610,6 +668,7 @@ async function taskStep(state: StepState): Promise<void> {
         requester: state.admin,
         systemProgram: SystemProgram.programId,
         oracle: oracle.publicKey,
+        vrfAuthority: state.pdas.vrfAuthority,
         instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       } as never)
       .remainingAccounts([
@@ -908,6 +967,7 @@ export async function runLifecycleStep(
     connection: context.connection,
     wallet: context.wallet,
     admin: context.wallet.publicKey,
+    seed: context.progress.seed,
     ids,
     pdas,
     operators,

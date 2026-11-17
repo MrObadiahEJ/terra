@@ -14,9 +14,16 @@ pub struct Config {
     pub cors_allowed_origins: Vec<String>,
     /// Solana RPC URL for the chain indexer (Sprint C). Defaults to localnet.
     pub rpc_url: String,
-    /// Ed25519 public key (base58) that may sign privileged requests.
-    /// When absent, privileged endpoints reject all callers (fail-closed).
-    pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
+/// Ed25519 public key (base58) that may sign privileged requests.
+/// When absent, privileged endpoints reject all callers (fail-closed).
+pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
+/// Ed25519 public key (base58) of the Switchboard/Pyth VRF oracle authority.
+/// When set, `GET /providers/{id}/replicas/{replica_id}/prove` verifies that
+/// the submitted proof is a valid Ed25519 signature from this authority over
+/// the challenge + content_address bytes. When absent, proof verification
+/// falls back to the legacy SHA-256(challenge + content_address) comparison
+/// for backward compatibility during migration.
+pub vrf_oracle_pubkey: Option<ed25519_dalek::VerifyingKey>,
     /// Maximum accepted request body size in bytes (tower-http limit).
     /// Default 64 MiB: covers multipart OSM ingest (PBF extracts) and photo
     /// evidence uploads; JSON API payloads are far smaller. Override via env.
@@ -40,6 +47,21 @@ impl Config {
                 Some(
                     ed25519_dalek::VerifyingKey::from_bytes(&arr)
                         .context("invalid ed25519 public key in API_AUTHORITY_PUBKEY")?,
+                )
+            }
+            Err(_) => None,
+        };
+        let vrf_oracle_pubkey = match std::env::var("VRF_ORACLE_PUBKEY") {
+            Ok(key_b58) => {
+                let bytes = bs58::decode(&key_b58)
+                    .into_vec()
+                    .context("VRF_ORACLE_PUBKEY is not valid base58")?;
+                let arr: [u8; 32] = bytes.try_into().map_err(|_| {
+                    anyhow::anyhow!("VRF_ORACLE_PUBKEY must be 32 bytes (ed25519 pubkey)")
+                })?;
+                Some(
+                    ed25519_dalek::VerifyingKey::from_bytes(&arr)
+                        .context("invalid ed25519 public key in VRF_ORACLE_PUBKEY")?,
                 )
             }
             Err(_) => None,
@@ -75,6 +97,7 @@ impl Config {
                     ]
                 }),
             api_authority_pubkey,
+            vrf_oracle_pubkey,
             rpc_url: std::env::var("TERRA_RPC_URL")
                 .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string()),
         })

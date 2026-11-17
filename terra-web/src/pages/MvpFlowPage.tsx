@@ -17,8 +17,9 @@ import {
   Wallet,
 } from 'lucide-react'
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
-import { BN } from '@coral-xyz/anchor'
-import { useWallet } from '../lib/wallet'
+import { BN, BorshCoder } from '@coral-xyz/anchor'
+import { ed25519 } from '@noble/curves/ed25519'
+import { connection, useWallet } from '../lib/wallet'
 import { TERRA_PROGRAM_ID } from '../lib/constants'
 import idl from '../idl/terra_registry.json'
 import type { TerraRegistry } from '../idl/terraRegistry'
@@ -58,6 +59,7 @@ type VC = {
   vcType: string
   issuer: string
   credentialSubject: string
+  observation: string
   issuanceDate: number
   expirationDate: number
   sdJwtDigest: string
@@ -82,6 +84,48 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleString()
 }
 
+function hexToBytes(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(hex)) return new Uint8Array()
+  const out = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < out.length; i += 1) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+  }
+  return out
+}
+
+function bytesToHex(bytes: Uint8Array | number[]): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/** Canonical dual-sign residency message (RFC-018 §4, Step 2). */
+function residencyMessage(input: {
+  ownerPubkey: string
+  tenantPubkey: string
+  parcelId: string
+  timestamp: number
+}): Uint8Array {
+  return new TextEncoder().encode(
+    `RESIDENCY_PROOF\nowner:${input.ownerPubkey}\ntenant:${input.tenantPubkey}\nparcel:${input.parcelId}\ntimestamp:${input.timestamp}`,
+  )
+}
+
+function verifyEd25519(
+  pubkeyBase58: string,
+  message: Uint8Array,
+  signatureHex: string,
+): boolean {
+  try {
+    const sig = hexToBytes(signatureHex)
+    if (sig.length !== 64) return false
+    const pubkey = new PublicKey(pubkeyBase58).toBytes()
+    return ed25519.verify(sig, message, pubkey)
+  } catch {
+    return false
+  }
+}
+
 export default function MvpFlowPage() {
   const { t } = useLocale()
   const { publicKey, connected, connect, anchorWallet, send, signMessage } = useWallet()
@@ -94,6 +138,7 @@ export default function MvpFlowPage() {
   const [error, setError] = useState<string | null>(null)
   const [ownerSigned, setOwnerSigned] = useState(false)
   const [tenantSigned, setTenantSigned] = useState(false)
+  const [tenantKey, setTenantKey] = useState('')
 
   const handleConnect = useCallback(async () => {
     try {
@@ -109,38 +154,34 @@ export default function MvpFlowPage() {
     setBusy(true)
     setError(null)
     try {
-      const claimPk = new PublicKey(selectedParcel.id)
+      const claimPk = new PublicKey(await digest([`terra:mvp:claim:${selectedParcel.id}`]))
       const surveyorPk = publicKey
       const observationPk = PublicKey.unique()
       const issuanceDate = Math.floor(Date.now() / 1000)
       const expirationDate = issuanceDate + 365 * 24 * 60 * 60 // 1 year
+      const vcType = 'ResidencyAttestation'
 
       const sdJwtDigest = await sdJwtDigest(
         claimPk,
         surveyorPk,
         observationPk,
         claimPk, // credential subject = parcel
-        'ResidencyAttestation',
+        vcType,
         issuanceDate,
         expirationDate,
       )
 
-      // Build Anchor instruction data manually to match the new IDL layout
-      const vcType = 'ResidencyAttestation'
-      const vcTypeBytes = new TextEncoder().encode(vcType)
-      const data = Buffer.alloc(8 + 4 + vcTypeBytes.length + 32 + 8 + 8 + 32 + 1)
-      data.writeUInt32LE(vcTypeBytes.length, 8)
-      data.set(vcTypeBytes, 12)
-      let offset = 12 + vcTypeBytes.length
-      data.set(claimPk.toBuffer(), offset)
-      offset += 32
-      data.writeBigUInt64LE(BigInt(issuanceDate), offset)
-      offset += 8
-      data.writeBigUInt64LE(BigInt(expirationDate), offset)
-      offset += 8
-      data.set(Buffer.from(sdJwtDigest), offset)
-      offset += 32
-      data[offset] = 0 // selective_disclosure = false
+      // Build the Anchor instruction with the generated IDL so the
+      // discriminator and Borsh layout cannot drift from the program.
+      const coder = new BorshCoder(idl as never)
+      const data = coder.instruction.encode('submitVerificationAttestation', {
+        vcType,
+        credentialSubject: claimPk,
+        issuanceDate: new BN(issuanceDate),
+        expirationDate: new BN(expirationDate),
+        sdJwtDigest: Array.from(sdJwtDigest),
+        selectiveDisclosure: false,
+      })
 
       const ix = {
         programId: new PublicKey(TERRA_PROGRAM_ID),
@@ -180,11 +221,10 @@ export default function MvpFlowPage() {
         vcType,
         issuer: surveyorPk.toBase58(),
         credentialSubject: claimPk.toBase58(),
+        observation: observationPk.toBase58(),
         issuanceDate,
         expirationDate,
-        sdJwtDigest: Array.from(sdJwtDigest)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(''),
+        sdJwtDigest: bytesToHex(sdJwtDigest),
         selectiveDisclosure: false,
       })
       setStep('vc')
@@ -195,93 +235,140 @@ export default function MvpFlowPage() {
     }
   }, [anchorWallet, send, publicKey, selectedParcel])
 
-  // Step 2: Owner+tenant dual-sign residency proof
+  // Step 2: Owner+tenant dual-sign residency proof. Both parties sign the
+  // exact same canonical message (RFC-018 §4, Step 2).
   const handleOwnerSign = useCallback(async () => {
-    if (!signMessage) return
+    if (!signMessage || !publicKey) return
     try {
-      const message = new TextEncoder().encode(
-        `RESIDENCY_PROOF\nowner:${publicKey.toBase58()}\ntenant:pending\nparcel:${selectedParcel?.id}\ntimestamp:${Math.floor(
-          Date.now() / 1000,
-        )}`,
-      )
+      const tenant = tenantKey.trim() || publicKey.toBase58()
+      new PublicKey(tenant) // validate before signing
+      const timestamp = Math.floor(Date.now() / 1000)
+      const message = residencyMessage({
+        ownerPubkey: publicKey.toBase58(),
+        tenantPubkey: tenant,
+        parcelId: selectedParcel!.id,
+        timestamp,
+      })
       const signature = await signMessage(message)
       setOwnerSigned(true)
       setResidencyProof({
         ownerPubkey: publicKey.toBase58(),
-        tenantPubkey: '',
+        tenantPubkey: tenant,
         parcelId: selectedParcel!.id,
-        ownerSignature: Array.from(signature)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(''),
+        ownerSignature: bytesToHex(signature),
         tenantSignature: '',
-        timestamp: Math.floor(Date.now() / 1000),
+        timestamp,
       })
+      setTenantSigned(false)
+      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Owner sign failed')
     }
-  }, [signMessage, publicKey, selectedParcel])
+  }, [signMessage, publicKey, selectedParcel, tenantKey])
 
   const handleTenantSign = useCallback(async () => {
-    if (!signMessage) return
+    if (!signMessage || !publicKey || !residencyProof) return
     try {
-      const message = new TextEncoder().encode(
-        `RESIDENCY_PROOF\nowner:${residencyProof?.ownerPubkey ?? 'pending'}\ntenant:${publicKey.toBase58()}\nparcel:${selectedParcel?.id}\ntimestamp:${Math.floor(
-          Date.now() / 1000,
-        )}`,
-      )
+      if (publicKey.toBase58() !== residencyProof.tenantPubkey) {
+        throw new Error(
+          `Connect the tenant wallet ${formatPubkey(residencyProof.tenantPubkey)} to sign`,
+        )
+      }
+      const message = residencyMessage(residencyProof)
       const signature = await signMessage(message)
       setTenantSigned(true)
-      setResidencyProof((prev) => ({
-        ...(prev ?? {
-          ownerPubkey: '',
-          tenantPubkey: publicKey.toBase58(),
-          parcelId: selectedParcel!.id,
-          ownerSignature: '',
-          tenantSignature: '',
-          timestamp: Math.floor(Date.now() / 1000),
-        }),
-        tenantPubkey: publicKey.toBase58(),
-        tenantSignature: Array.from(signature)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(''),
-      }))
+      setResidencyProof((prev) =>
+        prev ? { ...prev, tenantSignature: bytesToHex(signature) } : prev,
+      )
+      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tenant sign failed')
     }
-  }, [signMessage, publicKey, selectedParcel, residencyProof])
+  }, [signMessage, publicKey, residencyProof])
 
-  // Step 3: Mock verifier — validate VC + residency proof
+  // Step 3: Mock verifier — cryptographic VC + residency verification
   const handleVerify = useCallback(async () => {
-    if (!vc || !residencyProof) return
+    if (!vc || !residencyProof || !selectedParcel) return
     setVerificationResult('checking')
     setBusy(true)
     try {
-      // Real verification: check VC digest against on-chain anchor,
-      // verify both residency signatures are present and valid format,
-      // check expiration date.
       await new Promise((r) => setTimeout(r, 300)) // small delay for UX
 
       const now = Math.floor(Date.now() / 1000)
+      const programId = new PublicKey(TERRA_PROGRAM_ID)
+      const claimPk = new PublicKey(vc.credentialSubject)
+      const issuerPk = new PublicKey(vc.issuer)
+      const observationPk = new PublicKey(vc.observation)
 
-      // 1. VC digest must be 64 hex chars (32-byte SHA-256)
-      const vcDigestValid =
-        vc.sdJwtDigest && /^[0-9a-f]{64}$/.test(vc.sdJwtDigest)
+      // 1. Read the attestation anchored on chain and check that the VC
+      //    presented here is exactly the one the program stored.
+      const attestationPk = PublicKey.findProgramAddressSync(
+        [Buffer.from('verification_attestation'), claimPk.toBuffer(), issuerPk.toBuffer()],
+        programId,
+      )[0]
+      const info = await connection.getAccountInfo(attestationPk)
+      let attestationValid = false
+      if (info && info.owner.equals(programId)) {
+        const coder = new BorshCoder(idl as never)
+        const onChain = coder.accounts.decode('VerificationAttestation', info.data)
+        attestationValid =
+          onChain.claim.equals(claimPk) &&
+          onChain.validator.equals(issuerPk) &&
+          onChain.observation.equals(observationPk) &&
+          onChain.vcType === vc.vcType &&
+          Number(onChain.issuanceDate) === vc.issuanceDate &&
+          Number(onChain.expirationDate) === vc.expirationDate &&
+          bytesToHex(onChain.sdJwtDigest) === vc.sdJwtDigest &&
+          Boolean(onChain.selectiveDisclosure) === vc.selectiveDisclosure
+      }
 
-      // 2. VC must not be expired
+      // 2. Recompute the canonical SD-JWT digest from the credential fields
+      //    and require it to match both the VC and the on-chain anchor.
+      const recomputed = bytesToHex(
+        await sdJwtDigest(
+          claimPk,
+          issuerPk,
+          observationPk,
+          claimPk,
+          vc.vcType,
+          vc.issuanceDate,
+          vc.expirationDate,
+        ),
+      )
+      const vcDigestValid = /^[0-9a-f]{64}$/.test(vc.sdJwtDigest) &&
+        recomputed === vc.sdJwtDigest
+
+      // 3. VC validity window.
       const vcNotExpired = vc.expirationDate > now
-
-      // 3. VC must not be issued in the future
       const vcNotFuture = vc.issuanceDate <= now
 
-      // 4. Residency proof: both signatures present and valid format
+      // 4. Residency proof: both signatures must verify against their
+      //    declared Ed25519 pubkeys over the same canonical message.
+      const timestampFresh = Math.abs(now - residencyProof.timestamp) <= 600
+      const message = residencyMessage(residencyProof)
+      const ownerSignatureValid = verifyEd25519(
+        residencyProof.ownerPubkey,
+        message,
+        residencyProof.ownerSignature,
+      )
+      const tenantSignatureValid = verifyEd25519(
+        residencyProof.tenantPubkey,
+        message,
+        residencyProof.tenantSignature,
+      )
       const residencyValid =
-        Boolean(residencyProof.ownerSignature && residencyProof.tenantSignature) &&
-        /^[0-9a-f]{128}$/.test(residencyProof.ownerSignature) &&
-        /^[0-9a-f]{128}$/.test(residencyProof.tenantSignature) &&
-        residencyProof.parcelId === vc.credentialSubject
+        ownerSignatureValid &&
+        tenantSignatureValid &&
+        residencyProof.parcelId === selectedParcel.id &&
+        timestampFresh
 
-      // 5. All checks must pass
-      const allValid = vcDigestValid && vcNotExpired && vcNotExpired && residencyValid
+      // 5. All checks must pass.
+      const allValid =
+        attestationValid &&
+        vcDigestValid &&
+        vcNotExpired &&
+        vcNotFuture &&
+        residencyValid
 
       setVerificationResult(allValid ? 'valid' : 'invalid')
     } catch (err) {
@@ -290,7 +377,7 @@ export default function MvpFlowPage() {
     } finally {
       setBusy(false)
     }
-  }, [vc, residencyProof])
+  }, [vc, residencyProof, selectedParcel])
 
   const restart = () => {
     setStep('surveyor')
@@ -510,6 +597,27 @@ export default function MvpFlowPage() {
               <UserCheck size={16} /> {stepLabels.residency}
             </div>
             <p className="text-sm text-muted">{stepDescriptions.residency}</p>
+            <div className="mb-3">
+              <label className="text-xs text-muted" style={{ display: 'block', marginBottom: 4 }}>
+                Tenant wallet (base58)
+              </label>
+              <input
+                value={tenantKey}
+                onChange={(e) => setTenantKey(e.target.value)}
+                placeholder={publicKey?.toBase58() ?? 'Tenant pubkey'}
+                disabled={ownerSigned || busy}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--ink)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                }}
+              />
+            </div>
             <div className="mvp-dual-sign">
               <div className="mvp-sign-role">
                 <UserCheck size={16} className="text-blue-600" />
@@ -535,8 +643,7 @@ export default function MvpFlowPage() {
                 <div>
                   <div className="text-sm font-medium">Tenant</div>
                   <div className="text-xs text-muted">
-                    {formatPubkey(residencyProof?.tenantPubkey ?? '')}
-                  </div>
+                    {formatPubkey(residencyProof?.tenantPubkey ?? '')}                  </div>
                 </div>
                 <button
                   className={`btn ${tenantSigned ? 'btn-success' : 'btn-outline'} w-full mb-2`}

@@ -404,6 +404,11 @@ export async function fetchComponentAsset(
         }
 
         setCachedAsset(componentId, componentVersion, data)
+        // Record bytes served for settlement/reliability metrics.
+        await recordAssetAccess(componentId, componentVersion, data.byteLength)
+          .catch(() => {
+            // Non-fatal: metering failure should not block asset retrieval.
+          })
         return { data, retrieval }
       } catch (err) {
         lastError = err
@@ -429,6 +434,10 @@ export async function fetchComponentAsset(
         }
       }
       setCachedAsset(componentId, componentVersion, artifact.data)
+      await recordAssetAccess(componentId, componentVersion, artifact.data.byteLength)
+        .catch(() => {
+          // Non-fatal: metering failure should not block asset retrieval.
+        })
       return {
         data: artifact.data,
         retrieval: {
@@ -501,10 +510,33 @@ export async function fetchComponentArtifact(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scene graph resolution
-// ---------------------------------------------------------------------------
+/**
+ * Record bytes served for a component replica (settlement/metering).
+ * Called after a successful fetch so the provider gets credit for delivery.
+ */
+export async function recordAssetAccess(
+  componentId: string,
+  componentVersion: string,
+  bytesServed: number,
+): Promise<void> {
+  await request(
+    `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
+      componentVersion,
+    )}/access`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        component_id: componentId,
+        component_version: componentVersion,
+        bytes_served: bytesServed,
+      }),
+    },
+  )
+}
 
+/**
+ * Scene graph resolution
+ */
 export async function resolveScene(manifestId: string): Promise<SceneWithNodes> {
   return request<SceneWithNodes>(
     `/runtime/scene/${encodeURIComponent(manifestId)}`,

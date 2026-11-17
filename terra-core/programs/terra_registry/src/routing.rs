@@ -33,6 +33,97 @@ pub const MAX_COMPETITOR_COUNT: u16 = 64;
 pub const EARTH_RADIUS_M: f64 = 6_371_000.0;
 
 // ---------------------------------------------------------------------------
+// VRF authority allowlist (Sprint E hardening)
+//
+// `route_task` only accepts randomness from a single allowlisted oracle key.
+// The key is stored in a program-owned PDA and can only be set/rotated by the
+// validator-registry admin, so a caller cannot mint a fresh throwaway key to
+// choose its own routing entropy.
+// ---------------------------------------------------------------------------
+
+/// Allowlisted VRF oracle authority. Seeded by `[b"vrf_authority"]`.
+#[account]
+pub struct VrfAuthority {
+    /// Ed25519 key permitted to attest route randomness.
+    pub authority: Pubkey,
+    /// Registry admin that last rotated the authority.
+    pub admin: Pubkey,
+    /// Unix timestamp of the last update.
+    pub updated_at: i64,
+    pub bump: u8,
+}
+
+impl VrfAuthority {
+    pub const LEN: usize = 32 + 32 + 8 + 1;
+}
+
+#[derive(Accounts)]
+pub struct InitVrfAuthority<'info> {
+    #[account(
+        init_if_needed,
+        payer = admin,
+        space = 8 + VrfAuthority::LEN,
+        seeds = [b"vrf_authority"],
+        bump,
+    )]
+    pub vrf_authority: Account<'info, VrfAuthority>,
+    #[account(
+        seeds = [b"validator_registry"],
+        bump,
+        constraint = registry.admin == admin.key() @ TerraError::NotAuthorized,
+    )]
+    pub registry: Account<'info, crate::validator_registry::ValidatorRegistry>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[event]
+pub struct VrfAuthoritySet {
+    pub authority: Pubkey,
+    pub admin: Pubkey,
+    pub updated_at: i64,
+}
+
+/// Set or rotate the allowlisted VRF oracle. Admin-gated by the registry.
+pub fn init_vrf_authority(ctx: Context<InitVrfAuthority>, authority: Pubkey) -> Result<()> {
+    require_keys_neq!(authority, Pubkey::default(), TerraError::InvalidVrfRandomness);
+    let now = Clock::get()?.unix_timestamp;
+    let cfg = &mut ctx.accounts.vrf_authority;
+    cfg.authority = authority;
+    cfg.admin = ctx.accounts.admin.key();
+    cfg.updated_at = now;
+    cfg.bump = ctx.bumps.vrf_authority;
+    emit!(VrfAuthoritySet {
+        authority,
+        admin: ctx.accounts.admin.key(),
+        updated_at: now,
+    });
+    Ok(())
+}
+
+/// Domain-separated message the oracle signs for a task.
+///
+/// Ed25519 is deterministic (RFC 8032), so the signature — and therefore the
+/// derived output below — is fixed for a given key + task id. The oracle can
+/// refuse to sign (liveness) but cannot choose the resulting randomness.
+pub fn vrf_message(task_id: &[u8; 32]) -> [u8; 32] {
+    hashv(&[b"terra:vrf:msg:v1", task_id.as_ref()]).to_bytes()
+}
+
+/// Verifiable output derived from the oracle signature. On-chain we recompute
+/// this and require the caller-supplied `vrf_randomness` to match.
+pub fn vrf_output(oracle: &Pubkey, task_id: &[u8; 32], signature: &[u8; 64]) -> [u8; 32] {
+    hashv(&[
+        b"terra:vrf:out:v1",
+        oracle.as_ref(),
+        task_id.as_ref(),
+        signature.as_ref(),
+    ])
+    .to_bytes()
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (unit-testable)
 // ---------------------------------------------------------------------------
 
@@ -299,19 +390,44 @@ pub fn route_task(
     // 1. Oracle independence: oracle cannot be chosen winner, candidate, or requester.
     let oracle_key = ctx.accounts.oracle.key();
     require!(oracle_key != chosen, TerraError::CandidateCannotBeOracle);
-    require!(!candidates.contains(&oracle_key), TerraError::CandidateCannotBeOracle);
-    require!(oracle_key != ctx.accounts.requester.key(), TerraError::RequesterCannotBeOracle);
+    require!(
+        !candidates.contains(&oracle_key),
+        TerraError::CandidateCannotBeOracle
+    );
+    require!(
+        oracle_key != ctx.accounts.requester.key(),
+        TerraError::RequesterCannotBeOracle
+    );
 
-    // 2. On-chain Ed25519 oracle signature verification over (task_id ‖ vrf_randomness).
-    let mut vrf_msg = [0u8; 64];
-    vrf_msg[..32].copy_from_slice(&task_id);
-    vrf_msg[32..].copy_from_slice(&vrf_randomness);
-    crate::zk::verify_precompiled_ed25519(
+    // 2. The oracle must be the admin-allowlisted VRF authority. A throwaway
+    //    key cannot pass this check.
+    require_keys_eq!(
+        oracle_key,
+        ctx.accounts.vrf_authority.authority,
+        TerraError::VrfAuthorityMismatch
+    );
+
+    // 3. On-chain Ed25519 attestation over the domain-separated task message.
+    //    The runtime verifies the signature; atomicity ties it to this
+    //    instruction's writes.
+    let vrf_msg = vrf_message(&task_id);
+    if crate::zk::verify_precompiled_ed25519(
         &ctx.accounts.instructions,
         &oracle_key,
         &vrf_msg,
         &oracle_signature,
-    )?;
+    )
+    .is_err()
+    {
+        return err!(TerraError::InvalidVrfRandomness);
+    }
+
+    // 4. The randomness is the deterministic output of the attested
+    //    (oracle, task_id, signature) tuple — the caller cannot choose it.
+    require!(
+        vrf_randomness == vrf_output(&oracle_key, &task_id, &oracle_signature),
+        TerraError::InvalidVrfRandomness
+    );
 
     let now = Clock::get()?.unix_timestamp;
     let t = &ctx.accounts.task;

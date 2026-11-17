@@ -10,6 +10,8 @@
 use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use ed25519_dalek::Verifier;
+use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -536,20 +538,30 @@ pub async fn prove_replica(
     let challenge = last_challenge
         .ok_or_else(|| AppError::bad_request("no pending challenge; call /challenge first"))?;
 
-    // Compute expected proof: SHA-256(challenge + content_address).
+    // Compute expected payload: challenge + content_address bytes.
     let addr = content_address
         .ok_or_else(|| AppError::bad_request("replica has no content address; re-register it"))?;
+    let payload = format!("{challenge}{addr}");
 
-    // Compute expected proof: SHA-256(challenge + content_address).
-    let expected_proof = format!(
-        "{:x}",
-        Sha256::digest(format!("{challenge}{addr}").as_bytes())
-    );
-
-    if req.proof != expected_proof {
-        return Err(AppError::bad_request(
-            "proof does not match expected digest",
-        ));
+    // Verify the proof as an Ed25519 signature from the VRF oracle authority
+    // over the payload bytes. When no oracle key is configured, fall back to
+    // the legacy SHA-256(challenge + content_address) comparison.
+    if let Some(oracle_key) = &state.vrf_oracle_pubkey {
+        let sig_bytes = hex::decode(&req.proof)
+            .map_err(|_| AppError::bad_request("proof is not valid hex"))?;
+        let sig: ed25519_dalek::Signature = sig_bytes.as_slice().try_into()
+            .map_err(|_| AppError::bad_request("proof is not a valid Ed25519 signature"))?;
+        oracle_key
+            .verify(payload.as_bytes(), &sig)
+            .map_err(|_| AppError::bad_request("proof signature does not verify against oracle key"))?;
+    } else {
+        // Legacy fallback: SHA-256(challenge + content_address) comparison.
+        let expected_proof = format!("{:x}", Sha256::digest(payload.as_bytes()));
+        if req.proof != expected_proof {
+            return Err(AppError::bad_request(
+                "proof does not match expected digest",
+            ));
+        }
     }
 
     // Update last_proof_at and clear the challenge, then derive the
@@ -846,7 +858,7 @@ mod tests {
         let provider_a = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'object_storage', $4, $5, $6, 1.0, NULL) \
-             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, created_at, updated_at",
+             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
         )
         .bind(provider_a_id)
         .bind(&provider_a_pid)
@@ -861,7 +873,7 @@ mod tests {
         let provider_b = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'ipfs', $4, $5, $6, 1.0, NULL) \
-             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, created_at, updated_at",
+             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
         )
         .bind(provider_b_id)
         .bind(&provider_b_pid)
@@ -981,15 +993,29 @@ mod tests {
             .await
             .expect("connect test database");
 
+        // Clean up leftovers from a previous failed run. `provider_id` is
+        // UNIQUE, so reusing a fixed id would fail on the second run.
+        sqlx::query(
+            "DELETE FROM provider_replicas WHERE component_id LIKE 'component-reliability%'",
+        )
+        .execute(&pool)
+        .await
+        .expect("clean up leftover replicas");
+        sqlx::query("DELETE FROM storage_providers WHERE provider_id LIKE 'provider-reliability%'")
+            .execute(&pool)
+            .await
+            .expect("clean up leftover providers");
+
         // Create a provider.
         let provider_id = Uuid::new_v4();
+        let provider_pid = format!("provider-reliability-{}", provider_id);
         let provider = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'object_storage', $4, $5, $6, 1.0, NULL) \
-              RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, created_at, updated_at",
+              RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
         )
         .bind(provider_id)
-        .bind("provider-reliability")
+        .bind(&provider_pid)
         .bind("Reliability Provider")
         .bind("https://storage.example.com")
         .bind(serde_json::json!({}))
@@ -1002,7 +1028,7 @@ mod tests {
         let replica = sqlx::query_as::<_, ReplicaRow>(
             "INSERT INTO provider_replicas (provider_id, component_id, component_version, storage_reference, version, size_bytes, checksum, content_address, latency_ms, is_available, last_challenge) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10) \
-             RETURNING id, provider_id, component_id, component_version, storage_reference, version, size_bytes, checksum, content_address, latency_ms, is_available, last_checked_at, last_challenge, last_proof_at, created_at",
+             RETURNING id, provider_id, component_id, component_version, storage_reference, version, size_bytes, checksum, content_address, latency_ms, is_available, last_checked_at, last_challenge, last_proof_at, access_count, bytes_served, created_at",
         )
         .bind(provider.id)
         .bind("component-reliability")

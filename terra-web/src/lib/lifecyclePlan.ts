@@ -89,6 +89,7 @@ export async function deriveLifecycleIds(seed: string): Promise<LifecycleIds> {
 
 export interface LifecyclePdas {
   registry: PublicKey
+  vrfAuthority: PublicKey
   feePolicy: PublicKey
   coverageIncentive: PublicKey
   treasury: PublicKey
@@ -130,6 +131,7 @@ export function deriveLifecyclePdas(ids: LifecycleIds): LifecyclePdas {
 
   return {
     registry,
+    vrfAuthority: pda(['vrf_authority']),
     feePolicy: pda(['fee_policy']),
     coverageIncentive: pda(['coverage_incentive']),
     treasury: pda(['task_treasury']),
@@ -182,6 +184,30 @@ export async function deriveOperatorKeypairs(seed: string): Promise<OperatorKeyp
     key('tenant'),
   ])
   return { validatorOne, validatorTwo, tenant }
+}
+
+/**
+ * Demo-only VRF oracle. The on-chain `VrfAuthority` allowlist makes this key
+ * the only accepted oracle once the registry admin pins it, so a caller cannot
+ * mint a throwaway key. On a real deployment set
+ * `VITE_TERRA_VRF_ORACLE_SECRET` to the allowlisted oracle instead.
+ */
+export async function deriveDemoVrfOracle(seed: string): Promise<Keypair> {
+  return Keypair.fromSeed(await digest([`terra:lifecycle:v1:${seed}:vrf-oracle`]))
+}
+
+/** Domain-separated message the oracle signs (must match `routing::vrf_message`). */
+export async function vrfMessage(taskId: Uint8Array): Promise<Uint8Array> {
+  return digest(['terra:vrf:msg:v1', taskId])
+}
+
+/** Randomness derived from the oracle attestation (must match `routing::vrf_output`). */
+export async function vrfOutput(
+  oracle: PublicKey,
+  taskId: Uint8Array,
+  signature: Uint8Array,
+): Promise<Uint8Array> {
+  return digest(['terra:vrf:out:v1', oracle.toBuffer(), taskId, signature])
 }
 
 export type LifecycleStepId =

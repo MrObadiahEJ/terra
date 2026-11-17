@@ -27,7 +27,7 @@ use terra_registry::{
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
-    IdentityRights, Parcel, Rights, ID as PROGRAM_ID,
+    IdentityRights, Parcel, Rights, TerraError, ID as PROGRAM_ID,
 };
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
@@ -2206,6 +2206,21 @@ async fn peer_consensus_endorsement_flow() {
         .expect("peer add with quorum failed");
     let reg: ValidatorRegistry = read_account(&ctx, registry).await;
     assert!(reg.validators.contains(&v3));
+}
+
+/// On-chain code for a `TerraError` variant (Anchor's `#[error_code]`
+/// enum starts at 6000). Prefer this over numeric literals: appending or
+/// reordering variants must not silently change what a test asserts.
+fn terra_error_code(err: TerraError) -> u32 {
+    6000 + err as u32
+}
+
+fn assert_terra_error(
+    res: Result<(), solana_program_test::BanksClientError>,
+    expected: TerraError,
+    what: &str,
+) {
+    assert_custom_error(res, terra_error_code(expected), what);
 }
 
 fn assert_custom_error(
@@ -8907,8 +8922,8 @@ async fn p0_6_attestation_rejects_non_canonical_digest() {
     .unwrap();
 
     // Everything else is valid (registry, ACTIVE reputation, claim status),
-    // but signature_hash is not the canonical digest over this content —
-    // must be rejected with AttestationDigestMismatch (6158), not stored.
+    // but signature_hash is not the canonical SD-JWT digest over this
+    // content — must be rejected with SdJwtDigestMismatch, not stored.
     let (att, _) = verification_attestation_pda(&claim_pk, &validator.pubkey());
     let result = process(
         &mut ctx,
@@ -8937,9 +8952,9 @@ async fn p0_6_attestation_rejects_non_canonical_digest() {
         },
     )
     .await;
-    assert_custom_error(
+    assert_terra_error(
         result,
-        6158,
+        TerraError::SdJwtDigestMismatch,
         "non-canonical attestation digest must be rejected",
     );
 
@@ -24234,7 +24249,11 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6179, "wrong req_index must fail");
+    assert_terra_error(
+        res,
+        TerraError::RequirementIndexMismatch,
+        "wrong req_index must fail",
+    );
 
     // assign_task_validator (requester assigns a validator)
     let validator = Keypair::new();
@@ -24303,7 +24322,11 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6177, "second assign when full must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyAssigned,
+        "second assign when full must fail",
+    );
 
     // Self-assignment rejected → 178.
     let res = process(
@@ -24326,7 +24349,7 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6178, "self-assign must fail");
+    assert_terra_error(res, TerraError::SelfTaskAssignment, "self-assign must fail");
 
     // Non-requester cannot assign → 175.
     // Use a fresh target wallet: validator's assignment PDA already exists,
@@ -24355,7 +24378,11 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6175, "non-requester assign must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotTaskRequester,
+        "non-requester assign must fail",
+    );
 
     // Assigned validator submits PASS → task COMPLETED.
     let mut data = discriminator("global", "submit_task_result").to_vec();
@@ -24413,7 +24440,11 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6174, "double submit must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "double submit must fail",
+    );
 
     // Cancel completed task → 174.
     let res = process(
@@ -24433,7 +24464,11 @@ async fn phase3_create_requirement_assign_submit_complete() {
         },
     )
     .await;
-    assert_custom_error(res, 6174, "cancel completed task must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "cancel completed task must fail",
+    );
 }
 
 #[tokio::test]
@@ -24501,7 +24536,7 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6172, "deadline in past must fail");
+    assert_terra_error(res, TerraError::TaskDeadlinePassed, "deadline in past must fail");
 
     // Invalid task class → 169.
     let bad_class_id = [10u8; 32];
@@ -24519,7 +24554,7 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6169, "invalid class must fail");
+    assert_terra_error(res, TerraError::InvalidTaskClass, "invalid class must fail");
 
     // Validator claims open task.
     let validator = Keypair::new();
@@ -24575,7 +24610,11 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6175, "non-requester cancel must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotTaskRequester,
+        "non-requester cancel must fail",
+    );
 
     // Requester cancels incomplete task.
     let mut data = discriminator("global", "cancel_task").to_vec();
@@ -24627,7 +24666,11 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6174, "claim cancelled task must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "claim cancelled task must fail",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -24985,9 +25028,13 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6182, "invalid source must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidObservationSource,
+        "invalid source must fail",
+    );
 
-    // Invalid provenance (99) → 6183. Fresh nonce (init may not have happened).
+    // Invalid provenance (99). Fresh nonce (init may not have happened).
     let nonce = 1u16;
     let (obs_pk, _) = observation_v2_pda(&task_id, &observer.pubkey(), nonce);
     let data = observation_v2_data(
@@ -25019,7 +25066,11 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6183, "invalid provenance must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidObservationProvenance,
+        "invalid provenance must fail",
+    );
 
     // Confidence 101 → 6135 InvalidConfidence.
     let nonce = 2u16;
@@ -25053,7 +25104,7 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6135, "confidence 101 must fail");
+    assert_terra_error(res, TerraError::InvalidConfidence, "confidence 101 must fail");
 
     // Bad location → 6163 InvalidPresenceFix.
     let nonce = 3u16;
@@ -25087,7 +25138,7 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6163, "bad location must fail");
+    assert_terra_error(res, TerraError::InvalidPresenceFix, "bad location must fail");
 
     // Happy path: valid observation succeeds.
     let nonce = 4u16;
@@ -25179,7 +25230,11 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6174, "observe cancelled task must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "observe cancelled task must fail",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -25507,7 +25562,11 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6184, "invalid artifact kind must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidEvidenceArtifactKind,
+        "invalid artifact kind must fail",
+    );
 
     // Out-of-order index (5 when count=0) → 6185 EvidenceIndexMismatch.
     // Kind/source/provenance/content/storage must pass so we reach the index guard.
@@ -25536,7 +25595,11 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6185, "out-of-order artifact index must fail");
+    assert_terra_error(
+        res,
+        TerraError::EvidenceIndexMismatch,
+        "out-of-order artifact index must fail",
+    );
 
     // Zero content_hash → 6014 EmptyContentHash (index 0 is correct order).
     let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
@@ -25564,7 +25627,7 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6014, "empty content_hash must fail");
+    assert_terra_error(res, TerraError::EmptyContentHash, "empty content_hash must fail");
 
     // Empty storage_reference → 6134 EmptyStorageReference.
     let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
@@ -25592,7 +25655,11 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6134, "empty storage_reference must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyStorageReference,
+        "empty storage_reference must fail",
+    );
 
     // Cancel the task, then try to append → 6174 TaskAlreadyFinalized.
     let mut data = discriminator("global", "cancel_task").to_vec();
@@ -25640,7 +25707,11 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6174, "append after cancel must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "append after cancel must fail",
+    );
 
     // Manifest still has count 0 (failed appends rolled back).
     let manifest: EvidenceManifest = read_account(&ctx, manifest_pk).await;
@@ -25651,6 +25722,68 @@ async fn phase5_evidence_guards() {
 // RFC-012 Phase 6 — dynamic routing (route_task)
 // ---------------------------------------------------------------------------
 
+/// Message the VRF oracle signs for `route_task`. Must match the program:
+/// `H("terra:vrf:msg:v1" ‖ task_id)`.
+fn vrf_message(task_id: &[u8; 32]) -> [u8; 32] {
+    terra_registry::routing::vrf_message(task_id)
+}
+
+/// Randomness derived from the oracle's attestation. Must match the program:
+/// `H("terra:vrf:out:v1" ‖ oracle ‖ task_id ‖ signature)`.
+fn vrf_output(oracle: &Pubkey, task_id: &[u8; 32], signature: &[u8; 64]) -> [u8; 32] {
+    terra_registry::routing::vrf_output(oracle, task_id, signature)
+}
+
+fn vrf_sign(oracle: &Keypair, task_id: &[u8; 32]) -> [u8; 64] {
+    use ed25519_dalek::Signer;
+    keypair_signing_key(oracle)
+        .sign(&vrf_message(task_id))
+        .to_bytes()
+}
+
+/// Correct randomness for (`oracle`, `task_id`).
+fn vrf_randomness(oracle: &Keypair, task_id: &[u8; 32]) -> [u8; 32] {
+    vrf_output(&oracle.pubkey(), task_id, &vrf_sign(oracle, task_id))
+}
+
+fn vrf_authority_pda() -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"vrf_authority"], &PROGRAM_ID)
+}
+
+/// Create the registry (if needed) and set/rotate the allowlisted VRF oracle
+/// to `oracle`. `route_task` rejects any oracle that is not this authority.
+async fn set_vrf_authority(ctx: &mut ProgramTestContext, admin: &Keypair, oracle: &Pubkey) {
+    let (registry, _) = registry_pda();
+    if ctx
+        .banks_client
+        .get_account(registry)
+        .await
+        .unwrap()
+        .is_none()
+    {
+        create_registry_ok(&mut *ctx, admin).await;
+    }
+    let (cfg, _) = vrf_authority_pda();
+    let mut data = discriminator("global", "init_vrf_authority").to_vec();
+    data.extend_from_slice(oracle.as_ref());
+    process(
+        &mut *ctx,
+        admin,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(cfg, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(admin.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("init_vrf_authority failed");
+}
+
 fn route_task_data(
     task_id: &[u8; 32],
     req_index: u8,
@@ -25658,6 +25791,7 @@ fn route_task_data(
     chosen: &Pubkey,
     competitor_count: u16,
     vrf_randomness: &[u8; 32],
+    oracle: &Keypair,
 ) -> Vec<u8> {
     let mut data = discriminator("global", "route_task").to_vec();
     data.extend_from_slice(task_id);
@@ -25669,7 +25803,41 @@ fn route_task_data(
     data.extend_from_slice(chosen.as_ref());
     data.extend_from_slice(&competitor_count.to_le_bytes());
     data.extend_from_slice(vrf_randomness);
+    data.extend_from_slice(&vrf_sign(oracle, task_id));
     data
+}
+
+/// `route_task` account list: [fixed 6] + oracle + vrf_authority +
+/// instructions sysvar + remaining validator slots.
+fn route_accounts_with_oracle(
+    base: Vec<AccountMeta>,
+    remaining: Vec<AccountMeta>,
+    oracle: &Pubkey,
+) -> Vec<AccountMeta> {
+    let mut accounts = base;
+    accounts.push(AccountMeta::new_readonly(*oracle, false));
+    accounts.push(AccountMeta::new_readonly(vrf_authority_pda().0, false));
+    accounts.push(instructions_meta());
+    accounts.extend(remaining);
+    accounts
+}
+
+/// Send `route_task` with the Ed25519 VRF attestation the program expects.
+async fn process_route(
+    ctx: &mut ProgramTestContext,
+    payer: &Keypair,
+    oracle: &Keypair,
+    task_id: &[u8; 32],
+    vrf_randomness: &[u8; 32],
+    ix: Instruction,
+) -> Result<(), solana_program_test::BanksClientError> {
+    set_vrf_authority(ctx, payer, &oracle.pubkey()).await;
+    process_multi(
+        ctx,
+        payer,
+        &[ed25519_ix(oracle, &vrf_message(task_id)), ix],
+    )
+    .await
 }
 
 #[tokio::test]
@@ -25795,25 +25963,42 @@ async fn phase6_route_single_candidate_assigns() {
 
     // route_task: single candidate → always wins.
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
     // remaining: profile, availability, reputation-missing (use avail as stand-in → deser fail → score 0)
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
-    process(
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(assign_pk, false),
-                AccountMeta::new(task_pk, false),
-                AccountMeta::new_readonly(req_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-                // remaining_accounts
-                AccountMeta::new_readonly(profile_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(avail_pk, false), // fake reputation → deser fail → 0
-            ],
+            accounts: route_accounts_with_oracle(
+                vec![
+                    AccountMeta::new(assign_pk, false),
+                    AccountMeta::new(task_pk, false),
+                    AccountMeta::new_readonly(req_pk, false),
+                    AccountMeta::new_readonly(validator.pubkey(), false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                vec![
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false), // fake reputation → deser fail → 0
+                ],
+                &oracle.pubkey(),
+            ),
             data,
         },
     )
@@ -25960,24 +26145,39 @@ async fn phase6_route_guards() {
     .expect("add requirement");
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
     let route_accounts = |remaining: Vec<AccountMeta>| {
-        let mut accounts = vec![
-            AccountMeta::new(assign_pk, false),
-            AccountMeta::new(task_pk, false),
-            AccountMeta::new_readonly(req_pk, false),
-            AccountMeta::new_readonly(validator.pubkey(), false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program_id(), false),
-        ];
-        accounts.extend(remaining);
-        accounts
+        route_accounts_with_oracle(
+            vec![
+                AccountMeta::new(assign_pk, false),
+                AccountMeta::new(task_pk, false),
+                AccountMeta::new_readonly(req_pk, false),
+                AccountMeta::new_readonly(validator.pubkey(), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            remaining,
+            &oracle.pubkey(),
+        )
     };
 
-    // Empty candidates → 6189.
-    let data = route_task_data(&task_id, 0, &[], &validator.pubkey(), 1, &[0u8; 32]);
-    let res = process(
+    // Empty candidates → TooManyRouteCandidates.
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: route_accounts(vec![]),
@@ -25985,14 +26185,25 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6189, "empty candidates must fail");
+    assert_terra_error(res, TerraError::TooManyRouteCandidates, "empty candidates must fail");
 
-    // chosen not in candidates → 6188.
+    // chosen not in candidates → NotRouteWinner.
     let other = Pubkey::new_unique();
-    let data = route_task_data(&task_id, 0, &[other], &validator.pubkey(), 1, &[0u8; 32]);
-    let res = process(
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[other],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: route_accounts(vec![]),
@@ -26000,13 +26211,24 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6188, "chosen not in candidates must fail");
+    assert_terra_error(res, TerraError::NotRouteWinner, "chosen not in candidates must fail");
 
-    // Wrong remaining_accounts count → 6190.
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
-    let res = process(
+    // Wrong remaining_accounts count → RouteAccountMismatch.
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
             // only 2 accounts instead of stride 3
@@ -26018,7 +26240,11 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6190, "wrong remaining length must fail");
+    assert_terra_error(
+        res,
+        TerraError::RouteAccountMismatch,
+        "wrong remaining length must fail",
+    );
 
     // Flip availability to OFFLINE → ineligible → 6187.
     let mut data = discriminator("global", "set_validator_availability").to_vec();
@@ -26040,10 +26266,21 @@ async fn phase6_route_guards() {
     .await
     .expect("set offline");
 
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
-    let res = process(
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: route_accounts(vec![
@@ -26055,7 +26292,11 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6187, "offline validator must be ineligible");
+    assert_terra_error(
+        res,
+        TerraError::ValidatorNotEligible,
+        "offline validator must be ineligible",
+    );
 
     // Sanity: task still unassigned after all failures.
     let task: VerificationTask = read_account(&ctx, task_pk).await;
@@ -26244,7 +26485,7 @@ async fn phase7_self_report_rejected() {
         },
     )
     .await;
-    assert_custom_error(res, 6193, "self fraud report must fail");
+    assert_terra_error(res, TerraError::SelfFraudReport, "self fraud report must fail");
 }
 
 #[tokio::test]
@@ -26286,7 +26527,7 @@ async fn phase7_invalid_reason_rejected() {
         },
     )
     .await;
-    assert_custom_error(res, 6191, "invalid reason must fail");
+    assert_terra_error(res, TerraError::InvalidFraudReason, "invalid reason must fail");
 }
 
 #[tokio::test]
@@ -26348,7 +26589,7 @@ async fn phase7_open_review_needs_committee() {
         },
     )
     .await;
-    assert_custom_error(res, 6194, "empty committee pool must fail");
+    assert_terra_error(res, TerraError::CommitteeTooSmall, "empty committee pool must fail");
 }
 
 #[tokio::test]
@@ -26474,7 +26715,7 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_custom_error(res, 6196, "non-member vote must fail");
+    assert_terra_error(res, TerraError::NotCommitteeMember, "non-member vote must fail");
 
     // First member votes; double-vote fails (6197).
     let first = case.committee[0];
@@ -26516,7 +26757,7 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_custom_error(res, 6197, "double vote must fail");
+    assert_terra_error(res, TerraError::DuplicateCommitteeVote, "double vote must fail");
 
     // Finalize too early (only 1/5) → 6198.
     let data = discriminator("global", "finalize_fraud_review").to_vec();
@@ -26541,7 +26782,7 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_custom_error(res, 6198, "early finalize must fail");
+    assert_terra_error(res, TerraError::ReviewNotFinalizable, "early finalize must fail");
 }
 
 #[tokio::test]
@@ -26805,7 +27046,7 @@ async fn phase7_upheld_demotes_not_jails() {
         },
     )
     .await;
-    assert_custom_error(res, 6204, "rehab before 30 days must fail");
+    assert_terra_error(res, TerraError::RehabTooEarly, "rehab before 30 days must fail");
 
     // Restriction still ACTIVE after failed rehab.
     let still: CapabilityRestriction = read_account(&ctx, restriction_pk).await;
@@ -27074,7 +27315,7 @@ async fn phase8_policies_quote_fund_and_guards() {
         set_fee_policy_ix(fee_pk, payer.pubkey(), 1_001),
     )
     .await;
-    assert_custom_error(res, 6206, "fee above max must fail");
+    assert_terra_error(res, TerraError::InvalidFeeBps, "fee above max must fail");
 
     // Coverage factor above 5000 → 6208.
     let res = process(
@@ -27083,7 +27324,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         set_coverage_incentive_ix(cov_pk, payer.pubkey(), 5_001, 0, 0, 0, 0),
     )
     .await;
-    assert_custom_error(res, 6208, "coverage factor above max must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidCoverageParams,
+        "coverage factor above max must fail",
+    );
 
     // Valid coverage policy (fee policy still missing for the fund test).
     process(
@@ -27150,7 +27395,7 @@ async fn phase8_policies_quote_fund_and_guards() {
         quote_task_resources_ix(task_pk, quote_pk, stranger.pubkey(), 100_000),
     )
     .await;
-    assert_custom_error(res, 6175, "non-requester quote must fail");
+    assert_terra_error(res, TerraError::NotTaskRequester, "non-requester quote must fail");
 
     // Requester quotes → read back.
     process(
@@ -27173,7 +27418,7 @@ async fn phase8_policies_quote_fund_and_guards() {
         quote_task_resources_ix(task_pk, quote_pk, payer.pubkey(), 1),
     )
     .await;
-    assert_custom_error(res, 6210, "double quote must fail");
+    assert_terra_error(res, TerraError::QuoteAlreadyExists, "double quote must fail");
 
     // Fund before the fee policy exists → 6207.
     let (escrow_pk, _) = task_escrow_pda(&task_id);
@@ -27193,7 +27438,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         ),
     )
     .await;
-    assert_custom_error(res, 6207, "missing fee policy must fail");
+    assert_terra_error(
+        res,
+        TerraError::FeePolicyNotInitialized,
+        "missing fee policy must fail",
+    );
 
     // Non-requester fund → 6175 (before any handler logic).
     let res = process(
@@ -27210,7 +27459,7 @@ async fn phase8_policies_quote_fund_and_guards() {
         ),
     )
     .await;
-    assert_custom_error(res, 6175, "non-requester fund must fail");
+    assert_terra_error(res, TerraError::NotTaskRequester, "non-requester fund must fail");
 
     // Now the admin sets a valid fee policy (100 bps = 1%).
     process(
@@ -27231,7 +27480,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         set_fee_policy_ix(fee_pk, stranger.pubkey(), 100),
     )
     .await;
-    assert_custom_error(res, 6010, "non-admin set_fee_policy must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotAuthorized,
+        "non-admin set_fee_policy must fail",
+    );
 
     // Seed the treasury so the fee is charged (an empty treasury would
     // waive sub-rent-exempt dust fees — covered in phase8_refund_paths).
@@ -27295,7 +27548,7 @@ async fn phase8_policies_quote_fund_and_guards() {
         ),
     )
     .await;
-    assert_custom_error(res, 6212, "double fund must fail");
+    assert_terra_error(res, TerraError::EscrowAlreadyFunded, "double fund must fail");
 }
 
 #[tokio::test]
@@ -27390,7 +27643,7 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_custom_error(res, 6213, "claim before completion must fail");
+    assert_terra_error(res, TerraError::TaskNotCompleted, "claim before completion must fail");
 
     // Non-assignee claim → 6176 NotTaskAssignee (their own allocation PDA
     // so the seeds constraint passes and the assignee constraint fires).
@@ -27418,7 +27671,7 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_custom_error(res, 6176, "non-assignee claim must fail");
+    assert_terra_error(res, TerraError::NotTaskAssignee, "non-assignee claim must fail");
 
     // Validator submits PASS → task COMPLETED.
     let mut data = discriminator("global", "submit_task_result").to_vec();
@@ -27520,7 +27773,7 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_custom_error(res, 6216, "double claim must fail");
+    assert_terra_error(res, TerraError::RewardAlreadyClaimed, "double claim must fail");
 }
 
 #[tokio::test]
@@ -27552,7 +27805,11 @@ async fn phase8_refund_paths() {
         refund_task_escrow_ix(task_a_pk, escrow_a, vault_a, payer.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6217, "refund of active task must fail");
+    assert_terra_error(
+        res,
+        TerraError::EscrowNotRefundable,
+        "refund of active task must fail",
+    );
 
     // Dust fee waived: empty treasury cannot receive a sub-rent-exempt fee.
     let escrow_a_state: TaskEscrow = read_account(&ctx, escrow_a).await;
@@ -27599,7 +27856,7 @@ async fn phase8_refund_paths() {
         refund_task_escrow_ix(task_a_pk, escrow_a, vault_a, payer.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6215, "double refund must fail");
+    assert_terra_error(res, TerraError::EscrowNotFunded, "double refund must fail");
 
     // --- Task B: completed but claim window open → 6218. ---
     let task_b = [54u8; 32];
@@ -27668,7 +27925,11 @@ async fn phase8_refund_paths() {
         refund_task_escrow_ix(task_b_pk, escrow_b, vault_b, payer.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6218, "refund inside claim window must fail");
+    assert_terra_error(
+        res,
+        TerraError::ClaimWindowNotClosed,
+        "refund inside claim window must fail",
+    );
 }
 
 // ===========================================================================
@@ -27885,7 +28146,7 @@ async fn phase9_register_update_calibrate_verify_lifecycle() {
         },
     )
     .await;
-    assert_custom_error(res, 6223, "verify after revoke must fail");
+    assert_terra_error(res, TerraError::DeviceRevoked, "verify after revoke must fail");
 
     let mut data = discriminator("global", "update_device").to_vec();
     data.extend_from_slice(&1u64.to_le_bytes());
@@ -27903,7 +28164,7 @@ async fn phase9_register_update_calibrate_verify_lifecycle() {
         },
     )
     .await;
-    assert_custom_error(res, 6223, "update after revoke must fail");
+    assert_terra_error(res, TerraError::DeviceRevoked, "update after revoke must fail");
 }
 
 #[tokio::test]
@@ -27959,7 +28220,7 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6224, "stranger update must fail");
+    assert_terra_error(res, TerraError::NotDeviceOwner, "stranger update must fail");
 
     let mut data = discriminator("global", "rotate_device_key").to_vec();
     data.extend_from_slice(Keypair::new().pubkey().as_ref());
@@ -27976,7 +28237,7 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6224, "stranger rotate must fail");
+    assert_terra_error(res, TerraError::NotDeviceOwner, "stranger rotate must fail");
 
     let mut data = discriminator("global", "set_device_status").to_vec();
     data.push(device_identity::device_status::SUSPENDED);
@@ -27993,7 +28254,11 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6224, "stranger status change must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotDeviceOwner,
+        "stranger status change must fail",
+    );
 
     // Zero device key rejected (6221) — fresh nonce, init rolls back with tx.
     let (pk2, _) = device_identity_pda(&payer.pubkey(), 2);
@@ -28011,7 +28276,7 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6221, "zero device key must fail");
+    assert_terra_error(res, TerraError::InvalidDeviceKey, "zero device key must fail");
 
     // Invalid source (99) → 6182 (reused Phase 4 error).
     let (pk3, _) = device_identity_pda(&payer.pubkey(), 3);
@@ -28029,9 +28294,13 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6182, "invalid source must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidObservationSource,
+        "invalid source must fail",
+    );
 
-    // Over-long metadata (129 bytes) → 6220.
+    // Over-long metadata (129 bytes).
     let (pk4, _) = device_identity_pda(&payer.pubkey(), 4);
     let res = process(
         &mut ctx,
@@ -28047,7 +28316,11 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6220, "over-long metadata must fail");
+    assert_terra_error(
+        res,
+        TerraError::DeviceMetadataTooLong,
+        "over-long metadata must fail",
+    );
 
     // Invalid status value → 6222.
     let mut data = discriminator("global", "set_device_status").to_vec();
@@ -28065,7 +28338,11 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6222, "invalid status must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidDeviceStatus,
+        "invalid status must fail",
+    );
 
     // Empty calibration hash → 6014 (reused EmptyContentHash).
     let mut data = discriminator("global", "set_device_calibration").to_vec();
@@ -28084,7 +28361,11 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_custom_error(res, 6014, "empty calibration hash must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyContentHash,
+        "empty calibration hash must fail",
+    );
 
     // verify_device requires a validator profile (no profile → seeds fail).
     let no_profile = Keypair::new();
@@ -28655,26 +28936,44 @@ async fn phase10_route(
     let (assign_pk, _) = task_assignment_pda(task_id, validator);
     let (profile_pk, _) = validator_profile_pda(validator);
     let (avail_pk, _) = validator_availability_pda(validator);
-    let data = route_task_data(task_id, 0, &[*validator], validator, 1, &[0u8; 32]);
-    process(
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
+    let data = route_task_data(
+        task_id,
+        0,
+        &[*validator],
+        validator,
+        1,
+        &randomness,
+        &oracle,
+    );
+    process_route(
         ctx,
         payer,
+        &oracle,
+        task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(assign_pk, false),
-                AccountMeta::new(task_pk, false),
-                AccountMeta::new_readonly(req_pk, false),
-                AccountMeta::new_readonly(*validator, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-                // remaining_accounts (stride 4): profile, availability,
-                // reputation stand-in, binding slot
-                AccountMeta::new_readonly(profile_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(binding_slot, false),
-            ],
+            accounts: route_accounts_with_oracle(
+                vec![
+                    AccountMeta::new(assign_pk, false),
+                    AccountMeta::new(task_pk, false),
+                    AccountMeta::new_readonly(req_pk, false),
+                    AccountMeta::new_readonly(*validator, false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                vec![
+                    // remaining_accounts (stride 4): profile, availability,
+                    // reputation stand-in, binding slot
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(binding_slot, false),
+                ],
+                &oracle.pubkey(),
+            ),
             data,
         },
     )
@@ -28751,7 +29050,11 @@ async fn phase10_cross_border_binding_lifecycle() {
         phase10_create_binding_ix(&payer.pubkey(), &jx, &jm, *b"NG", *b"CM", 0),
     )
     .await;
-    assert_custom_error(res, 6225, "reversed country pair must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidJurisdictionPair,
+        "reversed country pair must fail",
+    );
 
     // Past expiry rejected.
     let res = process(
@@ -28767,7 +29070,7 @@ async fn phase10_cross_border_binding_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6229, "past expiry must fail");
+    assert_terra_error(res, TerraError::InvalidBindingExpiry, "past expiry must fail");
 
     // Happy path: both authorities (= payer/admin here) sign.
     let (binding_pk, _) = cb_binding_pda(b"CM", b"NG");
@@ -28801,7 +29104,11 @@ async fn phase10_cross_border_binding_lifecycle() {
         phase10_set_status_ix(&binding_pk, &jm, &jx, &payer.pubkey(), 9),
     )
     .await;
-    assert_custom_error(res, 6226, "invalid binding status must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidBindingStatus,
+        "invalid binding status must fail",
+    );
 
     // ACTIVE → SUSPENDED → REVOKED (terminal).
     process(
@@ -28901,7 +29208,11 @@ async fn phase10_routing_jurisdiction_gate() {
     phase10_create_task_with_req(&mut ctx, &payer, &task_bad, *b"NG").await;
     let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
     let res = phase10_route(&mut ctx, &payer, &task_bad, &validator.pubkey(), avail_pk).await;
-    assert_custom_error(res, 6187, "foreign task without binding must fail");
+    assert_terra_error(
+        res,
+        TerraError::ValidatorNotEligible,
+        "foreign task without binding must fail",
+    );
 
     // 3. Same-country task (CM) → binding slot is filler (any account).
     let task_same = [0xA3u8; 32];
@@ -28923,7 +29234,11 @@ async fn phase10_routing_jurisdiction_gate() {
         binding_pk,
     )
     .await;
-    assert_custom_error(res, 6187, "undeclared jurisdiction must fail routing");
+    assert_terra_error(
+        res,
+        TerraError::ValidatorNotEligible,
+        "undeclared jurisdiction must fail routing",
+    );
 }
 
 #[tokio::test]
@@ -28987,7 +29302,11 @@ async fn phase10_record_cross_border_verification() {
         phase10_record(task_a, &v1.pubkey(), binding_pk),
     )
     .await;
-    assert_custom_error(res, 6214, "record before submit must fail");
+    assert_terra_error(
+        res,
+        TerraError::AssignmentNotSubmitted,
+        "record before submit must fail",
+    );
 
     // Submit → record happy path.
     phase10_submit(&mut ctx, &task_a, &v1).await;
@@ -29025,7 +29344,11 @@ async fn phase10_record_cross_border_verification() {
         phase10_record(task_b, &v2.pubkey(), binding_pk),
     )
     .await;
-    assert_custom_error(res, 6227, "same-jurisdiction record must fail");
+    assert_terra_error(
+        res,
+        TerraError::SameJurisdiction,
+        "same-jurisdiction record must fail",
+    );
 
     // C: wrong binding pair (CM↔GH) → 6228.
     let jgh = phase10_register_jurisdiction(&mut ctx, &payer, &registry, b"GH", "Ghana").await;
@@ -29049,7 +29372,11 @@ async fn phase10_record_cross_border_verification() {
         phase10_record(task_c, &v1.pubkey(), binding_gh),
     )
     .await;
-    assert_custom_error(res, 6228, "mismatched binding must fail");
+    assert_terra_error(
+        res,
+        TerraError::JurisdictionMismatch,
+        "mismatched binding must fail",
+    );
 
     // D: binding suspended → 6089.
     let task_d = [0xB4u8; 32];
@@ -29115,7 +29442,11 @@ async fn phase10_record_cross_border_verification() {
         phase10_record(task_e, &v3.pubkey(), binding_pk),
     )
     .await;
-    assert_custom_error(res, 6230, "undeclared jurisdiction record must fail");
+    assert_terra_error(
+        res,
+        TerraError::UndeclaredJurisdiction,
+        "undeclared jurisdiction record must fail",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -29293,7 +29624,11 @@ async fn stage3_spatial_asset_lifecycle() {
         stage3_init_ix(&p2, &payer.pubkey(), 9, 0, 10),
     )
     .await;
-    assert_custom_error(res, 6231, "invalid dimensionality must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidSpatialDimension,
+        "invalid dimensionality must fail",
+    );
 
     // inverted elevation range rejected.
     let p3 = stage3_register_parcel(&mut ctx, &payer, 212).await;
@@ -29303,7 +29638,11 @@ async fn stage3_spatial_asset_lifecycle() {
         stage3_init_ix(&p3, &payer.pubkey(), spatial_dimension::D3, 100, 50),
     )
     .await;
-    assert_custom_error(res, 6235, "inverted elevation range must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationRange,
+        "inverted elevation range must fail",
+    );
 
     // --- append v0 (2D survey claim) --------------------------------------
     let h0 = [3u8; 32];
@@ -29386,7 +29725,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6231, "3D version on 2.5D asset must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidSpatialDimension,
+        "3D version on 2.5D asset must fail",
+    );
 
     // unknown source → 6232.
     let res = process(
@@ -29406,7 +29749,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6232, "unknown geometry source must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidGeometrySource,
+        "unknown geometry source must fail",
+    );
 
     // all-zero geometry hash → 6002.
     let res = process(
@@ -29426,7 +29773,7 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6002, "zero geometry hash must fail");
+    assert_terra_error(res, TerraError::EmptyGeometryHash, "zero geometry hash must fail");
 
     // empty storage reference → 6134.
     let res = process(
@@ -29446,7 +29793,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6134, "empty storage reference must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyStorageReference,
+        "empty storage reference must fail",
+    );
 
     // --- Phase B elevation provenance guards ------------------------------
     // unknown elevation source → 6237.
@@ -29467,7 +29818,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6237, "unknown elevation source must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationSource,
+        "unknown elevation source must fail",
+    );
 
     // NONE provenance with a nonzero envelope → 6237.
     let res = process(
@@ -29487,7 +29842,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6237, "NONE provenance with nonzero envelope must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationSource,
+        "NONE provenance with nonzero envelope must fail",
+    );
 
     // elevation provenance on a flat D2 layer → 6237.
     let res = process(
@@ -29507,7 +29866,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6237, "provenance on a flat D2 layer must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationSource,
+        "provenance on a flat D2 layer must fail",
+    );
 
     // NONE provenance on a 2.5D layer → 6237.
     let res = process(
@@ -29527,7 +29890,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6237, "NONE provenance on a 2.5D layer must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationSource,
+        "NONE provenance on a 2.5D layer must fail",
+    );
 
     // envelope outside the asset bounding box → 6235.
     let res = process(
@@ -29547,7 +29914,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6235, "envelope outside asset bounds must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidElevationRange,
+        "envelope outside asset bounds must fail",
+    );
 
     // --- append v1 (2.5D lidar layer) -------------------------------------
     let h1 = [4u8; 32];
@@ -29609,7 +29980,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6234, "cap-exhausted append must fail");
+    assert_terra_error(
+        res,
+        TerraError::GeometryVersionsFull,
+        "cap-exhausted append must fail",
+    );
 }
 
 #[tokio::test]
@@ -29692,7 +30067,11 @@ async fn stage3_geometry_version_verification() {
         stage3_verify_ix(&asset_pk, &entry_pk, &v1.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6238, "duplicate attestation must fail");
+    assert_terra_error(
+        res,
+        TerraError::GeometryAlreadyAttested,
+        "duplicate attestation must fail",
+    );
 
     // Second validator completes the quorum (claim → fact).
     let v2 = Keypair::new();
@@ -29719,7 +30098,11 @@ async fn stage3_geometry_version_verification() {
         stage3_verify_ix(&asset_pk, &entry_pk, &v2.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6236, "double verify must fail");
+    assert_terra_error(
+        res,
+        TerraError::GeometryAlreadyVerified,
+        "double verify must fail",
+    );
 
     // An entry from asset A cannot be verified against asset B.
     let parcel_b = stage3_register_parcel(&mut ctx, &payer, 221).await;
@@ -29737,7 +30120,11 @@ async fn stage3_geometry_version_verification() {
         stage3_verify_ix(&asset_b_pk, &entry_pk, &v2.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6233, "cross-asset verify must fail");
+    assert_terra_error(
+        res,
+        TerraError::GeometryVersionMismatch,
+        "cross-asset verify must fail",
+    );
 }
 
 // ============================================================================
@@ -29965,7 +30352,11 @@ async fn stage3_evidence_linked_geometry() {
         ),
     )
     .await;
-    assert_custom_error(res, 6239, "empty evidence manifest must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyEvidenceManifest,
+        "empty evidence manifest must fail",
+    );
 
     // Cancel the task → anchored append on a terminal task → 6174.
     let mut cancel = discriminator("global", "cancel_task").to_vec();
@@ -30003,7 +30394,11 @@ async fn stage3_evidence_linked_geometry() {
         ),
     )
     .await;
-    assert_custom_error(res, 6174, "terminal-task anchored append must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskAlreadyFinalized,
+        "terminal-task anchored append must fail",
+    );
 }
 
 #[tokio::test]
@@ -30295,7 +30690,11 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6243, "model must derive from an anchored version");
+    assert_terra_error(
+        res,
+        TerraError::ModelGeometryVersionMismatch,
+        "model must derive from an anchored version",
+    );
 
     // --- format / hash / storage-reference guards -------------------------
     let res = process(
@@ -30312,7 +30711,7 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6241, "UNKNOWN format must fail");
+    assert_terra_error(res, TerraError::InvalidModelFormat, "UNKNOWN format must fail");
     let res = process(
         &mut ctx,
         &payer,
@@ -30327,7 +30726,11 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6241, "out-of-range format must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidModelFormat,
+        "out-of-range format must fail",
+    );
     let res = process(
         &mut ctx,
         &payer,
@@ -30342,7 +30745,7 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6002, "zero model hash must fail");
+    assert_terra_error(res, TerraError::EmptyGeometryHash, "zero model hash must fail");
     let res = process(
         &mut ctx,
         &payer,
@@ -30357,7 +30760,11 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_custom_error(res, 6134, "empty storage reference must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyStorageReference,
+        "empty storage reference must fail",
+    );
 
     // --- register m1 (glTF from the same geometry v0) ---------------------
     let mh1 = [0x33u8; 32];
@@ -30415,7 +30822,11 @@ async fn stage3_3d_model_lifecycle() {
         stage3_verify_model_ix(&model0_pk, &v1.pubkey()),
     )
     .await;
-    assert_custom_error(res, 6244, "double verify must fail");
+    assert_terra_error(
+        res,
+        TerraError::ThreeDModelAlreadyVerified,
+        "double verify must fail",
+    );
 
     // m1 stays an unverified claim — models verify independently.
     let (model1_pk, _) = three_d_model_pda(&asset_pk, 1);
@@ -30560,7 +30971,7 @@ async fn stage3_spatial_snapshot_lifecycle() {
         stage3_snapshot_ix(&asset_pk, &payer.pubkey(), 2, &long_label),
     )
     .await;
-    assert_custom_error(res, 6246, "oversized label must fail");
+    assert_terra_error(res, TerraError::InvalidSnapshotLabel, "oversized label must fail");
 }
 
 // ============================================================================
@@ -30702,28 +31113,50 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
     ctx.set_account(&profile_pk, &acc.into());
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
-    let res = process(
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(assign_pk, false),
-                AccountMeta::new(task_pk, false),
-                AccountMeta::new_readonly(req_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-                AccountMeta::new_readonly(profile_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
-            ],
+            accounts: route_accounts_with_oracle(
+                vec![
+                    AccountMeta::new(assign_pk, false),
+                    AccountMeta::new(task_pk, false),
+                    AccountMeta::new_readonly(req_pk, false),
+                    AccountMeta::new_readonly(validator.pubkey(), false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                vec![
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+                ],
+                &oracle.pubkey(),
+            ),
             data,
         },
     )
     .await;
-    assert_custom_error(res, 6190, "foreign-owned profile slot must be rejected");
+    assert_terra_error(
+        res,
+        TerraError::RouteAccountMismatch,
+        "foreign-owned profile slot must be rejected",
+    );
 
     let task: VerificationTask = read_account(&ctx, task_pk).await;
     assert_eq!(task.assigned_count, 0, "forged slot must not assign");
@@ -30816,7 +31249,11 @@ async fn remaining_accounts_fraud_foreign_profile_rejected() {
         },
     )
     .await;
-    assert_custom_error(res, 6190, "foreign-owned pool profile must abort");
+    assert_terra_error(
+        res,
+        TerraError::RouteAccountMismatch,
+        "foreign-owned pool profile must abort",
+    );
 
     assert!(
         ctx.banks_client
@@ -31002,32 +31439,54 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
     .expect("add requirement");
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
-    let data = route_task_data(&task_id, 0, &[validator.pubkey()], &validator.pubkey(), 1, &[0u8; 32]);
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &randomness,
+        &oracle,
+    );
 
     // Attempt 1: junk restriction slot (not the canonical PDA) → hard fail.
-    let res = process(
+    let res = process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(assign_pk, false),
-                AccountMeta::new(task_pk, false),
-                AccountMeta::new_readonly(req_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-                AccountMeta::new_readonly(profile_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
-                AccountMeta::new_readonly(cap_pk, false),
-                AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk
-            ],
+            accounts: route_accounts_with_oracle(
+                vec![
+                    AccountMeta::new(assign_pk, false),
+                    AccountMeta::new(task_pk, false),
+                    AccountMeta::new_readonly(req_pk, false),
+                    AccountMeta::new_readonly(validator.pubkey(), false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                vec![
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+                    AccountMeta::new_readonly(cap_pk, false),
+                    AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk
+                ],
+                &oracle.pubkey(),
+            ),
             data: data.clone(),
         },
     )
     .await;
-    assert_custom_error(res, 6190, "junk restriction slot must be rejected");
+    assert_terra_error(
+        res,
+        TerraError::RouteAccountMismatch,
+        "junk restriction slot must be rejected",
+    );
     let task: VerificationTask = read_account(&ctx, task_pk).await;
     assert_eq!(task.assigned_count, 0, "junk slot must not assign");
 
@@ -31040,24 +31499,32 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
         ],
         &PROGRAM_ID,
     );
-    process(
+    process_route(
         &mut ctx,
         &payer,
+        &oracle,
+        &task_id,
+        &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(assign_pk, false),
-                AccountMeta::new(task_pk, false),
-                AccountMeta::new_readonly(req_pk, false),
-                AccountMeta::new_readonly(validator.pubkey(), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-                AccountMeta::new_readonly(profile_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(avail_pk, false),
-                AccountMeta::new_readonly(cap_pk, false),
-                AccountMeta::new_readonly(restriction_pk, false), // ghost PDA
-            ],
+            accounts: route_accounts_with_oracle(
+                vec![
+                    AccountMeta::new(assign_pk, false),
+                    AccountMeta::new(task_pk, false),
+                    AccountMeta::new_readonly(req_pk, false),
+                    AccountMeta::new_readonly(validator.pubkey(), false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(system_program_id(), false),
+                ],
+                vec![
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(cap_pk, false),
+                    AccountMeta::new_readonly(restriction_pk, false), // ghost PDA
+                ],
+                &oracle.pubkey(),
+            ),
             data,
         },
     )

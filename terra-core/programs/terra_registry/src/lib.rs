@@ -276,6 +276,11 @@ pub use security::{
     FinalizeAppeal, FinalizeDecision, RecordAuditEvent, SubmitJurisdictionalRestriction,
     SubmitPrivacyRequest, SubmitSecurityRequest,
 };
+// Routing contexts now live in `routing::` too; the `#[program]` block names
+// them unqualified, which Anchor resolves through these root re-exports.
+pub use routing::InitVrfAuthority;
+#[doc(hidden)]
+pub(crate) use routing::__client_accounts_init_vrf_authority;
 // `#[derive(Accounts)]` emits a hidden `__client_accounts_*` module next to
 // each struct. Anchor's `#[program]` macro resolves those at the crate root,
 // so the modules generated inside `security` must be re-exported there too.
@@ -2443,6 +2448,14 @@ pub mod terra_registry {
     // -----------------------------------------------------------------------
     // Dynamic routing (RFC-012 Phase 6)
     // -----------------------------------------------------------------------
+
+    /// Set or rotate the allowlisted VRF oracle authority. Registry admin only.
+    pub fn init_vrf_authority(
+        ctx: Context<InitVrfAuthority>,
+        authority: Pubkey,
+    ) -> Result<()> {
+        routing::init_vrf_authority(ctx, authority)
+    }
 
     #[allow(clippy::too_many_arguments)]
     pub fn route_task(
@@ -5521,6 +5534,13 @@ pub struct RouteTask<'info> {
     pub system_program: Program<'info, System>,
     /// CHECK: Oracle authority providing the VRF randomness attestation.
     pub oracle: UncheckedAccount<'info>,
+    /// Admin-allowlisted VRF authority. `route_task` requires `oracle` to
+    /// match this account's `authority` field.
+    #[account(
+        seeds = [b"vrf_authority"],
+        bump = vrf_authority.bump,
+    )]
+    pub vrf_authority: Account<'info, routing::VrfAuthority>,
     /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
     /// (must be the Instructions sysvar holding this transaction's
     /// Ed25519 precompile attestation of the VRF randomness).
@@ -8117,6 +8137,8 @@ pub enum TerraError {
     RequesterCannotBeOracle,
     #[msg("Invalid VRF oracle signature or forged randomness")]
     InvalidVrfRandomness,
+    #[msg("VRF oracle is not the allowlisted authority")]
+    VrfAuthorityMismatch,
 }
 
 #[cfg(test)]

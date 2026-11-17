@@ -86,6 +86,7 @@ async fn main() -> Result<()> {
         pool,
         geo,
         api_authority: auth::ApiAuthority(config.api_authority_pubkey),
+        vrf_oracle_pubkey: config.vrf_oracle_pubkey,
         storage,
         zk,
     };
