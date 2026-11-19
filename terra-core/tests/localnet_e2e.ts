@@ -762,7 +762,7 @@ describe("terra localnet lifecycle (Sprint A)", function () {
     ];
 
     await program.methods
-      .fileDispute(caseHash, 2, validators)
+      .fileDispute(caseHash, 2, validators, 1_000_000) // bond_lamports > 0
       .accounts({
         dispute: disputePda,
         parcel: disputeParcelPda,
