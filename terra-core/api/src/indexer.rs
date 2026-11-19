@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 use crate::state::AppState;
 
@@ -28,12 +29,17 @@ const PARCEL_DISCRIMINATOR: [u8; 8] = [149, 167, 245, 67, 209, 244, 214, 75];
 
 /// Anchor 8-byte discriminator for the `VerificationAttestation` account:
 /// SHA-256("account:VerificationAttestation")[..8]
-const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] = [143, 201, 182, 196, 87, 192, 219, 159];
+const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] = [231, 126, 92, 51, 84, 178, 81, 242];
 
 /// Interval between indexer polls.
 const POLL_INTERVAL_SECS: u64 = 15;
 
 /// Parsed Parcel account from on-chain data.
+///
+/// `id` is part of the account layout and kept for completeness/debugging
+/// even though the mirror uses `onchain_id` (the PDA address as base58 text)
+/// as the natural key.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ParsedParcel {
     pub id: [u8; 32],
@@ -168,11 +174,6 @@ fn parse_parcel(data: &[u8]) -> Option<ParsedParcel> {
         created_at,
         updated_at,
     })
-}
-
-/// Convert a ParsedParcel id to a hex string.
-fn id_hex(id: &[u8; 32]) -> String {
-    id.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// Parsed VerificationAttestation account from on-chain data.
@@ -396,6 +397,12 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
 }
 
 /// Insert or update a parcel row from on-chain data.
+///
+/// The on-chain `Parcel` account carries a 32-byte id and a geometry hash but
+/// no owner — ownership lives in a separate Rights PDA. Off-chain we mirror
+/// this with `parcels.id` (auto-generated UUID) + `onchain_id` (the PDA
+/// address as base58 text) plus a `parcel_ownership` row so `PARCEL_SELECT`'s
+/// JOIN finds indexed parcels.
 async fn upsert_parcel(
     state: &AppState,
     pubkey: &Pubkey,
@@ -403,7 +410,6 @@ async fn upsert_parcel(
     _slot: u64,
     _signature: &str,
 ) -> Result<()> {
-    let id_hex = id_hex(&parcel.id);
     let pubkey_str = pubkey.to_string();
 
     // geometry_hash as text (hex)
@@ -428,13 +434,13 @@ async fn upsert_parcel(
             anyhow::anyhow!("check existing parcel {pubkey}: {e}")
         })?;
 
-    if exists.is_some() {
+    if let Some(parcel_id) = exists {
         sqlx::query(
             r#"
             UPDATE parcels SET
                 name = $1,
                 status = $2,
-                geometry = ST_GeomFromGeoJSON('{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}'),
+                geometry = NULL,
                 geometry_hash = $3,
                 infrastructure_flags = $4,
                 rights_count = $5,
@@ -443,7 +449,7 @@ async fn upsert_parcel(
                 chain_verified = TRUE,
                 chain_slot = $8,
                 chain_signature = $9
-            WHERE onchain_id = $10
+            WHERE id = $10
             "#,
         )
         .bind(&parcel.name)
@@ -455,7 +461,7 @@ async fn upsert_parcel(
         .bind(parcel.updated_at as f64)
         .bind(0i64) // chain_slot
         .bind("") // chain_signature
-        .bind(&pubkey_str)
+        .bind(parcel_id)
         .execute(&state.pool)
         .await
         .map_err(|e| {
@@ -463,19 +469,19 @@ async fn upsert_parcel(
             anyhow::anyhow!("update parcel {pubkey}: {e}")
         })?;
     } else {
-        sqlx::query(
+        let parcel_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO parcels (
-                id, name, status, geometry, onchain_id, geometry_hash,
+                name, status, geometry, onchain_id, geometry_hash,
                 infrastructure_flags, rights_count, access_hash,
                 created_at, updated_at, chain_verified, chain_slot, chain_signature
             ) VALUES (
-                $1, $2, $3, ST_GeomFromGeoJSON('{"type":"Polygon","coordinates":[[[0,0],[0,0],[0,0]]]}'), $4, $5, $6, $7, $8,
-                to_timestamp($9::double precision), to_timestamp($10::double precision), TRUE, $11, $12
+                $1, $2, NULL, $3, $4, $5, $6, $7,
+                to_timestamp($8::double precision), to_timestamp($9::double precision), TRUE, $10, $11
             )
+            RETURNING id
             "#,
         )
-        .bind(id_hex)
         .bind(&parcel.name)
         .bind(format!("{}", parcel.status))
         .bind(&pubkey_str)
@@ -487,12 +493,27 @@ async fn upsert_parcel(
         .bind(parcel.updated_at as f64)
         .bind(0i64) // chain_slot
         .bind("") // chain_signature
-        .execute(&state.pool)
+        .fetch_one(&state.pool)
         .await
         .map_err(|e| {
             warn!("insert parcel {pubkey} failed: {e:?}");
             anyhow::anyhow!("insert parcel {pubkey}: {e}")
         })?;
+
+        // Mirror the on-chain ownership into parcel_ownership so PARCEL_SELECT's
+        // JOIN finds this indexed parcel. We don't know the real wallet owner
+        // from the Parcel account alone (ownership lives in a Rights PDA), so
+        // we record the PDA address as holder and rely on /parcels/{id}/reconcile
+        // to correct it later.
+        sqlx::query("INSERT INTO parcel_ownership (parcel_id, holder) VALUES ($1, $2)")
+            .bind(parcel_id)
+            .bind(&pubkey_str)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| {
+                warn!("insert parcel_ownership {pubkey} failed: {e:?}");
+                anyhow::anyhow!("insert parcel_ownership {pubkey}: {e}")
+            })?;
     }
 
     Ok(())

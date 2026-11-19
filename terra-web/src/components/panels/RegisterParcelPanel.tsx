@@ -213,13 +213,15 @@ export default function RegisterParcelPanel({
         // reachability only available when the server loaded OSM data
       }
 
-      // 4) Persist the parcel + geometry off-chain (PostGIS) for display.
+      // 4) Persist the parcel + geometry off-chain (PostGIS) for display,
+      //    linking to the on-chain PDA via onchain_id.
       try {
         await api.createParcel({
           name: name.trim(),
           holder: publicKey.toBase58(),
           status: 'registered',
           geometry,
+          onchain_id: pda.toBase58(),
         })
         await refreshOffChain()
       } catch (e) {

@@ -420,11 +420,14 @@ async function claimStep(state: StepState): Promise<void> {
   if (!(await evidence.fetchNullable(state.pdas.evidence))) {
     const contentHash = await digest(['terra:lifecycle:evidence:survey'])
     const observedAt = Math.floor(Date.now() / 1000)
+    // Demo placeholder: in production this should be a real content address
+    // (IPFS CID or S3 key) for the uploaded evidence bytes.
+    const evidenceUri = `ipfs://${hex(contentHash)}`
     const ix = await state.program.methods
       .addEvidence(
         0, // PERSON_SUBMISSION
         Array.from(contentHash),
-        'ipfs://terra-lifecycle/evidence-0',
+        evidenceUri,
         new BN(observedAt),
       )
       .accounts({
@@ -472,21 +475,22 @@ async function attestationsStep(state: StepState): Promise<void> {
     ['validator-two', state.operators.validatorTwo],
   ] as const) {
     if (await attestations.fetchNullable(state.pdas.attestation(validator.publicKey))) continue
+    const now = Math.floor(Date.now() / 1000)
     const sd_jwt_digest = await sdJwtDigest(
       state.pdas.claim,
       validator.publicKey,
       state.pdas.observation(validator.publicKey),
       state.pdas.claim,
       'VerificationAttestation',
-      1_700_000_000,
-      1_800_000_000,
+      now,
+      now + 365 * 24 * 60 * 60,
     )
     const ix = await state.program.methods
       .submitVerificationAttestation(
         'VerificationAttestation',
         state.pdas.claim,
-        new BN(1_700_000_000),
-        new BN(1_800_000_000),
+        new BN(now),
+        new BN(now + 365 * 24 * 60 * 60),
         Array.from(sd_jwt_digest),
         false,
       )
@@ -745,12 +749,15 @@ async function geometryStep(state: StepState): Promise<void> {
 
   if (!(await versions.fetchNullable(state.pdas.geometryVersion))) {
     const geometryHash = await digest(['terra:lifecycle:geometry:verified:v0'])
+    // Demo placeholder: in production this should be a real content address
+    // for the geometry bytes.
+    const geometryUri = `ipfs://${hex(geometryHash)}`
     const ix = await state.program.methods
       .appendGeometryVersion(
         Array.from(geometryHash),
         0,
         0,
-        'ipfs://terra-lifecycle/geometry-v0',
+        geometryUri,
         0,
         0,
         0,

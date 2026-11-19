@@ -18,6 +18,8 @@ export interface NewParcelInput {
   holder: string
   status?: string
   geometry: unknown // GeoJSON Polygon
+  /// On-chain parcel PDA address (base58), links mirror row to chain record.
+  onchain_id?: string
 }
 
 // ---- Off-chain API: /api/v1/geo ------------------------------------------

@@ -65,7 +65,7 @@ const DEMO_PARCELS: Parcel[] = [
   {
     id: 'e2e-verify-parcel',
     name: 'Soa Pilot Parcel — Yaoundé, Cameroon',
-    owner: '3xK…Drsy',
+    owner: '11111111111111111111111111111111',
     geometry: 'POLYGON((11.499 3.847, 11.505 3.847, 11.505 3.849, 11.499 3.849, 11.499 3.847))',
   },
 ]
@@ -99,14 +99,46 @@ export default function MvpFlowPage() {
   }, [setWalletModalVisible])
 
   // Step 1: Surveyor attests parcel → issues W3C VC (SD-JWT)
+  // Builds the full on-chain account chain: parcel → claim → observation →
+  // verification_attestation. Each PDA is derived with the exact seeds the
+  // program expects, and every account is created before it is referenced.
   const handleIssueVC = useCallback(async () => {
     if (!anchorWallet || !send || !selectedParcel || !publicKey) return
     setBusy(true)
     setError(null)
     try {
-      const claimPk = new PublicKey(await digest([`terra:mvp:claim:${selectedParcel.id}`]))
+      const programId = new PublicKey(TERRA_PROGRAM_ID)
+      const encoder = new TextEncoder()
+
+      // ── PDAs (must match program seed layout) ─────────────────────────
+      const parcelIdBytes = await digest([`terra:mvp:parcel:${selectedParcel.id}`])
+      const [parcelPk] = PublicKey.findProgramAddressSync(
+        [encoder.encode('parcel'), parcelIdBytes],
+        programId,
+      )
+      const [ownershipPk] = PublicKey.findProgramAddressSync(
+        [encoder.encode('ownership'), parcelPk.toBuffer()],
+        programId,
+      )
+
+      const claimIdBytes = await digest([`terra:mvp:claim:${selectedParcel.id}`])
+      const [claimPk] = PublicKey.findProgramAddressSync(
+        [encoder.encode('claim'), parcelPk.toBuffer(), claimIdBytes],
+        programId,
+      )
+
       const surveyorPk = publicKey
-      const observationPk = PublicKey.unique()
+      const [observationPk] = PublicKey.findProgramAddressSync(
+        [encoder.encode('observation'), claimPk.toBuffer(), surveyorPk.toBuffer()],
+        programId,
+      )
+
+      const [attestationPk] = PublicKey.findProgramAddressSync(
+        [encoder.encode('verification_attestation'), claimPk.toBuffer(), surveyorPk.toBuffer()],
+        programId,
+      )
+
+      // ── Dates ─────────────────────────────────────────────────────────
       const issuanceDate = Math.floor(Date.now() / 1000)
       const expirationDate = issuanceDate + 365 * 24 * 60 * 60 // 1 year
       const vcType = 'ResidencyAttestation'
@@ -121,50 +153,89 @@ export default function MvpFlowPage() {
         expirationDate,
       )
 
-      // Build the Anchor instruction with the generated IDL so the
-      // discriminator and Borsh layout cannot drift from the program.
       const coder = new BorshCoder(idl as never)
-      const data = coder.instruction.encode('submitVerificationAttestation', {
-        vcType,
-        credentialSubject: claimPk,
-        issuanceDate: new BN(issuanceDate),
-        expirationDate: new BN(expirationDate),
-        sdJwtDigest: Array.from(vcDigest),
-        selectiveDisclosure: false,
-      })
 
-      const ix = {
-        programId: new PublicKey(TERRA_PROGRAM_ID),
+      // 1) register_parcel — creates parcel + ownership PDAs
+      const geometryHash = await digest([`terra:mvp:geometry:${selectedParcel.id}`])
+      const regData = coder.instruction.encode('register_parcel', {
+        id: Array.from(parcelIdBytes),
+        name: selectedParcel.name,
+        geometry_hash: Array.from(geometryHash),
+      })
+      const regIx = {
+        programId,
         keys: [
-          {
-            pubkey: PublicKey.findProgramAddressSync(
-              [new TextEncoder().encode('verification_attestation'), claimPk.toBuffer(), surveyorPk.toBuffer()],
-              new PublicKey(TERRA_PROGRAM_ID),
-            )[0],
-            isSigner: false,
-            isWritable: true,
-          },
-          { pubkey: claimPk, isSigner: false, isWritable: true },
-          {
-            pubkey: observationPk,
-            isSigner: false,
-            isWritable: false,
-          },
+          { pubkey: parcelPk, isSigner: false, isWritable: true },
           { pubkey: surveyorPk, isSigner: true, isWritable: false },
+          { pubkey: ownershipPk, isSigner: false, isWritable: true },
           { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          {
-            pubkey: PublicKey.findProgramAddressSync(
-              [new TextEncoder().encode('validator_reputation'), surveyorPk.toBuffer()],
-              new PublicKey(TERRA_PROGRAM_ID),
-            )[0],
-            isSigner: false,
-            isWritable: false,
-          },
         ],
-        data,
+        data: regData,
       }
 
-      const tx = new Transaction().add(ix)
+      // 2) create_claim — creates claim PDA (requires parcel PDA)
+      const statementHash = await digest([`terra:mvp:statement:${selectedParcel.id}`])
+      const claimData = coder.instruction.encode('create_claim', {
+        claim_id: Array.from(claimIdBytes),
+        claim_type: 1, // CLAIM_TYPE.BOUNDARY
+        statement_hash: Array.from(statementHash),
+        parcel_type: 0,
+        region: [0, 0],
+      })
+      const claimIx = {
+        programId,
+        keys: [
+          { pubkey: claimPk, isSigner: false, isWritable: true },
+          { pubkey: parcelPk, isSigner: false, isWritable: false },
+          { pubkey: surveyorPk, isSigner: true, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: claimData,
+      }
+
+      // 3) submit_observation — creates observation PDA (requires claim PDA)
+      const findingsHash = await digest([`terra:mvp:findings:${selectedParcel.id}`])
+      const sigHash = await digest([`terra:mvp:sig:${selectedParcel.id}`])
+      const obsData = coder.instruction.encode('submit_observation', {
+        location: [-6_200_000_000, 106_800_000_000], // demo coordinates
+        method: 0,
+        findings_hash: Array.from(findingsHash),
+        confidence: 90,
+        signature_hash: Array.from(sigHash),
+      })
+      const obsIx = {
+        programId,
+        keys: [
+          { pubkey: observationPk, isSigner: false, isWritable: true },
+          { pubkey: claimPk, isSigner: false, isWritable: false },
+          { pubkey: surveyorPk, isSigner: true, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: obsData,
+      }
+
+      // 4) submit_verification_attestation — creates attestation PDA
+      const attData = coder.instruction.encode('submit_verification_attestation', {
+        vc_type: vcType,
+        credential_subject: claimPk,
+        issuance_date: new BN(issuanceDate),
+        expiration_date: new BN(expirationDate),
+        sd_jwt_digest: Array.from(vcDigest),
+        selective_disclosure: false,
+      })
+      const attIx = {
+        programId,
+        keys: [
+          { pubkey: attestationPk, isSigner: false, isWritable: true },
+          { pubkey: claimPk, isSigner: false, isWritable: false },
+          { pubkey: observationPk, isSigner: false, isWritable: false },
+          { pubkey: surveyorPk, isSigner: true, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data: attData,
+      }
+
+      const tx = new Transaction().add(regIx, claimIx, obsIx, attIx)
       await send(tx)
 
       setVc({

@@ -29,12 +29,13 @@ export const TERRA_IS_LOCALNET = TERRA_CLUSTER === 'localnet'
 // relative base here. Point this at the deployed host in production.
 export const API_BASE = import.meta.env.VITE_API_BASE?.trim() || '/api/v1'
 
-// Camera/journal target for the pilot region in Cameroon (Soa / Yaoundé area)
-// used as the default focus of the 3D globe view.
+// Camera/journal default focus — neutral equatorial position. The globe
+// initializes here; users navigate to their region of interest. Deliberately
+// not hardcoded to any specific country to remain jurisdiction-agnostic.
 export const DEFAULT_FOCUS = {
-  longitude: 11.502,
-  latitude: 3.848,
-  height: 12000,
+  longitude: 0,
+  latitude: 0,
+  height: 15000,
 }
 
 // Parcel statuses on-chain (must match lib.rs `parcel_status` module).

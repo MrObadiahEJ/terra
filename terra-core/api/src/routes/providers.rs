@@ -647,9 +647,22 @@ pub struct ProveRequest {
 
 pub async fn prove_replica(
     State(state): State<AppState>,
+    auth: SignedRequest,
     Path((_provider_id, replica_id)): Path<(Uuid, Uuid)>,
     Json(req): Json<ProveRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    // Only the API authority may submit PoP proofs — prevents anyone who can
+    // read the replica row from forging a SHA-256 legacy proof.
+    if let Some(key) = &state.api_authority.0 {
+        auth.verify(
+            key,
+            "POST",
+            &format!("/api/v1/providers/{_provider_id}/replicas/{replica_id}/prove"),
+        )?;
+    } else {
+        return Err(AppError::unauthorized("API authority not configured"));
+    }
+
     // Verify replica exists and has a pending challenge.
     let (provider_id, content_address, last_challenge): (Uuid, Option<String>, Option<String>) =
         sqlx::query_as(
@@ -903,7 +916,7 @@ mod tests {
     use crate::auth::ApiAuthority;
     use crate::storage::StorageBackend;
     use chrono::{Duration, Utc};
-    use ed25519_dalek::{SigningKey, VerifyingKey};
+    use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
     use std::sync::Arc;
 
     #[test]
@@ -1192,9 +1205,30 @@ mod tests {
             zk: None,
         };
 
-        // Prove the replica.
+        // Prove the replica (requires a valid SignedRequest against the API
+        // authority key configured in the test state).
+        let body = format!(r#"{{"proof":"{}"}}"#, expected_proof);
+        let body_hash = Sha256::digest(body.as_bytes());
+        let body_hash_hex = hex::encode(body_hash);
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before epoch")
+            .as_secs() as i64;
+        let payload = format!(
+            "POST\n/api/v1/providers/{}/replicas/{}/prove\n{}\n{}",
+            provider.id, replica.id, body_hash_hex, timestamp
+        );
+        let signing_key = SigningKey::from_bytes(&[13u8; 32]);
+        let signature = signing_key.sign(payload.as_bytes());
+        let auth = SignedRequest {
+            signature,
+            timestamp,
+            body_hash_hex,
+        };
+
         let result = prove_replica(
             State(state.clone()),
+            auth,
             Path((provider.id, replica.id)),
             Json(ProveRequest {
                 proof: expected_proof.clone(),

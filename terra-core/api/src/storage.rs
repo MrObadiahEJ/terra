@@ -459,25 +459,11 @@ fn aws_signature_v4(
     query: &str,
     headers: &[(String, String)],
     body: &[u8],
+    amz_date: &str,
 ) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time before epoch")
-        .as_secs();
-    let date =
-        time::OffsetDateTime::from_unix_timestamp(now as i64).expect("invalid unix timestamp");
-    let amz_date = format!(
-        "{:04}{:02}{:02}{:02}{:02}{:02}",
-        date.year(),
-        date.month() as u8,
-        date.day(),
-        date.hour(),
-        date.minute(),
-        date.second(),
-    );
     let date_str = &amz_date[..8];
 
-    // Canonical request
+    // Canonical request — headers must already carry x-amz-date = amz_date.
     let mut canonical_headers: Vec<String> = headers
         .iter()
         .map(|(k, v)| format!("{}:{}", k.to_lowercase(), v))
@@ -510,14 +496,14 @@ fn aws_signature_v4(
         sha256_hex(canonical_request.as_bytes()),
     );
 
-    // Signing key
+    // Signing key (AWS v4: k_date → k_region → k_service → k_signing)
     let k_date = hmac_sha256(
         format!("AWS4{}", secret_key).as_bytes(),
         date_str.as_bytes(),
     );
     let k_region = hmac_sha256(&k_date, region.as_bytes());
-    let _k_service = hmac_sha256(&k_region, service.as_bytes());
-    let k_signing = hmac_sha256(&k_region, b"aws4_request");
+    let k_service = hmac_sha256(&k_region, service.as_bytes());
+    let k_signing = hmac_sha256(&k_service, b"aws4_request");
 
     let signature = hex::encode(hmac_sha256(&k_signing, string_to_sign.as_bytes()));
 
@@ -539,22 +525,31 @@ async fn store_s3(
     data: &[u8],
 ) -> Result<(String, u64)> {
     let client = reqwest::Client::new();
+    let endpoint_host = endpoint
+        .trim_end_matches('/')
+        .strip_prefix("https://")
+        .or_else(|| endpoint.trim_end_matches('/').strip_prefix("http://"))
+        .unwrap_or(endpoint.trim_end_matches('/'));
     let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
 
-    let date = std::time::SystemTime::now()
+    let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system time before epoch")
         .as_secs();
-    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
-        .expect("invalid unix timestamp")
-        .format(&time::format_description::well_known::Rfc3339)
-        .expect("invalid date format");
+    let date =
+        time::OffsetDateTime::from_unix_timestamp(now as i64).expect("invalid unix timestamp");
+    let amz_date = format!(
+        "{:04}{:02}{:02}T{:02}{:02}{:02}Z",
+        date.year(),
+        date.month() as u8,
+        date.day(),
+        date.hour(),
+        date.minute(),
+        date.second(),
+    );
 
     let headers = vec![
-        (
-            "host".to_string(),
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        ),
+        ("host".to_string(), endpoint_host.to_string()),
         ("x-amz-date".to_string(), amz_date.clone()),
         ("x-amz-content-sha256".to_string(), sha256_hex(data)),
     ];
@@ -569,14 +564,12 @@ async fn store_s3(
         "",
         &headers,
         data,
+        &amz_date,
     );
 
     let resp = client
         .put(&url)
-        .header(
-            "host",
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        )
+        .header("host", endpoint_host)
         .header("x-amz-date", &amz_date)
         .header("x-amz-content-sha256", sha256_hex(data))
         .header("authorization", &authorization)
@@ -606,22 +599,31 @@ async fn load_s3(
     key: &str,
 ) -> Result<Option<Vec<u8>>> {
     let client = reqwest::Client::new();
+    let endpoint_host = endpoint
+        .trim_end_matches('/')
+        .strip_prefix("https://")
+        .or_else(|| endpoint.trim_end_matches('/').strip_prefix("http://"))
+        .unwrap_or(endpoint.trim_end_matches('/'));
     let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
 
-    let date = std::time::SystemTime::now()
+    let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system time before epoch")
         .as_secs();
-    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
-        .expect("invalid unix timestamp")
-        .format(&time::format_description::well_known::Rfc3339)
-        .expect("invalid date format");
+    let date =
+        time::OffsetDateTime::from_unix_timestamp(now as i64).expect("invalid unix timestamp");
+    let amz_date = format!(
+        "{:04}{:02}{:02}T{:02}{:02}{:02}Z",
+        date.year(),
+        date.month() as u8,
+        date.day(),
+        date.hour(),
+        date.minute(),
+        date.second(),
+    );
 
     let headers = vec![
-        (
-            "host".to_string(),
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        ),
+        ("host".to_string(), endpoint_host.to_string()),
         ("x-amz-date".to_string(), amz_date.clone()),
     ];
 
@@ -635,14 +637,12 @@ async fn load_s3(
         "",
         &headers,
         &[],
+        &amz_date,
     );
 
     let resp = client
         .get(&url)
-        .header(
-            "host",
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        )
+        .header("host", endpoint_host)
         .header("x-amz-date", &amz_date)
         .header("authorization", &authorization)
         .send()
@@ -696,22 +696,31 @@ async fn delete_s3(
     key: &str,
 ) -> Result<()> {
     let client = reqwest::Client::new();
+    let endpoint_host = endpoint
+        .trim_end_matches('/')
+        .strip_prefix("https://")
+        .or_else(|| endpoint.trim_end_matches('/').strip_prefix("http://"))
+        .unwrap_or(endpoint.trim_end_matches('/'));
     let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
 
-    let date = std::time::SystemTime::now()
+    let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system time before epoch")
         .as_secs();
-    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
-        .expect("invalid unix timestamp")
-        .format(&time::format_description::well_known::Rfc3339)
-        .expect("invalid date format");
+    let date =
+        time::OffsetDateTime::from_unix_timestamp(now as i64).expect("invalid unix timestamp");
+    let amz_date = format!(
+        "{:04}{:02}{:02}T{:02}{:02}{:02}Z",
+        date.year(),
+        date.month() as u8,
+        date.day(),
+        date.hour(),
+        date.minute(),
+        date.second(),
+    );
 
     let headers = vec![
-        (
-            "host".to_string(),
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        ),
+        ("host".to_string(), endpoint_host.to_string()),
         ("x-amz-date".to_string(), amz_date.clone()),
     ];
 
@@ -725,14 +734,12 @@ async fn delete_s3(
         "",
         &headers,
         &[],
+        &amz_date,
     );
 
     let resp = client
         .delete(&url)
-        .header(
-            "host",
-            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
-        )
+        .header("host", endpoint_host)
         .header("x-amz-date", &amz_date)
         .header("authorization", &authorization)
         .send()

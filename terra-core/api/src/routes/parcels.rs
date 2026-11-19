@@ -30,7 +30,8 @@ const PARCEL_SELECT: &str = r#"
         ST_AsGeoJSON(p.geometry)::text AS geometry,
         ST_Area(p.geometry::geography)::float8 AS area_m2,
         p.created_at,
-        p.updated_at
+        p.updated_at,
+        p.onchain_id
     FROM parcels p
     JOIN parcel_ownership o ON o.parcel_id = p.id
 "#;
@@ -45,6 +46,7 @@ pub struct Parcel {
     pub area_m2: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub onchain_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +66,8 @@ pub struct NewParcel {
     #[serde(default)]
     pub status: String,
     pub geometry: serde_json::Value,
+    /// On-chain parcel PDA address (base58), links mirror row to chain record.
+    pub onchain_id: Option<String>,
 }
 
 pub fn router() -> Router<AppState> {
@@ -139,25 +143,26 @@ async fn create_parcel(
 
     let parcel = sqlx::query_as::<_, Parcel>(
         "WITH p AS (
-            INSERT INTO parcels (name, status, geometry)
-            VALUES ($1, $3, ST_GeomFromGeoJSON($4))
+            INSERT INTO parcels (name, status, geometry, onchain_id)
+            VALUES ($1, $3, ST_GeomFromGeoJSON($4), $5)
             RETURNING id, name, status,
                       ST_AsGeoJSON(geometry)::text AS geometry,
                       ST_Area(geometry::geography)::float8 AS area_m2,
-                      created_at, updated_at
+                      created_at, updated_at, onchain_id
          ), o AS (
             INSERT INTO parcel_ownership (parcel_id, holder)
             SELECT id, $2 FROM p
             RETURNING holder
          )
          SELECT p.id, p.name, o.holder, p.status, p.geometry, p.area_m2,
-                p.created_at, p.updated_at
+                p.created_at, p.updated_at, p.onchain_id
          FROM p, o",
     )
     .bind(&params.name)
     .bind(&params.holder)
     .bind(&status)
     .bind(&geojson)
+    .bind(&params.onchain_id)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {

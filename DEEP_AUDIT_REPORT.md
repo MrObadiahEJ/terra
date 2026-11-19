@@ -16,7 +16,7 @@
 
 ## Executive Summary
 
-Terra is a Solana-based spatial identity and land-tenure protocol. The MVP implements
+Terra is a Solana-based spatial identity and parcel protocol. The MVP implements
 end-to-end runtime scene resolution grounded in publisher-signed manifests, per-row
 mirror hash anchoring, server-side two-point road routing with an allowlisted VRF
 oracle, and a distributed storage-provider economy with N-of-M replication auditing,
@@ -244,14 +244,16 @@ Additional API coverage added in this pass:
 
 ## 8. Conclusion
 
-The Terra MVP is functionally complete on localnet with all core features implemented:
+The Terra MVP is substantially complete on localnet with all core features implemented:
 runtime scene resolution, signed manifest verification, mirror hash anchoring,
 server-side routing with an allowlisted VRF, a storage-provider economy with N-of-M
 replication auditing, per-replica metering, and a service-fee settlement rail
 whose default payout asset is issuer-free SOL.
 Evidence intake now quarantines bad uploads, purges expired rows on a 15-minute
-maintenance loop, and schedules PoP challenges automatically; the MVP flow verifies
-real Ed25519 residency signatures, the VC issuer and the on-chain digest.
+maintenance loop, and schedules PoP challenges automatically; the MVP flow (Intent 5)
+anchors parcel, claim, observation, and verification-attestation PDAs on-chain via
+the real `terra_registry` program, then verifies real Ed25519 residency signatures,
+the VC issuer, and the on-chain digest against that anchor.
 
 Gates pass: `cargo fmt --check`, `cargo clippy -D warnings`, registry BPF 307/307,
 identity BPF 23/23, registry lib 154, identity lib 7, security 9, RFC-012 21,

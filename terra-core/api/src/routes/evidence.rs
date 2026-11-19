@@ -119,10 +119,18 @@ fn quarantine_decision(content_type: &str, size: usize, max_size: usize) -> (boo
 ///     are still stored but flagged as untrusted.
 pub async fn upload_evidence(
     State(state): State<AppState>,
-    _auth: SignedRequest,
+    auth: SignedRequest,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<UploadResponse>), AppError> {
+    // Verify the signed request against the API authority key. Required for
+    // every upload — without this, anyone could forge evidence uploads.
+    if let Some(key) = &state.api_authority.0 {
+        auth.verify(key, "POST", "/api/v1/evidence/upload")?;
+    } else {
+        return Err(AppError::unauthorized("API authority not configured"));
+    }
+
     // Optional caller wallet: proof of who uploaded, stored as uploaded_by.
     let mut uploaded_by: Option<String> = None;
     if let Some(wallet) = headers
@@ -130,7 +138,7 @@ pub async fn upload_evidence(
         .and_then(|value| value.to_str().ok())
         .map(str::to_string)
     {
-        _auth.verify_wallet(&wallet, "POST", "/api/v1/evidence/upload")?;
+        auth.verify_wallet(&wallet, "POST", "/api/v1/evidence/upload")?;
         uploaded_by = Some(wallet);
     }
 
@@ -798,23 +806,31 @@ mod tests {
 // ---------------------------------------------------------------------------
 // PURGE: Delete expired, quarantined evidence rows.
 // Called periodically (e.g. via cron) to clean up rows whose TTL has expired.
+// Only rows that are both expired AND quarantined are purged; non-quarantined
+// expired rows are retained. Files are deleted from the storage backend that
+// originally stored them (recorded in `storage_backend`); if the backend has
+// since been switched, the DB row is still removed but the file deletion is
+// skipped (the file is orphaned either way).
 pub async fn purge_expired_evidence(state: &AppState) -> Result<i64, AppError> {
-    // Find expired, quarantined rows.
-    let expired: Vec<(Uuid, String)> = sqlx::query_as(
-        "SELECT id, storage_ref FROM evidence_uploads \
+    // Find expired, quarantined rows with their storage backend.
+    let expired: Vec<(Uuid, String, String)> = sqlx::query_as(
+        "SELECT id, storage_ref, storage_backend FROM evidence_uploads \
          WHERE expires_at IS NOT NULL \
-           AND expires_at < now()",
+           AND expires_at < now() \
+           AND quarantined = true",
     )
     .fetch_all(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("expired evidence query failed: {e}")))?;
 
-    for (id, storage_ref) in &expired {
-        // Delete the stored file if present.
-        if let Err(e) = crate::storage::StorageBackend::load(&state.storage, storage_ref).await {
-            if !e.to_string().contains("not found") {
-                tracing::warn!("failed to load expired evidence {id} for deletion: {e}");
-            }
+    for (id, storage_ref, backend) in &expired {
+        // Only delete from the backend that originally stored the file.
+        let current_backend = state.storage.backend_name();
+        if backend != current_backend {
+            tracing::warn!(
+                "skipping storage delete for expired evidence {id}: file was on {backend}, current backend is {current_backend}"
+            );
+            continue;
         }
         // Attempt deletion (best-effort; ignore errors).
         let _ = crate::storage::StorageBackend::delete(&state.storage, storage_ref).await;
@@ -823,7 +839,8 @@ pub async fn purge_expired_evidence(state: &AppState) -> Result<i64, AppError> {
     let result = sqlx::query(
         "DELETE FROM evidence_uploads \
          WHERE expires_at IS NOT NULL \
-           AND expires_at < now()",
+           AND expires_at < now() \
+           AND quarantined = true",
     )
     .execute(&state.pool)
     .await
