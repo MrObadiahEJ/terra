@@ -25,7 +25,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, Idl } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
-import { Keypair, PublicKey, Connection, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  Connection,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+  Ed25519Program,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+} from "@solana/web3.js";
 import { assert } from "chai";
 import { createHash } from "crypto";
 import * as fs from "fs";
@@ -44,7 +52,6 @@ const PARCEL = { REGISTERED: 1, FOR_SALE: 2, TRANSFERRED: 3, DISPUTED: 4, FROZEN
 const RIGHTS = { USAGE: 1 } as const;
 const CLAIM_TYPE = { BOUNDARY: 1 } as const;
 const CLAIM_STATUS = { VERIFIED: 2 } as const;
-const ATTEST = { CONFIRMED: 0 } as const;
 const TASK_CLASS = { REMOTE: 1 } as const;
 const TASK_STATUS = { COMPLETED: 3 } as const;
 const TASK_OUTCOME = { PASS: 1 } as const;
@@ -71,21 +78,50 @@ function digest(parts: (Buffer | Uint8Array | string)[]): Uint8Array {
   return Uint8Array.from(h.digest());
 }
 
-function attestationDigest(
+/** Canonical SD-JWT digest from `verification/attestation.rs`. */
+function sdJwtDigest(
   claim: PublicKey,
   validator: PublicKey,
   observation: PublicKey,
-  result: number,
-  confidence: number
+  credentialSubject: PublicKey,
+  vcType: string,
+  issuanceDate: number,
+  expirationDate: number
 ): Uint8Array {
   return digest([
-    "terra:attestation:v1",
+    "terra:vc:sd-jwt:v1",
     claim.toBuffer(),
     validator.toBuffer(),
     observation.toBuffer(),
-    Buffer.from([result]),
-    Buffer.from([confidence]),
+    credentialSubject.toBuffer(),
+    vcType,
+    i64le(issuanceDate),
+    i64le(expirationDate),
   ]);
+}
+
+function i64le(n: number): Buffer {
+  const b = Buffer.alloc(8);
+  b.writeBigInt64LE(BigInt(n), 0);
+  return b;
+}
+
+/** Domain-separated VRF message + attested randomness for `route_task`. */
+function vrfAttestation(oracle: Keypair, taskId: Uint8Array) {
+  const message = Buffer.from(digest([Buffer.from("terra:vrf:msg:v1"), taskId]));
+  const ix = Ed25519Program.createInstructionWithPrivateKey({
+    privateKey: oracle.secretKey,
+    message,
+  });
+  // Layout: [count, padding, 7 x u16 offsets, pubkey(32), signature(64), message]
+  const signature = Buffer.from(ix.data.subarray(48, 112));
+  const randomness = digest([
+    Buffer.from("terra:vrf:out:v1"),
+    oracle.publicKey.toBuffer(),
+    Buffer.from(taskId),
+    signature,
+  ]);
+  return { ix, signature, randomness };
 }
 
 describe("terra localnet lifecycle (Sprint A)", function () {
@@ -108,6 +144,7 @@ describe("terra localnet lifecycle (Sprint A)", function () {
   const admin = payer.publicKey;
   const v1 = Keypair.generate();
   const v2 = Keypair.generate();
+  const oracle = Keypair.generate();
   const buyer = Keypair.generate();
   const tenant = Keypair.generate();
 
@@ -148,6 +185,7 @@ describe("terra localnet lifecycle (Sprint A)", function () {
   const taskVaultPda = pda(["task_escrow_vault", taskEscrowPda.toBuffer()]);
   const assignmentPda = pda(["task_assignment", taskId, v1.publicKey.toBuffer()]);
   const rewardAllocationPda = pda(["reward_allocation", taskId, v1.publicKey.toBuffer()]);
+  const vrfAuthorityPda = pda(["vrf_authority"]);
 
   const assetPda = pda(["spatial_asset", parcelPda.toBuffer()]);
   const geometryVersionPda = pda(["geometry_version", assetPda.toBuffer(), u32le(0)]);
@@ -194,6 +232,18 @@ describe("terra localnet lifecycle (Sprint A)", function () {
     assert.strictEqual(registry.admin.toBase58(), admin.toBase58());
     assert.strictEqual(registry.validators.length, 0);
     assert.isFalse(registry.paused);
+
+    // Pin the VRF oracle. `route_task` rejects any other key.
+    await program.methods
+      .initVrfAuthority(oracle.publicKey)
+      .accounts({
+        vrfAuthority: vrfAuthorityPda,
+        registry: registryPda,
+        admin,
+        systemProgram,
+      })
+      .signers([payer])
+      .rpc();
   });
 
   it("bootstraps two validators with profiles, availability and reputation", async () => {
@@ -345,9 +395,26 @@ describe("terra localnet lifecycle (Sprint A)", function () {
   it("collects two attestations and verifies the claim by quorum", async () => {
     for (const v of [v1, v2]) {
       const observation = observationPda(v.publicKey);
-      const sig = attestationDigest(claimPda, v.publicKey, observation, ATTEST.CONFIRMED, 95);
+      const issuance = now();
+      const expiration = issuance + 86_400;
+      const sig = sdJwtDigest(
+        claimPda,
+        v.publicKey,
+        observation,
+        claimPda,
+        "VerificationAttestation",
+        issuance,
+        expiration
+      );
       await program.methods
-        .submitVerificationAttestation(ATTEST.CONFIRMED, 95, sig)
+        .submitVerificationAttestation(
+          "VerificationAttestation",
+          claimPda,
+          new anchor.BN(issuance),
+          new anchor.BN(expiration),
+          Array.from(sig),
+          false
+        )
         .accounts({
           attestation: attestationPda(v.publicKey),
           claim: claimPda,
@@ -437,8 +504,17 @@ describe("terra localnet lifecycle (Sprint A)", function () {
     assert.strictEqual(escrow.amount.toNumber(), reward + resourceCost);
     assert.strictEqual(escrow.status, 1); // FUNDED
 
+    const vrf = vrfAttestation(oracle, taskId);
     await program.methods
-      .routeTask(taskId, 0, [v1.publicKey], v1.publicKey, 1)
+      .routeTask(
+        taskId,
+        0,
+        [v1.publicKey],
+        v1.publicKey,
+        1,
+        Array.from(vrf.randomness),
+        Array.from(vrf.signature)
+      )
       .accounts({
         assignment: assignmentPda,
         task: taskPda,
@@ -446,12 +522,16 @@ describe("terra localnet lifecycle (Sprint A)", function () {
         chosen: v1.publicKey,
         requester: admin,
         systemProgram,
+        oracle: oracle.publicKey,
+        vrfAuthority: vrfAuthorityPda,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY,
       })
       .remainingAccounts([
         { pubkey: profilePda(v1.publicKey), isWritable: false, isSigner: false },
         { pubkey: availabilityPda(v1.publicKey), isWritable: false, isSigner: false },
         { pubkey: reputationPda(v1.publicKey), isWritable: false, isSigner: false },
       ])
+      .preInstructions([vrf.ix])
       .signers([payer])
       .rpc();
 
