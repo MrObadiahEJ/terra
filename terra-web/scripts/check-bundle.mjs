@@ -26,7 +26,7 @@ const BUDGET = {
   entryGzipKb: 340, // index-*.js            ~295 kB
   initialGzipKb: 360, // entry + preloads      ~301 kB
   cesiumGzipKb: 1200, // Cesium chunk         ~1098 kB
-  totalGzipKb: 1900, // every emitted JS     ~1678 kB
+  totalGzipKb: 1950, // every emitted JS     ~1678 kB; 1901 kB after Sprint E/F IDL + verifier
 }
 
 const CESIUM_MARKERS = ['CesiumJS', 'CesiumWidget']

@@ -7820,6 +7820,95 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "initVrfAuthority",
+      "docs": [
+        "Set or rotate the allowlisted VRF oracle authority. Registry admin only."
+      ],
+      "discriminator": [
+        163,
+        206,
+        138,
+        118,
+        111,
+        181,
+        86,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "vrfAuthority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  114,
+                  102,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "registry",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "initializeValidatorReputation",
       "discriminator": [
         199,
@@ -10637,7 +10726,7 @@ export type TerraRegistry = {
       "docs": [
         "Register an off-chain 3D model claim against an anchored geometry",
         "version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain",
-        "geometry, only hash + storage pointer)."
+        "geometry, only hash + storage_reference)."
       ],
       "discriminator": [
         210,
@@ -12643,6 +12732,45 @@ export type TerraRegistry = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "oracle"
+        },
+        {
+          "name": "vrfAuthority",
+          "docs": [
+            "Admin-allowlisted VRF authority. `route_task` requires `oracle` to",
+            "match this account's `authority` field."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  114,
+                  102,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "(must be the Instructions sysvar holding this transaction's",
+            "Ed25519 precompile attestation of the VRF randomness)."
+          ]
         }
       ],
       "args": [
@@ -12672,6 +12800,24 @@ export type TerraRegistry = {
         {
           "name": "competitorCount",
           "type": "u16"
+        },
+        {
+          "name": "vrfRandomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "oracleSignature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
         }
       ]
     },
@@ -15119,21 +15265,33 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "result",
-          "type": "u8"
+          "name": "vcType",
+          "type": "string"
         },
         {
-          "name": "confidence",
-          "type": "u8"
+          "name": "credentialSubject",
+          "type": "pubkey"
         },
         {
-          "name": "signatureHash",
+          "name": "issuanceDate",
+          "type": "i64"
+        },
+        {
+          "name": "expirationDate",
+          "type": "i64"
+        },
+        {
+          "name": "sdJwtDigest",
           "type": {
             "array": [
               "u8",
               32
             ]
           }
+        },
+        {
+          "name": "selectiveDisclosure",
+          "type": "bool"
         }
       ]
     },
@@ -18199,6 +18357,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "vrfAuthority",
+      "discriminator": [
+        38,
+        133,
+        126,
+        18,
+        55,
+        188,
+        204,
+        215
+      ]
+    },
+    {
       "name": "worldRegistry",
       "discriminator": [
         222,
@@ -20333,6 +20504,19 @@ export type TerraRegistry = {
       ]
     },
     {
+      "name": "vrfAuthoritySet",
+      "discriminator": [
+        14,
+        131,
+        213,
+        73,
+        12,
+        197,
+        68,
+        164
+      ]
+    },
+    {
       "name": "worldRegistryCreated",
       "discriminator": [
         18,
@@ -21157,523 +21341,558 @@ export type TerraRegistry = {
     },
     {
       "code": 6159,
+      "name": "vcTypeTooLong",
+      "msg": "VC type exceeds maximum length"
+    },
+    {
+      "code": 6160,
+      "name": "invalidVcValidity",
+      "msg": "VC issuance_date must not be after expiration_date"
+    },
+    {
+      "code": 6161,
+      "name": "sdJwtDigestMismatch",
+      "msg": "SD-JWT digest does not match the canonical digest over VC fields"
+    },
+    {
+      "code": 6162,
       "name": "duplicateValidator",
       "msg": "Duplicate validator in the declared validator set"
     },
     {
-      "code": 6160,
+      "code": 6163,
       "name": "stringTooLong",
       "msg": "Profile note exceeds maximum length"
     },
     {
-      "code": 6161,
+      "code": 6164,
       "name": "invalidProfileTier",
       "msg": "Invalid validator profile tier"
     },
     {
-      "code": 6162,
+      "code": 6165,
       "name": "invalidPresenceProvenance",
       "msg": "Invalid presence provenance code"
     },
     {
-      "code": 6163,
+      "code": 6166,
       "name": "invalidPresenceFix",
       "msg": "Presence fix is outside valid geographic bounds"
     },
     {
-      "code": 6164,
+      "code": 6167,
       "name": "invalidAvailabilityStatus",
       "msg": "Invalid availability status"
     },
     {
-      "code": 6165,
+      "code": 6168,
       "name": "invalidCapabilityCode",
       "msg": "Invalid capability code"
     },
     {
-      "code": 6166,
+      "code": 6169,
       "name": "invalidCapabilityLevel",
       "msg": "Invalid capability level"
     },
     {
-      "code": 6167,
+      "code": 6170,
       "name": "invalidEdgeType",
       "msg": "Invalid relationship edge type"
     },
     {
-      "code": 6168,
+      "code": 6171,
       "name": "selfRelationshipEdge",
       "msg": "Self-relationship edges are not allowed"
     },
     {
-      "code": 6169,
+      "code": 6172,
       "name": "invalidTaskClass",
       "msg": "Invalid task class"
     },
     {
-      "code": 6170,
+      "code": 6173,
       "name": "invalidTaskStatus",
       "msg": "Invalid task status"
     },
     {
-      "code": 6171,
+      "code": 6174,
       "name": "invalidTaskOutcome",
       "msg": "Invalid task outcome"
     },
     {
-      "code": 6172,
+      "code": 6175,
       "name": "taskDeadlinePassed",
       "msg": "Task deadline has passed"
     },
     {
-      "code": 6173,
+      "code": 6176,
       "name": "taskNotOpen",
       "msg": "Task is not open for assignment"
     },
     {
-      "code": 6174,
+      "code": 6177,
       "name": "taskAlreadyFinalized",
       "msg": "Task is already finalized"
     },
     {
-      "code": 6175,
+      "code": 6178,
       "name": "notTaskRequester",
       "msg": "Signer is not the task requester"
     },
     {
-      "code": 6176,
+      "code": 6179,
       "name": "notTaskAssignee",
       "msg": "Signer is not an assigned validator for this task"
     },
     {
-      "code": 6177,
+      "code": 6180,
       "name": "taskAlreadyAssigned",
       "msg": "Task already has the required number of assignments"
     },
     {
-      "code": 6178,
+      "code": 6181,
       "name": "selfTaskAssignment",
       "msg": "Requester cannot be assigned to their own task"
     },
     {
-      "code": 6179,
+      "code": 6182,
       "name": "requirementIndexMismatch",
       "msg": "Requirement index must append sequentially"
     },
     {
-      "code": 6180,
+      "code": 6183,
       "name": "invalidTaskRequirement",
       "msg": "Invalid task requirement field or task id"
     },
     {
-      "code": 6181,
+      "code": 6184,
       "name": "taskRequirementsFull",
       "msg": "Task has reached the maximum number of requirements"
     },
     {
-      "code": 6182,
+      "code": 6185,
       "name": "invalidObservationSource",
       "msg": "Invalid observation source"
     },
     {
-      "code": 6183,
+      "code": 6186,
       "name": "invalidObservationProvenance",
       "msg": "Invalid observation provenance"
     },
     {
-      "code": 6184,
+      "code": 6187,
       "name": "invalidEvidenceArtifactKind",
       "msg": "Invalid evidence artifact kind"
     },
     {
-      "code": 6185,
+      "code": 6188,
       "name": "evidenceIndexMismatch",
       "msg": "Evidence artifact index does not match manifest count"
     },
     {
-      "code": 6186,
+      "code": 6189,
       "name": "evidenceManifestFull",
       "msg": "Evidence manifest has reached the maximum number of artifacts"
     },
     {
-      "code": 6187,
+      "code": 6190,
       "name": "validatorNotEligible",
       "msg": "Validator failed multi-factor eligibility filters"
     },
     {
-      "code": 6188,
+      "code": 6191,
       "name": "notRouteWinner",
       "msg": "Chosen candidate is not the randomized route winner"
     },
     {
-      "code": 6189,
+      "code": 6192,
       "name": "tooManyRouteCandidates",
       "msg": "Too many route candidates or invalid competitor count"
     },
     {
-      "code": 6190,
+      "code": 6193,
       "name": "routeAccountMismatch",
       "msg": "Route remaining_accounts do not match candidate list"
     },
     {
-      "code": 6191,
+      "code": 6194,
       "name": "invalidFraudReason",
       "msg": "Invalid fraud reason code"
     },
     {
-      "code": 6192,
+      "code": 6195,
       "name": "invalidFraudStatus",
       "msg": "Fraud status does not allow this transition"
     },
     {
-      "code": 6193,
+      "code": 6196,
       "name": "selfFraudReport",
       "msg": "Reporters cannot file fraud against themselves"
     },
     {
-      "code": 6194,
+      "code": 6197,
       "name": "committeeTooSmall",
       "msg": "Too few eligible well-reputed validators for a committee"
     },
     {
-      "code": 6195,
+      "code": 6198,
       "name": "reviewAlreadyDecided",
       "msg": "Review already has a final decision"
     },
     {
-      "code": 6196,
+      "code": 6199,
       "name": "notCommitteeMember",
       "msg": "Signer is not a member of this review committee"
     },
     {
-      "code": 6197,
+      "code": 6200,
       "name": "duplicateCommitteeVote",
       "msg": "This committee member has already voted"
     },
     {
-      "code": 6198,
+      "code": 6201,
       "name": "reviewNotFinalizable",
       "msg": "Not every committee member has voted yet"
     },
     {
-      "code": 6199,
+      "code": 6202,
       "name": "invalidRestrictionStatus",
       "msg": "Invalid capability restriction status"
     },
     {
-      "code": 6200,
+      "code": 6203,
       "name": "restrictionNotActive",
       "msg": "Restriction is not active"
     },
     {
-      "code": 6201,
+      "code": 6204,
       "name": "appealWindowClosed",
       "msg": "Appeal window for this restriction has not opened"
     },
     {
-      "code": 6202,
+      "code": 6205,
       "name": "notRestrictedWallet",
       "msg": "Signer is not the restricted wallet"
     },
     {
-      "code": 6203,
+      "code": 6206,
       "name": "invalidAppealStatus",
       "msg": "Invalid fraud appeal status"
     },
     {
-      "code": 6204,
+      "code": 6207,
       "name": "rehabTooEarly",
       "msg": "Rehabilitation period for this restriction has not elapsed"
     },
     {
-      "code": 6205,
+      "code": 6208,
       "name": "capabilityRestricted",
       "msg": "Active capability restriction blocks this route"
     },
     {
-      "code": 6206,
+      "code": 6209,
       "name": "invalidFeeBps",
       "msg": "Protocol fee exceeds the maximum allowed bps"
     },
     {
-      "code": 6207,
+      "code": 6210,
       "name": "feePolicyNotInitialized",
       "msg": "Fee policy has not been initialized"
     },
     {
-      "code": 6208,
+      "code": 6211,
       "name": "invalidCoverageParams",
       "msg": "Invalid coverage incentive parameters"
     },
     {
-      "code": 6209,
+      "code": 6212,
       "name": "coverageIncentiveNotInitialized",
       "msg": "Coverage incentive has not been initialized"
     },
     {
-      "code": 6210,
+      "code": 6213,
       "name": "quoteAlreadyExists",
       "msg": "A resource quote already exists for this task"
     },
     {
-      "code": 6211,
+      "code": 6214,
       "name": "resourceQuoteMissing",
       "msg": "Resource quote is missing for this task"
     },
     {
-      "code": 6212,
+      "code": 6215,
       "name": "escrowAlreadyFunded",
       "msg": "Task escrow is already funded"
     },
     {
-      "code": 6213,
+      "code": 6216,
       "name": "taskNotCompleted",
       "msg": "Task is not completed"
     },
     {
-      "code": 6214,
+      "code": 6217,
       "name": "assignmentNotSubmitted",
       "msg": "Validator has not submitted a result for this task"
     },
     {
-      "code": 6215,
+      "code": 6218,
       "name": "escrowNotFunded",
       "msg": "Task escrow is not funded or already fully released"
     },
     {
-      "code": 6216,
+      "code": 6219,
       "name": "rewardAlreadyClaimed",
       "msg": "This validator already claimed the task reward"
     },
     {
-      "code": 6217,
+      "code": 6220,
       "name": "escrowNotRefundable",
       "msg": "Task is still active — escrow is not refundable"
     },
     {
-      "code": 6218,
+      "code": 6221,
       "name": "claimWindowNotClosed",
       "msg": "Claim window for this completed task is still open"
     },
     {
-      "code": 6219,
+      "code": 6222,
       "name": "nothingToRefund",
       "msg": "No refundable lamports remain in the escrow vault"
     },
     {
-      "code": 6220,
+      "code": 6223,
       "name": "deviceMetadataTooLong",
       "msg": "Device metadata reference exceeds the maximum length"
     },
     {
-      "code": 6221,
+      "code": 6224,
       "name": "invalidDeviceKey",
       "msg": "Device key must not be the zero key"
     },
     {
-      "code": 6222,
+      "code": 6225,
       "name": "invalidDeviceStatus",
       "msg": "Invalid device status value"
     },
     {
-      "code": 6223,
+      "code": 6226,
       "name": "deviceRevoked",
       "msg": "Device is revoked — this operation is no longer allowed"
     },
     {
-      "code": 6224,
+      "code": 6227,
       "name": "notDeviceOwner",
       "msg": "Signer is not the device owner"
     },
     {
-      "code": 6225,
+      "code": 6228,
       "name": "invalidJurisdictionPair",
       "msg": "Country pair is invalid (equal, reversed, or mismatched)"
     },
     {
-      "code": 6226,
+      "code": 6229,
       "name": "invalidBindingStatus",
       "msg": "Invalid cross-border binding status value"
     },
     {
-      "code": 6227,
+      "code": 6230,
       "name": "sameJurisdiction",
       "msg": "Verification must span two different jurisdictions"
     },
     {
-      "code": 6228,
+      "code": 6231,
       "name": "jurisdictionMismatch",
       "msg": "Jurisdiction accounts or binding do not match the required pair"
     },
     {
-      "code": 6229,
+      "code": 6232,
       "name": "invalidBindingExpiry",
       "msg": "Cross-border binding expiry must be in the future (or 0)"
     },
     {
-      "code": 6230,
+      "code": 6233,
       "name": "undeclaredJurisdiction",
       "msg": "Validator profile or requirement jurisdiction is undeclared"
     },
     {
-      "code": 6231,
+      "code": 6234,
       "name": "invalidSpatialDimension",
       "msg": "Spatial dimension must be 0 (2D), 1 (2.5D) or 2 (3D)"
     },
     {
-      "code": 6232,
+      "code": 6235,
       "name": "invalidGeometrySource",
       "msg": "Unknown geometry source"
     },
     {
-      "code": 6233,
+      "code": 6236,
       "name": "geometryVersionMismatch",
       "msg": "Geometry version index or parent asset does not match"
     },
     {
-      "code": 6234,
+      "code": 6237,
       "name": "geometryVersionsFull",
       "msg": "Spatial asset has reached the maximum number of geometry versions"
     },
     {
-      "code": 6235,
+      "code": 6238,
       "name": "invalidElevationRange",
       "msg": "Elevation range is invalid (min > max)"
     },
     {
-      "code": 6236,
+      "code": 6239,
       "name": "geometryAlreadyVerified",
       "msg": "Geometry version is already verified"
     },
     {
-      "code": 6237,
+      "code": 6240,
       "name": "invalidElevationSource",
       "msg": "Unknown elevation source, or provenance does not match the layer dimension"
     },
     {
-      "code": 6238,
+      "code": 6241,
       "name": "geometryAlreadyAttested",
       "msg": "Validator has already attested this geometry version"
     },
     {
-      "code": 6239,
+      "code": 6242,
       "name": "emptyEvidenceManifest",
       "msg": "Evidence manifest has no artifacts to anchor a version from"
     },
     {
-      "code": 6240,
+      "code": 6243,
       "name": "geometryQuorumFull",
       "msg": "Geometry version quorum list has no free attestation slot"
     },
     {
-      "code": 6241,
+      "code": 6244,
       "name": "invalidModelFormat",
       "msg": "Unknown 3D model format, or format is the UNKNOWN placeholder"
     },
     {
-      "code": 6242,
+      "code": 6245,
       "name": "threeDModelsFull",
       "msg": "Spatial asset has reached the maximum number of 3D models"
     },
     {
-      "code": 6243,
+      "code": 6246,
       "name": "modelGeometryVersionMismatch",
       "msg": "Model geometry version does not exist in the asset's version history"
     },
     {
-      "code": 6244,
+      "code": 6247,
       "name": "threeDModelAlreadyVerified",
       "msg": "3D model is already verified"
     },
     {
-      "code": 6245,
+      "code": 6248,
       "name": "spatialSnapshotsFull",
       "msg": "Spatial asset has reached the maximum number of snapshots"
     },
     {
-      "code": 6246,
+      "code": 6249,
       "name": "invalidSnapshotLabel",
       "msg": "Snapshot label is too long"
     },
     {
-      "code": 6247,
+      "code": 6250,
       "name": "invalidRequestDescription",
       "msg": "Request description is too long"
     },
     {
-      "code": 6248,
+      "code": 6251,
       "name": "invalidRemedyType",
       "msg": "Invalid remedy type"
     },
     {
-      "code": 6249,
+      "code": 6252,
       "name": "invalidRestrictionType",
       "msg": "Invalid restriction type"
     },
     {
-      "code": 6250,
+      "code": 6253,
       "name": "requestNotOpen",
       "msg": "Request is not open"
     },
     {
-      "code": 6251,
+      "code": 6254,
       "name": "requestExpired",
       "msg": "Request has expired"
     },
     {
-      "code": 6252,
+      "code": 6255,
       "name": "invalidReviewVote",
       "msg": "Invalid review vote"
     },
     {
-      "code": 6253,
+      "code": 6256,
       "name": "alreadyVoted",
       "msg": "Already voted on this case"
     },
     {
-      "code": 6254,
+      "code": 6257,
       "name": "caseAlreadyDecided",
       "msg": "Case is already decided"
     },
     {
-      "code": 6255,
+      "code": 6258,
       "name": "reviewerInsufficientReputation",
       "msg": "Reviewer has insufficient reputation"
     },
     {
-      "code": 6256,
+      "code": 6259,
       "name": "securityQuorumNotReached",
       "msg": "Security quorum not reached"
     },
     {
-      "code": 6257,
+      "code": 6260,
       "name": "decisionNotAppealable",
       "msg": "Decision is not appealable"
     },
     {
-      "code": 6258,
+      "code": 6261,
       "name": "reasonTooLong",
       "msg": "Reason is too long"
     },
     {
-      "code": 6259,
+      "code": 6262,
       "name": "appealAlreadyDecided",
       "msg": "Appeal is already decided"
     },
     {
-      "code": 6260,
+      "code": 6263,
       "name": "appealDecisionMismatch",
       "msg": "Appeal decision account does not match appeal"
     },
     {
-      "code": 6261,
+      "code": 6264,
       "name": "protectionAlreadyActive",
       "msg": "Emergency protection is already active"
     },
     {
-      "code": 6262,
+      "code": 6265,
       "name": "protectionExpired",
       "msg": "Emergency protection has expired"
+    },
+    {
+      "code": 6266,
+      "name": "candidateCannotBeOracle",
+      "msg": "Candidate validator cannot serve as VRF oracle"
+    },
+    {
+      "code": 6267,
+      "name": "requesterCannotBeOracle",
+      "msg": "Requester cannot serve as VRF oracle"
+    },
+    {
+      "code": 6268,
+      "name": "invalidVrfRandomness",
+      "msg": "Invalid VRF oracle signature or forged randomness"
+    },
+    {
+      "code": 6269,
+      "name": "vrfAuthorityMismatch",
+      "msg": "VRF oracle is not the allowlisted authority"
     }
   ],
   "types": [
@@ -31350,14 +31569,14 @@ export type TerraRegistry = {
           {
             "name": "claim",
             "docs": [
-              "The claim being attested."
+              "The claim being attested (W3C VC `credentialSubject.id` anchor)."
             ],
             "type": "pubkey"
           },
           {
             "name": "validator",
             "docs": [
-              "Validator submitting this attestation."
+              "Validator submitting this attestation = VC issuer (`issuer`)."
             ],
             "type": "pubkey"
           },
@@ -31369,23 +31588,38 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "result",
+            "name": "credentialSubject",
             "docs": [
-              "Attestation result (confirmed, disputed, unable_to_verify)."
+              "Credential subject the VC is about (parcel / owner / tenant pubkey)."
             ],
-            "type": "u8"
+            "type": "pubkey"
           },
           {
-            "name": "confidence",
+            "name": "vcType",
             "docs": [
-              "Confidence level (0-100)."
+              "W3C VC type: \"VerificationAttestation\" or \"ResidencyAttestation\"."
             ],
-            "type": "u8"
+            "type": "string"
           },
           {
-            "name": "signatureHash",
+            "name": "issuanceDate",
             "docs": [
-              "sha-256 of the signed attestation payload."
+              "VC issuance date (unix seconds)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "expirationDate",
+            "docs": [
+              "VC expiration date (unix seconds)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "sdJwtDigest",
+            "docs": [
+              "SD-JWT digest: sha-256 over the serialized SD-JWT. Anchors the full",
+              "credential off-chain; selective disclosure reveals claims selectively."
             ],
             "type": {
               "array": [
@@ -31393,6 +31627,13 @@ export type TerraRegistry = {
                 32
               ]
             }
+          },
+          {
+            "name": "selectiveDisclosure",
+            "docs": [
+              "Whether SD-JWT selective disclosure is enabled for this credential."
+            ],
+            "type": "bool"
           },
           {
             "name": "createdAt",
@@ -31426,12 +31667,29 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "result",
-            "type": "u8"
+            "name": "credentialSubject",
+            "type": "pubkey"
           },
           {
-            "name": "confidence",
-            "type": "u8"
+            "name": "vcType",
+            "type": "string"
+          },
+          {
+            "name": "issuanceDate",
+            "type": "i64"
+          },
+          {
+            "name": "expirationDate",
+            "type": "i64"
+          },
+          {
+            "name": "sdJwtDigest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "attestationCount",
@@ -31817,6 +32075,62 @@ export type TerraRegistry = {
           {
             "name": "requiredValidators",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vrfAuthority",
+      "docs": [
+        "Allowlisted VRF oracle authority. Seeded by `[b\"vrf_authority\"]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Ed25519 key permitted to attest route randomness."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "docs": [
+              "Registry admin that last rotated the authority."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "updatedAt",
+            "docs": [
+              "Unix timestamp of the last update."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "vrfAuthoritySet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
           }
         ]
       }

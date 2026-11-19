@@ -141,10 +141,7 @@ pub fn submit_attestation(
     sd_jwt_digest: [u8; 32],
     selective_disclosure: bool,
 ) -> Result<()> {
-    require!(
-        vc_type.len() <= vc_type::MAX_LEN,
-        TerraError::VcTypeTooLong
-    );
+    require!(vc_type.len() <= vc_type::MAX_LEN, TerraError::VcTypeTooLong);
     require!(
         issuance_date <= expiration_date,
         TerraError::InvalidVcValidity

@@ -546,7 +546,10 @@ async fn audit_spatial_snapshots(state: &AppState, limit: usize) -> Result<Table
     })
 }
 
-async fn audit_verification_attestations(state: &AppState, limit: usize) -> Result<TableAudit, AppError> {
+async fn audit_verification_attestations(
+    state: &AppState,
+    limit: usize,
+) -> Result<TableAudit, AppError> {
     let total: i64 = sqlx::query_scalar("SELECT count(*) FROM verification_attestations_onchain")
         .fetch_one(&state.pool)
         .await?;

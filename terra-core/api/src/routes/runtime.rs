@@ -48,6 +48,15 @@ pub struct ListLodParams {
     pub max_level: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RetrieveAssetParams {
+    /// Optional provider type filter (e.g. "ipfs", "object_storage", "cdn").
+    /// When set, at least one replica from that provider type is guaranteed
+    /// in the results (if available); remaining slots are filled randomly
+    /// from reputable eligible providers.
+    pub provider_type: Option<String>,
+}
+
 #[derive(Debug, Serialize, Clone, Copy)]
 pub struct LodLevel {
     pub level: i32,
@@ -407,9 +416,16 @@ pub async fn resolve_scene_internal(
 /// preferring Terra's own data-plane record over the provider-declared replica
 /// checksum, so a client can reject bytes that do not match — a trust anchor
 /// that does not depend on the provider telling the truth at retrieval time.
+///
+/// When `provider_type` is provided, at least one replica from that provider
+/// type is guaranteed in the results (if available); remaining slots are
+/// filled randomly from other reputable eligible providers. This is the
+/// protocol-side candidate discovery: the server, not the client, chooses
+/// which providers are eligible.
 pub async fn retrieve_asset(
     State(state): State<AppState>,
     Path((component_id, component_version)): Path<(String, String)>,
+    Query(params): Query<RetrieveAssetParams>,
     auth: OptionalSignedRequest,
     headers: axum::http::HeaderMap,
 ) -> Result<Json<Vec<AssetRetrieval>>, AppError> {
@@ -437,32 +453,110 @@ pub async fn retrieve_asset(
     }
 
     const MAX_REPLICAS: i64 = 5;
-    let rows = sqlx::query_as::<_, AssetRetrievalRow>(
-        r#"
-        SELECT pr.component_id, pr.component_version, sp.id as provider_id,
-               sp.name as provider_name, pr.storage_reference,
-               pr.latency_ms, sp.reliability_score,
-               cp.global_transform, cp.crs,
-               COALESCE(ca.content_address, pr.checksum) as content_address
-        FROM provider_replicas pr
-        JOIN storage_providers sp ON sp.id = pr.provider_id
-        LEFT JOIN component_packages cp
-          ON cp.component_id = pr.component_id
-         AND cp.component_version = pr.component_version
-        LEFT JOIN component_artifacts ca
-          ON ca.component_package_id = cp.id
-        WHERE pr.component_id = $1 AND pr.component_version = $2
-          AND pr.is_available = true AND sp.is_active = true
-        ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
-        LIMIT $3
-        "#,
-    )
-    .bind(&component_id)
-    .bind(&component_version)
-    .bind(MAX_REPLICAS)
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|e| AppError::internal(format!("asset query failed: {e}")))?;
+
+    // When a provider_type is requested, guarantee at least one replica from
+    // that provider type (protocol-side candidate discovery). Fill remaining
+    // slots randomly from other reputable eligible providers — not strictly
+    // by reliability_score, so no single provider can dominate by score alone.
+    let rows: Vec<AssetRetrievalRow> = if let Some(ref provider_type) = params.provider_type {
+        let mut rows: Vec<AssetRetrievalRow> = Vec::new();
+
+        // First: premium-category replica (guaranteed at least one).
+        let premium_rows: Vec<AssetRetrievalRow> = sqlx::query_as(
+            r#"
+            SELECT pr.component_id, pr.component_version, sp.id as provider_id,
+                   sp.name as provider_name, pr.storage_reference,
+                   pr.latency_ms, sp.reliability_score,
+                   cp.global_transform, cp.crs,
+                   COALESCE(ca.content_address, pr.checksum) as content_address
+            FROM provider_replicas pr
+            JOIN storage_providers sp ON sp.id = pr.provider_id
+            LEFT JOIN component_packages cp
+              ON cp.component_id = pr.component_id
+             AND cp.component_version = pr.component_version
+            LEFT JOIN component_artifacts ca
+              ON ca.component_package_id = cp.id
+            WHERE pr.component_id = $1 AND pr.component_version = $2
+              AND sp.provider_type = $3
+              AND pr.is_available = true AND sp.is_active = true
+            ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
+            LIMIT 1
+            "#,
+        )
+        .bind(&component_id)
+        .bind(&component_version)
+        .bind(provider_type)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("premium replica query failed: {e}")))?;
+
+        rows.extend(premium_rows);
+
+        // Then: fill remaining slots randomly from other eligible providers.
+        let remaining_slots = MAX_REPLICAS - rows.len() as i64;
+        if remaining_slots > 0 {
+            let other_rows: Vec<AssetRetrievalRow> = sqlx::query_as(
+                r#"
+                SELECT pr.component_id, pr.component_version, sp.id as provider_id,
+                       sp.name as provider_name, pr.storage_reference,
+                       pr.latency_ms, sp.reliability_score,
+                       cp.global_transform, cp.crs,
+                       COALESCE(ca.content_address, pr.checksum) as content_address
+                FROM provider_replicas pr
+                JOIN storage_providers sp ON sp.id = pr.provider_id
+                LEFT JOIN component_packages cp
+                  ON cp.component_id = pr.component_id
+                 AND cp.component_version = pr.component_version
+                LEFT JOIN component_artifacts ca
+                  ON ca.component_package_id = cp.id
+                WHERE pr.component_id = $1 AND pr.component_version = $2
+                  AND (sp.provider_type <> $3 OR $3 = '')
+                  AND pr.is_available = true AND sp.is_active = true
+                ORDER BY RANDOM()
+                LIMIT $4
+                "#,
+            )
+            .bind(&component_id)
+            .bind(&component_version)
+            .bind(provider_type)
+            .bind(remaining_slots)
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| AppError::internal(format!("replica query failed: {e}")))?;
+
+            rows.extend(other_rows);
+        }
+
+        rows
+    } else {
+        // No provider_type filter: rank by reliability_score then latency.
+        sqlx::query_as::<_, AssetRetrievalRow>(
+            r#"
+            SELECT pr.component_id, pr.component_version, sp.id as provider_id,
+                   sp.name as provider_name, pr.storage_reference,
+                   pr.latency_ms, sp.reliability_score,
+                   cp.global_transform, cp.crs,
+                   COALESCE(ca.content_address, pr.checksum) as content_address
+            FROM provider_replicas pr
+            JOIN storage_providers sp ON sp.id = pr.provider_id
+            LEFT JOIN component_packages cp
+              ON cp.component_id = pr.component_id
+             AND cp.component_version = pr.component_version
+            LEFT JOIN component_artifacts ca
+              ON ca.component_package_id = cp.id
+            WHERE pr.component_id = $1 AND pr.component_version = $2
+              AND pr.is_available = true AND sp.is_active = true
+            ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
+            LIMIT $3
+            "#,
+        )
+        .bind(&component_id)
+        .bind(&component_version)
+        .bind(MAX_REPLICAS)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("asset query failed: {e}")))?
+    };
 
     if rows.is_empty() {
         return Err(AppError::not_found(format!(
@@ -475,9 +569,15 @@ pub async fn retrieve_asset(
     // POST /runtime/assets/{id}/{version}/access after the client confirms
     // successful download.
     for row in &rows {
+        // `provider_id` on AssetRetrieval is the storage provider's UUID, so
+        // match the replica by (component, version, provider) rather than
+        // treating it as a replica id.
         sqlx::query(
-            "UPDATE provider_replicas SET access_count = access_count + 1 WHERE id = $1",
+            "UPDATE provider_replicas SET access_count = access_count + 1 \
+             WHERE component_id = $1 AND component_version = $2 AND provider_id = $3",
         )
+        .bind(&row.component_id)
+        .bind(&row.component_version)
         .bind(row.provider_id)
         .execute(&state.pool)
         .await
@@ -543,7 +643,11 @@ pub async fn record_cache(
 
 #[derive(Debug, Deserialize)]
 pub struct RecordAssetAccessRequest {
+    /// Accepted for forward-compatibility with per-component metering; the
+    /// current rail records bytes against the provider replica.
+    #[allow(dead_code)]
     pub component_id: String,
+    #[allow(dead_code)]
     pub component_version: String,
     pub bytes_served: i64,
 }
@@ -553,9 +657,21 @@ pub async fn record_asset_access(
     Path((component_id, component_version)): Path<(String, String)>,
     Json(req): Json<RecordAssetAccessRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // Verify the component/version exists.
-    let exists: Option<i64> = sqlx::query_scalar(
-        "SELECT count(*) FROM provider_replicas WHERE component_id = $1 AND component_version = $2",
+    if req.bytes_served <= 0 {
+        return Err(AppError::bad_request("bytes_served must be positive"));
+    }
+
+    // Attribute the download to the best-ranked replica for this component —
+    // the first one `retrieve_asset` would have returned. Resolve the replica
+    // id first because Postgres UPDATE does not support ORDER BY/LIMIT.
+    let replica_id: Option<Uuid> = sqlx::query_scalar(
+        "SELECT pr.id
+         FROM provider_replicas pr
+         JOIN storage_providers sp ON sp.id = pr.provider_id
+         WHERE pr.component_id = $1 AND pr.component_version = $2
+           AND pr.is_available = true AND sp.is_active = true
+         ORDER BY sp.reliability_score DESC NULLS LAST, pr.latency_ms ASC NULLS LAST
+         LIMIT 1",
     )
     .bind(&component_id)
     .bind(&component_version)
@@ -563,27 +679,18 @@ pub async fn record_asset_access(
     .await
     .map_err(|e| AppError::internal(format!("replica query failed: {e}")))?;
 
-    if exists.map_or(false, |c| c == 0) {
-        return Err(AppError::not_found(format!(
-            "no replicas for component {component_id} version {component_version}"
-        )));
-    }
+    let replica_id = replica_id.ok_or_else(|| {
+        AppError::not_found(format!(
+            "no available replica for component {component_id} version {component_version}"
+        ))
+    })?;
 
-    // Increment bytes_served for the best-ranked replica (first one returned
-    // by retrieve_asset). Since replicas are ordered by reliability_score DESC,
-    // the first one is the most likely to have been used.
-    sqlx::query(
-        "UPDATE provider_replicas SET bytes_served = bytes_served + $1 \
-         WHERE component_id = $2 AND component_version = $3 \
-         ORDER BY reliability_score DESC NULLS LAST, latency_ms ASC NULLS LAST \
-         LIMIT 1",
-    )
-    .bind(req.bytes_served)
-    .bind(&component_id)
-    .bind(&component_version)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| AppError::internal(format!("bytes served increment failed: {e}")))?;
+    sqlx::query("UPDATE provider_replicas SET bytes_served = bytes_served + $1 WHERE id = $2")
+        .bind(req.bytes_served)
+        .bind(replica_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("bytes served increment failed: {e}")))?;
 
     Ok(Json(serde_json::json!({
         "status": "ok",
@@ -789,6 +896,9 @@ mod tests {
         let Json(assets) = retrieve_asset(
             State(state.clone()),
             Path((component_id.clone(), "v1".to_string())),
+            Query(RetrieveAssetParams {
+                provider_type: None,
+            }),
             OptionalSignedRequest(None),
             axum::http::HeaderMap::new(),
         )
@@ -802,6 +912,187 @@ mod tests {
             assets[0].content_address.as_deref(),
             Some(checksum.as_str())
         );
+
+        sqlx::query("DELETE FROM storage_providers WHERE id = $1")
+            .bind(provider_uuid)
+            .execute(&pool)
+            .await
+            .expect("clean up provider");
+    }
+
+    #[tokio::test]
+    async fn premium_category_guarantees_one_reputable_replica() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed premium-category test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let component_id = format!("category-component-{}", Uuid::new_v4());
+        let mut provider_ids = Vec::new();
+        for (name, provider_type, reliability) in [
+            ("Premium Object Storage", "object_storage", 0.95_f64),
+            ("Colluding Object Storage", "object_storage", 0.10_f64),
+            ("Ordinary IPFS", "ipfs", 0.80_f64),
+        ] {
+            let provider_uuid = Uuid::new_v4();
+            provider_ids.push(provider_uuid);
+            sqlx::query(
+                "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, reliability_score) \
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+            )
+            .bind(provider_uuid)
+            .bind(format!("category-provider-{}", Uuid::new_v4()))
+            .bind(name)
+            .bind(provider_type)
+            .bind("https://provider.example.com")
+            .bind(reliability)
+            .execute(&pool)
+            .await
+            .expect("insert provider");
+            sqlx::query(
+                "INSERT INTO provider_replicas (provider_id, component_id, component_version, \
+                 storage_reference, version, checksum, latency_ms) \
+                 VALUES ($1, $2, 'v1', $3, 'v1', $4, 40)",
+            )
+            .bind(provider_uuid)
+            .bind(&component_id)
+            .bind(format!("https://provider.example.com/{component_id}.glb"))
+            .bind(format!("sha256:{}", "cd".repeat(32)))
+            .execute(&pool)
+            .await
+            .expect("insert replica");
+        }
+
+        // The client may ask for a category but cannot submit a candidate
+        // shortlist. The protocol guarantees one replica from the requested
+        // category and fills the rest from other types at random, so a
+        // low-reliability colluder in the requested category is never forced.
+        let Json(assets) = retrieve_asset(
+            State(state.clone()),
+            Path((component_id.clone(), "v1".to_string())),
+            Query(RetrieveAssetParams {
+                provider_type: Some("object_storage".to_string()),
+            }),
+            OptionalSignedRequest(None),
+            axum::http::HeaderMap::new(),
+        )
+        .await
+        .expect("retrieve category asset");
+
+        let object_storage: Vec<_> = assets
+            .iter()
+            .filter(|a| a.provider_name.contains("Object Storage"))
+            .collect();
+        assert_eq!(
+            object_storage.len(),
+            1,
+            "exactly one requested-category replica must be guaranteed"
+        );
+        assert_eq!(object_storage[0].provider_name, "Premium Object Storage");
+        assert!(
+            assets
+                .iter()
+                .all(|a| a.provider_name != "Colluding Object Storage"),
+            "low-reliability colluder must not be selected"
+        );
+        assert!(assets.len() <= 5, "replica cap must hold");
+
+        for id in provider_ids {
+            sqlx::query("DELETE FROM storage_providers WHERE id = $1")
+                .bind(id)
+                .execute(&pool)
+                .await
+                .expect("clean up provider");
+        }
+    }
+
+    #[tokio::test]
+    async fn retrieval_and_download_increment_provider_metering() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed metering test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        let provider_uuid = Uuid::new_v4();
+        let component_id = format!("metering-component-{}", Uuid::new_v4());
+        sqlx::query(
+            "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, reliability_score) \
+             VALUES ($1, $2, 'Metering Provider', 'object_storage', $3, 0.9)",
+        )
+        .bind(provider_uuid)
+        .bind(format!("metering-provider-{}", Uuid::new_v4()))
+        .bind("https://provider.example.com")
+        .execute(&pool)
+        .await
+        .expect("insert provider");
+        sqlx::query(
+            "INSERT INTO provider_replicas (provider_id, component_id, component_version, \
+             storage_reference, version, checksum, latency_ms, access_count, bytes_served) \
+             VALUES ($1, $2, 'v1', $3, 'v1', $4, 40, 0, 0)",
+        )
+        .bind(provider_uuid)
+        .bind(&component_id)
+        .bind("https://provider.example.com/metered.glb")
+        .bind(format!("sha256:{}", "aa".repeat(32)))
+        .execute(&pool)
+        .await
+        .expect("insert replica");
+
+        retrieve_asset(
+            State(state.clone()),
+            Path((component_id.clone(), "v1".to_string())),
+            Query(RetrieveAssetParams {
+                provider_type: None,
+            }),
+            OptionalSignedRequest(None),
+            axum::http::HeaderMap::new(),
+        )
+        .await
+        .expect("retrieve asset");
+        retrieve_asset(
+            State(state.clone()),
+            Path((component_id.clone(), "v1".to_string())),
+            Query(RetrieveAssetParams {
+                provider_type: None,
+            }),
+            OptionalSignedRequest(None),
+            axum::http::HeaderMap::new(),
+        )
+        .await
+        .expect("second retrieve");
+
+        record_asset_access(
+            State(state.clone()),
+            Path((component_id.clone(), "v1".to_string())),
+            Json(RecordAssetAccessRequest {
+                component_id: component_id.clone(),
+                component_version: "v1".to_string(),
+                bytes_served: 1234,
+            }),
+        )
+        .await
+        .expect("record bytes");
+
+        let (access_count, bytes_served): (i64, i64) = sqlx::query_as(
+            "SELECT access_count, bytes_served FROM provider_replicas WHERE provider_id = $1",
+        )
+        .bind(provider_uuid)
+        .fetch_one(&pool)
+        .await
+        .expect("read metering");
+        assert_eq!(
+            access_count, 2,
+            "each retrieval must increment access_count"
+        );
+        assert_eq!(bytes_served, 1234, "download must add bytes_served");
 
         sqlx::query("DELETE FROM storage_providers WHERE id = $1")
             .bind(provider_uuid)

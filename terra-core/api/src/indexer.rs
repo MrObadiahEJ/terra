@@ -8,7 +8,7 @@
 //!
 //! The indexer runs as a background tokio task spawned from `main.rs`.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -28,8 +28,7 @@ const PARCEL_DISCRIMINATOR: [u8; 8] = [149, 167, 245, 67, 209, 244, 214, 75];
 
 /// Anchor 8-byte discriminator for the `VerificationAttestation` account:
 /// SHA-256("account:VerificationAttestation")[..8]
-const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] =
-    [143, 201, 182, 196, 87, 192, 219, 159];
+const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] = [143, 201, 182, 196, 87, 192, 219, 159];
 
 /// Interval between indexer polls.
 const POLL_INTERVAL_SECS: u64 = 15;
@@ -177,6 +176,10 @@ fn id_hex(id: &[u8; 32]) -> String {
 }
 
 /// Parsed VerificationAttestation account from on-chain data.
+///
+/// `id` and `created_at` are part of the account layout and kept for
+/// completeness/debugging even though the mirror only needs the fields below.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ParsedVerificationAttestation {
     pub id: [u8; 32],
@@ -269,8 +272,14 @@ fn parse_verification_attestation(data: &[u8]) -> Option<ParsedVerificationAttes
         return None;
     }
     let issuance_date = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -279,8 +288,14 @@ fn parse_verification_attestation(data: &[u8]) -> Option<ParsedVerificationAttes
         return None;
     }
     let expiration_date = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -304,8 +319,14 @@ fn parse_verification_attestation(data: &[u8]) -> Option<ParsedVerificationAttes
         return None;
     }
     let created_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -398,16 +419,14 @@ async fn upsert_parcel(
         .collect();
 
     // Check whether the row already exists (onchain_id is the natural key).
-    let exists: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM parcels WHERE onchain_id = $1",
-    )
-    .bind(&pubkey_str)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        warn!("check existing parcel {pubkey} failed: {e:?}");
-        anyhow::anyhow!("check existing parcel {pubkey}: {e}")
-    })?;
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM parcels WHERE onchain_id = $1")
+        .bind(&pubkey_str)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("check existing parcel {pubkey} failed: {e:?}");
+            anyhow::anyhow!("check existing parcel {pubkey}: {e}")
+        })?;
 
     if exists.is_some() {
         sqlx::query(
@@ -490,7 +509,11 @@ async fn upsert_verification_attestation(
     let pubkey_str = pubkey.to_string();
 
     // Convert [u8; 32] to hex strings
-    let claim_hex: String = attestation.claim.iter().map(|b| format!("{b:02x}")).collect();
+    let claim_hex: String = attestation
+        .claim
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
     let validator_hex: String = attestation
         .validator
         .iter()
@@ -513,16 +536,15 @@ async fn upsert_verification_attestation(
         .collect();
 
     // Check whether the row already exists (pubkey is the natural key).
-    let exists: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM verification_attestations_onchain WHERE pubkey = $1",
-    )
-    .bind(&pubkey_str)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        warn!("check existing verification_attestation {pubkey} failed: {e:?}");
-        anyhow::anyhow!("check existing verification_attestation {pubkey}: {e}")
-    })?;
+    let exists: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM verification_attestations_onchain WHERE pubkey = $1")
+            .bind(&pubkey_str)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                warn!("check existing verification_attestation {pubkey} failed: {e:?}");
+                anyhow::anyhow!("check existing verification_attestation {pubkey}: {e}")
+            })?;
 
     if exists.is_some() {
         sqlx::query(

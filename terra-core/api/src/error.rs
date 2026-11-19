@@ -37,6 +37,23 @@ impl AppError {
     }
 }
 
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AppError::NotFound(m)
+            | AppError::BadRequest(m)
+            | AppError::Conflict(m)
+            | AppError::Unauthorized(m)
+            | AppError::Forbidden(m)
+            | AppError::Unavailable(m)
+            | AppError::Internal(m) => write!(f, "{m}"),
+            AppError::Database(e) => write!(f, "database error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}
+
 impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
         match err {

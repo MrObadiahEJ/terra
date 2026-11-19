@@ -14,7 +14,6 @@ use ed25519_dalek::Verifier;
 use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tempfile::tempdir;
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -211,11 +210,14 @@ pub async fn list_providers(
 ) -> Result<Json<Vec<ProviderRow>>, AppError> {
     let limit = params.limit.min(500);
     // Premium category filter: only bonded providers (stake_bond > 0).
-    let premium_clause = params
-        .premium_category
-        .as_ref()
-        .map(|_| " AND stake_bond > 0".to_string())
-        .unwrap_or_default();
+    let premium_category = match &params.premium_category {
+        Some(name) => PremiumCategory::Premium(name.clone()),
+        None => PremiumCategory::Standard,
+    };
+    let premium_clause = match premium_category {
+        PremiumCategory::Premium(_) => " AND stake_bond > 0".to_string(),
+        PremiumCategory::Standard => String::new(),
+    };
     let rows: Vec<ProviderRow> = match (&params.provider_type, &params.is_active, &params.region)
     {
         (Some(t), Some(a), Some(r)) => sqlx::query_as::<_, ProviderRow>(
@@ -511,6 +513,43 @@ pub async fn challenge_replica(
     Ok(Json(ChallengeResponse { challenge }))
 }
 
+/// Issue PoP challenges for replicas that are due (scheduled maintenance).
+///
+/// A replica is due when it is active/available, has no pending challenge, and
+/// has not proven within the last hour (or never). Returns the number of
+/// challenges issued. Called from the API's maintenance loop; the manual
+/// `POST /providers/{id}/replicas/{id}/challenge` endpoint remains available.
+pub async fn schedule_pop_challenges(state: &AppState, batch: i64) -> Result<u64, AppError> {
+    let due: Vec<(Uuid,)> = sqlx::query_as(
+        "SELECT pr.id FROM provider_replicas pr \
+         JOIN storage_providers sp ON sp.id = pr.provider_id \
+         WHERE pr.is_available = true AND sp.is_active = true \
+           AND pr.last_challenge IS NULL \
+           AND (pr.last_proof_at IS NULL OR pr.last_proof_at < now() - interval '1 hour') \
+         ORDER BY pr.last_proof_at ASC NULLS FIRST \
+         LIMIT $1",
+    )
+    .bind(batch)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("scheduled challenge query failed: {e}")))?;
+
+    let mut issued = 0u64;
+    for (replica_id,) in due {
+        let challenge = Uuid::new_v4().to_string();
+        let result = sqlx::query(
+            "UPDATE provider_replicas SET last_challenge = $1, last_proof_at = NULL WHERE id = $2",
+        )
+        .bind(&challenge)
+        .bind(replica_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| AppError::internal(format!("scheduled challenge store failed: {e}")))?;
+        issued += result.rows_affected();
+    }
+    Ok(issued)
+}
+
 // ---------------------------------------------------------------------------
 // POST /providers/{id}/replicas/{replica_id}/prove
 // ---------------------------------------------------------------------------
@@ -548,13 +587,15 @@ pub async fn prove_replica(
     // over the payload bytes. When no oracle key is configured, fall back to
     // the legacy SHA-256(challenge + content_address) comparison.
     if let Some(oracle_key) = &state.vrf_oracle_pubkey {
-        let sig_bytes = hex::decode(&req.proof)
-            .map_err(|_| AppError::bad_request("proof is not valid hex"))?;
-        let sig: ed25519_dalek::Signature = sig_bytes.as_slice().try_into()
+        let sig_bytes =
+            hex::decode(&req.proof).map_err(|_| AppError::bad_request("proof is not valid hex"))?;
+        let sig: ed25519_dalek::Signature = sig_bytes
+            .as_slice()
+            .try_into()
             .map_err(|_| AppError::bad_request("proof is not a valid Ed25519 signature"))?;
-        oracle_key
-            .verify(payload.as_bytes(), &sig)
-            .map_err(|_| AppError::bad_request("proof signature does not verify against oracle key"))?;
+        oracle_key.verify(payload.as_bytes(), &sig).map_err(|_| {
+            AppError::bad_request("proof signature does not verify against oracle key")
+        })?;
     } else {
         // Legacy fallback: SHA-256(challenge + content_address) comparison.
         let expected_proof = format!("{:x}", Sha256::digest(payload.as_bytes()));
@@ -927,7 +968,7 @@ mod tests {
         .expect("insert replica");
 
         // Run the audit.
-        let dir = tempdir().expect("temp storage dir");
+        let dir = tempfile::tempdir().expect("temp storage dir");
         let state = AppState {
             pool: pool.clone(),
             geo: None,
@@ -1110,6 +1151,96 @@ mod tests {
             .execute(&pool)
             .await
             .expect("clean up replica");
+        sqlx::query("DELETE FROM storage_providers WHERE id = $1")
+            .bind(provider_id)
+            .execute(&pool)
+            .await
+            .expect("clean up provider");
+    }
+
+    #[tokio::test]
+    async fn scheduled_pop_challenges_challenge_due_replicas_once() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed scheduled PoP test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        let provider_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO storage_providers
+                (id, provider_id, name, provider_type, base_url, reliability_score)
+             VALUES ($1, $2, 'PoP Scheduler Provider', 'object_storage',
+                     'https://provider.example.com', 0.9)",
+        )
+        .bind(provider_id)
+        .bind(format!("pop-schedule-provider-{}", Uuid::new_v4()))
+        .execute(&pool)
+        .await
+        .expect("insert provider");
+
+        // Never proven and no pending challenge -> due for a challenge.
+        let replica_id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO provider_replicas
+                (id, provider_id, component_id, component_version, storage_reference,
+                 version, checksum, latency_ms, is_available, last_challenge, last_proof_at)
+             VALUES ($1, $2, $3, 'v1', 'https://provider.example.com/pop.glb',
+                     'v1', $4, 40, true, NULL, NULL)",
+        )
+        .bind(replica_id)
+        .bind(provider_id)
+        .bind(format!("pop-schedule-component-{}", Uuid::new_v4()))
+        .bind(format!("sha256:{}", "ab".repeat(32)))
+        .execute(&pool)
+        .await
+        .expect("insert replica");
+
+        let issued = schedule_pop_challenges(&state, 500)
+            .await
+            .expect("schedule PoP challenges");
+        assert!(issued >= 1, "a due replica must receive a challenge");
+
+        let challenge: Option<String> =
+            sqlx::query_scalar("SELECT last_challenge FROM provider_replicas WHERE id = $1")
+                .bind(replica_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read challenge");
+        assert!(
+            challenge.is_some(),
+            "scheduled maintenance must set last_challenge"
+        );
+
+        // A second sweep must not reissue a challenge while one is pending.
+        let again = schedule_pop_challenges(&state, 500)
+            .await
+            .expect("second schedule sweep");
+        let unchanged: Option<String> =
+            sqlx::query_scalar("SELECT last_challenge FROM provider_replicas WHERE id = $1")
+                .bind(replica_id)
+                .fetch_one(&pool)
+                .await
+                .expect("read challenge again");
+        assert_eq!(
+            unchanged, challenge,
+            "pending challenges must not be replaced (issued {} in second sweep)",
+            again
+        );
+
         sqlx::query("DELETE FROM storage_providers WHERE id = $1")
             .bind(provider_id)
             .execute(&pool)

@@ -343,6 +343,7 @@ export async function fetchComponentAsset(
   componentId: string,
   componentVersion: string,
   expectedContentAddress?: string | null,
+  providerType?: string | null,
 ): Promise<{ data: ArrayBuffer; retrieval: AssetRetrieval }> {
   const cached = getCachedAsset(componentId, componentVersion)
   if (cached) {
@@ -351,12 +352,17 @@ export async function fetchComponentAsset(
   }
 
   try {
-    // The API returns a ranked list; accept a single object too so this
-    // client keeps working against an older runtime build.
+    // Build query params: provider_type is optional; when set, the backend
+    // guarantees at least one replica from that provider type (protocol-side
+    // candidate discovery) and fills remaining slots randomly.
+    const params = new URLSearchParams()
+    if (providerType) params.set('provider_type', providerType)
+    const query = params.toString() ? `?${params.toString()}` : ''
+
     const response = await request<AssetRetrieval[] | AssetRetrieval>(
       `/runtime/assets/${encodeURIComponent(componentId)}/${encodeURIComponent(
         componentVersion,
-      )}`,
+      )}${query}`,
     )
     const retrievals = Array.isArray(response) ? response : [response]
 

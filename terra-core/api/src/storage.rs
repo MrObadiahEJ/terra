@@ -27,7 +27,10 @@ pub enum StorageBackend {
     Local { root: PathBuf },
     /// Pin bytes to an IPFS node via its HTTP API (e.g. http://localhost:5001).
     /// The storage_ref returned is the IPFS CID.
-    Ipfs { api_url: String, gateway_url: Option<String> },
+    Ipfs {
+        api_url: String,
+        gateway_url: Option<String>,
+    },
     /// Store bytes in an S3-compatible bucket (Cloudflare R2, AWS S3, MinIO, etc.).
     /// The storage_ref returned is the object key.
     S3 {
@@ -72,9 +75,14 @@ impl StorageBackend {
                 gateway_url,
             } => {
                 // IPFS is inherently content-addressed; pin via store_ipfs.
-                let (storage_ref, size_bytes) =
-                    store_ipfs(api_url, gateway_url.as_deref(), filename, content_type, data)
-                        .await?;
+                let (storage_ref, size_bytes) = store_ipfs(
+                    api_url,
+                    gateway_url.as_deref(),
+                    filename,
+                    content_type,
+                    data,
+                )
+                .await?;
                 Ok(StoredArtifact {
                     content_hash,
                     storage_ref,
@@ -94,8 +102,14 @@ impl StorageBackend {
                 let storage_ref = format!("content/sha256/{}/{}/{}", &hex[..2], &hex[2..4], hex);
                 let s3_key = storage_ref.clone();
                 let (_stored_ref, size_bytes) = store_s3(
-                    bucket, region, endpoint, access_key, secret_key,
-                    &s3_key, content_type, data,
+                    bucket,
+                    region,
+                    endpoint,
+                    access_key,
+                    secret_key,
+                    &s3_key,
+                    content_type,
+                    data,
                 )
                 .await?;
                 Ok(StoredArtifact {
@@ -106,7 +120,7 @@ impl StorageBackend {
                 })
             }
         }
-        }
+    }
 
     /// Store bytes under a content-addressed path (`content/sha256/aa/bb/<hex>`).
     /// Re-storing identical bytes is idempotent and returns the same reference.
@@ -143,9 +157,14 @@ impl StorageBackend {
                 gateway_url,
             } => {
                 // IPFS is inherently content-addressed; pin via store_ipfs.
-                let (storage_ref, size_bytes) =
-                    store_ipfs(api_url, gateway_url.as_deref(), "artifact", "application/octet-stream", data)
-                        .await?;
+                let (storage_ref, size_bytes) = store_ipfs(
+                    api_url,
+                    gateway_url.as_deref(),
+                    "artifact",
+                    "application/octet-stream",
+                    data,
+                )
+                .await?;
                 Ok(StoredArtifact {
                     content_hash,
                     storage_ref,
@@ -165,15 +184,46 @@ impl StorageBackend {
                 let storage_ref = format!("content/sha256/{}/{}/{}", &hex[..2], &hex[2..4], hex);
                 let s3_key = storage_ref.clone();
                 let (_stored_ref, size_bytes) = store_s3(
-                    bucket, region, endpoint, access_key, secret_key,
-                    &s3_key, content_type, data,
-                ).await?;
+                    bucket,
+                    region,
+                    endpoint,
+                    access_key,
+                    secret_key,
+                    &s3_key,
+                    content_type,
+                    data,
+                )
+                .await?;
                 Ok(StoredArtifact {
                     content_hash,
                     storage_ref,
                     size_bytes,
                     backend_name: self.backend_name().to_string(),
                 })
+            }
+        }
+    }
+
+    /// Delete stored bytes. Best-effort: a missing object is treated as
+    /// already deleted, so TTL purges are idempotent.
+    pub async fn delete(&self, storage_ref: &str) -> Result<()> {
+        match self {
+            StorageBackend::Local { root } => delete_local(root, storage_ref).await,
+            StorageBackend::Ipfs { .. } => {
+                // IPFS objects are content-addressed and immutable; unpinning
+                // is a separate concern, so deletion is a no-op here.
+                Ok(())
+            }
+            StorageBackend::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key,
+                secret_key,
+            } => {
+                let prefix = format!("{}/{}/", endpoint.trim_end_matches('/'), bucket);
+                let key = storage_ref.strip_prefix(&prefix).unwrap_or(storage_ref);
+                delete_s3(bucket, region, endpoint, access_key, secret_key, key).await
             }
         }
     }
@@ -193,7 +243,17 @@ impl StorageBackend {
                 endpoint,
                 access_key,
                 secret_key,
-            } => load_s3(bucket, region, endpoint, access_key, secret_key, storage_ref).await,
+            } => {
+                load_s3(
+                    bucket,
+                    region,
+                    endpoint,
+                    access_key,
+                    secret_key,
+                    storage_ref,
+                )
+                .await
+            }
         }
     }
 }
@@ -297,9 +357,7 @@ async fn store_ipfs(
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("ipfs add response missing Hash field"))?;
 
-    let size_bytes = json["Size"]
-        .as_u64()
-        .unwrap_or(data.len() as u64);
+    let size_bytes = json["Size"].as_u64().unwrap_or(data.len() as u64);
 
     let storage_ref = if let Some(gw) = gateway_url {
         format!("{}/ipfs/{}", gw.trim_end_matches('/'), cid)
@@ -310,14 +368,20 @@ async fn store_ipfs(
     Ok((storage_ref, size_bytes))
 }
 
-async fn load_ipfs(api_url: &str, gateway_url: Option<&str>, storage_ref: &str) -> Result<Option<Vec<u8>>> {
+async fn load_ipfs(
+    api_url: &str,
+    gateway_url: Option<&str>,
+    storage_ref: &str,
+) -> Result<Option<Vec<u8>>> {
     let client = reqwest::Client::new();
 
     // Extract CID from storage_ref (either "ipfs://<cid>" or "<gateway>/ipfs/<cid>")
     let cid = if storage_ref.starts_with("ipfs://") {
         storage_ref.trim_start_matches("ipfs://").to_string()
     } else if let Some(gw) = gateway_url {
-        storage_ref.trim_start_matches(&format!("{}/ipfs/", gw.trim_end_matches('/'))).to_string()
+        storage_ref
+            .trim_start_matches(&format!("{}/ipfs/", gw.trim_end_matches('/')))
+            .to_string()
     } else {
         storage_ref.to_string()
     };
@@ -327,14 +391,23 @@ async fn load_ipfs(api_url: &str, gateway_url: Option<&str>, storage_ref: &str) 
         let url = format!("{}/ipfs/{}", gw.trim_end_matches('/'), cid);
         if let Ok(resp) = client.get(&url).send().await {
             if resp.status().is_success() {
-                return Ok(Some(resp.bytes().await.context("reading ipfs gateway bytes")?.to_vec()));
+                return Ok(Some(
+                    resp.bytes()
+                        .await
+                        .context("reading ipfs gateway bytes")?
+                        .to_vec(),
+                ));
             }
         }
     }
 
     // Fall back to API
     let url = format!("{}/api/v0/cat?arg={}", api_url, cid);
-    let resp = client.get(&url).send().await.context("ipfs cat request failed")?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .context("ipfs cat request failed")?;
 
     if resp.status() == 404 {
         return Ok(None);
@@ -346,7 +419,12 @@ async fn load_ipfs(api_url: &str, gateway_url: Option<&str>, storage_ref: &str) 
         anyhow::bail!("ipfs cat returned {status}: {body}");
     }
 
-    Ok(Some(resp.bytes().await.context("reading ipfs cat bytes")?.to_vec()))
+    Ok(Some(
+        resp.bytes()
+            .await
+            .context("reading ipfs cat bytes")?
+            .to_vec(),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +448,7 @@ fn sha256_hex(data: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+#[allow(clippy::too_many_arguments)] // signing routine mirrors the AWS v4 spec
 fn aws_signature_v4(
     access_key: &str,
     secret_key: &str,
@@ -385,16 +464,16 @@ fn aws_signature_v4(
         .duration_since(std::time::UNIX_EPOCH)
         .expect("system time before epoch")
         .as_secs();
-    let date = time::OffsetDateTime::from_unix_timestamp(now as i64)
-        .expect("invalid unix timestamp");
+    let date =
+        time::OffsetDateTime::from_unix_timestamp(now as i64).expect("invalid unix timestamp");
     let amz_date = format!(
         "{:04}{:02}{:02}{:02}{:02}{:02}",
         date.year(),
         date.month() as u8,
-        date.day() as u8,
-        date.hour() as u8,
-        date.minute() as u8,
-        date.second() as u8,
+        date.day(),
+        date.hour(),
+        date.minute(),
+        date.second(),
     );
     let date_str = &amz_date[..8];
 
@@ -437,7 +516,7 @@ fn aws_signature_v4(
         date_str.as_bytes(),
     );
     let k_region = hmac_sha256(&k_date, region.as_bytes());
-                let _k_service = hmac_sha256(&k_region, service.as_bytes());
+    let _k_service = hmac_sha256(&k_region, service.as_bytes());
     let k_signing = hmac_sha256(&k_region, b"aws4_request");
 
     let signature = hex::encode(hmac_sha256(&k_signing, string_to_sign.as_bytes()));
@@ -448,6 +527,7 @@ fn aws_signature_v4(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // one argument per S3 connection field
 async fn store_s3(
     bucket: &str,
     region: &str,
@@ -471,7 +551,10 @@ async fn store_s3(
         .expect("invalid date format");
 
     let headers = vec![
-        ("host".to_string(), format!("{}/{}", endpoint.trim_end_matches('/'), bucket)),
+        (
+            "host".to_string(),
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        ),
         ("x-amz-date".to_string(), amz_date.clone()),
         ("x-amz-content-sha256".to_string(), sha256_hex(data)),
     ];
@@ -490,7 +573,10 @@ async fn store_s3(
 
     let resp = client
         .put(&url)
-        .header("host", format!("{}/{}", endpoint.trim_end_matches('/'), bucket))
+        .header(
+            "host",
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        )
         .header("x-amz-date", &amz_date)
         .header("x-amz-content-sha256", sha256_hex(data))
         .header("authorization", &authorization)
@@ -532,7 +618,10 @@ async fn load_s3(
         .expect("invalid date format");
 
     let headers = vec![
-        ("host".to_string(), format!("{}/{}", endpoint.trim_end_matches('/'), bucket)),
+        (
+            "host".to_string(),
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        ),
         ("x-amz-date".to_string(), amz_date.clone()),
     ];
 
@@ -550,7 +639,10 @@ async fn load_s3(
 
     let resp = client
         .get(&url)
-        .header("host", format!("{}/{}", endpoint.trim_end_matches('/'), bucket))
+        .header(
+            "host",
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        )
         .header("x-amz-date", &amz_date)
         .header("authorization", &authorization)
         .send()
@@ -567,7 +659,93 @@ async fn load_s3(
         anyhow::bail!("s3 get returned {status}: {body}");
     }
 
-    Ok(Some(resp.bytes().await.context("reading s3 bytes")?.to_vec()))
+    Ok(Some(
+        resp.bytes().await.context("reading s3 bytes")?.to_vec(),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Delete helpers
+// ---------------------------------------------------------------------------
+
+async fn delete_local(root: &Path, storage_ref: &str) -> Result<()> {
+    let candidate = root.join(storage_ref);
+    let canonical_root = root
+        .canonicalize()
+        .context("canonicalizing evidence storage root")?;
+    match tokio::fs::canonicalize(&candidate).await {
+        Ok(path) if path.starts_with(&canonical_root) => {
+            match tokio::fs::remove_file(&path).await {
+                Ok(()) => Ok(()),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(err) => Err(err).context("deleting evidence file"),
+            }
+        }
+        Ok(_) => anyhow::bail!("storage_ref escapes the evidence root"),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err).context("resolving evidence storage_ref"),
+    }
+}
+
+async fn delete_s3(
+    bucket: &str,
+    region: &str,
+    endpoint: &str,
+    access_key: &str,
+    secret_key: &str,
+    key: &str,
+) -> Result<()> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/{}/{}", endpoint.trim_end_matches('/'), bucket, key);
+
+    let date = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before epoch")
+        .as_secs();
+    let amz_date = time::OffsetDateTime::from_unix_timestamp(date as i64)
+        .expect("invalid unix timestamp")
+        .format(&time::format_description::well_known::Rfc3339)
+        .expect("invalid date format");
+
+    let headers = vec![
+        (
+            "host".to_string(),
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        ),
+        ("x-amz-date".to_string(), amz_date.clone()),
+    ];
+
+    let authorization = aws_signature_v4(
+        access_key,
+        secret_key,
+        region,
+        "s3",
+        "DELETE",
+        &format!("/{}/{}", bucket, key),
+        "",
+        &headers,
+        &[],
+    );
+
+    let resp = client
+        .delete(&url)
+        .header(
+            "host",
+            format!("{}/{}", endpoint.trim_end_matches('/'), bucket),
+        )
+        .header("x-amz-date", &amz_date)
+        .header("authorization", &authorization)
+        .send()
+        .await
+        .context("s3 delete request failed")?;
+
+    if resp.status() == 404 || resp.status().is_success() {
+        return Ok(());
+    }
+
+    let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+    anyhow::bail!("s3 delete returned {status}: {body}");
 }
 
 // ---------------------------------------------------------------------------
@@ -580,7 +758,32 @@ pub fn from_env() -> Result<StorageBackend> {
         if !api_url.is_empty() {
             let gateway_url = std::env::var("IPFS_GATEWAY_URL").ok();
             tracing::info!(api_url = %api_url, "evidence storage: ipfs");
-            return Ok(StorageBackend::Ipfs { api_url, gateway_url });
+            return Ok(StorageBackend::Ipfs {
+                api_url,
+                gateway_url,
+            });
+        }
+    }
+
+    // S3-compatible backend (Filebase, R2, MinIO, AWS) when configured.
+    // Filebase's 5 GB free tier is the zero-budget production target; the
+    // bucket must be private because evidence may be quarantined.
+    if let (Ok(bucket), Ok(endpoint), Ok(access_key), Ok(secret_key)) = (
+        std::env::var("S3_BUCKET"),
+        std::env::var("S3_ENDPOINT"),
+        std::env::var("S3_ACCESS_KEY"),
+        std::env::var("S3_SECRET_KEY"),
+    ) {
+        if !bucket.is_empty() && !endpoint.is_empty() {
+            let region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
+            tracing::info!(bucket = %bucket, endpoint = %endpoint, "evidence storage: s3");
+            return Ok(StorageBackend::S3 {
+                bucket,
+                region,
+                endpoint,
+                access_key,
+                secret_key,
+            });
         }
     }
 

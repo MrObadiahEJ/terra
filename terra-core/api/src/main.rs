@@ -106,9 +106,35 @@ async fn main() -> Result<()> {
 
     // Sprint C: start the chain indexer as a background task.
     let rpc_url = config.rpc_url.clone();
+    let indexer_state = state.clone();
     tokio::spawn(async move {
-        if let Err(err) = indexer::run_indexer(rpc_url, Arc::new(state)).await {
+        if let Err(err) = indexer::run_indexer(rpc_url, Arc::new(indexer_state)).await {
             tracing::error!("chain indexer stopped: {err}");
+        }
+    });
+
+    // Sprint F maintenance loop: TTL purge + scheduled PoP challenges.
+    // Render has no cron, so the API owns this schedule: every 15 minutes it
+    // deletes expired evidence and challenges replicas that are due.
+    let maintenance_state = state.clone();
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(15 * 60));
+        loop {
+            ticker.tick().await;
+            match routes::evidence::purge_expired_evidence(&maintenance_state).await {
+                Ok(purged) if purged > 0 => {
+                    tracing::info!(purged, "evidence TTL purge");
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "evidence TTL purge failed"),
+            }
+            match routes::providers::schedule_pop_challenges(&maintenance_state, 50).await {
+                Ok(issued) if issued > 0 => {
+                    tracing::info!(issued, "scheduled PoP challenges");
+                }
+                Ok(_) => {}
+                Err(err) => tracing::warn!(error = %err, "scheduled PoP challenges failed"),
+            }
         }
     });
 

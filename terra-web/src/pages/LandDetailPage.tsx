@@ -9,7 +9,7 @@ import {
   Pause,
   Play,
 } from 'lucide-react'
-import { useLocale } from './locale'
+import { useLocale } from '../lib/locale'
 import {
   useLabVault,
   labShape,
@@ -27,11 +27,8 @@ import {
   polygonPerimeterM,
   ringDigest,
 } from '../lib/geo'
-import { parseGeoJSON, type OffChainParcel } from './lib/api'
+import LandViewer, { type VolumeLayer } from '../components/lab/LandViewer'
 import ElevationCrossSection from '../components/lab/ElevationCrossSection'
-import type { VolumeLayer } from '../components/lab/LandViewer'
-import TerraGlobe from '../components/map/TerraGlobe'
-import type { FocusTarget } from './components/map/TerraGlobe'
 
 // Land detail view (/lab/land) — click-through from the Geometry Vault.
 // Shows every prop of the selected land (SpatialAsset + GeometryVersion) and
@@ -317,92 +314,25 @@ export default function LandDetailPage() {
                 {entry ? `v${entry.version}` : 'current shape'}
               </span>
             </div>
-            {(() => {
-              const parcelRing = ring.length >= 3 ? ring : [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]
-              const parcel: OffChainParcel = {
-                id: entry?.pubkey ?? digest ?? 'land-detail',
-                name: entry ? `v${entry.version}` : 'Current shape',
-                holder: 'lab',
-                status: entry ? 'registered' : 'pending',
-                geometry: JSON.stringify({
-                  type: 'Polygon',
-                  coordinates: [parcelRing.map(([lon, lat]) => [lon, lat])],
-                }),
-                area_m2: polygonAreaM2(ring),
-                created_at: entry?.createdAt ?? '',
-                updated_at: entry?.updatedAt ?? '',
-              }
-              const [longitude, latitude] = polygonCentroid(parcelRing)
-              const focus: FocusTarget = {
-                longitude,
-                latitude,
-                height: Math.max(55, Math.sqrt(Math.max(1, parcel.area_m2)) * 4),
-              }
-              return (
-                <TerraGlobe
-                  offChainParcels={[parcel]}
-                  roads={[]}
-                  pois={[]}
-                  buildings={[]}
-                  plannedRoads={[]}
-                  drawing={false}
-                  drawKind="parcel"
-                  drawVertices={[]}
-                  onDrawVertexAdd={() => undefined}
-                  onDrawFinish={() => undefined}
-                  onParcelClick={() => undefined}
-                  onBuildingClick={() => undefined}
-                  highlightParcelId={parcel.id}
-                  highlightBuildingId={null}
-                  viewMode="3d"
-                  collapsibleHud
-                  focus={focus}
-                  basemap="imagery"
-                  graphicsTier="high"
-                  autoTier
-                  showLabels={true}
-                  onCameraMoved={() => undefined}
-                  onMapZoom={() => undefined}
-                  onWebGLStatus={() => undefined}
-                  onFps={() => undefined}
-                  onTierCapped={() => undefined}
-                  onTerrainStatus={() => undefined}
-                  tilesetUrl={null}
-                  runtimeNodes={[]}
-                  coverCells={null}
-                  fetchedNodeIds={[]}
-                  fetchedAssets={new Map()}
-                  onFetchComponent={() => undefined}
-                  viewCommand={null}
-                />
-              )
-            })()}
-          </div>
-          <div className="lab-card">
-            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-              <h3 className="text-[13px] font-semibold">{t('elevationCrossSection')}</h3>
-              <span className={`lab-badge ${elevSource === 0 ? 'lab-badge-warn' : 'lab-badge-ok'}`}>
-                {ELEVATION_SOURCES[elevSource]?.id ?? 'NONE'}
-              </span>
-            </div>
-            <ElevationCrossSection
-              assetMinM={v.elevationMinMm / 1000}
-              assetMaxM={v.elevationMaxMm / 1000}
-              versionMinM={elevMinM}
-              versionMaxM={elevMaxM}
-              elevSource={elevSource}
+            <LandViewer
+              ring={ring}
+              elevMinM={elevMinM}
+              elevMaxM={elevMaxM}
+              elevationSource={elevSource}
               dimension={dimension}
-              assetDimension={v.dimensionality}
+              seedHex={seedHex}
+              verified={entry?.verified ?? false}
+              volumes={volumes}
+              volumeDomain={volumeDomain}
+              onVolumeClick={openStratum}
             />
-          </div>
-          <p className="text-[10px] text-muted mt-1">
-            {t('svgNavHint')}
-          </p>
+            <p className="text-[10px] text-muted mt-1">
+              {t('svgNavHint')}
+            </p>
             <p className="text-[10px] text-muted mt-1">
               <strong>{t('rightsVolumesLead')}</strong>{t('rightsVolumesBody')}
             </p>
           </div>
-
           <div className="lab-card">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
               <h3 className="text-[13px] font-semibold">{t('elevationCrossSection')}</h3>

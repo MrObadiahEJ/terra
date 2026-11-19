@@ -23,11 +23,9 @@ import { lodFromHeight, lodFromLeafletZoom } from './lod'
 import { parseGeoJSON, type OffChainParcel, type OsmBuildingFootprint, type RoadRow, type PoiRow } from './api'
 import { selectBuildingsForTier } from './atlasLayers'
 import { type FocusTarget } from '../components/map/TerraGlobe'
-import { type QuadCellRow, type QuadCoverRow } from './runtime'
+import { type QuadCoverRow } from './runtime'
 import { type SceneNodeRow } from './runtime'
-import { type TerrainStatus } from './cesiumTerrain'
 import { polygonCentroid, type LonLat } from './geo'
-import { useLocale } from './locale'
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -81,12 +79,17 @@ export interface GlobeEnv {
   setFetchedAssets: (assets: Map<string, { data: ArrayBuffer; transform: any | null; crs: string | null }>) => void
 }
 
-export function useGlobeEnv(): GlobeEnv {
-  const { t } = useLocale()
+export interface GlobeEnvSource {
+  roads?: RoadRow[]
+  pois?: PoiRow[]
+  buildings?: OsmBuildingFootprint[]
+}
+
+export function useGlobeEnv(source: GlobeEnvSource = {}): GlobeEnv {
+  const { roads = [], pois = [], buildings = [] } = source
   const offChainParcels = useAppStore((s) => s.offChainParcels)
   const refreshOffChain = useAppStore((s) => s.refreshOffChain)
   const loadStats = useAppStore((s) => s.loadStats)
-  const selectedParcel = useAppStore((s) => s.selectedParcel)
   const selectedOffChain = useAppStore((s) => s.selectedOffChain)
   const demoMode = useAppStore((s) => s.demoMode)
 
@@ -153,7 +156,6 @@ export function useGlobeEnv(): GlobeEnv {
 
   const onTierCapped = useCallback(() => {
     if (tierPref !== 'auto' || graphicsTier === 'low') return
-    const next = stepDownTier(graphicsTier)
     setTierStep((step) => step + 1)
   }, [tierPref, graphicsTier])
 
@@ -215,7 +217,7 @@ export function useGlobeEnv(): GlobeEnv {
   )
 
   // ---- resize key ----------------------------------------------------------
-  const [mapResizeKey, setMapResizeKey] = useState(0)
+  const [, setMapResizeKey] = useState(0)
   const settleMapResize = useCallback(() => {
     window.setTimeout(() => setMapResizeKey((k) => k + 1), 260)
   }, [])

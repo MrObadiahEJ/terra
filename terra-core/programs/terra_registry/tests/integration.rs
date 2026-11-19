@@ -7712,25 +7712,25 @@ async fn verified_claim_ok(
                     AccountMeta::new_readonly(system_program_id(), false),
                     AccountMeta::new_readonly(rep_pk, false),
                 ],
-            data: {
-                let d = attestation_instruction_data(
-                    verification::vc_type::VERIFICATION_ATTESTATION,
-                    &claim_pk,
-                    1_700_000_000,
-                    1_800_000_000,
-                    &sd_jwt_digest(
-                        &claim_pk,
-                        &validator.pubkey(),
-                        &obs_pk,
-                        &claim_pk,
+                data: {
+                    let d = attestation_instruction_data(
                         verification::vc_type::VERIFICATION_ATTESTATION,
+                        &claim_pk,
                         1_700_000_000,
                         1_800_000_000,
-                    ),
-                    false,
-                );
-                d
-            },
+                        &sd_jwt_digest(
+                            &claim_pk,
+                            &validator.pubkey(),
+                            &obs_pk,
+                            &claim_pk,
+                            verification::vc_type::VERIFICATION_ATTESTATION,
+                            1_700_000_000,
+                            1_800_000_000,
+                        ),
+                        false,
+                    );
+                    d
+                },
             },
         )
         .await
@@ -8715,7 +8715,10 @@ async fn p0_5_attestation_with_active_reputation_succeeds() {
 
     let att_record: VerificationAttestation = read_account(&ctx, att).await;
     assert_eq!(att_record.validator, validator.pubkey());
-    assert_eq!(att_record.vc_type, verification::vc_type::VERIFICATION_ATTESTATION);
+    assert_eq!(
+        att_record.vc_type,
+        verification::vc_type::VERIFICATION_ATTESTATION
+    );
     let claim: Claim = read_account(&ctx, claim_pk).await;
     assert_eq!(claim.attestation_count, 1);
 }
@@ -10665,7 +10668,10 @@ async fn evidence_immutable_after_claim_verification() {
 
     // Read the attestation — should exist and be intact.
     let att_record: VerificationAttestation = read_account(&ctx, att).await;
-    assert_eq!(att_record.vc_type, verification::vc_type::VERIFICATION_ATTESTATION);
+    assert_eq!(
+        att_record.vc_type,
+        verification::vc_type::VERIFICATION_ATTESTATION
+    );
     assert_eq!(att_record.selective_disclosure, false);
 
     // All records remain immutable — no status field on Evidence/Observation to change.
@@ -24536,7 +24542,11 @@ async fn phase3_claim_then_submit_and_cancel_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::TaskDeadlinePassed, "deadline in past must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskDeadlinePassed,
+        "deadline in past must fail",
+    );
 
     // Invalid task class → 169.
     let bad_class_id = [10u8; 32];
@@ -25104,7 +25114,11 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidConfidence, "confidence 101 must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidConfidence,
+        "confidence 101 must fail",
+    );
 
     // Bad location → 6163 InvalidPresenceFix.
     let nonce = 3u16;
@@ -25138,7 +25152,11 @@ async fn phase4_observation_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidPresenceFix, "bad location must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidPresenceFix,
+        "bad location must fail",
+    );
 
     // Happy path: valid observation succeeds.
     let nonce = 4u16;
@@ -25627,7 +25645,11 @@ async fn phase5_evidence_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::EmptyContentHash, "empty content_hash must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyContentHash,
+        "empty content_hash must fail",
+    );
 
     // Empty storage_reference → 6134 EmptyStorageReference.
     let (art_pk, _) = evidence_artifact_pda(&manifest_pk, 0);
@@ -25832,12 +25854,7 @@ async fn process_route(
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
     set_vrf_authority(ctx, payer, &oracle.pubkey()).await;
-    process_multi(
-        ctx,
-        payer,
-        &[ed25519_ix(oracle, &vrf_message(task_id)), ix],
-    )
-    .await
+    process_multi(ctx, payer, &[ed25519_ix(oracle, &vrf_message(task_id)), ix]).await
 }
 
 #[tokio::test]
@@ -26162,6 +26179,54 @@ async fn phase6_route_guards() {
         )
     };
 
+    // G6: a key that is not the allowlisted VRF authority is rejected even
+    // when it produces a well-formed Ed25519 attestation and matching output.
+    set_vrf_authority(&mut ctx, &payer, &oracle.pubkey()).await;
+    let rogue = Keypair::new();
+    let rogue_randomness = vrf_randomness(&rogue, &task_id);
+    let data = route_task_data(
+        &task_id,
+        0,
+        &[validator.pubkey()],
+        &validator.pubkey(),
+        1,
+        &rogue_randomness,
+        &rogue,
+    );
+    let res = process_multi(
+        &mut ctx,
+        &payer,
+        &[
+            ed25519_ix(&rogue, &vrf_message(&task_id)),
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: route_accounts_with_oracle(
+                    vec![
+                        AccountMeta::new(assign_pk, false),
+                        AccountMeta::new(task_pk, false),
+                        AccountMeta::new_readonly(req_pk, false),
+                        AccountMeta::new_readonly(validator.pubkey(), false),
+                        AccountMeta::new(payer.pubkey(), true),
+                        AccountMeta::new_readonly(system_program_id(), false),
+                    ],
+                    vec![
+                        AccountMeta::new_readonly(profile_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
+                    ],
+                    &rogue.pubkey(),
+                ),
+                data,
+            },
+        ],
+    )
+    .await;
+    assert_terra_error(
+        res,
+        TerraError::VrfAuthorityMismatch,
+        "unregistered VRF oracle must be rejected",
+    );
+
     // Empty candidates → TooManyRouteCandidates.
     let data = route_task_data(
         &task_id,
@@ -26185,7 +26250,11 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::TooManyRouteCandidates, "empty candidates must fail");
+    assert_terra_error(
+        res,
+        TerraError::TooManyRouteCandidates,
+        "empty candidates must fail",
+    );
 
     // chosen not in candidates → NotRouteWinner.
     let other = Pubkey::new_unique();
@@ -26211,7 +26280,11 @@ async fn phase6_route_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::NotRouteWinner, "chosen not in candidates must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotRouteWinner,
+        "chosen not in candidates must fail",
+    );
 
     // Wrong remaining_accounts count → RouteAccountMismatch.
     let data = route_task_data(
@@ -26485,7 +26558,11 @@ async fn phase7_self_report_rejected() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::SelfFraudReport, "self fraud report must fail");
+    assert_terra_error(
+        res,
+        TerraError::SelfFraudReport,
+        "self fraud report must fail",
+    );
 }
 
 #[tokio::test]
@@ -26527,7 +26604,11 @@ async fn phase7_invalid_reason_rejected() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidFraudReason, "invalid reason must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidFraudReason,
+        "invalid reason must fail",
+    );
 }
 
 #[tokio::test]
@@ -26589,7 +26670,11 @@ async fn phase7_open_review_needs_committee() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::CommitteeTooSmall, "empty committee pool must fail");
+    assert_terra_error(
+        res,
+        TerraError::CommitteeTooSmall,
+        "empty committee pool must fail",
+    );
 }
 
 #[tokio::test]
@@ -26715,7 +26800,11 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::NotCommitteeMember, "non-member vote must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotCommitteeMember,
+        "non-member vote must fail",
+    );
 
     // First member votes; double-vote fails (6197).
     let first = case.committee[0];
@@ -26757,7 +26846,11 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::DuplicateCommitteeVote, "double vote must fail");
+    assert_terra_error(
+        res,
+        TerraError::DuplicateCommitteeVote,
+        "double vote must fail",
+    );
 
     // Finalize too early (only 1/5) → 6198.
     let data = discriminator("global", "finalize_fraud_review").to_vec();
@@ -26782,7 +26875,11 @@ async fn phase7_vote_double_and_not_member() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::ReviewNotFinalizable, "early finalize must fail");
+    assert_terra_error(
+        res,
+        TerraError::ReviewNotFinalizable,
+        "early finalize must fail",
+    );
 }
 
 #[tokio::test]
@@ -27046,7 +27143,11 @@ async fn phase7_upheld_demotes_not_jails() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::RehabTooEarly, "rehab before 30 days must fail");
+    assert_terra_error(
+        res,
+        TerraError::RehabTooEarly,
+        "rehab before 30 days must fail",
+    );
 
     // Restriction still ACTIVE after failed rehab.
     let still: CapabilityRestriction = read_account(&ctx, restriction_pk).await;
@@ -27395,7 +27496,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         quote_task_resources_ix(task_pk, quote_pk, stranger.pubkey(), 100_000),
     )
     .await;
-    assert_terra_error(res, TerraError::NotTaskRequester, "non-requester quote must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotTaskRequester,
+        "non-requester quote must fail",
+    );
 
     // Requester quotes → read back.
     process(
@@ -27418,7 +27523,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         quote_task_resources_ix(task_pk, quote_pk, payer.pubkey(), 1),
     )
     .await;
-    assert_terra_error(res, TerraError::QuoteAlreadyExists, "double quote must fail");
+    assert_terra_error(
+        res,
+        TerraError::QuoteAlreadyExists,
+        "double quote must fail",
+    );
 
     // Fund before the fee policy exists → 6207.
     let (escrow_pk, _) = task_escrow_pda(&task_id);
@@ -27459,7 +27568,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::NotTaskRequester, "non-requester fund must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotTaskRequester,
+        "non-requester fund must fail",
+    );
 
     // Now the admin sets a valid fee policy (100 bps = 1%).
     process(
@@ -27548,7 +27661,11 @@ async fn phase8_policies_quote_fund_and_guards() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::EscrowAlreadyFunded, "double fund must fail");
+    assert_terra_error(
+        res,
+        TerraError::EscrowAlreadyFunded,
+        "double fund must fail",
+    );
 }
 
 #[tokio::test]
@@ -27643,7 +27760,11 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::TaskNotCompleted, "claim before completion must fail");
+    assert_terra_error(
+        res,
+        TerraError::TaskNotCompleted,
+        "claim before completion must fail",
+    );
 
     // Non-assignee claim → 6176 NotTaskAssignee (their own allocation PDA
     // so the seeds constraint passes and the assignee constraint fires).
@@ -27671,7 +27792,11 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::NotTaskAssignee, "non-assignee claim must fail");
+    assert_terra_error(
+        res,
+        TerraError::NotTaskAssignee,
+        "non-assignee claim must fail",
+    );
 
     // Validator submits PASS → task COMPLETED.
     let mut data = discriminator("global", "submit_task_result").to_vec();
@@ -27773,7 +27898,11 @@ async fn phase8_claim_reward_with_subsidy() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::RewardAlreadyClaimed, "double claim must fail");
+    assert_terra_error(
+        res,
+        TerraError::RewardAlreadyClaimed,
+        "double claim must fail",
+    );
 }
 
 #[tokio::test]
@@ -28146,7 +28275,11 @@ async fn phase9_register_update_calibrate_verify_lifecycle() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::DeviceRevoked, "verify after revoke must fail");
+    assert_terra_error(
+        res,
+        TerraError::DeviceRevoked,
+        "verify after revoke must fail",
+    );
 
     let mut data = discriminator("global", "update_device").to_vec();
     data.extend_from_slice(&1u64.to_le_bytes());
@@ -28164,7 +28297,11 @@ async fn phase9_register_update_calibrate_verify_lifecycle() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::DeviceRevoked, "update after revoke must fail");
+    assert_terra_error(
+        res,
+        TerraError::DeviceRevoked,
+        "update after revoke must fail",
+    );
 }
 
 #[tokio::test]
@@ -28276,7 +28413,11 @@ async fn phase9_device_guards() {
         },
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidDeviceKey, "zero device key must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidDeviceKey,
+        "zero device key must fail",
+    );
 
     // Invalid source (99) → 6182 (reused Phase 4 error).
     let (pk3, _) = device_identity_pda(&payer.pubkey(), 3);
@@ -29070,7 +29211,11 @@ async fn phase10_cross_border_binding_lifecycle() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidBindingExpiry, "past expiry must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidBindingExpiry,
+        "past expiry must fail",
+    );
 
     // Happy path: both authorities (= payer/admin here) sign.
     let (binding_pk, _) = cb_binding_pda(b"CM", b"NG");
@@ -29773,7 +29918,11 @@ async fn stage3_spatial_asset_lifecycle() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::EmptyGeometryHash, "zero geometry hash must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyGeometryHash,
+        "zero geometry hash must fail",
+    );
 
     // empty storage reference → 6134.
     let res = process(
@@ -30711,7 +30860,11 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidModelFormat, "UNKNOWN format must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidModelFormat,
+        "UNKNOWN format must fail",
+    );
     let res = process(
         &mut ctx,
         &payer,
@@ -30745,7 +30898,11 @@ async fn stage3_3d_model_lifecycle() {
         ),
     )
     .await;
-    assert_terra_error(res, TerraError::EmptyGeometryHash, "zero model hash must fail");
+    assert_terra_error(
+        res,
+        TerraError::EmptyGeometryHash,
+        "zero model hash must fail",
+    );
     let res = process(
         &mut ctx,
         &payer,
@@ -30971,7 +31128,11 @@ async fn stage3_spatial_snapshot_lifecycle() {
         stage3_snapshot_ix(&asset_pk, &payer.pubkey(), 2, &long_label),
     )
     .await;
-    assert_terra_error(res, TerraError::InvalidSnapshotLabel, "oversized label must fail");
+    assert_terra_error(
+        res,
+        TerraError::InvalidSnapshotLabel,
+        "oversized label must fail",
+    );
 }
 
 // ============================================================================

@@ -1,13 +1,9 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  ChevronRight,
   Clock,
-  Copy,
   FileText,
   Fingerprint,
   MapPin,
@@ -18,13 +14,12 @@ import {
 } from 'lucide-react'
 import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js'
 import { BN, BorshCoder } from '@coral-xyz/anchor'
-import { ed25519 } from '@noble/curves/ed25519'
 import { connection, useWallet } from '../lib/wallet'
 import { TERRA_PROGRAM_ID } from '../lib/constants'
 import idl from '../idl/terra_registry.json'
-import type { TerraRegistry } from '../idl/terraRegistry'
-import { sdJwtDigest } from '../lib/lifecyclePlan'
-import { useLocale } from '../lib/locale'
+import { digest, sdJwtDigest } from '../lib/lifecyclePlan'
+import { bytesToHex, residencyMessage, verifyEd25519 } from '../lib/mvpVerifier'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 
 // ---------------------------------------------------------------------------
 // MVP Flow — Intent 5: ONE flow end-to-end
@@ -84,51 +79,10 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleString()
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  if (hex.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(hex)) return new Uint8Array()
-  const out = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < out.length; i += 1) {
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  }
-  return out
-}
-
-function bytesToHex(bytes: Uint8Array | number[]): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-/** Canonical dual-sign residency message (RFC-018 §4, Step 2). */
-function residencyMessage(input: {
-  ownerPubkey: string
-  tenantPubkey: string
-  parcelId: string
-  timestamp: number
-}): Uint8Array {
-  return new TextEncoder().encode(
-    `RESIDENCY_PROOF\nowner:${input.ownerPubkey}\ntenant:${input.tenantPubkey}\nparcel:${input.parcelId}\ntimestamp:${input.timestamp}`,
-  )
-}
-
-function verifyEd25519(
-  pubkeyBase58: string,
-  message: Uint8Array,
-  signatureHex: string,
-): boolean {
-  try {
-    const sig = hexToBytes(signatureHex)
-    if (sig.length !== 64) return false
-    const pubkey = new PublicKey(pubkeyBase58).toBytes()
-    return ed25519.verify(sig, message, pubkey)
-  } catch {
-    return false
-  }
-}
 
 export default function MvpFlowPage() {
-  const { t } = useLocale()
-  const { publicKey, connected, connect, anchorWallet, send, signMessage } = useWallet()
+  const { publicKey, connected, anchorWallet, send, signMessage } = useWallet()
+  const { setVisible: setWalletModalVisible } = useWalletModal()
   const [step, setStep] = useState<FlowStep>('surveyor')
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(DEMO_PARCELS[0])
   const [vc, setVc] = useState<VC | null>(null)
@@ -140,13 +94,9 @@ export default function MvpFlowPage() {
   const [tenantSigned, setTenantSigned] = useState(false)
   const [tenantKey, setTenantKey] = useState('')
 
-  const handleConnect = useCallback(async () => {
-    try {
-      await connect()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Wallet connect failed')
-    }
-  }, [connect])
+  const handleConnect = useCallback(() => {
+    setWalletModalVisible(true)
+  }, [setWalletModalVisible])
 
   // Step 1: Surveyor attests parcel → issues W3C VC (SD-JWT)
   const handleIssueVC = useCallback(async () => {
@@ -161,7 +111,7 @@ export default function MvpFlowPage() {
       const expirationDate = issuanceDate + 365 * 24 * 60 * 60 // 1 year
       const vcType = 'ResidencyAttestation'
 
-      const sdJwtDigest = await sdJwtDigest(
+      const vcDigest = await sdJwtDigest(
         claimPk,
         surveyorPk,
         observationPk,
@@ -179,7 +129,7 @@ export default function MvpFlowPage() {
         credentialSubject: claimPk,
         issuanceDate: new BN(issuanceDate),
         expirationDate: new BN(expirationDate),
-        sdJwtDigest: Array.from(sdJwtDigest),
+        sdJwtDigest: Array.from(vcDigest),
         selectiveDisclosure: false,
       })
 
@@ -188,7 +138,7 @@ export default function MvpFlowPage() {
         keys: [
           {
             pubkey: PublicKey.findProgramAddressSync(
-              [Buffer.from('verification_attestation'), claimPk.toBuffer(), surveyorPk.toBuffer()],
+              [new TextEncoder().encode('verification_attestation'), claimPk.toBuffer(), surveyorPk.toBuffer()],
               new PublicKey(TERRA_PROGRAM_ID),
             )[0],
             isSigner: false,
@@ -204,14 +154,14 @@ export default function MvpFlowPage() {
           { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
           {
             pubkey: PublicKey.findProgramAddressSync(
-              [Buffer.from('validator_reputation'), surveyorPk.toBuffer()],
+              [new TextEncoder().encode('validator_reputation'), surveyorPk.toBuffer()],
               new PublicKey(TERRA_PROGRAM_ID),
             )[0],
             isSigner: false,
             isWritable: false,
           },
         ],
-        data: Buffer.from(data),
+        data,
       }
 
       const tx = new Transaction().add(ix)
@@ -224,7 +174,7 @@ export default function MvpFlowPage() {
         observation: observationPk.toBase58(),
         issuanceDate,
         expirationDate,
-        sdJwtDigest: bytesToHex(sdJwtDigest),
+        sdJwtDigest: bytesToHex(vcDigest),
         selectiveDisclosure: false,
       })
       setStep('vc')
@@ -303,7 +253,7 @@ export default function MvpFlowPage() {
       // 1. Read the attestation anchored on chain and check that the VC
       //    presented here is exactly the one the program stored.
       const attestationPk = PublicKey.findProgramAddressSync(
-        [Buffer.from('verification_attestation'), claimPk.toBuffer(), issuerPk.toBuffer()],
+        [new TextEncoder().encode('verification_attestation'), claimPk.toBuffer(), issuerPk.toBuffer()],
         programId,
       )[0]
       const info = await connection.getAccountInfo(attestationPk)

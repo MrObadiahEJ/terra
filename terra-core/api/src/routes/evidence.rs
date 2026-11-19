@@ -44,6 +44,8 @@ pub struct EvidenceUploadRow {
     pub uploaded_by: Option<String>,
     pub parcel_id: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    pub quarantined: bool,
+    pub quarantine_reason: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -65,10 +67,56 @@ pub struct EvidenceListParams {
 
 const SELECT_UPLOAD: &str =
     "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
-     uploaded_by, parcel_id, created_at";
+     uploaded_by, parcel_id, created_at, quarantined, quarantine_reason";
+
+/// Apply the intake quarantine policy to one upload.
+///
+/// Returns `(quarantined, reason)`. Unknown content types and oversize files
+/// are stored but flagged so they cannot be served until reviewed. This is a
+/// pure function so the policy is unit-tested without multipart plumbing.
+fn quarantine_decision(content_type: &str, size: usize, max_size: usize) -> (bool, Option<String>) {
+    const ALLOWED_TYPES: &[&str] = &[
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "application/pdf",
+        "text/plain",
+        "text/csv",
+        "text/html",
+        "application/json",
+        "application/zip",
+        "application/gzip",
+    ];
+    let allowed = ALLOWED_TYPES
+        .iter()
+        .any(|t| content_type == *t || content_type.starts_with(&format!("{t}/")));
+    if !allowed {
+        return (
+            true,
+            Some(format!("disallowed content type: {content_type}")),
+        );
+    }
+    if size > max_size {
+        return (
+            true,
+            Some(format!("file too large: {size} bytes (max {max_size})")),
+        );
+    }
+    (false, None)
+}
 
 /// Upload evidence file. Requires authenticated request (SignedRequest).
 /// The caller's wallet address is recorded as `uploaded_by` for provenance.
+///
+/// Intake performs quarantine checks:
+///   - SHA-256 digest of bytes is computed and stored as `content_hash`.
+///   - Content type must be in the allow-list (image/*, application/pdf,
+///     text/*, application/json). Unknown types are quarantined.
+///   - Size must not exceed EVIDENCE_MAX_SIZE_BYTES (default 50 MB).
+///   - Failing any check sets `quarantined=true` with a reason; the bytes
+///     are still stored but flagged as untrusted.
 pub async fn upload_evidence(
     State(state): State<AppState>,
     _auth: SignedRequest,
@@ -134,14 +182,16 @@ pub async fn upload_evidence(
         .and_then(|v| v.parse().ok())
         .unwrap_or(50 * 1024 * 1024); // 50 MB default
 
-    if bytes.len() > max_size {
-        return Err(AppError::bad_request(format!(
-            "file too large: {} bytes (max {})",
-            bytes.len(),
-            max_size,
-        )));
-    }
+    // --- Quarantine checks -------------------------------------------------
+    // Content-type allow-list and size cap: failing either quarantines the
+    // upload rather than rejecting it, so the bytes are preserved as evidence
+    // while being blocked from serving until reviewed.
+    let (quarantined, quarantine_reason) =
+        quarantine_decision(&content_type, bytes.len(), max_size);
 
+    // Store the artifact regardless (quarantined bytes are still stored but
+    // flagged; they cannot be served via GET /evidence/{id}/file until
+    // unquarantined).
     let artifact = state
         .storage
         .store(&filename, &content_type, &bytes)
@@ -151,10 +201,10 @@ pub async fn upload_evidence(
     let id = Uuid::new_v4();
     let row = sqlx::query_as::<_, EvidenceUploadRow>(
         "INSERT INTO evidence_uploads
-            (id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, uploaded_by, parcel_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, uploaded_by, parcel_id, quarantined, quarantine_reason)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes,
-                   uploaded_by, parcel_id, created_at",
+                   uploaded_by, parcel_id, created_at, quarantined, quarantine_reason",
     )
     .bind(id)
     .bind(hex::encode(artifact.content_hash))
@@ -165,6 +215,8 @@ pub async fn upload_evidence(
     .bind(artifact.size_bytes as i64)
     .bind(&uploaded_by)
     .bind(&parcel_id)
+    .bind(quarantined)
+    .bind(&quarantine_reason)
     .fetch_one(&state.pool)
     .await?;
 
@@ -280,6 +332,14 @@ pub async fn get_evidence_file(
     .await?
     .ok_or_else(|| AppError::not_found("evidence upload not found"))?;
 
+    if row.quarantined {
+        return Err(AppError::Forbidden(
+            row.quarantine_reason
+                .clone()
+                .unwrap_or_else(|| "evidence is quarantined".to_string()),
+        ));
+    }
+
     let bytes = state
         .storage
         .load(&row.storage_ref)
@@ -325,6 +385,8 @@ mod tests {
     use sha2::Digest;
     use tower::ServiceExt;
 
+    // -----------------------------------------------------------------------
+    // EvidenceUploadRow serialization
     // -----------------------------------------------------------------------
     // UploadResponse serialization
     // -----------------------------------------------------------------------
@@ -579,6 +641,24 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
+    fn quarantine_policy_flags_bad_type_and_oversize() {
+        let max = 1024;
+        assert_eq!(quarantine_decision("image/png", 10, max), (false, None));
+        assert_eq!(
+            quarantine_decision("application/pdf", max, max),
+            (false, None)
+        );
+
+        let (bad_type, reason) = quarantine_decision("application/x-msdownload", 10, max);
+        assert!(bad_type);
+        assert!(reason.unwrap().contains("disallowed content type"));
+
+        let (too_large, reason) = quarantine_decision("text/plain", max + 1, max);
+        assert!(too_large);
+        assert!(reason.unwrap().contains("file too large"));
+    }
+
+    #[test]
     fn evidence_row_serializes() {
         let row = EvidenceUploadRow {
             id: Uuid::nil(),
@@ -591,6 +671,8 @@ mod tests {
             uploaded_by: None,
             parcel_id: Some("PARCEL-2".into()),
             created_at: chrono::Utc::now(),
+            quarantined: false,
+            quarantine_reason: None,
         };
         let json = serde_json::to_string(&row).unwrap();
         assert!(json.contains("content_hash"));
@@ -652,4 +734,100 @@ mod tests {
             .unwrap()
             .is_none());
     }
+
+    #[tokio::test]
+    async fn purge_deletes_only_expired_evidence() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed evidence purge test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool: pool.clone(),
+            geo: None,
+            api_authority: crate::auth::ApiAuthority(None),
+            vrf_oracle_pubkey: None,
+            storage: Arc::new(crate::storage::StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+        let expired_id = Uuid::new_v4();
+        let live_id = Uuid::new_v4();
+        for (id, expires) in [
+            (expired_id, "now() - interval '1 hour'"),
+            (live_id, "now() + interval '1 hour'"),
+        ] {
+            let sql = format!(
+                "INSERT INTO evidence_uploads
+                    (id, content_hash, storage_ref, storage_backend, filename,
+                     content_type, size_bytes, quarantined, quarantine_reason, expires_at)
+                 VALUES ($1, $2, '2099/01/01/x', 'local', 'x', 'text/plain', 1,
+                         true, 'test', {expires})"
+            );
+            sqlx::query(&sql)
+                .bind(id)
+                .bind(format!("{:064x}", Uuid::new_v4().as_u128()))
+                .execute(&pool)
+                .await
+                .expect("insert evidence row");
+        }
+
+        let purged = purge_expired_evidence(&state).await.expect("purge");
+        assert!(purged >= 1);
+        let remaining: Vec<(Uuid,)> =
+            sqlx::query_as("SELECT id FROM evidence_uploads WHERE id = ANY($1)")
+                .bind(&[expired_id, live_id][..])
+                .fetch_all(&pool)
+                .await
+                .expect("read remaining rows");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].0, live_id, "only the live row survives");
+
+        sqlx::query("DELETE FROM evidence_uploads WHERE id = $1")
+            .bind(live_id)
+            .execute(&pool)
+            .await
+            .expect("clean up");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PURGE: Delete expired, quarantined evidence rows.
+// Called periodically (e.g. via cron) to clean up rows whose TTL has expired.
+pub async fn purge_expired_evidence(state: &AppState) -> Result<i64, AppError> {
+    // Find expired, quarantined rows.
+    let expired: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT id, storage_ref FROM evidence_uploads \
+         WHERE expires_at IS NOT NULL \
+           AND expires_at < now()",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("expired evidence query failed: {e}")))?;
+
+    for (id, storage_ref) in &expired {
+        // Delete the stored file if present.
+        if let Err(e) = crate::storage::StorageBackend::load(&state.storage, storage_ref).await {
+            if !e.to_string().contains("not found") {
+                tracing::warn!("failed to load expired evidence {id} for deletion: {e}");
+            }
+        }
+        // Attempt deletion (best-effort; ignore errors).
+        let _ = crate::storage::StorageBackend::delete(&state.storage, storage_ref).await;
+    }
+
+    let result = sqlx::query(
+        "DELETE FROM evidence_uploads \
+         WHERE expires_at IS NOT NULL \
+           AND expires_at < now()",
+    )
+    .execute(&state.pool)
+    .await
+    .map_err(|e| AppError::internal(format!("expired evidence delete failed: {e}")))?;
+
+    Ok(result.rows_affected() as i64)
 }

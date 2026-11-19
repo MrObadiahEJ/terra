@@ -278,9 +278,9 @@ pub use security::{
 };
 // Routing contexts now live in `routing::` too; the `#[program]` block names
 // them unqualified, which Anchor resolves through these root re-exports.
-pub use routing::InitVrfAuthority;
 #[doc(hidden)]
 pub(crate) use routing::__client_accounts_init_vrf_authority;
+pub use routing::InitVrfAuthority;
 // `#[derive(Accounts)]` emits a hidden `__client_accounts_*` module next to
 // each struct. Anchor's `#[program]` macro resolves those at the crate root,
 // so the modules generated inside `security` must be re-exported there too.
@@ -2450,10 +2450,7 @@ pub mod terra_registry {
     // -----------------------------------------------------------------------
 
     /// Set or rotate the allowlisted VRF oracle authority. Registry admin only.
-    pub fn init_vrf_authority(
-        ctx: Context<InitVrfAuthority>,
-        authority: Pubkey,
-    ) -> Result<()> {
+    pub fn init_vrf_authority(ctx: Context<InitVrfAuthority>, authority: Pubkey) -> Result<()> {
         routing::init_vrf_authority(ctx, authority)
     }
 

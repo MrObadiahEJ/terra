@@ -87,7 +87,11 @@ pub struct VrfAuthoritySet {
 
 /// Set or rotate the allowlisted VRF oracle. Admin-gated by the registry.
 pub fn init_vrf_authority(ctx: Context<InitVrfAuthority>, authority: Pubkey) -> Result<()> {
-    require_keys_neq!(authority, Pubkey::default(), TerraError::InvalidVrfRandomness);
+    require_keys_neq!(
+        authority,
+        Pubkey::default(),
+        TerraError::InvalidVrfRandomness
+    );
     let now = Clock::get()?.unix_timestamp;
     let cfg = &mut ctx.accounts.vrf_authority;
     cfg.authority = authority;

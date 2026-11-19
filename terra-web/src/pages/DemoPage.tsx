@@ -140,7 +140,7 @@ export default function DemoPage() {
   const [sceneWebglError, setSceneWebglError] = useState<string | null>(null)
   const [view, setView] = useState<'events' | 'viz'>('viz')
   const tlRef = useRef<HTMLDivElement | null>(null)
-  const [mapResizeKey, setMapResizeKey] = useState(0)
+  const [mapResizeKey] = useState(0)
 
   useEffect(() => {
     let live = true

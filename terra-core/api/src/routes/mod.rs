@@ -23,6 +23,7 @@ pub mod reconstruction;
 pub mod recovery;
 pub mod rights;
 pub mod runtime;
+pub mod settlement;
 pub mod spatial;
 pub mod spatial_accounts;
 pub mod staking;
@@ -45,6 +46,7 @@ pub fn router() -> Router<AppState> {
         .nest("/components", components::router())
         .nest("/manifests", manifests::router())
         .nest("/mirror", mirror::router())
+        .nest("/providers/settlement", settlement::router())
         .nest("/providers", providers::router())
         .nest("/runtime", runtime::router())
         .nest("/vaults", vaults::router())

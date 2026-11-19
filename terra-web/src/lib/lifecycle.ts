@@ -625,9 +625,10 @@ async function taskStep(state: StepState): Promise<void> {
   if (!assignment) {
     const { oracle } = await resolveVrfOracle(state.seed)
 
-    const authority = await state.program.account.vrfAuthority.fetchNullable(
-      state.pdas.vrfAuthority,
-    )
+    const authority = await reader<{ authority: PublicKey }>(
+      state.program,
+      'vrfAuthority',
+    ).fetchNullable(state.pdas.vrfAuthority)
     if (!authority || !authority.authority.equals(oracle.publicKey)) {
       const ix = await state.program.methods
         .initVrfAuthority(oracle.publicKey)
