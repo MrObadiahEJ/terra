@@ -38,7 +38,7 @@ import { useLocale } from '../lib/locale'
 // labelled as such — it is never presented as live chain state.
 
 const FALLBACK: DemoScenarioInfo[] = [
-  { name: 'land-registration', description: 'parcel → ownership right → spatial asset → geometry v0', method: 'POST', path: '/demo/scenarios/land-registration' },
+  { name: 'parcel-registration', description: 'parcel → ownership right → spatial asset → geometry v0', method: 'POST', path: '/demo/scenarios/parcel-registration' },
   { name: 'verification', description: 'claim → evidence → observation → task → routing → quorum → verified', method: 'POST', path: '/demo/scenarios/verification' },
   { name: 'cross-border', description: 'jurisdictions → identity binding → membership → cross-border verification', method: 'POST', path: '/demo/scenarios/cross-border' },
   { name: 'dispute', description: 'dispute → freeze → adjudication → judgment → execution', method: 'POST', path: '/demo/scenarios/dispute' },

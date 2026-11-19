@@ -435,7 +435,7 @@ If a validator is temporarily offline (no internet), they can:
 ### 10.2 Arweave
 
 - Permanent, pay-once storage.
-- Appropriate for land registry data that must outlive any single server.
+- Appropriate for spatial data that must outlive any single server.
 - Cost is negligible for small dossiers (KB to low MB).
 
 ### 10.3 PostGIS

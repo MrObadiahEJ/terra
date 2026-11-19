@@ -367,7 +367,7 @@ export const STATUS_MODULES: StatusModule[] = [
     evidence:
       'api/src/routes/demo_scenarios.rs (GET/POST /api/v1/demo/scenarios/*, 7 unit tests — cargo test -p terra-api: 75 passed) + shipped /demo player; live chain-event streaming tracked under activity-feed (B4)',
     verified: [
-      '8 scenario builders (verification, land-registration, cross-border, dispute, validator-routing, spatial-update, fraud-review, recovery)',
+      '8 scenario builders (verification, parcel-registration, cross-border, dispute, validator-routing, spatial-update, fraud-review, recovery)',
       'Deterministic seeded output (FNV-1a + xorshift64*, byte-identical per seed — unit-tested + in-page "Verify determinism")',
       'Every payload carries demo:true + demo-prefixed accounts (never presented as chain state)',
       'Shipped /demo player: scenario picker, seeded runs, animated event timeline (play/pause/step), entity inspector',

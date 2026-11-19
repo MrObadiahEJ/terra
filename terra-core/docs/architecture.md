@@ -7,13 +7,13 @@
 
 ## System Overview
 
-Terra is a decentralized land claim & verification network on Solana built with Anchor — the on-chain core of the wider Terra vision. It manages land parcels, rights, escrow, staking, verification, vaults, ZK proofs, and cross-border governance through two on-chain programs, a PostGIS mirror API, and a geo engine.
+Terra is a decentralized spatial claim & verification network on Solana built with Anchor — the on-chain core of the wider Terra vision. It manages land parcels, rights, escrow, staking, verification, vaults, ZK proofs, and cross-border governance through two on-chain programs, a PostGIS mirror API, and a geo engine.
 
 **Program IDs** (devnet / localnet / mainnet slots in `Anchor.toml`):
 
 | Program | ID | Crate | Purpose |
 |---------|-----|-------|---------|
-| `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core land registry, escrow, staking, verification, vaults, ZK proofs |
+| `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | `terra-registry` | Core spatial registry, escrow, staking, verification, vaults, ZK proofs |
 | `terra_identity` | `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p` | `terra-identity` | Identity management, succession, guardianship |
 
 **Source counts** (as of 2026-10-13, Vision Stage 3 Phase C — 3D models + spatial snapshots — after Phases A/B spatial assets, RFC-012 Phase 10 cross-border, legacy sweep, B6 boundary split, P0-2 removal-endorsement path): `terra_registry` — 165 instructions, 71 `#[account]` types, 152 events, 247 `TerraError` codes. `terra_identity` — 8 instructions, 2 accounts, 8 events, 29 `IdentityError` codes. Regenerate IDL with `make idl` after program changes.

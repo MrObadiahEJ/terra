@@ -66,10 +66,10 @@ terra-web/src/
 | `/welcome` | `WelcomePage` | Landing page with atlas preview and offline/API status |
 | `/atlas` | `GlobePage` → `TerraGlobe` | Immersive, Google-Earth-style primary atlas: full-viewport map with floating glass header, search pill, tool rail and coordinate status bar; keyless OSM / Esri World Imagery / OpenTopoMap basemaps; 2D↔3D switch that preserves the camera; layer loading by LOD; parcel/building selection; floating land panel (bottom sheet on phones, swipe-down to dismiss); collapsible WASDQE/X-Y-Z navigation pad. Deep links: `?parcel=…`, `?c=lon,lat,height`. Falls back to Leaflet (2D) or Three.js when WebGL/Cesium fails |
 | `/lab` | `LabPage` | Interactive experiments (`components/lab/`); deep-link `?tab=vault\|pipeline\|crossborder` |
-| `/lab/land` | `LandDetailPage` | Land record detail / viewer |
-| `/demo` | `DemoPage` | Seeded scenario player (land registration, verification, cross-border, dispute, validator routing, spatial update, fraud review, recovery); deterministic browser preview when the scenario API is offline. Deep links: `?scenario=…&seed=…` |
+| `/lab/land` | `LandDetailPage` | Parcel record detail / viewer |
+| `/demo` | `DemoPage` | Seeded scenario player (parcel registration, verification, cross-border, dispute, validator routing, spatial update, fraud review, recovery); deterministic browser preview when the scenario API is offline. Deep links: `?scenario=…&seed=…` |
 | `/network` | `NetworkPage` | Validator/worker network view |
-| `/portfolio` | `PortfolioPage` | Wallet holdings and land assets |
+| `/portfolio` | `PortfolioPage` | Wallet holdings and spatial assets |
 | `/status` | `StatusPage` | Protocol + API + devnet status |
 | `/transactions` | `TransactionsPage` | Demo chain explorer: simulated tx feed, failure injection, wallet-signed txs, land-version timeline |
 | `/console` | `ProtocolConsolePage` | Protocol operation console |

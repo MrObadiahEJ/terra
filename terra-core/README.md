@@ -8,13 +8,13 @@ Representation of the Physical World** (land is the first domain).
 
 ## Overview
 
-Terra is a multi-program Solana system for managing land parcels, rights, escrow, staking, verification, and cross-border governance. It consists of two on-chain programs and supporting infrastructure: PostGIS mirror API + OSM geo-engine.
+Terra is a multi-program Solana system for managing spatial parcels, rights, escrow, staking, verification, and cross-border governance. It consists of two on-chain programs and supporting infrastructure: PostGIS mirror API + OSM geo-engine.
 
 ### Programs
 
 | Program | ID | Purpose |
 |---------|-----|---------|
-| `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | Core land registry, escrow, staking, verification |
+| `terra_registry` | `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage` | Core spatial registry, escrow, staking, verification |
 | `terra_identity` | `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p` | Identity management, succession, guardianship |
 
 ### Architecture

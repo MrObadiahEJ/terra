@@ -67,7 +67,7 @@ pub async fn run(
 
 const SCENARIOS: &[(&str, &str)] = &[
     (
-        "land-registration",
+        "parcel-registration",
         "parcel → ownership right → spatial asset → geometry v0",
     ),
     (
@@ -102,7 +102,7 @@ const SCENARIOS: &[(&str, &str)] = &[
 
 fn build_scenario(name: &str, seed: &str) -> Option<Value> {
     match name {
-        "land-registration" => Some(build_land_registration(seed)),
+        "parcel-registration" => Some(build_parcel_registration(seed)),
         "verification" => Some(build_verification(seed)),
         "cross-border" => Some(build_cross_border(seed)),
         "dispute" => Some(build_dispute(seed)),
@@ -239,8 +239,8 @@ fn with(envelope: Value, fields: Value) -> Value {
 // Scenarios
 // ---------------------------------------------------------------------------
 
-fn build_land_registration(seed: &str) -> Value {
-    let mut s = Story::new("land-registration", seed);
+fn build_parcel_registration(seed: &str) -> Value {
+    let mut s = Story::new("parcel-registration", seed);
     let parcel = s.rng.hash_id();
     let owner = s.rng.account();
     let spatial = s.rng.hash_id();
@@ -276,7 +276,7 @@ fn build_land_registration(seed: &str) -> Value {
         &parcel,
     );
     with(
-        envelope("land-registration", seed),
+        envelope("parcel-registration", seed),
         json!({
             "result": "REGISTERED",
             "parcel": { "id": parcel, "status": "ACTIVE" },

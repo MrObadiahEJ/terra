@@ -1,7 +1,7 @@
 import type { DemoScenarioEvent, DemoScenarioResult } from './api'
 
 const SCENARIOS: Record<string, { result: string; steps: [string, string][]; entities: Record<string, unknown> }> = {
-  'land-registration': {
+  'parcel-registration': {
     result: 'PARCEL_REGISTERED',
     steps: [
       ['PARCEL_REGISTERED', 'Parcel boundary and ownership right recorded.'],
