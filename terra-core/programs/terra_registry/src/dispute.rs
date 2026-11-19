@@ -93,10 +93,7 @@ pub fn file_dispute(
         !case_hash.iter().all(|b| *b == 0),
         TerraError::EmptyCaseHash
     );
-    require!(
-        bond_lamports > 0,
-        TerraError::InvalidBond
-    );
+    require!(bond_lamports > 0, TerraError::InvalidBond);
     require!(
         required >= MIN_DISPUTE_VALIDATORS,
         TerraError::InvalidThreshold
@@ -114,10 +111,7 @@ pub fn file_dispute(
             continue;
         }
         // The filer cannot be their own validator (self-dealing).
-        require!(
-            v != filer_key,
-            TerraError::ValidatorOwnsAsset
-        );
+        require!(v != filer_key, TerraError::ValidatorOwnsAsset);
         // The ownership holder cannot be a dispute validator (self-dealing).
         require!(
             v != ctx.accounts.ownership.holder,

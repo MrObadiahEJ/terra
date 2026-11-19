@@ -220,9 +220,10 @@ async fn create_parcel(
     // Only the API authority may create mirror rows — untrusted callers must
     // go through the authority-gated /reconcile endpoint after the on-chain
     // parcel exists, which re-derives and validates the access digest.
-    let key = state.api_authority.0.ok_or_else(|| {
-        AppError::unauthorized("API_AUTHORITY_PUBKEY not configured")
-    })?;
+    let key = state
+        .api_authority
+        .0
+        .ok_or_else(|| AppError::unauthorized("API_AUTHORITY_PUBKEY not configured"))?;
     auth.verify(&key, "POST", "/api/v1/parcels/")?;
     let geojson = params.geometry.to_string();
     let status = if params.status.is_empty() {
@@ -582,20 +583,26 @@ mod tests {
     /// property data and must not leak to unauthenticated callers.
     #[test]
     fn holder_is_none_for_unsigned_request() {
-let row = ParcelRow {
-        id: Uuid::nil(),
-        name: "test".into(),
-        holder: "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage".into(),
-        status: "registered".into(),
-        geometry: None,
-        area_m2: None,
-        created_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
-        updated_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
-        onchain_id: None,
-    };
-    let unauthenticated = row.clone().into_parcel(false);
-    assert!(unauthenticated.holder.is_none(), "holder must be redacted for unsigned callers");
-    let authority = row.into_parcel(true);
-    assert_eq!(authority.holder.as_deref(), Some("GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"));
+        let row = ParcelRow {
+            id: Uuid::nil(),
+            name: "test".into(),
+            holder: "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage".into(),
+            status: "registered".into(),
+            geometry: None,
+            area_m2: None,
+            created_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+            updated_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+            onchain_id: None,
+        };
+        let unauthenticated = row.clone().into_parcel(false);
+        assert!(
+            unauthenticated.holder.is_none(),
+            "holder must be redacted for unsigned callers"
+        );
+        let authority = row.into_parcel(true);
+        assert_eq!(
+            authority.holder.as_deref(),
+            Some("GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage")
+        );
     }
 }

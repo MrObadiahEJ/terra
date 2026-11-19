@@ -92,7 +92,7 @@ pub async fn parse_signed_request(parts: &mut Parts) -> Result<SignedRequest, St
         .and_then(|v| v.to_str().ok())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-        // Parse "Signature <base64>" format.
+    // Parse "Signature <base64>" format.
     let sig_b64 = auth_header
         .strip_prefix("Signature ")
         .ok_or(StatusCode::UNAUTHORIZED)?;
