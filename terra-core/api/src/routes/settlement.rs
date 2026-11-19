@@ -1,15 +1,28 @@
-//! Provider settlement rail (RFC-014 direction, USDC service fees only).
+//! Provider settlement rail (RFC-014 direction, service-fee only).
 //!
 //! Usage is metered per replica (`access_count`, `bytes_served`). Closing an
-//! epoch snapshots each provider's un-settled delta, prices it in micro-USDC,
-//! commits all leaves to a Merkle root, and advances the provider's settled
-//! counters so the same bytes can never be paid twice. A provider then claims
-//! its leaf with a Merkle inclusion proof signed by its registered wallet.
+//! epoch snapshots each provider's un-settled delta, prices it in the epoch's
+//! settlement asset, commits all leaves to a Merkle root, and advances the
+//! provider's settled counters so the same bytes can never be paid twice. A
+//! provider then claims its leaf with a Merkle inclusion proof signed by its
+//! registered wallet.
+//!
+//! The payout asset is a row in `settlement_assets`, not a constant. The
+//! default is SOL — no issuer, no country — and a provider can opt into
+//! another enabled asset (USDC, EURC, anything an operator registers) with
+//! `payout_currency`. Epoch closes only include providers whose effective
+//! currency matches the epoch currency, so nobody is silently paid in a rail
+//! they did not choose.
 //!
 //! Q-005 hard gate: this rail models payment for verified storage service
-//! only. `currency` is constrained to USDC and `settlement_kind` to
-//! `service_fee` in migration 0054 — there is no token, fractional interest,
-//! yield, or profit share.
+//! only. `settlement_kind` is constrained to `service_fee` in migration 0054 —
+//! there is no token, fractional interest, or profit share in any currency.
+//!
+//! Censorship boundary, stated plainly: the registry/storage/retrieval data
+//! plane does not depend on any settlement asset. This module records an
+//! obligation (a signed, Merkle-provable leaf); executing the transfer is an
+//! operational step on whatever rail the parties chose. If one rail freezes an
+//! address, the proof still stands and can be honoured over another rail.
 
 use axum::extract::{Path, State};
 use axum::routing::{get, post};
@@ -23,11 +36,12 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 const BYTES_PER_GB: i128 = 1_000_000_000;
-/// 100_000 micro-USDC = $0.10 per GB by default.
-const DEFAULT_RATE_MICRO_USDC_PER_GB: i64 = 100_000;
+/// Q-005: the only settlement kind this rail models.
+const SETTLEMENT_KIND: &str = "service_fee";
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/assets", get(list_assets))
         .route("/epochs", get(list_epochs).post(close_epoch))
         .route("/epochs/{epoch_id}", get(get_epoch))
         .route(
@@ -38,13 +52,27 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct SettlementAssetRow {
+    pub currency: String,
+    pub display_name: String,
+    pub decimals: i16,
+    pub kind: String,
+    pub issuer: Option<String>,
+    pub is_enabled: bool,
+    pub is_default: bool,
+    pub default_rate_micro_units_per_gb: i64,
+    pub min_payout_micro_units: i64,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct EpochRow {
     pub epoch_id: i64,
     pub currency: String,
     pub settlement_kind: String,
-    pub rate_micro_usdc_per_gb: i64,
-    pub min_payout_micro_usdc: i64,
-    pub total_micro_usdc: i64,
+    pub rate_micro_units_per_gb: i64,
+    pub min_payout_micro_units: i64,
+    pub total_micro_units: i64,
     pub merkle_root: String,
     pub leaf_count: i32,
     pub status: String,
@@ -55,10 +83,11 @@ pub struct EpochRow {
 pub struct LeafRow {
     pub epoch_id: i64,
     pub provider_id: Uuid,
+    pub currency: String,
     pub provider_wallet: String,
     pub access_count: i64,
     pub bytes_served: i64,
-    pub amount_micro_usdc: i64,
+    pub amount_micro_units: i64,
     pub leaf_hash: String,
     pub leaf_index: i32,
     pub claimed_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -67,8 +96,10 @@ pub struct LeafRow {
 
 #[derive(Debug, Deserialize)]
 pub struct CloseEpochRequest {
-    pub rate_micro_usdc_per_gb: Option<i64>,
-    pub min_payout_micro_usdc: Option<i64>,
+    /// Settlement asset symbol. Omit to use the registry's default asset.
+    pub currency: Option<String>,
+    pub rate_micro_units_per_gb: Option<i64>,
+    pub min_payout_micro_units: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -97,7 +128,8 @@ pub struct ClaimResponse {
     pub claimed: bool,
     pub epoch_id: i64,
     pub provider_id: Uuid,
-    pub amount_micro_usdc: i64,
+    pub currency: String,
+    pub amount_micro_units: i64,
     pub claim_reference: Option<String>,
 }
 
@@ -113,16 +145,19 @@ fn hash_pair(left: &str, right: &str) -> String {
     sha256_hex(format!("{left}{right}").as_bytes())
 }
 
+/// Leaf hash v2. The currency is part of the domain so a leaf priced in one
+/// asset can never be replayed against an epoch in another asset.
 pub fn settlement_leaf_hash(
+    currency: &str,
     provider_id: Uuid,
     wallet: &str,
     access_count: i64,
     bytes_served: i64,
-    amount_micro_usdc: i64,
+    amount_micro_units: i64,
 ) -> String {
     sha256_hex(
         format!(
-            "terra:settlement:leaf:v1\n{provider_id}\n{wallet}\n{access_count}\n{bytes_served}\n{amount_micro_usdc}"
+            "terra:settlement:leaf:v2\n{currency}\n{provider_id}\n{wallet}\n{access_count}\n{bytes_served}\n{amount_micro_units}"
         )
         .as_bytes(),
     )
@@ -186,6 +221,52 @@ fn verify_merkle_proof(leaf: &str, proof: &[MerkleStep], root: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Assets
+// ---------------------------------------------------------------------------
+
+const ASSET_SELECT: &str = "SELECT currency, display_name, decimals, kind, issuer, \
+    is_enabled, is_default, default_rate_micro_units_per_gb, \
+    min_payout_micro_units, notes FROM settlement_assets";
+
+pub async fn list_assets(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SettlementAssetRow>>, AppError> {
+    let rows: Vec<SettlementAssetRow> = sqlx::query_as(&format!(
+        "{ASSET_SELECT} WHERE is_enabled = true ORDER BY is_default DESC, currency"
+    ))
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(rows))
+}
+
+/// Resolve an epoch's settlement asset. `None` means the registry default.
+async fn fetch_asset(
+    state: &AppState,
+    currency: Option<&str>,
+) -> Result<SettlementAssetRow, AppError> {
+    let row = match currency {
+        Some(currency) => {
+            sqlx::query_as::<_, SettlementAssetRow>(&format!(
+                "{ASSET_SELECT} WHERE currency = $1 AND is_enabled = true"
+            ))
+            .bind(currency)
+            .fetch_optional(&state.pool)
+            .await?
+        }
+        None => {
+            sqlx::query_as::<_, SettlementAssetRow>(&format!(
+                "{ASSET_SELECT} WHERE is_default = true AND is_enabled = true"
+            ))
+            .fetch_optional(&state.pool)
+            .await?
+        }
+    };
+    row.ok_or_else(|| {
+        AppError::bad_request("no enabled settlement asset matches the requested currency")
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Close epoch
 // ---------------------------------------------------------------------------
 
@@ -202,8 +283,9 @@ pub async fn close_epoch(
 
     let response = close_epoch_inner(
         &state,
-        req.rate_micro_usdc_per_gb,
-        req.min_payout_micro_usdc,
+        req.currency.as_deref(),
+        req.rate_micro_units_per_gb,
+        req.min_payout_micro_units,
     )
     .await?;
     Ok((axum::http::StatusCode::CREATED, Json(response)))
@@ -211,25 +293,31 @@ pub async fn close_epoch(
 
 pub async fn close_epoch_inner(
     state: &AppState,
-    rate_micro_usdc_per_gb: Option<i64>,
-    min_payout_micro_usdc: Option<i64>,
+    currency: Option<&str>,
+    rate_micro_units_per_gb: Option<i64>,
+    min_payout_micro_units: Option<i64>,
 ) -> Result<CloseEpochResponse, AppError> {
-    let rate = rate_micro_usdc_per_gb.unwrap_or(DEFAULT_RATE_MICRO_USDC_PER_GB);
-    let min_payout = min_payout_micro_usdc.unwrap_or(0);
+    let asset = fetch_asset(state, currency).await?;
+    let rate = rate_micro_units_per_gb.unwrap_or(asset.default_rate_micro_units_per_gb);
+    let min_payout = min_payout_micro_units.unwrap_or(asset.min_payout_micro_units);
     if rate <= 0 {
         return Err(AppError::bad_request(
-            "rate_micro_usdc_per_gb must be positive",
+            "rate_micro_units_per_gb must be positive",
         ));
     }
     if min_payout < 0 {
         return Err(AppError::bad_request(
-            "min_payout_micro_usdc must be non-negative",
+            "min_payout_micro_units must be non-negative",
         ));
     }
 
     // Only rows whose cumulative replica usage exceeds what has already been
     // settled are eligible. `FOR UPDATE` on providers serializes concurrent
     // epoch closes so a byte cannot be paid twice.
+    //
+    // Providers are matched on their *effective* currency: an explicit
+    // `payout_currency`, or the registry default when it is NULL. Closing a
+    // non-default asset therefore only pays providers who opted into it.
     type Unsettled = (Uuid, String, i64, i64, i64, i64);
     let mut tx = state.pool.begin().await?;
     let rows: Vec<Unsettled> = sqlx::query_as(
@@ -241,11 +329,17 @@ pub async fn close_epoch_inner(
                           WHERE pr.provider_id = sp.id), 0)::bigint
          FROM storage_providers sp
          WHERE sp.wallet_address IS NOT NULL AND sp.is_active = true
+           AND COALESCE(
+                 sp.payout_currency,
+                 (SELECT sa.currency FROM settlement_assets sa
+                  WHERE sa.is_default = true AND sa.is_enabled = true)
+               ) = $1
            AND COALESCE((SELECT SUM(pr.bytes_served) FROM provider_replicas pr
                          WHERE pr.provider_id = sp.id), 0) > sp.settled_bytes_served
          ORDER BY sp.id
          FOR UPDATE",
     )
+    .bind(&asset.currency)
     .fetch_all(&mut *tx)
     .await
     .map_err(|e| AppError::internal(format!("settlement scan failed: {e}")))?;
@@ -273,8 +367,14 @@ pub async fn close_epoch_inner(
         if amount <= 0 || amount < min_payout {
             continue;
         }
-        let leaf_hash =
-            settlement_leaf_hash(provider_id, &wallet, access_delta, bytes_delta, amount);
+        let leaf_hash = settlement_leaf_hash(
+            &asset.currency,
+            provider_id,
+            &wallet,
+            access_delta,
+            bytes_delta,
+            amount,
+        );
         pending.push(Pending {
             provider_id,
             wallet,
@@ -289,20 +389,22 @@ pub async fn close_epoch_inner(
 
     let leaves: Vec<String> = pending.iter().map(|p| p.leaf_hash.clone()).collect();
     let root = merkle_root(&leaves);
-    let total_micro_usdc: i64 = pending.iter().map(|p| p.amount).sum();
+    let total_micro_units: i64 = pending.iter().map(|p| p.amount).sum();
 
     let epoch: EpochRow = sqlx::query_as(
         "INSERT INTO provider_settlement_epochs
-            (currency, settlement_kind, rate_micro_usdc_per_gb,
-             min_payout_micro_usdc, total_micro_usdc, merkle_root, leaf_count)
-         VALUES ('USDC', 'service_fee', $1, $2, $3, $4, $5)
-         RETURNING epoch_id, currency, settlement_kind, rate_micro_usdc_per_gb,
-                   min_payout_micro_usdc, total_micro_usdc, merkle_root, leaf_count,
+            (currency, settlement_kind, rate_micro_units_per_gb,
+             min_payout_micro_units, total_micro_units, merkle_root, leaf_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING epoch_id, currency, settlement_kind, rate_micro_units_per_gb,
+                   min_payout_micro_units, total_micro_units, merkle_root, leaf_count,
                    status, created_at",
     )
+    .bind(&asset.currency)
+    .bind(SETTLEMENT_KIND)
     .bind(rate)
     .bind(min_payout)
-    .bind(total_micro_usdc)
+    .bind(total_micro_units)
     .bind(&root)
     .bind(leaves.len() as i32)
     .fetch_one(&mut *tx)
@@ -312,15 +414,16 @@ pub async fn close_epoch_inner(
     for (index, leaf) in pending.iter().enumerate() {
         let row: LeafRow = sqlx::query_as(
             "INSERT INTO provider_settlement_leaves
-                (epoch_id, provider_id, provider_wallet, access_count,
-                 bytes_served, amount_micro_usdc, leaf_hash, leaf_index)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING epoch_id, provider_id, provider_wallet, access_count,
-                       bytes_served, amount_micro_usdc, leaf_hash, leaf_index,
-                       claimed_at, claim_reference",
+                (epoch_id, provider_id, currency, provider_wallet, access_count,
+                 bytes_served, amount_micro_units, leaf_hash, leaf_index)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING epoch_id, provider_id, currency, provider_wallet,
+                       access_count, bytes_served, amount_micro_units, leaf_hash,
+                       leaf_index, claimed_at, claim_reference",
         )
         .bind(epoch.epoch_id)
         .bind(leaf.provider_id)
+        .bind(&asset.currency)
         .bind(&leaf.wallet)
         .bind(leaf.access_delta)
         .bind(leaf.bytes_delta)
@@ -357,8 +460,8 @@ pub async fn close_epoch_inner(
 
 pub async fn list_epochs(State(state): State<AppState>) -> Result<Json<Vec<EpochRow>>, AppError> {
     let rows: Vec<EpochRow> = sqlx::query_as(
-        "SELECT epoch_id, currency, settlement_kind, rate_micro_usdc_per_gb,
-                min_payout_micro_usdc, total_micro_usdc, merkle_root, leaf_count,
+        "SELECT epoch_id, currency, settlement_kind, rate_micro_units_per_gb,
+                min_payout_micro_units, total_micro_units, merkle_root, leaf_count,
                 status, created_at
          FROM provider_settlement_epochs
          ORDER BY epoch_id DESC
@@ -373,16 +476,7 @@ pub async fn get_epoch(
     State(state): State<AppState>,
     Path(epoch_id): Path<i64>,
 ) -> Result<Json<EpochRow>, AppError> {
-    let row: EpochRow = sqlx::query_as(
-        "SELECT epoch_id, currency, settlement_kind, rate_micro_usdc_per_gb,
-                min_payout_micro_usdc, total_micro_usdc, merkle_root, leaf_count,
-                status, created_at
-         FROM provider_settlement_epochs WHERE epoch_id = $1",
-    )
-    .bind(epoch_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::not_found("settlement epoch not found"))?;
+    let row = fetch_epoch(&state, epoch_id).await?;
     Ok(Json(row))
 }
 
@@ -398,6 +492,7 @@ pub async fn get_claim_proof(
     Ok(Json(serde_json::json!({
         "epoch_id": epoch_id,
         "provider_id": provider_id,
+        "currency": epoch.currency,
         "leaf": leaf,
         "merkle_root": epoch.merkle_root,
         "proof": proof,
@@ -431,13 +526,19 @@ pub async fn claim_inner(state: &AppState, req: &ClaimRequest) -> Result<ClaimRe
     if leaf.claimed_at.is_some() {
         return Err(AppError::conflict("settlement leaf already claimed"));
     }
+    if leaf.currency != epoch.currency {
+        return Err(AppError::internal(
+            "settlement leaf currency does not match its epoch",
+        ));
+    }
 
     let recomputed = settlement_leaf_hash(
+        &leaf.currency,
         leaf.provider_id,
         &leaf.provider_wallet,
         leaf.access_count,
         leaf.bytes_served,
-        leaf.amount_micro_usdc,
+        leaf.amount_micro_units,
     );
     if recomputed != leaf.leaf_hash {
         return Err(AppError::internal(
@@ -480,15 +581,16 @@ pub async fn claim_inner(state: &AppState, req: &ClaimRequest) -> Result<ClaimRe
         claimed: true,
         epoch_id: req.epoch_id,
         provider_id: req.provider_id,
-        amount_micro_usdc: leaf.amount_micro_usdc,
+        currency: leaf.currency,
+        amount_micro_units: leaf.amount_micro_units,
         claim_reference: req.claim_reference.clone(),
     })
 }
 
 async fn fetch_epoch(state: &AppState, epoch_id: i64) -> Result<EpochRow, AppError> {
     sqlx::query_as(
-        "SELECT epoch_id, currency, settlement_kind, rate_micro_usdc_per_gb,
-                min_payout_micro_usdc, total_micro_usdc, merkle_root, leaf_count,
+        "SELECT epoch_id, currency, settlement_kind, rate_micro_units_per_gb,
+                min_payout_micro_units, total_micro_units, merkle_root, leaf_count,
                 status, created_at
          FROM provider_settlement_epochs WHERE epoch_id = $1",
     )
@@ -504,8 +606,9 @@ async fn fetch_leaf(
     provider_id: Uuid,
 ) -> Result<LeafRow, AppError> {
     sqlx::query_as(
-        "SELECT epoch_id, provider_id, provider_wallet, access_count, bytes_served,
-                amount_micro_usdc, leaf_hash, leaf_index, claimed_at, claim_reference
+        "SELECT epoch_id, provider_id, currency, provider_wallet, access_count,
+                bytes_served, amount_micro_units, leaf_hash, leaf_index,
+                claimed_at, claim_reference
          FROM provider_settlement_leaves
          WHERE epoch_id = $1 AND provider_id = $2",
     )
@@ -533,6 +636,7 @@ mod tests {
 
     fn leaf(seed: u8) -> String {
         settlement_leaf_hash(
+            "SOL",
             Uuid::from_bytes([seed; 16]),
             "wallet",
             seed as i64,
@@ -567,13 +671,136 @@ mod tests {
         assert!(!verify_merkle_proof(&leaves[2], &proof, &root));
     }
 
+    #[test]
+    fn leaf_hash_binds_the_currency() {
+        // Same provider, wallet, usage and amount: only the asset differs.
+        let sol = settlement_leaf_hash("SOL", Uuid::nil(), "wallet", 1, 1024, 10);
+        let usdc = settlement_leaf_hash("USDC", Uuid::nil(), "wallet", 1, 1024, 10);
+        assert_ne!(sol, usdc);
+
+        // A USDC leaf must not verify inside a SOL epoch.
+        let root = merkle_root(&[leaf(1), leaf(2)]);
+        let foreign =
+            settlement_leaf_hash("USDC", Uuid::from_bytes([1; 16]), "wallet", 1, 1024, 10);
+        assert!(!verify_merkle_proof(
+            &foreign,
+            &merkle_proof(&[leaf(1), leaf(2)], 0),
+            &root
+        ));
+    }
+
+    #[test]
+    fn amount_is_prorated_by_bytes() {
+        let actual =
+            |bytes: i64, rate: i64| ((bytes as i128) * (rate as i128) / BYTES_PER_GB) as i64;
+        assert_eq!(actual(2_000_000, 100_000), 200);
+        assert_eq!(actual(1_000_000_000, 100_000), 100_000);
+        assert_eq!(actual(0, 100_000), 0);
+    }
+
+    /// Unique, regex-valid asset symbol so parallel/leftover DB rows can never
+    /// be picked up by this test's epoch close.
+    fn unique_asset() -> String {
+        format!(
+            "T{}",
+            &Uuid::new_v4().simple().to_string()[..8].to_uppercase()
+        )
+    }
+
+    async fn insert_asset(pool: &sqlx::PgPool, currency: &str) {
+        sqlx::query(
+            "INSERT INTO settlement_assets
+                (currency, display_name, decimals, kind, is_enabled, is_default,
+                 default_rate_micro_units_per_gb, min_payout_micro_units)
+             VALUES ($1, 'Test Asset', 9, 'other', true, false, 1000000, 0)",
+        )
+        .bind(currency)
+        .execute(pool)
+        .await
+        .expect("insert test asset");
+    }
+
+    async fn insert_provider(
+        pool: &sqlx::PgPool,
+        payout_currency: Option<&str>,
+        bytes_served: i64,
+    ) -> (Uuid, String) {
+        let provider_id = Uuid::new_v4();
+        let wallet = format!("settlement-wallet-{}", Uuid::new_v4());
+        sqlx::query(
+            "INSERT INTO storage_providers
+                (id, provider_id, name, provider_type, base_url, wallet_address,
+                 reliability_score, payout_currency)
+             VALUES ($1, $2, 'Settlement Test Provider', 'object_storage',
+                     'https://provider.example.com', $3, 0.9, $4)",
+        )
+        .bind(provider_id)
+        .bind(format!("settle-test-{}", Uuid::new_v4()))
+        .bind(&wallet)
+        .bind(payout_currency)
+        .execute(pool)
+        .await
+        .expect("insert provider");
+        sqlx::query(
+            "INSERT INTO provider_replicas
+                (provider_id, component_id, component_version, storage_reference,
+                 version, checksum, latency_ms, access_count, bytes_served)
+             VALUES ($1, $2, 'v1', 'https://provider.example.com/a.glb',
+                     'v1', $3, 40, 3, $4)",
+        )
+        .bind(provider_id)
+        .bind(format!("settle-component-{}", Uuid::new_v4()))
+        .bind(format!("sha256:{}", "ef".repeat(32)))
+        .bind(bytes_served)
+        .execute(pool)
+        .await
+        .expect("insert replica");
+        (provider_id, wallet)
+    }
+
+    async fn cleanup_provider(pool: &sqlx::PgPool, provider_id: Uuid) {
+        sqlx::query("DELETE FROM storage_providers WHERE id = $1")
+            .bind(provider_id)
+            .execute(pool)
+            .await
+            .expect("clean up provider");
+    }
+
+    async fn cleanup_asset(pool: &sqlx::PgPool, currency: &str) {
+        // Epochs and leaves reference the asset, so remove them first.
+        sqlx::query("DELETE FROM provider_settlement_epochs WHERE currency = $1")
+            .bind(currency)
+            .execute(pool)
+            .await
+            .expect("clean up epochs");
+        sqlx::query("DELETE FROM settlement_assets WHERE currency = $1")
+            .bind(currency)
+            .execute(pool)
+            .await
+            .expect("clean up asset");
+    }
+
+    fn test_state(pool: sqlx::PgPool) -> crate::state::AppState {
+        use crate::auth::ApiAuthority;
+        use crate::storage::StorageBackend;
+        use std::sync::Arc;
+
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        crate::state::AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        }
+    }
+
     #[tokio::test]
     async fn epoch_close_and_claim_settle_a_provider() {
-        use crate::auth::ApiAuthority;
-        use crate::state::AppState;
-        use crate::storage::StorageBackend;
         use sqlx::PgPool;
-        use std::sync::Arc;
 
         let Ok(database_url) = std::env::var("DATABASE_URL") else {
             eprintln!("skipping DB-backed settlement test: DATABASE_URL is not set");
@@ -582,58 +809,25 @@ mod tests {
         let pool = PgPool::connect(&database_url)
             .await
             .expect("connect test database");
-        let dir = tempfile::tempdir().expect("temp storage dir");
-        let state = AppState {
-            pool: pool.clone(),
-            geo: None,
-            api_authority: ApiAuthority(None),
-            vrf_oracle_pubkey: None,
-            storage: Arc::new(StorageBackend::Local {
-                root: dir.path().to_path_buf(),
-            }),
-            zk: None,
-        };
+        let state = test_state(pool.clone());
 
-        let provider_id = Uuid::new_v4();
-        let wallet = format!("settlement-wallet-{}", Uuid::new_v4());
-        let component_id = format!("settlement-component-{}", Uuid::new_v4());
-        sqlx::query(
-            "INSERT INTO storage_providers
-                (id, provider_id, name, provider_type, base_url, wallet_address, reliability_score)
-             VALUES ($1, $2, 'Settlement Provider', 'object_storage',
-                     'https://provider.example.com', $3, 0.9)",
-        )
-        .bind(provider_id)
-        .bind(format!("settlement-provider-{}", Uuid::new_v4()))
-        .bind(&wallet)
-        .execute(&pool)
-        .await
-        .expect("insert provider");
-        sqlx::query(
-            "INSERT INTO provider_replicas
-                (provider_id, component_id, component_version, storage_reference,
-                 version, checksum, latency_ms, access_count, bytes_served)
-             VALUES ($1, $2, 'v1', 'https://provider.example.com/a.glb',
-                     'v1', $3, 40, 3, 2000000)",
-        )
-        .bind(provider_id)
-        .bind(&component_id)
-        .bind(format!("sha256:{}", "ef".repeat(32)))
-        .execute(&pool)
-        .await
-        .expect("insert replica");
+        let currency = unique_asset();
+        insert_asset(&pool, &currency).await;
+        let (provider_id, _wallet) = insert_provider(&pool, Some(&currency), 2_000_000).await;
 
-        let closed = close_epoch_inner(&state, None, None)
+        // Explicit asset, deterministic rate: 2 MB at 1_000_000 micro-units/GB.
+        let closed = close_epoch_inner(&state, Some(&currency), Some(1_000_000), Some(0))
             .await
             .expect("close epoch");
-        assert_eq!(closed.epoch.currency, "USDC");
+        assert_eq!(closed.epoch.currency, currency);
         assert_eq!(closed.epoch.settlement_kind, "service_fee");
         assert_eq!(closed.epoch.leaf_count, 1);
         assert_eq!(closed.leaves.len(), 1);
         let leaf = &closed.leaves[0];
         assert_eq!(leaf.provider_id, provider_id);
+        assert_eq!(leaf.currency, currency);
         assert_eq!(leaf.bytes_served, 2_000_000);
-        assert_eq!(leaf.amount_micro_usdc, 200); // 2 MB × $0.10/GB
+        assert_eq!(leaf.amount_micro_units, 2_000);
 
         let settled: (i64, i64) = sqlx::query_as(
             "SELECT settled_access_count, settled_bytes_served
@@ -653,11 +847,12 @@ mod tests {
             epoch_id: closed.epoch.epoch_id,
             provider_id,
             proof,
-            claim_reference: Some("usdc-transfer-test".to_string()),
+            claim_reference: Some("payout-transfer-test".to_string()),
         };
         let response = claim_inner(&state, &claim).await.expect("claim settles");
         assert!(response.claimed);
-        assert_eq!(response.amount_micro_usdc, 200);
+        assert_eq!(response.currency, currency);
+        assert_eq!(response.amount_micro_units, 2_000);
 
         // Replay is rejected.
         assert!(claim_inner(&state, &claim).await.is_err());
@@ -674,20 +869,68 @@ mod tests {
         .await
         .expect("read claim state");
         assert_eq!(status.0, "settled");
-        assert_eq!(status.1.as_deref(), Some("usdc-transfer-test"));
+        assert_eq!(status.1.as_deref(), Some("payout-transfer-test"));
 
-        sqlx::query("DELETE FROM storage_providers WHERE id = $1")
-            .bind(provider_id)
-            .execute(&pool)
-            .await
-            .expect("clean up provider");
+        cleanup_provider(&pool, provider_id).await;
+        cleanup_asset(&pool, &currency).await;
     }
 
-    #[test]
-    fn q005_shape_is_usdc_service_fee_only() {
-        // The rail never models token/yield fields; the DB constraints enforce
-        // this too. Guard the constants the close path writes.
-        assert_eq!(BYTES_PER_GB, 1_000_000_000);
-        assert!(DEFAULT_RATE_MICRO_USDC_PER_GB > 0);
+    #[tokio::test]
+    async fn default_is_sol_and_payout_currency_controls_epoch_membership() {
+        use sqlx::PgPool;
+
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed settlement test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let state = test_state(pool.clone());
+
+        // The registry default is the issuer-free native asset, never a
+        // permissioned stablecoin.
+        let default_asset = fetch_asset(&state, None).await.expect("default asset");
+        assert_eq!(default_asset.currency, "SOL");
+        assert_eq!(default_asset.kind, "native");
+        assert_eq!(default_asset.issuer, None);
+
+        let currency = unique_asset();
+        insert_asset(&pool, &currency).await;
+
+        // Provider A keeps the default; provider B opts into a custom rail.
+        let (default_provider, _) = insert_provider(&pool, None, 1_000_000).await;
+        let (opted_in_provider, _) = insert_provider(&pool, Some(&currency), 1_000_000).await;
+
+        // NULL resolves to the default asset, not to the epoch currency.
+        let effective: String = sqlx::query_scalar(
+            "SELECT COALESCE(payout_currency,
+                     (SELECT currency FROM settlement_assets
+                      WHERE is_default = true AND is_enabled = true))
+             FROM storage_providers WHERE id = $1",
+        )
+        .bind(default_provider)
+        .fetch_one(&pool)
+        .await
+        .expect("effective currency");
+        assert_eq!(effective, "SOL");
+
+        // A custom-rail epoch pays only the opt-in provider.
+        let closed = close_epoch_inner(&state, Some(&currency), Some(1_000_000), Some(0))
+            .await
+            .expect("close custom epoch");
+        assert_eq!(closed.epoch.currency, currency);
+        assert_eq!(closed.leaves.len(), 1);
+        assert_eq!(closed.leaves[0].provider_id, opted_in_provider);
+
+        // Closing again settles nothing new for that provider.
+        let again = close_epoch_inner(&state, Some(&currency), Some(1_000_000), Some(0))
+            .await
+            .expect("second close");
+        assert!(again.leaves.is_empty());
+
+        cleanup_provider(&pool, default_provider).await;
+        cleanup_provider(&pool, opted_in_provider).await;
+        cleanup_asset(&pool, &currency).await;
     }
 }

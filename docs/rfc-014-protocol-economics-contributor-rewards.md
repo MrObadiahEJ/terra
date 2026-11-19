@@ -134,6 +134,11 @@ NO protocol token, NO fee-yield to passive holders, NO profit-sharing instrument
 until the Q-005 per-jurisdiction memo + counsel sign-off. Any token is Phase 4,
 optional, adapter-level, never required to use the protocol.
 
+Implementation note (2026-11-19): the settlement rail defaults to native SOL and
+accepts any asset registered in `settlement_assets`; USDC/EURC are optional rows,
+never mandatory. Providers choose their rail; the data plane does not depend on
+the payout asset.
+
 ## 10. Decentralization & failure analysis
 - Independent recomputation: allocation is a pure function of public
   ContributorRecords + Attestations + usage events; any node can rebuild the

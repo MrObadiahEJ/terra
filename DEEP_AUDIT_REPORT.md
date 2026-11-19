@@ -20,7 +20,8 @@ Terra is a Solana-based spatial identity and land-tenure protocol. The MVP imple
 end-to-end runtime scene resolution grounded in publisher-signed manifests, per-row
 mirror hash anchoring, server-side two-point road routing with an allowlisted VRF
 oracle, and a distributed storage-provider economy with N-of-M replication auditing,
-per-replica usage metering, and a Merkle-claim USDC settlement rail.
+per-replica usage metering, and a Merkle-claim settlement rail that defaults to
+native SOL and accepts any registered payout asset.
 
 Off-chain, the MVP flow (Intent 5) now performs real cryptographic verification:
 owner and tenant Ed25519 residency signatures, W3C VC issuer binding, and the
@@ -47,7 +48,7 @@ testing, authority/pause key mapping, and known gaps.
 | Evidence durability | S3-compatible backend (Filebase/R2/MinIO) | `S3_*` env selection; local disk retained as fallback |
 | Runtime scene resolution | Signed manifest + scene node content addresses | Client-side Ed25519 verification + on-chain digest cross-check |
 | Residency verification | Dual owner+tenant Ed25519 signatures | `terra-web/src/lib/mvpVerifier.ts` unit-tested against forgeries |
-| Provider settlement | Merkle-claim epochs, USDC service fees only | SHA-256 inclusion proofs, per-provider settled counters prevent replay |
+| Provider settlement | Merkle-claim epochs over a payout-asset registry | SHA-256 inclusion proofs bind the currency; per-provider settled counters prevent replay; default asset is issuer-free SOL |
 
 ### 1.2 Key Roles
 
@@ -113,7 +114,7 @@ Registry lib              154 passed
 Identity lib                7 passed
 Registry security suite     9 passed
 RFC-012 structure suite    21 passed
-API integration (PostGIS) 161 passed
+API integration (PostGIS) 164 passed
 Frontend (vitest)         134 passed
 
 Failed: 0
@@ -211,7 +212,7 @@ Additional API coverage added in this pass:
 | RFC-018 (Residency verification) | Implemented | `terra-web/src/lib/mvpVerifier.ts` + `MvpFlowPage.tsx` |
 | Q-008 (Storage independence) | Implemented | N-of-M audit + provider economy + S3/IPFS backend options |
 | Q-007 (Server-side routing) | Implemented | `GET /geo/route` with allowlisted VRF |
-| Q-005 (No security/token) | Enforced | Settlement constrained to `currency='USDC'`, `settlement_kind='service_fee'` |
+| Q-005 (No security/token) | Enforced | Settlement is `settlement_kind='service_fee'`; payout assets are registry rows (default SOL, optional USDC/EURC), never a token or yield instrument |
 | Q-001 (Devnet funding) | Blocked | Deployer wallet unfunded |
 
 ---
@@ -231,7 +232,8 @@ Additional API coverage added in this pass:
 1. **Sprint E remainder**: staging bond PDA + reputation-weighted throughput
 2. **Sprint F remainder**: external uptime monitoring of a DB-touching endpoint
 3. **Settlement operations**: run epoch close on a schedule and document the
-   USDC payout process
+   payout process for each enabled rail (default SOL; USDC/EURC only when a
+   provider opts in)
 
 ### Long-term (90+ days)
 1. **Sprint G**: Institutional validator credentials (vLEI/DNSSEC)
@@ -245,14 +247,15 @@ Additional API coverage added in this pass:
 The Terra MVP is functionally complete on localnet with all core features implemented:
 runtime scene resolution, signed manifest verification, mirror hash anchoring,
 server-side routing with an allowlisted VRF, a storage-provider economy with N-of-M
-replication auditing, per-replica metering, and a USDC service-fee settlement rail.
+replication auditing, per-replica metering, and a service-fee settlement rail
+whose default payout asset is issuer-free SOL.
 Evidence intake now quarantines bad uploads, purges expired rows on a 15-minute
 maintenance loop, and schedules PoP challenges automatically; the MVP flow verifies
 real Ed25519 residency signatures, the VC issuer and the on-chain digest.
 
 Gates pass: `cargo fmt --check`, `cargo clippy -D warnings`, registry BPF 307/307,
 identity BPF 23/23, registry lib 154, identity lib 7, security 9, RFC-012 21,
-API 161 (PostGIS), frontend `tsc` clean, vitest 134/134, and `build:check`
+API 164 (PostGIS), frontend `tsc` clean, vitest 134/134, and `build:check`
 (1901.5 kB gz total, budget 1950).
 
 The primary blocker to public deployment is operational, not code: Q-001 devnet
