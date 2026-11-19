@@ -2,6 +2,26 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-19 — Settlement rail is asset-agnostic (no USD dependency)
+
+- **Migration 0055** (`0055_provider_settlement_multi_asset.sql`) — replaces
+  `CHECK (currency='USDC')` with a `settlement_assets` registry; renames
+  `*_micro_usdc` columns to `*_micro_units`; adds `currency` to leaves and binds
+  it into the leaf hash (`terra:settlement:leaf:v2`); clears pre-launch test
+  epochs because the hash domain changed.
+- **Default asset is native SOL** — no issuer, no country. USDC/EURC are opt-in
+  rows; adding any rail is an `INSERT`, not a redeploy.
+- **Provider choice** — `storage_providers.payout_currency` plus signed
+  `POST /providers/{id}/payout-currency`; `NULL` means the default. Epoch close
+  only includes providers whose effective currency matches, so a non-default
+  rail never pays someone who did not opt in.
+- **API** — `GET /providers/settlement/assets`; `currency` on close/proof/claim;
+  renamed rate/min/total/amount fields.
+- **Risk register R-033** — payment-layer issuer censorship documented;
+  "censorshipless" is not claimed for payout rails, only for the data plane.
+- Tests: API 164/164 (was 161; adds currency-bound leaf rejection and
+  opt-in-only epoch membership).
+
 ## 2026-11-16 — Sprint B: Real write path — delete `tx_prep.rs`, IDL/client `program.methods`, fix identity PDAs
 
 - **`tx_prep.rs` deleted** — all server-side placeholder transaction builders removed; every write now uses client-side IDL `program.methods` with real PDAs, discriminators and signers.

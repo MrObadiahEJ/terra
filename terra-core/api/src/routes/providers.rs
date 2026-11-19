@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::auth::SignedRequest;
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -26,6 +27,7 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_provider).get(list_providers))
         .route("/{id}", get(get_provider))
         .route("/{id}/replicas", post(create_replica).get(list_replicas))
+        .route("/{id}/payout-currency", post(set_payout_currency))
         .route(
             "/{provider_id}/replicas/{replica_id}/challenge",
             post(challenge_replica),
@@ -62,6 +64,9 @@ pub struct CreateProviderRequest {
     pub stake_bond: Option<i64>,
     /// Wallet address for bond settlement and reward payouts.
     pub wallet_address: Option<String>,
+    /// Preferred settlement asset (`settlement_assets.currency`). Omit to use
+    /// the registry default (SOL); the provider is never forced onto USD.
+    pub payout_currency: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +128,9 @@ pub struct ProviderRow {
     pub stake_bond: i64,
     /// Wallet address for bond settlement and reward payouts.
     pub wallet_address: Option<String>,
+    /// Preferred settlement asset (`settlement_assets.currency`); NULL uses the
+    /// registry default (SOL).
+    pub payout_currency: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -164,18 +172,19 @@ pub async fn create_provider(
     let cost = req.cost_per_gb;
     let stake_bond = req.stake_bond.unwrap_or(0);
     let wallet_address = req.wallet_address.clone();
+    ensure_enabled_settlement_asset(&state, req.payout_currency.as_deref()).await?;
 
     let row = sqlx::query_as::<_, ProviderRow>(
         r#"
         INSERT INTO storage_providers (
             provider_id, name, provider_type, base_url, capabilities,
             geographic_scope, reliability_score, cost_per_gb,
-            stake_bond, wallet_address
+            stake_bond, wallet_address, payout_currency
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id, provider_id, name, provider_type, base_url, capabilities,
                   geographic_scope, is_active, reliability_score, cost_per_gb,
-                  stake_bond, wallet_address, created_at, updated_at
+                  stake_bond, wallet_address, payout_currency, created_at, updated_at
         "#,
     )
     .bind(&req.provider_id)
@@ -188,11 +197,36 @@ pub async fn create_provider(
     .bind(cost)
     .bind(stake_bond)
     .bind(&wallet_address)
+    .bind(&req.payout_currency)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| AppError::internal(format!("insert failed: {e}")))?;
 
     Ok((axum::http::StatusCode::CREATED, Json(row)))
+}
+
+/// Reject a payout currency that is unknown or disabled before it reaches the
+/// foreign key, so callers get a 400 instead of a 500.
+async fn ensure_enabled_settlement_asset(
+    state: &AppState,
+    currency: Option<&str>,
+) -> Result<(), AppError> {
+    let Some(currency) = currency else {
+        return Ok(());
+    };
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM settlement_assets
+                       WHERE currency = $1 AND is_enabled = true)",
+    )
+    .bind(currency)
+    .fetch_one(&state.pool)
+    .await?;
+    if !exists {
+        return Err(AppError::bad_request(format!(
+            "unknown or disabled settlement asset: {currency}"
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +235,7 @@ pub async fn create_provider(
 
 const PROVIDERS_SELECT: &str = "SELECT id, provider_id, name, provider_type, \
     base_url, capabilities, geographic_scope, is_active, reliability_score, \
-    cost_per_gb, stake_bond, wallet_address, created_at, updated_at \
+    cost_per_gb, stake_bond, wallet_address, payout_currency, created_at, updated_at \
     FROM storage_providers";
 
 pub async fn list_providers(
@@ -323,7 +357,7 @@ pub async fn list_providers(
 
 const PROVIDER_SELECT: &str = "SELECT id, provider_id, name, provider_type, \
     base_url, capabilities, geographic_scope, is_active, reliability_score, \
-    cost_per_gb, stake_bond, wallet_address, created_at, updated_at \
+    cost_per_gb, stake_bond, wallet_address, payout_currency, created_at, updated_at \
     FROM storage_providers WHERE id = $1";
 
 pub async fn get_provider(
@@ -337,6 +371,58 @@ pub async fn get_provider(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?
         .ok_or_else(|| AppError::not_found(format!("provider {id} not found")))?;
 
+    Ok(Json(row))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetPayoutCurrencyRequest {
+    /// Asset symbol from `settlement_assets`; null resets to the default.
+    pub payout_currency: Option<String>,
+}
+
+/// Let a provider choose its settlement rail. Signed by the registered wallet
+/// so a third party cannot redirect someone else's payouts. No rail is
+/// mandatory: `null` means "pay me in the registry default".
+pub async fn set_payout_currency(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    auth: SignedRequest,
+    Json(req): Json<SetPayoutCurrencyRequest>,
+) -> Result<Json<ProviderRow>, AppError> {
+    ensure_enabled_settlement_asset(&state, req.payout_currency.as_deref()).await?;
+
+    let wallet: Option<String> =
+        sqlx::query_scalar("SELECT wallet_address FROM storage_providers WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?
+            .flatten();
+    let wallet = wallet.ok_or_else(|| {
+        AppError::bad_request("provider has no wallet address; cannot authorize payout change")
+    })?;
+    auth.verify_wallet(
+        &wallet,
+        "POST",
+        &format!("/api/v1/providers/{id}/payout-currency"),
+    )?;
+
+    let updated = sqlx::query(
+        "UPDATE storage_providers
+         SET payout_currency = $1, updated_at = now()
+         WHERE id = $2",
+    )
+    .bind(&req.payout_currency)
+    .bind(id)
+    .execute(&state.pool)
+    .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found(format!("provider {id} not found")));
+    }
+
+    let row = sqlx::query_as::<_, ProviderRow>(PROVIDER_SELECT)
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
     Ok(Json(row))
 }
 
@@ -900,7 +986,7 @@ mod tests {
         let provider_a = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'object_storage', $4, $5, $6, 1.0, NULL) \
-             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
+             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, payout_currency, created_at, updated_at",
         )
         .bind(provider_a_id)
         .bind(&provider_a_pid)
@@ -915,7 +1001,7 @@ mod tests {
         let provider_b = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'ipfs', $4, $5, $6, 1.0, NULL) \
-             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
+             RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, payout_currency, created_at, updated_at",
         )
         .bind(provider_b_id)
         .bind(&provider_b_pid)
@@ -1055,7 +1141,7 @@ mod tests {
         let provider = sqlx::query_as::<_, ProviderRow>(
             "INSERT INTO storage_providers (id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, reliability_score, cost_per_gb) \
              VALUES ($1, $2, $3, 'object_storage', $4, $5, $6, 1.0, NULL) \
-              RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, created_at, updated_at",
+              RETURNING id, provider_id, name, provider_type, base_url, capabilities, geographic_scope, is_active, reliability_score, cost_per_gb, stake_bond, wallet_address, payout_currency, created_at, updated_at",
         )
         .bind(provider_id)
         .bind(&provider_pid)
@@ -1246,5 +1332,47 @@ mod tests {
             .execute(&pool)
             .await
             .expect("clean up provider");
+    }
+
+    #[tokio::test]
+    async fn payout_currency_must_be_an_enabled_asset() {
+        use crate::auth::ApiAuthority;
+        use crate::state::AppState;
+        use crate::storage::StorageBackend;
+        use sqlx::PgPool;
+        use std::sync::Arc;
+
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed provider test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let state = AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+
+        // The native default and explicit registry rows are accepted.
+        ensure_enabled_settlement_asset(&state, None)
+            .await
+            .expect("null means default");
+        ensure_enabled_settlement_asset(&state, Some("SOL"))
+            .await
+            .expect("SOL is enabled");
+        // Unknown symbols are rejected before they reach the foreign key.
+        assert!(
+            ensure_enabled_settlement_asset(&state, Some("NOTAREALASSET"))
+                .await
+                .is_err()
+        );
     }
 }

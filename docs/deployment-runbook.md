@@ -9,9 +9,12 @@ The code side is done: `deploy.sh` verifies deploy keypairs against
 shortfall. Hosting is configured entirely through environment variables, never
 committed secrets.
 
-> **Q-005 gate:** the settlement rail is USDC service-fee only
-> (`currency='USDC'`, `settlement_kind='service_fee'`). Do not add token,
-> fractional-interest or profit-share fields to any deployment.
+> **Q-005 gate:** the settlement rail pays for verified storage service only
+> (`settlement_kind='service_fee'`). Do not add token, fractional-interest or
+> profit-share fields to any deployment. The payout **asset** is operator data
+> in `settlement_assets`, not a fixed constant: the default is native SOL, and
+> USDC/EURC are opt-in rows. Adding another rail is an `INSERT`, not a
+> redeploy.
 
 ---
 
@@ -170,25 +173,72 @@ Deploy `terra-web/dist` to Pages (or Cloudflare Pages/Vercel). Ensure:
 
 ## 5. Settlement rail operations
 
-1. Query usage: `GET /api/v1/providers/settlement/epochs`.
-2. Close an epoch (signed by `API_AUTHORITY_PUBKEY`):
+The rail is asset-agnostic. `settlement_assets` lists enabled payout assets and
+their unit counts; exactly one row is the default.
+
+| Asset | Kind | Decimals | Starting rate | Issuer |
+|---|---|---|---|---|
+| `SOL` | native | 9 (lamports) | 666,667 / GB | none |
+| `USDC` | stablecoin | 6 | 100,000 / GB | Circle |
+| `EURC` | stablecoin | 6 | 100,000 / GB | Circle |
+
+`SOL` is the default because it has no issuer and no country behind it. USDC and
+EURC are available for providers that prefer a stable unit of account; the
+issuer can freeze addresses, so they are a convenience rail, not a
+censorship-resistance claim. Add any other asset with:
+
+```sql
+INSERT INTO settlement_assets
+    (currency, display_name, decimals, kind, default_rate_micro_units_per_gb)
+VALUES ('XYZ', 'Example asset', 6, 'other', 100000);
+```
+
+Retiring a rail is a data change too, but do it in order: reassign its
+providers first, then disable it. Otherwise those providers have an effective
+currency that can no longer be closed.
+
+```sql
+UPDATE storage_providers SET payout_currency = NULL WHERE payout_currency = 'XYZ';
+UPDATE settlement_assets SET is_enabled = false WHERE currency = 'XYZ';
+```
+
+Keep exactly one enabled row with `is_default = true`; if none is enabled, epoch
+closes that omit `currency` fail closed with a 400.
+
+1. List assets: `GET /api/v1/providers/settlement/assets`.
+2. Query epochs: `GET /api/v1/providers/settlement/epochs`.
+3. Close an epoch (signed by `API_AUTHORITY_PUBKEY`):
 
    ```http
    POST /api/v1/providers/settlement/epochs
-   {"rate_micro_usdc_per_gb": 100000, "min_payout_micro_usdc": 0}
+   {"currency": "SOL", "rate_micro_units_per_gb": 666667, "min_payout_micro_units": 0}
    ```
 
-   Default rate is 100,000 micro-USDC/GB ($0.10/GB). The response includes each
-   provider leaf and the Merkle root.
-3. A provider fetches its proof at
+   Omit `currency` to use the default asset. Omit the rate to use the asset's
+   `default_rate_micro_units_per_gb`. The response includes each provider leaf
+   and the Merkle root.
+
+   An epoch only includes providers whose **effective** currency matches:
+   their `payout_currency`, or the registry default when it is unset. Closing a
+   non-default asset therefore never pays a provider who did not opt in. To pay
+   everyone in SOL and a subset in USDC, close twice: once with `"currency":
+   "SOL"` and once with `"currency": "USDC"`.
+
+4. A provider chooses its rail at
+   `POST /api/v1/providers/{id}/payout-currency` (signed by its registered
+   wallet), or at registration with `payout_currency`. `null` resets to the
+   default.
+5. A provider fetches its proof at
    `GET /api/v1/providers/settlement/epochs/{epoch_id}/leaves/{provider_id}/proof`
    and claims at `POST /api/v1/providers/settlement/claims` with its registered
    wallet. Claims settle exactly once and the epoch flips to `settled` when all
    leaves are claimed.
 
 Run epoch close on whatever cadence the payout process uses (manual or an
-external scheduler). Payout execution remains an operational USDC transfer; the
-API records the reference, it does not move funds.
+external scheduler). Payout execution remains an operational transfer on the
+chosen rail; the API records the reference, it does not move funds. Because the
+claim is a signed, Merkle-provable obligation, a frozen address does not erase
+the debt: it can be honoured over another rail without changing the proof.
 
 ---
 
