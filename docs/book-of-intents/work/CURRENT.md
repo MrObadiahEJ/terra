@@ -33,7 +33,7 @@ with no “SIMULATION” chips on any step of that path.
 
 ## Deep-audit report
 
-- **`DEEP_AUDIT_REPORT.md`** (new): security architecture, dependency analysis, BPF adversarial test results (229/307 passing; 78 pre-existing terra_identity .so failures), authority/pause key map, known gaps, recommendations.
+- **`DEEP_AUDIT_REPORT.md`** (new): security architecture, dependency analysis, BPF adversarial test results (307/307 passing, 0 failed — CI run `41474466105` green), authority/pause key map, known gaps, recommendations.
 
 ## Known blockers
 

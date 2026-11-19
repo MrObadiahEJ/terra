@@ -6,9 +6,10 @@
 `8cd7aa9`; Sprint F evidence durability `0f0a052`; deep-audit report
 `0f0a052`.
 **Method:** source inspection + test execution where machine limits allow.
-Vitest **130/130** executed 2026-11-16. BPF suite **229/307** passed (78
-pre-existing terra_identity `.so` deployment failures, not caused by current
-changes; re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage 1).
+Vitest **134/134** executed 2026-11-19 (all passed). BPF suite **307/307** passed,
+0 failed — CI run `41474466105` green (Solana `v3.1.14`, `anchor build --skip-lint`,
+single-threaded); local SBF execution unavailable on this machine (no AVX/SBF —
+see CURRENT.md blockers), CI is authoritative.
 
 **Status vocabulary:** see [BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md) (7 levels,
 1 = best).
@@ -139,11 +140,11 @@ changes; re-run before any release — tracked in [ROADMAP.md](ROADMAP.md) Stage
 
 | Suite | Baseline | Last verified | Re-verify due |
 | --- | --- | --- | --- |
-| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **229/307** | **2026-11-16 (executed locally; 78 pre-existing terra_identity `.so` deployment failures)** | before release |
+| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **307/307** | **CI run `41474466105` green (Solana `v3.1.14`)** | CI authoritative (local SBF unavailable — no AVX/SBF) |
 | Registry lib | **154** | **2026-11-16 (executed locally)** | before release |
 | API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **151** | **2026-11-16 (executed locally; DB-backed tests skip without `DATABASE_URL`; CI runs them against PostgreSQL)** | before release |
 | Geo-engine (`cargo test -p terra-geo`) | **42 (+1 ignored)** | **2026-11-16 (executed)** | before release |
 | Identity BPF | **23** | **2026-11-16 (executed; required `anchor build --skip-lint`)** | before release |
-| Frontend vitest (`pnpm exec vitest run`) | **130/130** | **2026-11-16 (executed)** | each story change |
+| Frontend vitest (`pnpm exec vitest run`) | **134/134** | **2026-11-19 (executed)** | each story change |
 | Frontend gates (`tsc -b` + eslint + build) | tsc/build green; eslint not green (18 pre-existing errors) | **2026-11-16 (executed)** | each story change |
 | Frontend bundle budget (`pnpm build:check`) | entry **303.8 kB gz** / initial **305.5 kB gz** / Cesium **1098.5 kB lazy** / total **1883.7 kB gz** | **2026-11-16 (executed; PASS, within budget: entry ≤360, Cesium ≤1200, total ≤1900)** | each frontend build |
