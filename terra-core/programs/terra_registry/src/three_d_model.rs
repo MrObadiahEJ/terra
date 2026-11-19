@@ -76,8 +76,9 @@ pub struct ThreeDModel {
     pub geometry_version: u32,
     /// SHA-256 canonical digest of the off-chain model bundle.
     pub model_hash: [u8; 32],
-    /// Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars.
-    #[max_len(128)]
+    /// Off-chain pointer (tileset URL / IPFS CID / storage key). Widened to
+    /// 256 chars to accommodate signed URLs (CIDs alone fit in 128).
+    #[max_len(256)]
     pub storage_reference: String,
     /// `model_format` code of the referenced bundle.
     pub model_format: u8,

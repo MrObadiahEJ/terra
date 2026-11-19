@@ -196,6 +196,8 @@ Additional API coverage added in this pass:
 | Storage-PoP oracle key not pinned in production | Medium | Set `VRF_ORACLE_PUBKEY`; otherwise the legacy SHA-256 fallback is used | Dev work |
 | No R2/CDN hot tier | Low | S3-compatible backend covers durability; CDN is an optimization | Dev work |
 | Audit is internal | Medium | External review not yet commissioned | Founder |
+| H3 hexagonal analytics deferred | Low | Quadtree covering retained (deterministic floor arithmetic, published conservative semantics); H3 deferred to Phase 2+ only if hexagonal analytics demand it | Founder |
+| Mirror `holder` not field-gated | Medium | `holder` is real property data; reads now redact to `null` unless the caller proves they are the holder (Ed25519 over the path) or the API authority. `create_parcel`/`reconcile` remain authority-gated; `reconcile` re-derives the access digest | Dev work |
 
 ---
 

@@ -5,6 +5,10 @@ use axum::http::StatusCode;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use std::convert::Infallible;
 
+/// Re-export of `axum::http::request::Parts` so route modules can name
+/// the type without importing axum directly.
+pub use axum::http::request::Parts as RequestParts;
+
 /// Authority public key loaded from `API_AUTHORITY_PUBKEY` env var.
 /// When `None`, privileged endpoints reject all requests (fail-closed).
 #[derive(Clone)]
@@ -72,57 +76,65 @@ where
     type Rejection = StatusCode;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Extract Authorization header.
-        let auth_header = parts
-            .headers
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        parse_signed_request(parts).await
+    }
+}
+
+/// Parse the signed-request headers without the `FromRequestParts` trait
+/// shim, so callers that already hold `&mut Parts` (e.g. the parcel
+/// read endpoints that need to try two different verifying keys) can
+/// reuse the same logic.
+pub async fn parse_signed_request(parts: &mut Parts) -> Result<SignedRequest, StatusCode> {
+    // Extract Authorization header.
+    let auth_header = parts
+        .headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
         // Parse "Signature <base64>" format.
-        let sig_b64 = auth_header
-            .strip_prefix("Signature ")
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+    let sig_b64 = auth_header
+        .strip_prefix("Signature ")
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
-        let sig_bytes = base64_decode(sig_b64).map_err(|_| StatusCode::UNAUTHORIZED)?;
-        if sig_bytes.len() != 64 {
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-
-        let mut sig_arr = [0u8; 64];
-        sig_arr.copy_from_slice(&sig_bytes);
-        let signature = Signature::from_bytes(&sig_arr);
-
-        // Extract the timestamp.
-        let timestamp_str = parts
-            .headers
-            .get("x-timestamp")
-            .and_then(|v| v.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-        let timestamp: i64 = timestamp_str
-            .parse()
-            .map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-        // Replay protection: reject requests older than 60 seconds.
-        let now = chrono::Utc::now().timestamp();
-        if (now - timestamp).abs() > 60 {
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-
-        // Body hash header.
-        let body_hash_hex = parts
-            .headers
-            .get("x-body-hash")
-            .and_then(|v| v.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?
-            .to_string();
-
-        Ok(SignedRequest {
-            signature,
-            timestamp,
-            body_hash_hex,
-        })
+    let sig_bytes = base64_decode(sig_b64).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if sig_bytes.len() != 64 {
+        return Err(StatusCode::UNAUTHORIZED);
     }
+
+    let mut sig_arr = [0u8; 64];
+    sig_arr.copy_from_slice(&sig_bytes);
+    let signature = Signature::from_bytes(&sig_arr);
+
+    // Extract the timestamp.
+    let timestamp_str = parts
+        .headers
+        .get("x-timestamp")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let timestamp: i64 = timestamp_str
+        .parse()
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Replay protection: reject requests older than 60 seconds.
+    let now = chrono::Utc::now().timestamp();
+    if (now - timestamp).abs() > 60 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Body hash header.
+    let body_hash_hex = parts
+        .headers
+        .get("x-body-hash")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?
+        .to_string();
+
+    Ok(SignedRequest {
+        signature,
+        timestamp,
+        body_hash_hex,
+    })
 }
 
 pub struct OptionalSignedRequest(pub Option<SignedRequest>);

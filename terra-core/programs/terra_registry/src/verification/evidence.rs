@@ -40,8 +40,9 @@ pub struct Evidence {
     pub evidence_type: u8,
     /// sha-256 hash of the off-chain evidence content.
     pub content_hash: [u8; 32],
-    /// Storage reference (IPFS CID, URL, or content address).
-    #[max_len(128)]
+    /// Storage reference (IPFS CID, URL, or content address). Widened to 256
+    /// chars so signed URLs (S3 pre-signed, R2, gateway tokens) fit.
+    #[max_len(256)]
     pub storage_reference: String,
     pub created_at: i64,
     /// When the evidence was originally observed (off-chain), if applicable.

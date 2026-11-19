@@ -3981,6 +3981,7 @@ async fn dispute_lifecycle_owner_wins() {
     for v in &validators {
         data.extend_from_slice(&v.to_bytes());
     }
+    data.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
     process(
         &mut ctx,
         &owner,
@@ -4029,6 +4030,7 @@ async fn dispute_lifecycle_owner_wins() {
     let mut adj_data = discriminator("global", "adjudicate_dispute").to_vec();
     adj_data.push(0u8); // outcome = OWNER_WINS
     adj_data.extend_from_slice(&Pubkey::default().to_bytes()); // new_owner (ignored for OWNER_WINS)
+    adj_data.extend_from_slice(&Pubkey::default().to_bytes()); // remedy_geometry_version (none)
     let adj_ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
@@ -4137,6 +4139,7 @@ async fn dispute_cancel_by_filer() {
     for v in &validators {
         data.extend_from_slice(&v.to_bytes());
     }
+    data.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
     process(
         &mut ctx,
         &owner,
@@ -19642,6 +19645,7 @@ async fn ownership_invariant_o14_dispute_cannot_bypass_ownership() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -21148,6 +21152,7 @@ async fn edge_case_c3_dispute_sets_disputed_status() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -21229,6 +21234,7 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -21281,6 +21287,7 @@ async fn edge_case_c4_double_dispute_same_case_hash_rejected() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -21443,6 +21450,7 @@ async fn edge_case_c6_empty_case_hash_rejected() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -22025,6 +22033,7 @@ async fn cross_module_d3_dispute_lifecycle() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -22507,6 +22516,7 @@ async fn negative_e3_threshold_bypass_rejected() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -22818,6 +22828,7 @@ async fn e2e_f1_full_parcel_lifecycle() {
                 for v in validators.iter() {
                     d.extend_from_slice(&borsh_ser(v));
                 }
+                d.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
                 d
             },
         },
@@ -29650,8 +29661,8 @@ fn stage3_init_ix(
     parcel_pk: &Pubkey,
     registrar: &Pubkey,
     dimensionality: u8,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
 ) -> Instruction {
     let (asset_pk, _) = spatial_asset_pda(parcel_pk);
     let mut data = discriminator("global", "init_spatial_asset").to_vec();
@@ -29679,8 +29690,8 @@ fn stage3_append_ix(
     source: u8,
     dimension: u8,
     storage_reference: &str,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
     elevation_source: u8,
 ) -> Instruction {
     let (entry_pk, _) = geometry_version_pda(asset_pk, version);
@@ -30109,8 +30120,8 @@ async fn stage3_spatial_asset_lifecycle() {
         .await
         .unwrap()
         .expect("asset account");
-    // disc(8) + parcel(32) + authority(32) + dim(1) + min(4) + max(4) = 81.
-    acc.data[81..85].copy_from_slice(&64u32.to_le_bytes());
+    // disc(8) + parcel(32) + authority(32) + dim(1) + min(8) + max(8) = 89.
+    acc.data[89..93].copy_from_slice(&64u32.to_le_bytes());
     ctx.set_account(&asset_pk, &acc.into());
     let res = process(
         &mut ctx,
@@ -30295,8 +30306,8 @@ fn stage3_append_from_evidence_ix(
     source: u8,
     dimension: u8,
     storage_reference: &str,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
     elevation_source: u8,
 ) -> Instruction {
     let (entry_pk, _) = geometry_version_pda(asset_pk, version);
@@ -32025,6 +32036,7 @@ async fn file_dispute_rejects_unregistered_validators() {
     for v in &validators {
         data.extend_from_slice(&v.to_bytes());
     }
+    data.extend_from_slice(&1_000_000u64.to_le_bytes()); // bond_lamports
 
     let ix = Instruction {
         program_id: PROGRAM_ID,

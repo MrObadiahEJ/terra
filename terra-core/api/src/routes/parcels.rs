@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::auth::{self, RequestParts};
 use crate::error::AppError;
 use crate::geoutil::geojson_polygon;
 use crate::routes::{disputes, identities, rights};
@@ -36,8 +37,29 @@ const PARCEL_SELECT: &str = r#"
     JOIN parcel_ownership o ON o.parcel_id = p.id
 "#;
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct Parcel {
+    pub id: Uuid,
+    pub name: String,
+    /// `holder` is only disclosed when the caller proves they are the
+    /// holder (Ed25519 signature over the request path) or the configured
+    /// API authority. Unsigned requests receive `null` — the mirror is
+    /// untrusted until `reconcile` re-derives the access digest, and real
+    /// property data must not leak before field-level read policies land.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
+    pub status: String,
+    pub geometry: Option<String>,
+    pub area_m2: Option<f64>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub onchain_id: Option<String>,
+}
+
+/// Row returned by the DB join (holder always present); converted into
+/// `Parcel` by `with_holder` only when the caller is authorised.
+#[derive(Debug, Clone, sqlx::FromRow)]
+struct ParcelRow {
     pub id: Uuid,
     pub name: String,
     pub holder: String,
@@ -47,6 +69,55 @@ pub struct Parcel {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub onchain_id: Option<String>,
+}
+
+impl ParcelRow {
+    fn into_parcel(self, disclose_holder: bool) -> Parcel {
+        Parcel {
+            id: self.id,
+            name: self.name,
+            holder: disclose_holder.then_some(self.holder),
+            status: self.status,
+            geometry: self.geometry,
+            area_m2: self.area_m2,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            onchain_id: self.onchain_id,
+        }
+    }
+}
+
+/// Field-level read policy for the mirror's `holder` column.
+///
+/// The mirror is untrusted until `reconcile` (authority-gated, re-derives
+/// the access digest) anchors it. Until then, and for every subsequent
+/// read, the holder wallet is treated as real property data: disclose
+/// only to the holder themselves (Ed25519 signature over the request
+/// path) or to the API authority. Everyone else gets `null`.
+///
+/// `parts` is consumed once to extract the signed request; the caller
+/// must pass `&mut` so the extractor can read headers.
+async fn disclose_holder(
+    state: &AppState,
+    parts: &mut RequestParts,
+    expected_holder: &str,
+) -> bool {
+    let key = match state.api_authority.0 {
+        Some(ref k) => k,
+        None => return false,
+    };
+    let req = match auth::parse_signed_request(parts).await {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    let path = parts.uri.path();
+    let method = parts.method.as_str();
+    // Authority signature always discloses.
+    if req.verify(key, method, path).is_ok() {
+        return true;
+    }
+    // Holder signature over the exact path discloses.
+    req.verify_wallet(expected_holder, method, path).is_ok()
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,10 +160,11 @@ pub fn router() -> Router<AppState> {
 async fn list(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
+    mut parts: RequestParts,
 ) -> Result<Json<Vec<Parcel>>, AppError> {
-    let parcels = match (params.minx, params.miny, params.maxx, params.maxy) {
+    let rows: Vec<ParcelRow> = match (params.minx, params.miny, params.maxx, params.maxy) {
         (Some(minx), Some(miny), Some(maxx), Some(maxy)) => {
-            sqlx::query_as::<_, Parcel>(&format!(
+            sqlx::query_as::<_, ParcelRow>(&format!(
                 "{PARCEL_SELECT}
              WHERE ST_Intersects(p.geometry, ST_MakeEnvelope($1, $2, $3, $4, 4326))
              ORDER BY created_at DESC"
@@ -105,7 +177,7 @@ async fn list(
             .await?
         }
         _ => {
-            sqlx::query_as::<_, Parcel>(&format!(
+            sqlx::query_as::<_, ParcelRow>(&format!(
                 "{PARCEL_SELECT}
              ORDER BY created_at DESC"
             ))
@@ -113,27 +185,45 @@ async fn list(
             .await?
         }
     };
-    Ok(Json(parcels))
+    // Field-level read policy: disclose each row's holder only to the
+    // holder (Ed25519 over the path) or the API authority. Unsigned
+    // requests receive `null` for every holder.
+    let mut out = Vec::with_capacity(rows.len());
+    for r in rows {
+        let disclose = disclose_holder(&state, &mut parts, &r.holder).await;
+        out.push(r.into_parcel(disclose));
+    }
+    Ok(Json(out))
 }
 
 async fn get_by_id(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    mut parts: RequestParts,
 ) -> Result<Json<Parcel>, AppError> {
-    let parcel = sqlx::query_as::<_, Parcel>(&format!(
+    let row: ParcelRow = sqlx::query_as::<_, ParcelRow>(&format!(
         "{PARCEL_SELECT}
          WHERE p.id = $1"
     ))
     .bind(id)
     .fetch_one(&state.pool)
     .await?;
-    Ok(Json(parcel))
+    let disclose = disclose_holder(&state, &mut parts, &row.holder).await;
+    Ok(Json(row.into_parcel(disclose)))
 }
 
 async fn create_parcel(
     State(state): State<AppState>,
+    auth: crate::auth::SignedRequest,
     Json(params): Json<NewParcel>,
 ) -> Result<(StatusCode, Json<Parcel>), AppError> {
+    // Only the API authority may create mirror rows — untrusted callers must
+    // go through the authority-gated /reconcile endpoint after the on-chain
+    // parcel exists, which re-derives and validates the access digest.
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "POST", "/api/v1/parcels/")?;
     let geojson = params.geometry.to_string();
     let status = if params.status.is_empty() {
         "pending".to_string()
@@ -141,7 +231,7 @@ async fn create_parcel(
         params.status
     };
 
-    let parcel = sqlx::query_as::<_, Parcel>(
+    let parcel = sqlx::query_as::<_, ParcelRow>(
         "WITH p AS (
             INSERT INTO parcels (name, status, geometry, onchain_id)
             VALUES ($1, $3, ST_GeomFromGeoJSON($4), $5)
@@ -173,7 +263,7 @@ async fn create_parcel(
         }
     })?;
 
-    Ok((StatusCode::CREATED, Json(parcel)))
+    Ok((StatusCode::CREATED, Json(parcel.into_parcel(true))))
 }
 
 async fn delete_parcel(
@@ -320,14 +410,15 @@ async fn reconcile(
     }
     tx.commit().await?;
 
-    let parcel = sqlx::query_as::<_, Parcel>(&format!(
+    let parcel = sqlx::query_as::<_, ParcelRow>(&format!(
         "{PARCEL_SELECT}
          WHERE p.id = $1"
     ))
     .bind(id)
     .fetch_one(&state.pool)
     .await?;
-    Ok(Json(parcel))
+    // Reconcile is authority-gated; the caller is trusted, so disclose.
+    Ok(Json(parcel.into_parcel(true)))
 }
 
 fn is_geometry_error(err: &sqlx::Error) -> bool {
@@ -485,5 +576,26 @@ mod tests {
         }
         assert!(validators_exclude_owner(&owner, &[v1.clone(), v2.clone()]));
         assert!(!validators_exclude_owner(&owner, &[v1, owner.clone()]));
+    }
+
+    /// Field-level read policy: the mirror's `holder` column is real
+    /// property data and must not leak to unauthenticated callers.
+    #[test]
+    fn holder_is_none_for_unsigned_request() {
+let row = ParcelRow {
+        id: Uuid::nil(),
+        name: "test".into(),
+        holder: "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage".into(),
+        status: "registered".into(),
+        geometry: None,
+        area_m2: None,
+        created_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+        updated_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+        onchain_id: None,
+    };
+    let unauthenticated = row.clone().into_parcel(false);
+    assert!(unauthenticated.holder.is_none(), "holder must be redacted for unsigned callers");
+    let authority = row.into_parcel(true);
+    assert_eq!(authority.holder.as_deref(), Some("GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage"));
     }
 }

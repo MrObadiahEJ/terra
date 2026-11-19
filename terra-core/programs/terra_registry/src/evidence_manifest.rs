@@ -19,8 +19,10 @@ use crate::TerraError;
 
 /// Max artifacts per manifest (append-only; caps rent abuse).
 pub const MAX_MANIFEST_ARTIFACTS: u16 = 32;
-/// Max storage_reference length (same as legacy Evidence).
-pub const MAX_STORAGE_REFERENCE_LEN: usize = 128;
+/// Max storage_reference length. CIDs fit in 128 bytes, but signed URLs
+/// (S3 pre-signed, R2, IPFS gateway tokens) routinely exceed that, so the
+/// bound is widened to 256 bytes before mainnet.
+pub const MAX_STORAGE_REFERENCE_LEN: usize = 256;
 /// Max valid artifact kind.
 pub const MAX_ARTIFACT_KIND: u8 = 5;
 
@@ -265,8 +267,9 @@ mod tests {
     fn storage_reference_bounds() {
         assert!(is_valid_storage_reference("ipfs://cid"));
         assert!(!is_valid_storage_reference(""));
-        assert!(!is_valid_storage_reference(&"x".repeat(129)));
-        assert!(is_valid_storage_reference(&"x".repeat(128)));
+        // Widened to 256 to accommodate signed URLs (CIDs fit in 128).
+        assert!(!is_valid_storage_reference(&"x".repeat(257)));
+        assert!(is_valid_storage_reference(&"x".repeat(256)));
     }
 
     #[test]

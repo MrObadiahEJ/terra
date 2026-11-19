@@ -111,9 +111,9 @@ pub struct SpatialAsset {
     /// Highest supported dimensionality: `spatial_dimension`.
     pub dimensionality: u8,
     /// Minimum elevation of the asset envelope, millimetres (may be < 0).
-    pub elevation_min_mm: i32,
+    pub elevation_min_mm: i64,
     /// Maximum elevation of the asset envelope, millimetres (>= min).
-    pub elevation_max_mm: i32,
+    pub elevation_max_mm: i64,
     /// Append-only cursor: next version index (0..=MAX_GEOMETRY_VERSIONS).
     pub geometry_version_count: u32,
     /// Geometry hash of the newest version (all-zero until the first append).
@@ -141,8 +141,8 @@ pub struct GeometryVersion {
     pub source: u8,
     /// `spatial_dimension` of this observation layer.
     pub dimension: u8,
-    /// Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 128 chars.
-    #[max_len(128)]
+    /// Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 512 chars.
+    #[max_len(512)]
     pub storage_reference: String,
     /// Whoever paid to anchor this claim (permissionless).
     pub submitted_by: Pubkey,
@@ -158,8 +158,8 @@ pub struct GeometryVersion {
     pub evidence_manifest: Pubkey,
     /// This version's elevation envelope, millimetres (both 0 when
     /// `elevation_source == elevation_source::NONE`).
-    pub elevation_min_mm: i32,
-    pub elevation_max_mm: i32,
+    pub elevation_min_mm: i64,
+    pub elevation_max_mm: i64,
     /// `elevation_source` provenance code for the Z values above.
     pub elevation_source: u8,
     /// Quorum threshold resolved at append (global `QuorumConfig`, else 2;
@@ -186,7 +186,7 @@ pub fn is_valid_geometry_source(s: u8) -> bool {
 
 /// An elevation envelope must be non-inverted (min <= max); equal bounds are
 /// legal (a flat plane).
-pub fn elevation_range_ok(min_mm: i32, max_mm: i32) -> bool {
+pub fn elevation_range_ok(min_mm: i64, max_mm: i64) -> bool {
     min_mm <= max_mm
 }
 
@@ -214,17 +214,17 @@ pub fn elevation_matches_dimension(source: u8, dimension: u8) -> bool {
 /// `elevation_source::NONE` must carry an all-zero envelope: a version
 /// that declares "no elevation" may not smuggle Z bounds along, and a
 /// version with a real envelope must state its provenance.
-pub fn elevation_none_is_zero(source: u8, min_mm: i32, max_mm: i32) -> bool {
+pub fn elevation_none_is_zero(source: u8, min_mm: i64, max_mm: i64) -> bool {
     source != elevation_source::NONE || (min_mm == 0 && max_mm == 0)
 }
 
 /// The version's elevation envelope must sit inside the asset's bounding
 /// envelope (equal bounds legal — a flat slice of the asset).
 pub fn elevation_within_asset(
-    min_mm: i32,
-    max_mm: i32,
-    asset_min_mm: i32,
-    asset_max_mm: i32,
+    min_mm: i64,
+    max_mm: i64,
+    asset_min_mm: i64,
+    asset_max_mm: i64,
 ) -> bool {
     min_mm >= asset_min_mm && max_mm <= asset_max_mm
 }
@@ -266,8 +266,8 @@ pub fn is_attestor(attestors: &[Pubkey; crate::MAX_VALIDATORS], validator: &Pubk
 pub fn init_spatial_asset(
     ctx: Context<crate::InitSpatialAsset>,
     dimensionality: u8,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
 ) -> Result<()> {
     require!(
         is_valid_dimension(dimensionality),
@@ -317,8 +317,8 @@ fn append_version_common(
     source: u8,
     dimension: u8,
     storage_reference: String,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
     elevation_source_code: u8,
     remaining_accounts: &[AccountInfo<'_>],
 ) -> Result<()> {
@@ -435,8 +435,8 @@ pub fn append_geometry_version(
     source: u8,
     dimension: u8,
     storage_reference: String,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
     elevation_source: u8,
 ) -> Result<()> {
     let asset_pk = ctx.accounts.asset.key();
@@ -471,8 +471,8 @@ pub fn append_geometry_version_from_evidence(
     source: u8,
     dimension: u8,
     storage_reference: String,
-    elevation_min_mm: i32,
-    elevation_max_mm: i32,
+    elevation_min_mm: i64,
+    elevation_max_mm: i64,
     elevation_source: u8,
 ) -> Result<()> {
     require!(

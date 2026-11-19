@@ -69,8 +69,8 @@ pub struct SpatialSnapshot {
     /// Asset dimensionality copied at creation (`spatial_dimension`).
     pub dimensionality: u8,
     /// Asset elevation envelope copied at creation, millimetres.
-    pub elevation_min_mm: i32,
-    pub elevation_max_mm: i32,
+    pub elevation_min_mm: i64,
+    pub elevation_max_mm: i64,
     /// Short human label for timelines (e.g. "2022 baseline"), <= 64 bytes.
     #[max_len(64)]
     pub label: String,

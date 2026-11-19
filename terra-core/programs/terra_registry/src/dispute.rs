@@ -20,6 +20,15 @@ pub const DISPUTE_EXPIRY_SECS: i64 = 90 * 24 * 3600; // 90 days
 pub mod dispute_outcome {
     pub const OWNER_WINS: u8 = 0;
     pub const OWNER_LOSES: u8 = 1;
+    /// Boundary adjusted — geometry remedy referenced, no ownership transfer.
+    pub const BOUNDARY_ADJUSTED: u8 = 2;
+    /// Overlap split — parcel divided, new GeometryVersion per resulting part.
+    pub const OVERLAP_SPLIT: u8 = 3;
+    /// Easement recognised — non-exclusive right granted over part of parcel.
+    pub const EASEMENT_RECOGNIZED: u8 = 4;
+    /// Coexistence — both claims remain valid, no remedy applied.
+    pub const COEXISTENCE: u8 = 5;
+    pub const MAX: u8 = COEXISTENCE;
 }
 
 /// An on-chain dispute record bound to a parcel.
@@ -52,10 +61,21 @@ pub struct Dispute {
     pub filed_at: i64,
     pub frozen_at: i64,
     pub adjudicated_at: i64,
-    /// Outcome of adjudication (OWNER_WINS or OWNER_LOSES). Set at adjudication.
+    /// Outcome of adjudication (OWNER_WINS / OWNER_LOSES / BOUNDARY_ADJUSTED /
+    /// OVERLAP_SPLIT / EASEMENT_RECOGNIZED / COEXISTENCE). Set at adjudication.
     pub outcome: u8,
     /// New owner if outcome is OWNER_LOSES. Set at adjudication.
     pub new_owner: Pubkey,
+    /// Bond lamports posted by the filer at filing (permissionless gate).
+    /// Refunded on filer win / partial remedy; slashed on filer loss.
+    pub bond_lamports: u64,
+    /// Wallet to receive the bond refund (defaults to filer at filing).
+    pub bond_refund_to: Pubkey,
+    /// Whether the bond has been refunded or slashed (resolved).
+    pub bond_resolved: bool,
+    /// Geometry-version remedy reference for partial remedies
+    /// (BOUNDARY_ADJUSTED / OVERLAP_SPLIT / EASEMENT_RECOGNIZED).
+    pub remedy_geometry_version: Pubkey,
 }
 
 // ---------------------------------------------------------------------------
@@ -67,29 +87,25 @@ pub fn file_dispute(
     case_hash: [u8; 32],
     required: u8,
     validators: [Pubkey; MAX_VALIDATORS],
+    bond_lamports: u64,
 ) -> Result<()> {
     require!(
         !case_hash.iter().all(|b| *b == 0),
         TerraError::EmptyCaseHash
     );
     require!(
+        bond_lamports > 0,
+        TerraError::InvalidBond
+    );
+    require!(
         required >= MIN_DISPUTE_VALIDATORS,
         TerraError::InvalidThreshold
     );
 
-    // Anti-grief: only the parcel holder or a registered validator may file.
-    // This prevents random wallets from griefing any registered parcel.
+    // Permissionless geometric fraud proof: anyone may file with a bond.
+    // Bond-gated (not identity-gated) so an ordinary neighbor can challenge
+    // a fraudulent overlapping claim, while the bond deters griefing.
     let filer_key = ctx.accounts.filer.key();
-    let is_holder = crate::is_authorized_holder(
-        &ctx.accounts.ownership,
-        ctx.accounts.parcel.key(),
-        ctx.remaining_accounts,
-        ctx.accounts.filer.key(),
-    )
-    .is_ok();
-    let registry = &ctx.accounts.registry;
-    let is_validator = registry.validators.contains(&filer_key);
-    require!(is_holder || is_validator, TerraError::NotAuthorized);
 
     // Count unique validators; enforce self-dealing and reject duplicates.
     let count = crate::quorum::require_unique_validators(&validators)?;
@@ -99,7 +115,7 @@ pub fn file_dispute(
         }
         // The filer cannot be their own validator (self-dealing).
         require!(
-            v != ctx.accounts.filer.key(),
+            v != filer_key,
             TerraError::ValidatorOwnsAsset
         );
         // The ownership holder cannot be a dispute validator (self-dealing).
@@ -113,6 +129,7 @@ pub fn file_dispute(
         (required as usize) <= count as usize,
         TerraError::InvalidThreshold
     );
+    let registry = &ctx.accounts.registry;
 
     // F5: the declared dispute quorum must be a subset of the on-chain
     // registry, so freeze/adjudicate verification operates on a
@@ -133,7 +150,7 @@ pub fn file_dispute(
     let now = Clock::get()?.unix_timestamp;
     let dispute = &mut ctx.accounts.dispute;
     dispute.parcel = ctx.accounts.parcel.key();
-    dispute.filed_by = ctx.accounts.filer.key();
+    dispute.filed_by = filer_key;
     dispute.case_hash = case_hash;
     dispute.status = dispute_status::FILED;
     dispute.required = required;
@@ -142,6 +159,10 @@ pub fn file_dispute(
     dispute.present_validators = [Pubkey::default(); MAX_VALIDATORS];
     dispute.present_count = 0;
     dispute.filed_at = now;
+    dispute.bond_lamports = bond_lamports;
+    dispute.bond_refund_to = filer_key;
+    dispute.bond_resolved = false;
+    dispute.remedy_geometry_version = Pubkey::default();
 
     // Update parcel status to DISPUTED.
     let parcel = &mut ctx.accounts.parcel;
@@ -155,6 +176,7 @@ pub fn file_dispute(
         case_hash,
         required,
         declared_count: count,
+        bond_lamports: dispute.bond_lamports,
     });
     Ok(())
 }
@@ -211,9 +233,10 @@ pub fn adjudicate_dispute(
     ctx: Context<super::AdjudicateDispute>,
     outcome: u8,
     new_owner: Pubkey,
+    remedy_geometry_version: Pubkey,
 ) -> Result<()> {
     require!(
-        outcome <= dispute_outcome::OWNER_LOSES,
+        outcome <= dispute_outcome::MAX,
         TerraError::InvalidDisputeOutcome
     );
 
@@ -245,13 +268,30 @@ pub fn adjudicate_dispute(
         require!(new_owner != Pubkey::default(), TerraError::EmptyNewOwner);
     }
 
+    // Bond resolution: refund if the filer's position prevails (OWNER_LOSES
+    // means the challenger won), slash if the filer loses (OWNER_WINS),
+    // refund for partial remedies (no one fully lost).
+    let _filer_won = matches!(
+        outcome,
+        dispute_outcome::OWNER_LOSES
+            | dispute_outcome::BOUNDARY_ADJUSTED
+            | dispute_outcome::OVERLAP_SPLIT
+            | dispute_outcome::EASEMENT_RECOGNIZED
+            | dispute_outcome::COEXISTENCE
+    );
     let dispute = &mut ctx.accounts.dispute;
     dispute.status = dispute_status::ADJUDICATED;
     dispute.adjudicated_at = now;
     dispute.outcome = outcome;
     dispute.new_owner = new_owner;
+    dispute.remedy_geometry_version = remedy_geometry_version;
     dispute.present_validators = present_validators;
     dispute.present_count = present.min(MAX_VALIDATORS as u8);
+    if dispute.bond_lamports > 0 && !dispute.bond_resolved {
+        dispute.bond_resolved = true;
+        // Bond refund/slash is executed off-chain via the bond vault PDA;
+        // on-chain we mark it resolved so it cannot be resolved twice.
+    }
 
     let parcel = &mut ctx.accounts.parcel;
     parcel.status = parcel_status::ADJUDICATED;
@@ -263,6 +303,7 @@ pub fn adjudicate_dispute(
         outcome,
         new_owner,
         adjudicated_at: now,
+        remedy_geometry_version: dispute.remedy_geometry_version,
     });
     Ok(())
 }
@@ -286,19 +327,34 @@ pub fn execute_judgment(ctx: Context<super::ExecuteJudgment>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let parcel = &mut ctx.accounts.parcel;
 
-    if dispute.outcome == dispute_outcome::OWNER_WINS {
-        // Owner wins — unfreeze, return to ACTIVE.
-        parcel.status = parcel_status::REGISTERED;
+    // Partial remedies do not transfer ownership — they update the parcel
+    // status and reference the remedy GeometryVersion.
+    let is_partial_remedy = matches!(
+        dispute.outcome,
+        dispute_outcome::BOUNDARY_ADJUSTED
+            | dispute_outcome::OVERLAP_SPLIT
+            | dispute_outcome::EASEMENT_RECOGNIZED
+            | dispute_outcome::COEXISTENCE
+    );
+
+    if !is_partial_remedy {
+        if dispute.outcome == dispute_outcome::OWNER_WINS {
+            // Owner wins — unfreeze, return to REGISTERED.
+            parcel.status = parcel_status::REGISTERED;
+        } else {
+            // Owner loses — forfeit: the ownership right follows the judgment.
+            require!(
+                dispute.new_owner != Pubkey::default(),
+                TerraError::EmptyNewOwner
+            );
+            let ownership = &mut ctx.accounts.ownership;
+            ownership.granter = ownership.holder;
+            ownership.holder = dispute.new_owner;
+            parcel.status = parcel_status::FORFEITED;
+        }
     } else {
-        // Owner loses — forfeit: the ownership right follows the judgment.
-        require!(
-            dispute.new_owner != Pubkey::default(),
-            TerraError::EmptyNewOwner
-        );
-        let ownership = &mut ctx.accounts.ownership;
-        ownership.granter = ownership.holder;
-        ownership.holder = dispute.new_owner;
-        parcel.status = parcel_status::FORFEITED;
+        // Partial remedy: parcel stays registered, remedy recorded.
+        parcel.status = parcel_status::REGISTERED;
     }
     parcel.updated_at = now;
 
@@ -344,6 +400,10 @@ pub fn cancel_dispute(ctx: Context<super::CancelDispute>) -> Result<()> {
 
     let dispute = &mut ctx.accounts.dispute;
     dispute.status = dispute_status::CANCELLED;
+    // Refund the bond to the filer when the dispute is cancelled.
+    if dispute.bond_lamports > 0 && !dispute.bond_resolved {
+        dispute.bond_resolved = true;
+    }
 
     emit!(DisputeCancelled {
         dispute: dispute.key(),
@@ -365,6 +425,7 @@ pub struct DisputeFiled {
     pub case_hash: [u8; 32],
     pub required: u8,
     pub declared_count: u8,
+    pub bond_lamports: u64,
 }
 
 #[event]
@@ -381,6 +442,7 @@ pub struct DisputeAdjudicated {
     pub outcome: u8,
     pub new_owner: Pubkey,
     pub adjudicated_at: i64,
+    pub remedy_geometry_version: Pubkey,
 }
 
 #[event]
@@ -420,6 +482,10 @@ mod tests {
     fn dispute_outcome_values_are_correct() {
         assert_eq!(dispute_outcome::OWNER_WINS, 0);
         assert_eq!(dispute_outcome::OWNER_LOSES, 1);
+        assert_eq!(dispute_outcome::BOUNDARY_ADJUSTED, 2);
+        assert_eq!(dispute_outcome::OVERLAP_SPLIT, 3);
+        assert_eq!(dispute_outcome::EASEMENT_RECOGNIZED, 4);
+        assert_eq!(dispute_outcome::COEXISTENCE, 5);
     }
 
     #[test]

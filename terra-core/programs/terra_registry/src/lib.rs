@@ -1560,8 +1560,9 @@ pub mod terra_registry {
         case_hash: [u8; 32],
         required: u8,
         validators: [Pubkey; MAX_VALIDATORS],
+        bond_lamports: u64,
     ) -> Result<()> {
-        dispute::file_dispute(ctx, case_hash, required, validators)
+        dispute::file_dispute(ctx, case_hash, required, validators, bond_lamports)
     }
 
     pub fn freeze_parcel(ctx: Context<FreezeParcel>) -> Result<()> {
@@ -1572,8 +1573,9 @@ pub mod terra_registry {
         ctx: Context<AdjudicateDispute>,
         outcome: u8,
         new_owner: Pubkey,
+        remedy_geometry_version: Pubkey,
     ) -> Result<()> {
-        dispute::adjudicate_dispute(ctx, outcome, new_owner)
+        dispute::adjudicate_dispute(ctx, outcome, new_owner, remedy_geometry_version)
     }
 
     pub fn execute_judgment(ctx: Context<ExecuteJudgment>) -> Result<()> {
@@ -1935,8 +1937,8 @@ pub mod terra_registry {
     pub fn init_spatial_asset(
         ctx: Context<InitSpatialAsset>,
         dimensionality: u8,
-        elevation_min_mm: i32,
-        elevation_max_mm: i32,
+        elevation_min_mm: i64,
+        elevation_max_mm: i64,
     ) -> Result<()> {
         spatial_asset::init_spatial_asset(ctx, dimensionality, elevation_min_mm, elevation_max_mm)
     }
@@ -1948,8 +1950,8 @@ pub mod terra_registry {
         source: u8,
         dimension: u8,
         storage_reference: String,
-        elevation_min_mm: i32,
-        elevation_max_mm: i32,
+        elevation_min_mm: i64,
+        elevation_max_mm: i64,
         elevation_source: u8,
     ) -> Result<()> {
         spatial_asset::append_geometry_version(
@@ -1972,8 +1974,8 @@ pub mod terra_registry {
         source: u8,
         dimension: u8,
         storage_reference: String,
-        elevation_min_mm: i32,
-        elevation_max_mm: i32,
+        elevation_min_mm: i64,
+        elevation_max_mm: i64,
         elevation_source: u8,
     ) -> Result<()> {
         spatial_asset::append_geometry_version_from_evidence(
@@ -7293,8 +7295,8 @@ pub struct GeometryVersionAppended {
     pub submitted_by: Pubkey,
     pub submitted_at: i64,
     pub evidence_manifest: Pubkey,
-    pub elevation_min_mm: i32,
-    pub elevation_max_mm: i32,
+    pub elevation_min_mm: i64,
+    pub elevation_max_mm: i64,
     pub elevation_source: u8,
     pub required: u8,
 }
@@ -8136,6 +8138,8 @@ pub enum TerraError {
     InvalidVrfRandomness,
     #[msg("VRF oracle is not the allowlisted authority")]
     VrfAuthorityMismatch,
+    #[msg("Dispute bond must be greater than zero")]
+    InvalidBond,
 }
 
 #[cfg(test)]
