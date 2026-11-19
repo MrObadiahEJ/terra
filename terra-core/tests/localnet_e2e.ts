@@ -580,7 +580,7 @@ describe("terra localnet lifecycle (Sprint A)", function () {
     const geometryHash = digest(["geometry:verified:v0"]);
 
     await program.methods
-      .initSpatialAsset(0, 0, 0) // D2, no elevation
+      .initSpatialAsset(0, new anchor.BN(0), new anchor.BN(0)) // D2, no elevation
       .accounts({ asset: assetPda, parcel: parcelPda, registrar: admin, systemProgram })
       .signers([payer])
       .rpc();
@@ -591,8 +591,8 @@ describe("terra localnet lifecycle (Sprint A)", function () {
         0, // MANUAL
         0, // D2
         "ipfs://sprint-a/geometry-v0",
-        0,
-        0,
+        new anchor.BN(0),
+        new anchor.BN(0),
         0 // elevation_source NONE
       )
       .accounts({ asset: assetPda, geometryVersion: geometryVersionPda, payer: admin, systemProgram })
@@ -762,7 +762,7 @@ describe("terra localnet lifecycle (Sprint A)", function () {
     ];
 
     await program.methods
-      .fileDispute(caseHash, 2, validators, 1_000_000) // bond_lamports > 0
+      .fileDispute(caseHash, 2, validators, new anchor.BN(1_000_000)) // bond_lamports > 0
       .accounts({
         dispute: disputePda,
         parcel: disputeParcelPda,
