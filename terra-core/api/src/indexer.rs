@@ -1713,7 +1713,7 @@ async fn upsert_geometry_version(
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    let attestors_hex: Vec<String> = version.attestors.iter().map(|a| a.clone()).collect();
+    let attestors_hex: Vec<String> = version.attestors.to_vec();
 
     let exists: Option<i64> =
         sqlx::query_scalar("SELECT id FROM geometry_versions_onchain WHERE pubkey = $1")

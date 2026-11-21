@@ -324,7 +324,7 @@ pub fn discover_candidates(
     required_capability: Option<u8>,
     max_candidates: usize,
 ) -> Vec<Pubkey> {
-    let max_candidates = max_candidates.min(MAX_ROUTE_CANDIDATES).max(2);
+    let max_candidates = max_candidates.clamp(2, MAX_ROUTE_CANDIDATES);
     let mut with_cap: Vec<Pubkey> = Vec::new();
     let mut without_cap: Vec<(Pubkey, u16)> = Vec::new();
 
@@ -344,7 +344,7 @@ pub fn discover_candidates(
     }
 
     // Random reputable fill: sort by reputation desc, take remaining slots.
-    without_cap.sort_by(|a, b| b.1.cmp(&a.1));
+    without_cap.sort_by_key(|a| std::cmp::Reverse(a.1));
     for (wallet, _) in without_cap {
         if chosen.len() >= max_candidates {
             break;
