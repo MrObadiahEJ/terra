@@ -35,6 +35,18 @@ const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] = [231, 126, 92, 51, 84, 1
 /// SHA-256("account:Rights")[..8] = 4fbb5655f3d567ea
 const RIGHTS_DISCRIMINATOR: [u8; 8] = [0x4f, 0xbb, 0x56, 0x55, 0xf3, 0xd5, 0x67, 0xea];
 
+/// Anchor 8-byte discriminator for the `Claim` account:
+/// SHA-256("account:Claim")[..8] = 9b4616b07bd7f666
+const CLAIM_DISCRIMINATOR: [u8; 8] = [0x9b, 0x46, 0x16, 0xb0, 0x7b, 0xd7, 0xf6, 0x66];
+
+/// Anchor 8-byte discriminator for the `SpatialAsset` account:
+/// SHA-256("account:SpatialAsset")[..8] = 8f85940476320aaa
+const SPATIAL_ASSET_DISCRIMINATOR: [u8; 8] = [0x8f, 0x85, 0x94, 0x04, 0x76, 0x32, 0x0a, 0xaa];
+
+/// Anchor 8-byte discriminator for the `GeometryVersion` account:
+/// SHA-256("account:GeometryVersion")[..8] = 4e8f23c261d5c3d8
+const GEOMETRY_VERSION_DISCRIMINATOR: [u8; 8] = [0x4e, 0x8f, 0x23, 0xc2, 0x61, 0xd5, 0xc3, 0xd8];
+
 /// Rights account kind: OWNERSHIP = 0
 const RIGHTS_KIND_OWNERSHIP: u8 = 0;
 
@@ -208,6 +220,560 @@ pub struct ParsedParcel {
     pub access_hash: [u8; 32],
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+/// Parsed Claim account from on-chain data.
+///
+/// PDA: `["claim", parcel, claim_id]`.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ParsedClaim {
+    pub claim_id: [u8; 32],
+    pub parcel: [u8; 32],
+    pub claim_type: u8,
+    pub submitted_by: [u8; 32],
+    pub status: u8,
+    pub statement_hash: [u8; 32],
+    pub version: u8,
+    pub evidence_count: u8,
+    pub observation_count: u8,
+    pub attestation_count: u8,
+    pub required_attestations: u8,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// Decode a raw Anchor account buffer into a ParsedClaim.
+///
+/// Anchor account layout:
+///   [0..8]   discriminator (8 bytes)
+///   [8..40]  claim_id [u8; 32]
+///   [40..72] parcel [u8; 32]
+///   [72]     claim_type u8
+///   [73..105] submitted_by [u8; 32]
+///   [105]    status u8
+///   [106..138] statement_hash [u8; 32]
+///   [138]    version u8
+///   [139]    evidence_count u8
+///   [140]    observation_count u8
+///   [141]    attestation_count u8
+///   [142]    required_attestations u8
+///   [143..151] created_at i64 LE
+///   [151..159] updated_at i64 LE
+fn parse_claim(data: &[u8]) -> Option<ParsedClaim> {
+    if data.len() < 8 {
+        return None;
+    }
+    if data[..8] != CLAIM_DISCRIMINATOR {
+        return None;
+    }
+
+    let mut offset = 8;
+
+    // claim_id [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut claim_id = [0u8; 32];
+    claim_id.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // parcel [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut parcel = [0u8; 32];
+    parcel.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // claim_type u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let claim_type = data[offset];
+    offset += 1;
+
+    // submitted_by [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut submitted_by = [0u8; 32];
+    submitted_by.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // status u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let status = data[offset];
+    offset += 1;
+
+    // statement_hash [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut statement_hash = [0u8; 32];
+    statement_hash.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // version u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let version = data[offset];
+    offset += 1;
+
+    // evidence_count u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let evidence_count = data[offset];
+    offset += 1;
+
+    // observation_count u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let observation_count = data[offset];
+    offset += 1;
+
+    // attestation_count u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let attestation_count = data[offset];
+    offset += 1;
+
+    // required_attestations u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let required_attestations = data[offset];
+    offset += 1;
+
+    // created_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let created_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // updated_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let updated_at = i64::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
+    ]);
+
+    Some(ParsedClaim {
+        claim_id,
+        parcel,
+        claim_type,
+        submitted_by,
+        status,
+        statement_hash,
+        version,
+        evidence_count,
+        observation_count,
+        attestation_count,
+        required_attestations,
+        created_at,
+        updated_at,
+    })
+}
+
+/// Parsed SpatialAsset account from on-chain data.
+///
+/// PDA: `["spatial_asset", parcel]`.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ParsedSpatialAsset {
+    pub parcel: [u8; 32],
+    pub authority: [u8; 32],
+    pub dimensionality: u8,
+    pub elevation_min_mm: i64,
+    pub elevation_max_mm: i64,
+    pub geometry_version_count: u32,
+    pub latest_geometry: [u8; 32],
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// Decode a raw Anchor account buffer into a ParsedSpatialAsset.
+///
+/// Anchor account layout:
+///   [0..8]   discriminator (8 bytes)
+///   [8..40]  parcel [u8; 32]
+///   [40..72] authority [u8; 32]
+///   [72]     dimensionality u8
+///   [73..81] elevation_min_mm i64 LE
+///   [81..89] elevation_max_mm i64 LE
+///   [89..93] geometry_version_count u32 LE
+///   [93..125] latest_geometry [u8; 32]
+///   [125..133] created_at i64 LE
+///   [133..141] updated_at i64 LE
+fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
+    if data.len() < 8 {
+        return None;
+    }
+    if data[..8] != SPATIAL_ASSET_DISCRIMINATOR {
+        return None;
+    }
+
+    let mut offset = 8;
+
+    // parcel [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut parcel = [0u8; 32];
+    parcel.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // authority [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut authority = [0u8; 32];
+    authority.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // dimensionality u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let dimensionality = data[offset];
+    offset += 1;
+
+    // elevation_min_mm i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let elevation_min_mm = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // elevation_max_mm i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let elevation_max_mm = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // geometry_version_count u32 LE
+    if data.len() < offset + 4 {
+        return None;
+    }
+    let geometry_version_count = u32::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+    ]);
+    offset += 4;
+
+    // latest_geometry [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut latest_geometry = [0u8; 32];
+    latest_geometry.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // created_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let created_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // updated_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let updated_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+
+    Some(ParsedSpatialAsset {
+        parcel,
+        authority,
+        dimensionality,
+        elevation_min_mm,
+        elevation_max_mm,
+        geometry_version_count,
+        latest_geometry,
+        created_at,
+        updated_at,
+    })
+}
+
+/// Parsed GeometryVersion account from on-chain data.
+///
+/// PDA: `["geometry_version", asset, version_le_bytes]`.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ParsedGeometryVersion {
+    pub asset: [u8; 32],
+    pub parcel: [u8; 32],
+    pub version: u32,
+    pub geometry_hash: [u8; 32],
+    pub source: u8,
+    pub dimension: u8,
+    pub storage_reference: String,
+    pub submitted_by: [u8; 32],
+    pub submitted_at: i64,
+    pub verified: bool,
+    pub verified_by: [u8; 32],
+    pub verified_at: i64,
+    pub evidence_manifest: [u8; 32],
+    pub elevation_min_mm: i64,
+    pub elevation_max_mm: i64,
+    pub elevation_source: u8,
+    pub required: u8,
+    pub attestors: Vec<String>,
+    pub attest_count: u8,
+}
+
+/// Decode a raw Anchor account buffer into a ParsedGeometryVersion.
+///
+/// Anchor account layout:
+///   [0..8]   discriminator (8 bytes)
+///   [8..40]  asset [u8; 32]
+///   [40..72] parcel [u8; 32]
+///   [72..76] version u32 LE
+///   [76..108] geometry_hash [u8; 32]
+///   [108]    source u8
+///   [109]    dimension u8
+///   [110]    storage_reference length (u16 LE)
+///   [112..]  storage_reference bytes (UTF-8)
+///   then     submitted_by [u8; 32]
+///   then     submitted_at i64 LE
+///   then     verified u8
+///   then     verified_by [u8; 32]
+///   then     verified_at i64 LE
+///   then     evidence_manifest [u8; 32]
+///   then     elevation_min_mm i64 LE
+///   then     elevation_max_mm i64 LE
+///   then     elevation_source u8
+///   then     required u8
+///   then     attestors [Pubkey; MAX_VALIDATORS] (32 bytes each)
+///   then     attest_count u8
+fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
+    if data.len() < 8 {
+        return None;
+    }
+    if data[..8] != GEOMETRY_VERSION_DISCRIMINATOR {
+        return None;
+    }
+
+    let mut offset = 8;
+
+    // asset [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut asset = [0u8; 32];
+    asset.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // parcel [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut parcel = [0u8; 32];
+    parcel.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // version u32 LE
+    if data.len() < offset + 4 {
+        return None;
+    }
+    let version = u32::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+    ]);
+    offset += 4;
+
+    // geometry_hash [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut geometry_hash = [0u8; 32];
+    geometry_hash.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // source u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let source = data[offset];
+    offset += 1;
+
+    // dimension u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let dimension = data[offset];
+    offset += 1;
+
+    // storage_reference: u16 LE length + bytes
+    if data.len() < offset + 2 {
+        return None;
+    }
+    let storage_ref_len = u16::from_le_bytes([data[offset], data[offset + 1]]) as usize;
+    offset += 2;
+    if data.len() < offset + storage_ref_len {
+        return None;
+    }
+    let storage_reference = String::from_utf8_lossy(&data[offset..offset + storage_ref_len])
+        .to_string();
+    offset += storage_ref_len;
+
+    // submitted_by [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut submitted_by = [0u8; 32];
+    submitted_by.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // submitted_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let submitted_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // verified u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let verified = data[offset] != 0;
+    offset += 1;
+
+    // verified_by [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut verified_by = [0u8; 32];
+    verified_by.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // verified_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let verified_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // evidence_manifest [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut evidence_manifest = [0u8; 32];
+    evidence_manifest.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // elevation_min_mm i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let elevation_min_mm = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // elevation_max_mm i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let elevation_max_mm = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // elevation_source u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let elevation_source = data[offset];
+    offset += 1;
+
+    // required u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let required = data[offset];
+    offset += 1;
+
+    // attestors [Pubkey; MAX_VALIDATORS] - 8 validators per lib.rs
+    const MAX_VALIDATORS: usize = 8;
+    if data.len() < offset + MAX_VALIDATORS * 32 {
+        return None;
+    }
+    let mut attestors = Vec::with_capacity(MAX_VALIDATORS);
+    for i in 0..MAX_VALIDATORS {
+        let start = offset + i * 32;
+        let pk = &data[start..start + 32];
+        if pk.iter().all(|&b| b == 0) {
+            continue; // skip zero-filled slots
+        }
+        attestors.push(pk.iter().map(|b| format!("{b:02x}")).collect());
+    }
+    offset += MAX_VALIDATORS * 32;
+
+    // attest_count u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let attest_count = data[offset];
+
+    Some(ParsedGeometryVersion {
+        asset,
+        parcel,
+        version,
+        geometry_hash,
+        source,
+        dimension,
+        storage_reference,
+        submitted_by,
+        submitted_at,
+        verified,
+        verified_by,
+        verified_at,
+        evidence_manifest,
+        elevation_min_mm,
+        elevation_max_mm,
+        elevation_source,
+        required,
+        attestors,
+        attest_count,
+    })
 }
 
 /// Decode a raw Anchor account buffer into a ParsedParcel.
@@ -567,6 +1133,15 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
         } else if let Some(attestation) = parse_verification_attestation(&account.data) {
             upsert_verification_attestation(state, pubkey, &attestation, slot, "").await?;
             upserted += 1;
+        } else if let Some(claim) = parse_claim(&account.data) {
+            upsert_claim(state, pubkey, &claim, slot, "").await?;
+            upserted += 1;
+        } else if let Some(spatial_asset) = parse_spatial_asset(&account.data) {
+            upsert_spatial_asset(state, pubkey, &spatial_asset, slot, "").await?;
+            upserted += 1;
+        } else if let Some(geometry_version) = parse_geometry_version(&account.data) {
+            upsert_geometry_version(state, pubkey, &geometry_version, slot, "").await?;
+            upserted += 1;
         }
     }
 
@@ -830,6 +1405,388 @@ async fn upsert_verification_attestation(
         .map_err(|e| {
             warn!("insert verification_attestation {pubkey} failed: {e:?}");
             anyhow::anyhow!("insert verification_attestation {pubkey}: {e}")
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Insert or update a claim row from on-chain data.
+///
+/// NOTE: requires a `claims_onchain` mirror table migration (not yet present
+/// in api/migrations). The parsing logic is complete; the upsert SQL below
+/// assumes the table exists with columns matching the ParsedClaim fields.
+/// Create the migration before enabling claim indexing on a live database.
+async fn upsert_claim(
+    state: &AppState,
+    pubkey: &Pubkey,
+    claim: &ParsedClaim,
+    _slot: u64,
+    _signature: &str,
+) -> Result<()> {
+    let pubkey_str = pubkey.to_string();
+    let claim_id_hex: String = claim
+        .claim_id
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let parcel_hex: String = claim
+        .parcel
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let submitted_by_hex: String = claim
+        .submitted_by
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let statement_hash_hex: String = claim
+        .statement_hash
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM claims_onchain WHERE pubkey = $1")
+        .bind(&pubkey_str)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("check existing claim {pubkey} failed: {e:?}");
+            anyhow::anyhow!("check existing claim {pubkey}: {e}")
+        })?;
+
+    if let Some(_id) = exists {
+        sqlx::query(
+            r#"
+            UPDATE claims_onchain SET
+                claim_id = $1,
+                parcel_pubkey = $2,
+                claim_type = $3,
+                submitted_by = $4,
+                status = $5,
+                statement_hash = $6,
+                version = $7,
+                evidence_count = $8,
+                observation_count = $9,
+                attestation_count = $10,
+                required_attestations = $11,
+                chain_created_at = to_timestamp($12::double precision),
+                chain_updated_at = to_timestamp($13::double precision),
+                chain_verified = TRUE,
+                mirrored_at = now()
+            WHERE pubkey = $14
+            "#,
+        )
+        .bind(&claim_id_hex)
+        .bind(&parcel_hex)
+        .bind(claim.claim_type as i16)
+        .bind(&submitted_by_hex)
+        .bind(claim.status as i16)
+        .bind(&statement_hash_hex)
+        .bind(claim.version as i16)
+        .bind(claim.evidence_count as i16)
+        .bind(claim.observation_count as i16)
+        .bind(claim.attestation_count as i16)
+        .bind(claim.required_attestations as i16)
+        .bind(claim.created_at as f64)
+        .bind(claim.updated_at as f64)
+        .bind(&pubkey_str)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("update claim {pubkey} failed: {e:?}");
+            anyhow::anyhow!("update claim {pubkey}: {e}")
+        })?;
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO claims_onchain (
+                pubkey, claim_id, parcel_pubkey, claim_type, submitted_by,
+                status, statement_hash, version, evidence_count,
+                observation_count, attestation_count, required_attestations,
+                chain_created_at, chain_updated_at, chain_verified, mirrored_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                to_timestamp($13::double precision), to_timestamp($14::double precision), TRUE, now()
+            )
+            "#,
+        )
+        .bind(&pubkey_str)
+        .bind(&claim_id_hex)
+        .bind(&parcel_hex)
+        .bind(claim.claim_type as i16)
+        .bind(&submitted_by_hex)
+        .bind(claim.status as i16)
+        .bind(&statement_hash_hex)
+        .bind(claim.version as i16)
+        .bind(claim.evidence_count as i16)
+        .bind(claim.observation_count as i16)
+        .bind(claim.attestation_count as i16)
+        .bind(claim.required_attestations as i16)
+        .bind(claim.created_at as f64)
+        .bind(claim.updated_at as f64)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("insert claim {pubkey} failed: {e:?}");
+            anyhow::anyhow!("insert claim {pubkey}: {e}")
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Insert or update a spatial_asset row from on-chain data.
+async fn upsert_spatial_asset(
+    state: &AppState,
+    pubkey: &Pubkey,
+    asset: &ParsedSpatialAsset,
+    _slot: u64,
+    _signature: &str,
+) -> Result<()> {
+    let pubkey_str = pubkey.to_string();
+    let parcel_hex: String = asset
+        .parcel
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let authority_hex: String = asset
+        .authority
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let latest_geometry_hex: String = asset
+        .latest_geometry
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM spatial_assets_onchain WHERE pubkey = $1")
+        .bind(&pubkey_str)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("check existing spatial_asset {pubkey} failed: {e:?}");
+            anyhow::anyhow!("check existing spatial_asset {pubkey}: {e}")
+        })?;
+
+    if let Some(_id) = exists {
+        sqlx::query(
+            r#"
+            UPDATE spatial_assets_onchain SET
+                parcel_pubkey = $1,
+                authority = $2,
+                dimensionality = $3,
+                elevation_min_mm = $4,
+                elevation_max_mm = $5,
+                geometry_version_count = $6,
+                latest_geometry_hash = $7,
+                chain_created_at = to_timestamp($8::double precision),
+                chain_updated_at = to_timestamp($9::double precision),
+                mirrored_at = now()
+            WHERE pubkey = $10
+            "#,
+        )
+        .bind(&parcel_hex)
+        .bind(&authority_hex)
+        .bind(asset.dimensionality as i16)
+        .bind(asset.elevation_min_mm as i32)
+        .bind(asset.elevation_max_mm as i32)
+        .bind(asset.geometry_version_count as i32)
+        .bind(&latest_geometry_hex)
+        .bind(asset.created_at as f64)
+        .bind(asset.updated_at as f64)
+        .bind(&pubkey_str)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("update spatial_asset {pubkey} failed: {e:?}");
+            anyhow::anyhow!("update spatial_asset {pubkey}: {e}")
+        })?;
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO spatial_assets_onchain (
+                pubkey, parcel_pubkey, authority, dimensionality,
+                elevation_min_mm, elevation_max_mm, geometry_version_count,
+                latest_geometry_hash, chain_created_at, chain_updated_at, mirrored_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8,
+                to_timestamp($9::double precision), to_timestamp($10::double precision), now()
+            )
+            "#,
+        )
+        .bind(&pubkey_str)
+        .bind(&parcel_hex)
+        .bind(&authority_hex)
+        .bind(asset.dimensionality as i16)
+        .bind(asset.elevation_min_mm as i32)
+        .bind(asset.elevation_max_mm as i32)
+        .bind(asset.geometry_version_count as i32)
+        .bind(&latest_geometry_hex)
+        .bind(asset.created_at as f64)
+        .bind(asset.updated_at as f64)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("insert spatial_asset {pubkey} failed: {e:?}");
+            anyhow::anyhow!("insert spatial_asset {pubkey}: {e}")
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Insert or update a geometry_version row from on-chain data.
+async fn upsert_geometry_version(
+    state: &AppState,
+    pubkey: &Pubkey,
+    version: &ParsedGeometryVersion,
+    _slot: u64,
+    _signature: &str,
+) -> Result<()> {
+    let pubkey_str = pubkey.to_string();
+    let asset_hex: String = version
+        .asset
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let parcel_hex: String = version
+        .parcel
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let geometry_hash_hex: String = version
+        .geometry_hash
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let submitted_by_hex: String = version
+        .submitted_by
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let verified_by_hex: String = version
+        .verified_by
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let evidence_manifest_hex: String = version
+        .evidence_manifest
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let attestors_hex: Vec<String> = version
+        .attestors
+        .iter()
+        .map(|a| a.clone())
+        .collect();
+
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM geometry_versions_onchain WHERE pubkey = $1")
+        .bind(&pubkey_str)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("check existing geometry_version {pubkey} failed: {e:?}");
+            anyhow::anyhow!("check existing geometry_version {pubkey}: {e}")
+        })?;
+
+    if let Some(_id) = exists {
+        sqlx::query(
+            r#"
+            UPDATE geometry_versions_onchain SET
+                asset_pubkey = $1,
+                parcel_pubkey = $2,
+                version = $3,
+                geometry_hash = $4,
+                source = $5,
+                dimension = $6,
+                storage_reference = $7,
+                submitted_by = $8,
+                chain_submitted_at = to_timestamp($9::double precision),
+                verified = $10,
+                verified_by = $11,
+                chain_verified_at = to_timestamp($12::double precision),
+                evidence_manifest = $13,
+                elevation_min_mm = $14,
+                elevation_max_mm = $15,
+                elevation_source = $16,
+                required = $17,
+                attest_count = $18,
+                attestors = $19,
+                mirrored_at = now()
+            WHERE pubkey = $20
+            "#,
+        )
+        .bind(&asset_hex)
+        .bind(&parcel_hex)
+        .bind(version.version as i32)
+        .bind(&geometry_hash_hex)
+        .bind(version.source as i16)
+        .bind(version.dimension as i16)
+        .bind(&version.storage_reference)
+        .bind(&submitted_by_hex)
+        .bind(version.submitted_at as f64)
+        .bind(version.verified)
+        .bind(&verified_by_hex)
+        .bind(version.verified_at as f64)
+        .bind(&evidence_manifest_hex)
+        .bind(version.elevation_min_mm as i32)
+        .bind(version.elevation_max_mm as i32)
+        .bind(version.elevation_source as i16)
+        .bind(version.required as i16)
+        .bind(version.attest_count as i16)
+        .bind(&attestors_hex)
+        .bind(&pubkey_str)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("update geometry_version {pubkey} failed: {e:?}");
+            anyhow::anyhow!("update geometry_version {pubkey}: {e}")
+        })?;
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO geometry_versions_onchain (
+                pubkey, asset_pubkey, parcel_pubkey, version, geometry_hash,
+                source, dimension, storage_reference, submitted_by,
+                chain_submitted_at, verified, verified_by,
+                chain_verified_at, evidence_manifest, elevation_min_mm,
+                elevation_max_mm, elevation_source, required, attest_count,
+                attestors, mirrored_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                to_timestamp($10::double precision), $11, $12,
+                to_timestamp($13::double precision), $14, $15, $16, $17, $18, $19,
+                now()
+            )
+            "#,
+        )
+        .bind(&pubkey_str)
+        .bind(&asset_hex)
+        .bind(&parcel_hex)
+        .bind(version.version as i32)
+        .bind(&geometry_hash_hex)
+        .bind(version.source as i16)
+        .bind(version.dimension as i16)
+        .bind(&version.storage_reference)
+        .bind(&submitted_by_hex)
+        .bind(version.submitted_at as f64)
+        .bind(version.verified)
+        .bind(&verified_by_hex)
+        .bind(version.verified_at as f64)
+        .bind(&evidence_manifest_hex)
+        .bind(version.elevation_min_mm as i32)
+        .bind(version.elevation_max_mm as i32)
+        .bind(version.elevation_source as i16)
+        .bind(version.required as i16)
+        .bind(version.attest_count as i16)
+        .bind(&attestors_hex)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            warn!("insert geometry_version {pubkey} failed: {e:?}");
+            anyhow::anyhow!("insert geometry_version {pubkey}: {e}")
         })?;
     }
 

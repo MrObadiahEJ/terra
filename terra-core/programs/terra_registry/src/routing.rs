@@ -20,9 +20,17 @@ use crate::TerraError;
 // On-chain: `route_task` takes an explicit candidate list (instruction arg),
 // verifies each candidate's PDAs in `remaining_accounts`, filters, then
 // picks a winner with a seed derived from (task_id, recent_blockhash, slot).
-// Assignment PDA is created for the winner only. Single-candidate calls
-// (n=1) always select that candidate if eligible — used by tests and by
-// requesters who already short-listed off-chain.
+//
+// Protocol-side candidate discovery (anti-collusion):
+//   • Minimum 2 candidates — requester-supplied n=1 always wins, which is a
+//     griefing vector. Require ≥2 so there is always competition.
+//   • Category guarantee — when `req.capability_code != CAPABILITY_ANY`, at
+//     least 2 eligible candidates must carry that capability, so a requester
+//     cannot corner a premium category by listing a single friendly validator.
+//   • Random reputable fill — when the candidate list is empty, the protocol
+//     discovers candidates from the validator registry (see `discover_candidates`).
+//
+// Assignment PDA is created for the winner only.
 // ---------------------------------------------------------------------------
 
 /// Max candidates evaluated in one `route_task` call.
@@ -290,6 +298,64 @@ pub fn filter_eligible(candidates: &[Pubkey], is_ok: impl Fn(&Pubkey) -> bool) -
     candidates.iter().copied().filter(|c| is_ok(c)).collect()
 }
 
+/// Protocol-side candidate discovery.
+///
+/// Given a pool of validator pubkeys and their per-validator eligibility
+/// results (capability match, jurisdiction, availability, reputation),
+/// returns a candidate list suitable for `route_task` that satisfies the
+/// anti-collusion guarantees:
+///
+///   1. **Minimum 2 candidates** — never returns fewer than 2 (if the pool
+///      has fewer eligible validators, returns all of them).
+///   2. **Category guarantee** — when `required_capability` is set, ensures
+///      at least 2 eligible validators carry that capability.
+///   3. **Random reputable fill** — fills remaining slots with the
+///      highest-reputation eligible validators, then randomized.
+///
+/// Callers sort the result before passing to `route_task` (selection is
+/// order-independent). Intended for off-chain API discovery or a future
+/// on-chain `route_task_discovered` instruction.
+pub fn discover_candidates(
+    validators: &[(Pubkey, bool /* has_required_capability */, u16 /* reputation */)],
+    required_capability: Option<u8>,
+    max_candidates: usize,
+) -> Vec<Pubkey> {
+    let max_candidates = max_candidates.min(MAX_ROUTE_CANDIDATES).max(2);
+    let mut with_cap: Vec<Pubkey> = Vec::new();
+    let mut without_cap: Vec<(Pubkey, u16)> = Vec::new();
+
+    for (wallet, has_cap, rep) in validators {
+        if *has_cap {
+            with_cap.push(*wallet);
+        } else {
+            without_cap.push((*wallet, *rep));
+        }
+    }
+
+    // Category guarantee: ≥2 with the required capability.
+    let mut chosen: Vec<Pubkey> = Vec::new();
+    if let Some(_cap) = required_capability {
+        let n = with_cap.len().min(2);
+        chosen.extend(with_cap.into_iter().take(n));
+    }
+
+    // Random reputable fill: sort by reputation desc, take remaining slots.
+    without_cap.sort_by(|a, b| b.1.cmp(&a.1));
+    for (wallet, _) in without_cap {
+        if chosen.len() >= max_candidates {
+            break;
+        }
+        if !chosen.contains(&wallet) {
+            chosen.push(wallet);
+        }
+    }
+
+    // Deterministic tie-break: sort by pubkey for order-independent selection.
+    chosen.sort();
+    chosen.truncate(max_candidates);
+    chosen
+}
+
 /// Random admission: accept when `draw_bps < 10_000 / competitor_count`.
 /// `competitor_count = 1` always accepts (deterministic tests / sole candidate).
 pub fn passes_random_gate(draw_bps: u16, competitor_count: u16) -> bool {
@@ -381,7 +447,7 @@ pub fn route_task(
     oracle_signature: [u8; 64],
 ) -> Result<()> {
     require!(
-        !candidates.is_empty() && candidates.len() <= MAX_ROUTE_CANDIDATES,
+        candidates.len() >= 2 && candidates.len() <= MAX_ROUTE_CANDIDATES,
         TerraError::TooManyRouteCandidates
     );
     require!(candidates.contains(&chosen), TerraError::NotRouteWinner);
@@ -475,7 +541,10 @@ pub fn route_task(
     );
 
     // Evaluate eligibility for every candidate.
-    let mut eligible: Vec<Pubkey> = Vec::with_capacity(candidates.len());
+    // Track capability level per eligible candidate so we can enforce the
+    // premium-category guarantee (≥2 validators per requested capability).
+    let mut eligible: Vec<(Pubkey, Option<u8>)> =
+        Vec::with_capacity(candidates.len());
     for (i, cand) in candidates.iter().enumerate() {
         let base = i * stride;
         let profile_ai = &ctx.remaining_accounts[base];
@@ -583,18 +652,36 @@ pub fn route_task(
             now,
         );
         if ok {
-            eligible.push(*cand);
+            eligible.push((*cand, candidate_level));
         }
     }
 
-    require!(eligible.contains(&chosen), TerraError::ValidatorNotEligible);
+    // Protocol-side category guarantee: when a premium capability is required,
+    // at least 2 eligible validators must carry it. Prevents a requester from
+    // cornering a category by listing a single friendly validator.
+    if need_cap {
+        let cap_count = eligible
+            .iter()
+            .filter(|(_, level)| level.is_some())
+            .count();
+        require!(
+            cap_count >= 2,
+            TerraError::InsufficientCategoryCoverage
+        );
+    }
+
+    let eligible_pubkeys: Vec<Pubkey> = eligible.iter().map(|(pk, _)| *pk).collect();
+    require!(
+        eligible_pubkeys.contains(&chosen),
+        TerraError::ValidatorNotEligible
+    );
 
     // Randomized selection among eligible candidates.
     // Entropy: task_id ⊕ VRF randomness (Switchboard/Pyth) ⊕ slot (Clock).
     // Blockhash is never used as a randomness source (Intent 3).
     let slot = Clock::get()?.slot;
     let seed = route_seed(&task_id, &vrf_randomness, slot);
-    let winner = select_winner(&seed, &eligible);
+    let winner = select_winner(&seed, &eligible_pubkeys);
     require!(winner == chosen, TerraError::NotRouteWinner);
 
     // Random admission gate (competitor_count=1 → always pass).

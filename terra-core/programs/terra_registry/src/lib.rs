@@ -7972,6 +7972,8 @@ pub enum TerraError {
     NotRouteWinner,
     #[msg("Too many route candidates or invalid competitor count")]
     TooManyRouteCandidates,
+    #[msg("Fewer than 2 eligible validators carry the required capability category")]
+    InsufficientCategoryCoverage,
     #[msg("Route remaining_accounts do not match candidate list")]
     RouteAccountMismatch,
 

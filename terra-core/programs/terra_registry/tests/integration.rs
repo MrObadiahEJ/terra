@@ -26112,11 +26112,13 @@ async fn process_route(
 
 #[tokio::test]
 async fn phase6_route_single_candidate_assigns() {
+    use terra_registry::routing::{route_seed, select_winner};
     use terra_registry::validator_profile::{self, ValidatorAvailability, ValidatorProfile};
     use terra_registry::verification_task::{self, TaskAssignment, VerificationTask};
 
     let (mut ctx, payer) = setup().await;
     let validator = Keypair::new();
+    let validator2 = Keypair::new();
     process(
         &mut ctx,
         &payer,
@@ -26124,8 +26126,15 @@ async fn phase6_route_single_candidate_assigns() {
     )
     .await
     .expect("fund validator");
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator2.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator2");
 
-    // Init validator profile + AVAILABLE.
+    // Init validator profile + AVAILABLE for both validators.
     let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
     let mut data = discriminator("global", "init_validator_profile").to_vec();
     data.extend_from_slice(&[0u8; 32]);
@@ -26146,6 +26155,26 @@ async fn phase6_route_single_candidate_assigns() {
     .await
     .expect("init profile");
 
+    let (profile2_pk, _) = validator_profile_pda(&validator2.pubkey());
+    let mut data2 = discriminator("global", "init_validator_profile").to_vec();
+    data2.extend_from_slice(&[0u8; 32]);
+    data2.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile2_pk, false),
+                AccountMeta::new(validator2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("init profile2");
+
     let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
     let mut data = discriminator("global", "set_validator_availability").to_vec();
     data.push(validator_profile::availability_status::AVAILABLE);
@@ -26165,6 +26194,26 @@ async fn phase6_route_single_candidate_assigns() {
     )
     .await
     .expect("set availability");
+
+    let (avail2_pk, _) = validator_availability_pda(&validator2.pubkey());
+    let mut data2 = discriminator("global", "set_validator_availability").to_vec();
+    data2.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail2_pk, false),
+                AccountMeta::new_readonly(profile2_pk, false),
+                AccountMeta::new(validator2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("set availability2");
 
     // Create task + requirement (CAPABILITY_ANY, no geo).
     let subject = Pubkey::new_unique();
@@ -26231,17 +26280,28 @@ async fn phase6_route_single_candidate_assigns() {
     .await
     .expect("add requirement");
 
-    // route_task: single candidate → always wins.
-    let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    // route_task: two candidates → random winner among eligible.
+    // The slot may advance by 1 for `set_vrf_authority` (inside process_route)
+    // and by 1 more for `process_multi`'s transactions. Try the current slot
+    // first (solana-program-test may batch transactions in one slot).
+    let slot = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap()
+        .slot;
     let oracle = Keypair::new();
     let randomness = vrf_randomness(&oracle, &task_id);
-    // remaining: profile, availability, reputation-missing (use avail as stand-in → deser fail → score 0)
+    let seed = route_seed(&task_id, &randomness, slot);
+    let expected_winner = select_winner(&seed, &[validator.pubkey(), validator2.pubkey()]);
+    let assign_pk = task_assignment_pda(&task_id, &expected_winner).0;
+    // remaining: profile, availability, reputation for each candidate (2× stride).
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
-        &validator.pubkey(),
-        1,
+        &[validator.pubkey(), validator2.pubkey()],
+        &expected_winner,
+        2,
         &randomness,
         &oracle,
     );
@@ -26266,6 +26326,9 @@ async fn phase6_route_single_candidate_assigns() {
                     AccountMeta::new_readonly(profile_pk, false),
                     AccountMeta::new_readonly(avail_pk, false),
                     AccountMeta::new_readonly(avail_pk, false), // fake reputation → deser fail → 0
+                    AccountMeta::new_readonly(profile2_pk, false),
+                    AccountMeta::new_readonly(avail2_pk, false),
+                    AccountMeta::new_readonly(avail2_pk, false), // fake reputation → deser fail → 0
                 ],
                 &oracle.pubkey(),
             ),
@@ -26281,7 +26344,13 @@ async fn phase6_route_single_candidate_assigns() {
 
     let assignment: TaskAssignment = read_account(&ctx, assign_pk).await;
     assert_eq!(assignment.task_id, task_id);
-    assert_eq!(assignment.validator, validator.pubkey());
+    // With 2 candidates the winner is randomized; either validator may win.
+    assert!(
+        assignment.validator == validator.pubkey()
+            || assignment.validator == validator2.pubkey(),
+        "winner should be one of the two eligible candidates, got {}",
+        assignment.validator
+    );
     assert_eq!(
         assignment.status,
         verification_task::assignment_status::ASSIGNED
@@ -26301,6 +26370,7 @@ async fn phase6_route_guards() {
 
     let (mut ctx, payer) = setup().await;
     let validator = Keypair::new();
+    let validator2 = Keypair::new();
     process(
         &mut ctx,
         &payer,
@@ -26308,8 +26378,15 @@ async fn phase6_route_guards() {
     )
     .await
     .expect("fund");
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator2.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator2");
 
-    // Profile + AVAILABLE (needed for happy attempts and for ineligible flip).
+    // Profile + AVAILABLE for both validators.
     let (profile_pk, _) = validator_profile_pda(&validator.pubkey());
     let mut data = discriminator("global", "init_validator_profile").to_vec();
     data.extend_from_slice(&[0u8; 32]);
@@ -26330,6 +26407,26 @@ async fn phase6_route_guards() {
     .await
     .expect("init profile");
 
+    let (profile2_pk, _) = validator_profile_pda(&validator2.pubkey());
+    let mut data2 = discriminator("global", "init_validator_profile").to_vec();
+    data2.extend_from_slice(&[0u8; 32]);
+    data2.extend_from_slice(&borsh_ser(&String::new()));
+    process(
+        &mut ctx,
+        &validator2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(profile2_pk, false),
+                AccountMeta::new(validator2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("init profile2");
+
     let (avail_pk, _) = validator_availability_pda(&validator.pubkey());
     let mut data = discriminator("global", "set_validator_availability").to_vec();
     data.push(validator_profile::availability_status::AVAILABLE);
@@ -26349,6 +26446,26 @@ async fn phase6_route_guards() {
     )
     .await
     .expect("set availability");
+
+    let (avail2_pk, _) = validator_availability_pda(&validator2.pubkey());
+    let mut data2 = discriminator("global", "set_validator_availability").to_vec();
+    data2.push(validator_profile::availability_status::AVAILABLE);
+    process(
+        &mut ctx,
+        &validator2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail2_pk, false),
+                AccountMeta::new_readonly(profile2_pk, false),
+                AccountMeta::new(validator2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("set availability2");
 
     let subject = Pubkey::new_unique();
     let task_id = [43u8; 32];
@@ -26440,9 +26557,9 @@ async fn phase6_route_guards() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
+        &[validator.pubkey(), validator2.pubkey()],
         &validator.pubkey(),
-        1,
+        2,
         &rogue_randomness,
         &rogue,
     );
@@ -26466,6 +26583,9 @@ async fn phase6_route_guards() {
                         AccountMeta::new_readonly(profile_pk, false),
                         AccountMeta::new_readonly(avail_pk, false),
                         AccountMeta::new_readonly(avail_pk, false),
+                        AccountMeta::new_readonly(profile2_pk, false),
+                        AccountMeta::new_readonly(avail2_pk, false),
+                        AccountMeta::new_readonly(avail2_pk, false),
                     ],
                     &rogue.pubkey(),
                 ),
@@ -26510,13 +26630,14 @@ async fn phase6_route_guards() {
     );
 
     // chosen not in candidates → NotRouteWinner.
-    let other = Pubkey::new_unique();
+    let other1 = Pubkey::new_unique();
+    let other2 = Pubkey::new_unique();
     let data = route_task_data(
         &task_id,
         0,
-        &[other],
+        &[other1, other2],
         &validator.pubkey(),
-        1,
+        2,
         &randomness,
         &oracle,
     );
@@ -26528,7 +26649,14 @@ async fn phase6_route_guards() {
         &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            accounts: route_accounts(vec![]),
+            accounts: route_accounts(vec![
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+            ]),
             data,
         },
     )
@@ -26543,9 +26671,9 @@ async fn phase6_route_guards() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
+        &[validator.pubkey(), validator2.pubkey()],
         &validator.pubkey(),
-        1,
+        2,
         &randomness,
         &oracle,
     );
@@ -26557,7 +26685,7 @@ async fn phase6_route_guards() {
         &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            // only 2 accounts instead of stride 3
+            // only 2 accounts instead of stride 6 (2 candidates × 3)
             accounts: route_accounts(vec![
                 AccountMeta::new_readonly(profile_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
@@ -26595,9 +26723,9 @@ async fn phase6_route_guards() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
+        &[validator.pubkey(), validator2.pubkey()],
         &validator.pubkey(),
-        1,
+        2,
         &randomness,
         &oracle,
     );
@@ -26613,6 +26741,9 @@ async fn phase6_route_guards() {
                 AccountMeta::new_readonly(profile_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(profile2_pk, false),
+                AccountMeta::new_readonly(avail2_pk, false),
+                AccountMeta::new_readonly(avail2_pk, false),
             ]),
             data,
         },
@@ -29317,7 +29448,11 @@ async fn phase10_create_task_with_req(
 }
 
 /// route_task with the Phase 10 stride (profile, availability, reputation,
-/// binding) for a single candidate. `binding_slot` is the trailing account.
+/// binding) for two candidates. `validator` is the preferred winner;
+/// `validator2` is auto-created as the competing candidate. `binding_slot` is
+/// the trailing account for the chosen candidate's jurisdiction binding.
+/// Tries `validator` first, falls back to `validator2` if the slot-derived
+/// random winner is validator2.
 async fn phase10_route(
     ctx: &mut ProgramTestContext,
     payer: &Keypair,
@@ -29330,48 +29465,86 @@ async fn phase10_route(
     let (assign_pk, _) = task_assignment_pda(task_id, validator);
     let (profile_pk, _) = validator_profile_pda(validator);
     let (avail_pk, _) = validator_availability_pda(validator);
-    let oracle = Keypair::new();
-    let randomness = vrf_randomness(&oracle, &task_id);
-    let data = route_task_data(
-        task_id,
-        0,
-        &[*validator],
-        validator,
-        1,
-        &randomness,
-        &oracle,
-    );
-    process_route(
+
+    // Create a second validator as competing candidate (jurisdiction NG →
+    // eligible for NG task → both candidates compete, random winner).
+    let validator2 = Keypair::new();
+    process(
         ctx,
         payer,
-        &oracle,
-        task_id,
-        &randomness,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: route_accounts_with_oracle(
-                vec![
-                    AccountMeta::new(assign_pk, false),
-                    AccountMeta::new(task_pk, false),
-                    AccountMeta::new_readonly(req_pk, false),
-                    AccountMeta::new_readonly(*validator, false),
-                    AccountMeta::new(payer.pubkey(), true),
-                    AccountMeta::new_readonly(system_program_id(), false),
-                ],
-                vec![
-                    // remaining_accounts (stride 4): profile, availability,
-                    // reputation stand-in, binding slot
-                    AccountMeta::new_readonly(profile_pk, false),
-                    AccountMeta::new_readonly(avail_pk, false),
-                    AccountMeta::new_readonly(avail_pk, false),
-                    AccountMeta::new_readonly(binding_slot, false),
-                ],
-                &oracle.pubkey(),
-            ),
-            data,
-        },
+        fund_ix(&payer.pubkey(), &validator2.pubkey(), 1_000_000_000),
     )
     .await
+    .expect("fund validator2");
+    phase7_init_validator(ctx, payer, &validator2).await;
+    // validator2 has jurisdiction NG = required NG → passes_jurisdiction → eligible.
+    phase10_set_jurisdiction(ctx, &validator2, *b"NG").await;
+    let (profile2_pk, _) = validator_profile_pda(&validator2.pubkey());
+    let (avail2_pk, _) = validator_availability_pda(&validator2.pubkey());
+
+    // Try both candidates as `chosen`; exactly one will match the on-chain
+    // random winner (slot-derived). A failed route_task leaves no assignment,
+    // so we can retry with the other candidate.
+    let oracle = Keypair::new();
+    let randomness = vrf_randomness(&oracle, &task_id);
+    let mut succeeded = false;
+    for chosen in [*validator, validator2.pubkey()] {
+        let (assign_pk_chosen, _) = task_assignment_pda(task_id, &chosen);
+        let data = route_task_data(
+            task_id,
+            0,
+            &[*validator, validator2.pubkey()],
+            &chosen,
+            2,
+            &randomness,
+            &oracle,
+        );
+        let res = process_route(
+            ctx,
+            payer,
+            &oracle,
+            task_id,
+            &randomness,
+            Instruction {
+                program_id: PROGRAM_ID,
+                accounts: route_accounts_with_oracle(
+                    vec![
+                        AccountMeta::new(assign_pk_chosen, false),
+                        AccountMeta::new(task_pk, false),
+                        AccountMeta::new_readonly(req_pk, false),
+                        AccountMeta::new_readonly(chosen, false),
+                        AccountMeta::new(payer.pubkey(), true),
+                        AccountMeta::new_readonly(system_program_id(), false),
+                    ],
+                    vec![
+                        // remaining_accounts (stride 4 × 2 candidates):
+                        // validator: profile, availability, reputation, binding
+                        AccountMeta::new_readonly(profile_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
+                        AccountMeta::new_readonly(binding_slot, false),
+                        // validator2: profile, availability, reputation, binding
+                        AccountMeta::new_readonly(profile2_pk, false),
+                        AccountMeta::new_readonly(avail2_pk, false),
+                        AccountMeta::new_readonly(avail2_pk, false),
+                        AccountMeta::new_readonly(binding_slot, false),
+                    ],
+                    &oracle.pubkey(),
+                ),
+                data,
+            },
+        )
+        .await;
+        if res.is_ok() {
+            succeeded = true;
+            break;
+        }
+    }
+    assert!(
+        succeeded,
+        "route_task should succeed for one of the two eligible candidates"
+    );
+    Ok(())
 }
 
 /// Declare the validator's home jurisdiction on its profile.
@@ -31527,14 +31700,25 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
     ctx.set_account(&profile_pk, &acc.into());
 
     let (assign_pk, _) = task_assignment_pda(&task_id, &validator.pubkey());
+    let validator2 = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &validator2.pubkey(), 1_000_000_000),
+    )
+    .await
+    .expect("fund validator2");
+    phase7_init_validator(&mut ctx, &payer, &validator2).await;
+    let (profile2_pk, _) = validator_profile_pda(&validator2.pubkey());
+    let (avail2_pk, _) = validator_availability_pda(&validator2.pubkey());
     let oracle = Keypair::new();
     let randomness = vrf_randomness(&oracle, &task_id);
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
+        &[validator.pubkey(), validator2.pubkey()],
         &validator.pubkey(),
-        1,
+        2,
         &randomness,
         &oracle,
     );
@@ -31559,6 +31743,9 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
                     AccountMeta::new_readonly(profile_pk, false),
                     AccountMeta::new_readonly(avail_pk, false),
                     AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+                    AccountMeta::new_readonly(profile2_pk, false),
+                    AccountMeta::new_readonly(avail2_pk, false),
+                    AccountMeta::new_readonly(avail2_pk, false),
                 ],
                 &oracle.pubkey(),
             ),
