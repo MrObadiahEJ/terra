@@ -1,5 +1,6 @@
 [allowlist]
-description = "Deterministic test payer key (bs58 of [1u8; 32]) used in test fixtures only"
-regex = '''
-GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage
+  description = "Deterministic test fixture keys in VerifierPage.tsx only (not real secrets). Program ID excluded from global allowlist."
+  regex = '''
+GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage|4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM|9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 '''
+  paths = ["terra-web/src/pages/VerifierPage.tsx"]
