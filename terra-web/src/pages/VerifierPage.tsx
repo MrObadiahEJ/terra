@@ -28,8 +28,8 @@ const DEFAULT_SAMPLE_BUNDLE: VerificationBundle = {
   parcelId: 'e2e-verify-parcel',
   vc: {
     vcType: 'ResidencyAttestation',
-    issuer: 'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage',
-    credentialSubject: '4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM',
+    issuer: 'GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage', // gitleaks:allow deterministic test key (bs58 of [1u8;32])
+    credentialSubject: '4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM', // gitleaks:allow deterministic test key (bs58 of [2u8;32])
     observation: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
     issuanceDate: 1732190000,
     expirationDate: 1763726000,

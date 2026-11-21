@@ -1,0 +1,5 @@
+[allowlist]
+description = "Deterministic test payer key (bs58 of [1u8; 32]) used in test fixtures only"
+regex = '''
+GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage
+'''
