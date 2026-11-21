@@ -115,8 +115,14 @@ fn parse_rights(data: &[u8]) -> Option<ParsedRights> {
         return None;
     }
     let created_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -125,8 +131,14 @@ fn parse_rights(data: &[u8]) -> Option<ParsedRights> {
         return None;
     }
     let expires_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -156,8 +168,14 @@ fn parse_rights(data: &[u8]) -> Option<ParsedRights> {
         return None;
     }
     let grace_period_secs = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
 
     Some(ParsedRights {
@@ -518,9 +536,7 @@ pub async fn run_indexer(rpc_url: String, state: Arc<AppState>) -> Result<()> {
 /// Single poll: fetch program accounts, decode parcels/rights/attestations,
 /// upsert mirror rows with real slot + holder from Rights PDA.
 async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) -> Result<usize> {
-    let slot = client
-        .get_slot()
-        .with_context(|| "get_slot failed")?;
+    let slot = client.get_slot().with_context(|| "get_slot failed")?;
 
     let accounts = client
         .get_program_accounts(program_id)
