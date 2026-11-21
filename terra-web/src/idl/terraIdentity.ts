@@ -7,14 +7,14 @@
 export type TerraIdentityProgram = {
   "address": "HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p",
   "metadata": {
-    "name": "terra_identity_program",
+    "name": "terraIdentityProgram",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Terra Identity program \u2014 PEOPLE domain (identity, succession, guardianship)"
+    "description": "Terra Identity program — PEOPLE domain (identity, succession, guardianship)"
   },
   "instructions": [
     {
-      "name": "bind_identity",
+      "name": "bindIdentity",
       "discriminator": [
         233,
         223,
@@ -46,7 +46,7 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "arg",
-                "path": "identity_hash"
+                "path": "identityHash"
               }
             ]
           }
@@ -57,13 +57,13 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "identity_hash",
+          "name": "identityHash",
           "type": {
             "array": [
               "u8",
@@ -78,7 +78,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "cancel_succession",
+      "name": "cancelSuccession",
       "discriminator": [
         206,
         172,
@@ -110,8 +110,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -139,12 +139,12 @@ export type TerraIdentityProgram = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "Succession"
+                "account": "succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "Succession"
+                "account": "succession"
               }
             ]
           }
@@ -155,14 +155,14 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "claim_succession",
+      "name": "claimSuccession",
       "discriminator": [
         90,
         253,
@@ -194,8 +194,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -223,12 +223,12 @@ export type TerraIdentityProgram = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "Succession"
+                "account": "succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "Succession"
+                "account": "succession"
               }
             ]
           }
@@ -239,14 +239,14 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "endorse_succession",
+      "name": "endorseSuccession",
       "discriminator": [
         70,
         125,
@@ -278,8 +278,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -307,12 +307,12 @@ export type TerraIdentityProgram = {
               {
                 "kind": "account",
                 "path": "succession.identity",
-                "account": "Succession"
+                "account": "succession"
               },
               {
                 "kind": "account",
                 "path": "succession.successor",
-                "account": "Succession"
+                "account": "succession"
               }
             ]
           }
@@ -322,14 +322,14 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "execute_revoke_guardianship",
+      "name": "executeRevokeGuardianship",
       "discriminator": [
         119,
         219,
@@ -361,21 +361,21 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
         },
         {
-          "name": "new_owner",
+          "name": "newOwner",
           "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "request_court_guardianship",
+      "name": "requestCourtGuardianship",
       "discriminator": [
         161,
         23,
@@ -407,8 +407,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -450,7 +450,7 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -460,11 +460,11 @@ export type TerraIdentityProgram = {
           "type": "pubkey"
         },
         {
-          "name": "grace_secs",
+          "name": "graceSecs",
           "type": "i64"
         },
         {
-          "name": "required_validations",
+          "name": "requiredValidations",
           "type": "u8"
         },
         {
@@ -477,7 +477,7 @@ export type TerraIdentityProgram = {
           }
         },
         {
-          "name": "case_hash",
+          "name": "caseHash",
           "type": {
             "array": [
               "u8",
@@ -486,13 +486,13 @@ export type TerraIdentityProgram = {
           }
         },
         {
-          "name": "scope_notes",
+          "name": "scopeNotes",
           "type": "string"
         }
       ]
     },
     {
-      "name": "request_succession",
+      "name": "requestSuccession",
       "discriminator": [
         239,
         203,
@@ -524,8 +524,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -567,7 +567,7 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -581,11 +581,11 @@ export type TerraIdentityProgram = {
           "type": "u8"
         },
         {
-          "name": "grace_secs",
+          "name": "graceSecs",
           "type": "i64"
         },
         {
-          "name": "required_validations",
+          "name": "requiredValidations",
           "type": "u8"
         },
         {
@@ -600,7 +600,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "revoke_guardianship",
+      "name": "revokeGuardianship",
       "discriminator": [
         168,
         87,
@@ -632,8 +632,8 @@ export type TerraIdentityProgram = {
               },
               {
                 "kind": "account",
-                "path": "identity.identity_hash",
-                "account": "Identity"
+                "path": "identity.identityHash",
+                "account": "identity"
               }
             ]
           }
@@ -643,12 +643,12 @@ export type TerraIdentityProgram = {
           "signer": true
         },
         {
-          "name": "new_owner"
+          "name": "newOwner"
         }
       ],
       "args": [
         {
-          "name": "new_owner",
+          "name": "newOwner",
           "type": "pubkey"
         }
       ]
@@ -656,7 +656,7 @@ export type TerraIdentityProgram = {
   ],
   "accounts": [
     {
-      "name": "Identity",
+      "name": "identity",
       "discriminator": [
         58,
         132,
@@ -669,7 +669,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "Succession",
+      "name": "succession",
       "discriminator": [
         51,
         87,
@@ -684,7 +684,7 @@ export type TerraIdentityProgram = {
   ],
   "events": [
     {
-      "name": "CourtGuardianshipRequested",
+      "name": "courtGuardianshipRequested",
       "discriminator": [
         140,
         90,
@@ -697,7 +697,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "GuardianshipRevocationRequested",
+      "name": "guardianshipRevocationRequested",
       "discriminator": [
         78,
         209,
@@ -710,7 +710,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "GuardianshipRevoked",
+      "name": "guardianshipRevoked",
       "discriminator": [
         128,
         41,
@@ -723,7 +723,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "IdentityBound",
+      "name": "identityBound",
       "discriminator": [
         183,
         169,
@@ -736,7 +736,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "SuccessionCancelled",
+      "name": "successionCancelled",
       "discriminator": [
         67,
         67,
@@ -749,7 +749,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "SuccessionClaimed",
+      "name": "successionClaimed",
       "discriminator": [
         27,
         211,
@@ -762,7 +762,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "SuccessionEndorsed",
+      "name": "successionEndorsed",
       "discriminator": [
         207,
         163,
@@ -775,7 +775,7 @@ export type TerraIdentityProgram = {
       ]
     },
     {
-      "name": "SuccessionRequested",
+      "name": "successionRequested",
       "discriminator": [
         212,
         119,
@@ -791,153 +791,153 @@ export type TerraIdentityProgram = {
   "errors": [
     {
       "code": 6000,
-      "name": "EmptyIdentityHash",
+      "name": "emptyIdentityHash",
       "msg": "Identity hash is required"
     },
     {
       "code": 6001,
-      "name": "EmptyRecovery",
+      "name": "emptyRecovery",
       "msg": "Recovery wallet is required"
     },
     {
       "code": 6002,
-      "name": "EmptySuccessor",
+      "name": "emptySuccessor",
       "msg": "Successor wallet is required"
     },
     {
       "code": 6003,
-      "name": "InvalidSuccessionKind",
+      "name": "invalidSuccessionKind",
       "msg": "Invalid succession kind"
     },
     {
       "code": 6004,
-      "name": "SuccessorIsOwner",
+      "name": "successorIsOwner",
       "msg": "Successor must differ from the current owner"
     },
     {
       "code": 6005,
-      "name": "NotAuthorized",
+      "name": "notAuthorized",
       "msg": "Not authorized to perform this action"
     },
     {
       "code": 6006,
-      "name": "NotValidator",
+      "name": "notValidator",
       "msg": "Signing wallet is not a declared validator for this succession"
     },
     {
       "code": 6007,
-      "name": "ValidatorOwnsAsset",
+      "name": "validatorOwnsAsset",
       "msg": "A validator cannot be the owner of the asset being validated"
     },
     {
       "code": 6008,
-      "name": "SuccessionAlreadyEffective",
+      "name": "successionAlreadyEffective",
       "msg": "Succession has already become effective"
     },
     {
       "code": 6009,
-      "name": "ValidationLimitReached",
+      "name": "validationLimitReached",
       "msg": "No more validators may endorse this succession (limit reached)"
     },
     {
       "code": 6010,
-      "name": "NotSuccessor",
+      "name": "notSuccessor",
       "msg": "Only the named successor may claim this succession"
     },
     {
       "code": 6011,
-      "name": "SuccessionNotYetEffective",
+      "name": "successionNotYetEffective",
       "msg": "Succession is not yet effective"
     },
     {
       "code": 6012,
-      "name": "InsufficientValidations",
+      "name": "insufficientValidations",
       "msg": "Succession requires validator endorsements before it can be claimed"
     },
     {
       "code": 6013,
-      "name": "AttestationMismatch",
+      "name": "attestationMismatch",
       "msg": "Attestation does not belong to this parcel"
     },
     {
       "code": 6014,
-      "name": "IdentityMismatch",
+      "name": "identityMismatch",
       "msg": "Identity owner does not match the parcel owner"
     },
     {
       "code": 6015,
-      "name": "NotOwner",
+      "name": "notOwner",
       "msg": "Only the current owner can perform this action"
     },
     {
       "code": 6016,
-      "name": "InvalidThreshold",
+      "name": "invalidThreshold",
       "msg": "Required threshold exceeds the number of validators"
     },
     {
       "code": 6017,
-      "name": "EmptyCaseHash",
+      "name": "emptyCaseHash",
       "msg": "Court case hash is required"
     },
     {
       "code": 6018,
-      "name": "NotesTooLong",
+      "name": "notesTooLong",
       "msg": "Notes exceed the maximum length of 128"
     },
     {
       "code": 6019,
-      "name": "GuardianshipGraceTooShort",
+      "name": "guardianshipGraceTooShort",
       "msg": "Guardianship grace period is below the 90-day minimum"
     },
     {
       "code": 6020,
-      "name": "GuardianshipThresholdTooLow",
+      "name": "guardianshipThresholdTooLow",
       "msg": "Guardianship requires at least 3 validator endorsements"
     },
     {
       "code": 6021,
-      "name": "NoProposalFound",
+      "name": "noProposalFound",
       "msg": "No proposal found"
     },
     {
       "code": 6022,
-      "name": "GuardianshipAlreadyActive",
+      "name": "guardianshipAlreadyActive",
       "msg": "A revocation request is already pending for this identity"
     },
     {
       "code": 6023,
-      "name": "SettlementNotYetEffective",
+      "name": "settlementNotYetEffective",
       "msg": "Settlement not yet effective"
     },
     {
       "code": 6024,
-      "name": "ParcelDataTooShort",
+      "name": "parcelDataTooShort",
       "msg": "Parcel account data is too short for deserialization"
     },
     {
       "code": 6025,
-      "name": "ParcelDeserializeFailed",
+      "name": "parcelDeserializeFailed",
       "msg": "Failed to deserialize parcel account data"
     },
     {
       "code": 6026,
-      "name": "ParcelOwnerMismatch",
+      "name": "parcelOwnerMismatch",
       "msg": "Parcel owner does not match the identity owner"
     },
     {
       "code": 6027,
-      "name": "AlreadyEndorsed",
+      "name": "alreadyEndorsed",
       "msg": "This validator has already endorsed this succession"
     },
     {
       "code": 6028,
-      "name": "DuplicateValidator",
+      "name": "duplicateValidator",
       "msg": "Duplicate validator in the declared validator set"
     }
   ],
   "types": [
     {
-      "name": "CourtGuardianshipRequested",
+      "name": "courtGuardianshipRequested",
       "type": {
         "kind": "struct",
         "fields": [
@@ -950,7 +950,7 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "grace_secs",
+            "name": "graceSecs",
             "type": "i64"
           },
           {
@@ -962,11 +962,11 @@ export type TerraIdentityProgram = {
             "type": "u8"
           },
           {
-            "name": "effective_at",
+            "name": "effectiveAt",
             "type": "i64"
           },
           {
-            "name": "case_hash",
+            "name": "caseHash",
             "type": {
               "array": [
                 "u8",
@@ -975,14 +975,14 @@ export type TerraIdentityProgram = {
             }
           },
           {
-            "name": "scope_notes",
+            "name": "scopeNotes",
             "type": "string"
           }
         ]
       }
     },
     {
-      "name": "GuardianshipRevocationRequested",
+      "name": "guardianshipRevocationRequested",
       "type": {
         "kind": "struct",
         "fields": [
@@ -991,30 +991,30 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "previous_guardian",
+            "name": "previousGuardian",
             "type": "pubkey"
           },
           {
-            "name": "new_owner",
+            "name": "newOwner",
             "type": "pubkey"
           },
           {
-            "name": "requested_by",
+            "name": "requestedBy",
             "type": "pubkey"
           },
           {
-            "name": "revoke_after",
+            "name": "revokeAfter",
             "type": "i64"
           },
           {
-            "name": "block_time",
+            "name": "blockTime",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "GuardianshipRevoked",
+      "name": "guardianshipRevoked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1023,31 +1023,31 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "previous_guardian",
+            "name": "previousGuardian",
             "type": "pubkey"
           },
           {
-            "name": "new_owner",
+            "name": "newOwner",
             "type": "pubkey"
           },
           {
-            "name": "revoked_by",
+            "name": "revokedBy",
             "type": "pubkey"
           },
           {
-            "name": "block_time",
+            "name": "blockTime",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "Identity",
+      "name": "identity",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "identity_hash",
+            "name": "identityHash",
             "type": {
               "array": [
                 "u8",
@@ -1064,34 +1064,34 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "parcel_count",
+            "name": "parcelCount",
             "type": "u16"
           },
           {
-            "name": "created_at",
+            "name": "createdAt",
             "type": "i64"
           },
           {
-            "name": "updated_at",
+            "name": "updatedAt",
             "type": "i64"
           },
           {
-            "name": "pending_revocation",
+            "name": "pendingRevocation",
             "type": "bool"
           },
           {
-            "name": "pending_new_owner",
+            "name": "pendingNewOwner",
             "type": "pubkey"
           },
           {
-            "name": "revoke_after",
+            "name": "revokeAfter",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "IdentityBound",
+      "name": "identityBound",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1100,7 +1100,7 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "identity_hash",
+            "name": "identityHash",
             "type": {
               "array": [
                 "u8",
@@ -1120,7 +1120,7 @@ export type TerraIdentityProgram = {
       }
     },
     {
-      "name": "Succession",
+      "name": "succession",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1137,15 +1137,15 @@ export type TerraIdentityProgram = {
             "type": "u8"
           },
           {
-            "name": "requested_at",
+            "name": "requestedAt",
             "type": "i64"
           },
           {
-            "name": "effective_at",
+            "name": "effectiveAt",
             "type": "i64"
           },
           {
-            "name": "grace_secs",
+            "name": "graceSecs",
             "type": "i64"
           },
           {
@@ -1153,7 +1153,7 @@ export type TerraIdentityProgram = {
             "type": "u8"
           },
           {
-            "name": "validations_count",
+            "name": "validationsCount",
             "type": "u8"
           },
           {
@@ -1178,14 +1178,14 @@ export type TerraIdentityProgram = {
             }
           },
           {
-            "name": "endorsers_count",
+            "name": "endorsersCount",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "SuccessionCancelled",
+      "name": "successionCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1205,7 +1205,7 @@ export type TerraIdentityProgram = {
       }
     },
     {
-      "name": "SuccessionClaimed",
+      "name": "successionClaimed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1229,7 +1229,7 @@ export type TerraIdentityProgram = {
       }
     },
     {
-      "name": "SuccessionEndorsed",
+      "name": "successionEndorsed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1246,7 +1246,7 @@ export type TerraIdentityProgram = {
             "type": "pubkey"
           },
           {
-            "name": "validations_count",
+            "name": "validationsCount",
             "type": "u8"
           },
           {
@@ -1257,7 +1257,7 @@ export type TerraIdentityProgram = {
       }
     },
     {
-      "name": "SuccessionRequested",
+      "name": "successionRequested",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1274,7 +1274,7 @@ export type TerraIdentityProgram = {
             "type": "u8"
           },
           {
-            "name": "grace_secs",
+            "name": "graceSecs",
             "type": "i64"
           },
           {
@@ -1286,7 +1286,7 @@ export type TerraIdentityProgram = {
             "type": "u8"
           },
           {
-            "name": "effective_at",
+            "name": "effectiveAt",
             "type": "i64"
           }
         ]

@@ -699,10 +699,6 @@
         {
           "name": "new_owner",
           "type": "pubkey"
-        },
-        {
-          "name": "remedy_geometry_version",
-          "type": "pubkey"
         }
       ]
     },
@@ -1207,11 +1203,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i64"
+          "type": "i32"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i64"
+          "type": "i32"
         },
         {
           "name": "elevation_source",
@@ -1403,11 +1399,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i64"
+          "type": "i32"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i64"
+          "type": "i32"
         },
         {
           "name": "elevation_source",
@@ -6108,10 +6104,6 @@
               8
             ]
           }
-        },
-        {
-          "name": "bond_lamports",
-          "type": "u64"
         }
       ]
     },
@@ -7740,11 +7732,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i64"
+          "type": "i32"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i64"
+          "type": "i32"
         }
       ]
     },
@@ -21895,11 +21887,6 @@
       "code": 6269,
       "name": "VrfAuthorityMismatch",
       "msg": "VRF oracle is not the allowlisted authority"
-    },
-    {
-      "code": 6270,
-      "name": "InvalidBond",
-      "msg": "Dispute bond must be greater than zero"
     }
   ],
   "types": [
@@ -23942,8 +23929,7 @@
           {
             "name": "outcome",
             "docs": [
-              "Outcome of adjudication (OWNER_WINS / OWNER_LOSES / BOUNDARY_ADJUSTED /",
-              "OVERLAP_SPLIT / EASEMENT_RECOGNIZED / COEXISTENCE). Set at adjudication."
+              "Outcome of adjudication (OWNER_WINS or OWNER_LOSES). Set at adjudication."
             ],
             "type": "u8"
           },
@@ -23951,36 +23937,6 @@
             "name": "new_owner",
             "docs": [
               "New owner if outcome is OWNER_LOSES. Set at adjudication."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "bond_lamports",
-            "docs": [
-              "Bond lamports posted by the filer at filing (permissionless gate).",
-              "Refunded on filer win / partial remedy; slashed on filer loss."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "bond_refund_to",
-            "docs": [
-              "Wallet to receive the bond refund (defaults to filer at filing)."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "bond_resolved",
-            "docs": [
-              "Whether the bond has been refunded or slashed (resolved)."
-            ],
-            "type": "bool"
-          },
-          {
-            "name": "remedy_geometry_version",
-            "docs": [
-              "Geometry-version remedy reference for partial remedies",
-              "(BOUNDARY_ADJUSTED / OVERLAP_SPLIT / EASEMENT_RECOGNIZED)."
             ],
             "type": "pubkey"
           }
@@ -24011,10 +23967,6 @@
           {
             "name": "adjudicated_at",
             "type": "i64"
-          },
-          {
-            "name": "remedy_geometry_version",
-            "type": "pubkey"
           }
         ]
       }
@@ -24072,10 +24024,6 @@
           {
             "name": "declared_count",
             "type": "u8"
-          },
-          {
-            "name": "bond_lamports",
-            "type": "u64"
           }
         ]
       }
@@ -24625,8 +24573,7 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Storage reference (IPFS CID, URL, or content address). Widened to 256",
-              "chars so signed URLs (S3 pre-signed, R2, gateway tokens) fit."
+              "Storage reference (IPFS CID, URL, or content address)."
             ],
             "type": "string"
           },
@@ -25378,7 +25325,7 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 512 chars."
+              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 128 chars."
             ],
             "type": "string"
           },
@@ -25425,11 +25372,11 @@
               "This version's elevation envelope, millimetres (both 0 when",
               "`elevation_source == elevation_source::NONE`)."
             ],
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_source",
@@ -25517,11 +25464,11 @@
           },
           {
             "name": "elevation_min_mm",
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_source",
@@ -29022,14 +28969,14 @@
             "docs": [
               "Minimum elevation of the asset envelope, millimetres (may be < 0)."
             ],
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_max_mm",
             "docs": [
               "Maximum elevation of the asset envelope, millimetres (>= min)."
             ],
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "geometry_version_count",
@@ -29149,11 +29096,11 @@
             "docs": [
               "Asset elevation envelope copied at creation, millimetres."
             ],
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i64"
+            "type": "i32"
           },
           {
             "name": "label",
@@ -30102,8 +30049,7 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (tileset URL / IPFS CID / storage key). Widened to",
-              "256 chars to accommodate signed URLs (CIDs alone fit in 128)."
+              "Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars."
             ],
             "type": "string"
           },

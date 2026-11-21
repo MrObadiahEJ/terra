@@ -1713,11 +1713,11 @@ async fn zk_membership_prover_verifier_e2e() {
     use ark_snark::{CircuitSpecificSetupSNARK, SNARK};
     use ark_std::rand::{rngs::StdRng, SeedableRng};
     use ed25519_dalek::Signer as _;
+    use terra_zk_membership::frame::encode_frame;
     use terra_zk_membership::{
         canonical_ownership_statement, compute_root, derive_nullifier, field_to_be, Fr,
         MembershipCircuit, MembershipWitness, MerklePath, TREE_DEPTH,
     };
-    use terra_zk_membership::frame::encode_frame;
 
     let (mut ctx, payer) = setup().await;
     let registry = create_registry_ok(&mut ctx, &payer).await;
@@ -1786,23 +1786,16 @@ async fn zk_membership_prover_verifier_e2e() {
     )
     .expect("statement");
 
-    let setup_circuit = MembershipCircuit::new(
-        Some(statement.clone()),
-        Some(secret),
-        Some(path.clone()),
-    );
+    let setup_circuit =
+        MembershipCircuit::new(Some(statement.clone()), Some(secret), Some(path.clone()));
     let mut rng = StdRng::from_seed([42u8; 32]);
     // Local constraint sanity check before proving (mirrors
     // terra-zk-membership's own circuit test).
     use ark_relations::r1cs::ConstraintSystem;
     let check_cs = ConstraintSystem::<Fr>::new_ref();
-    MembershipCircuit::new(
-        Some(statement.clone()),
-        Some(secret),
-        Some(path.clone()),
-    )
-    .generate_constraints(check_cs.clone())
-    .expect("generate constraints");
+    MembershipCircuit::new(Some(statement.clone()), Some(secret), Some(path.clone()))
+        .generate_constraints(check_cs.clone())
+        .expect("generate constraints");
     assert!(
         check_cs.is_satisfied().unwrap(),
         "circuit unsatisfied: {:?}",
@@ -1925,8 +1918,7 @@ async fn zk_membership_prover_verifier_e2e() {
     )
     .expect("wrong statement");
     let wrong_sig = keypair_signing_key(&payer).sign(&wrong_stmt).to_bytes();
-    let wrong_frame =
-        encode_frame(&wrong_sig, &verifying_key, &proof).expect("encode wrong frame");
+    let wrong_frame = encode_frame(&wrong_sig, &verifying_key, &proof).expect("encode wrong frame");
     let mut wrong_data = discriminator("global", "verify_ownership_proof").to_vec();
     wrong_data.extend_from_slice(&borsh_ser(&wrong_frame));
     wrong_data.extend_from_slice(&wrong_nullifier);
