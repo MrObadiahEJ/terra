@@ -29460,14 +29460,15 @@ async fn phase10_route(
     validator: &Pubkey,
     binding_slot: Pubkey,
 ) -> Result<(), solana_program_test::BanksClientError> {
+    use terra_registry::validator_profile::availability_status;
     let (task_pk, _) = task_pda(task_id);
     let (req_pk, _) = task_requirement_pda(task_id, 0);
     let (assign_pk, _) = task_assignment_pda(task_id, validator);
     let (profile_pk, _) = validator_profile_pda(validator);
     let (avail_pk, _) = validator_availability_pda(validator);
 
-    // Create a second validator as competing candidate (jurisdiction NG →
-    // eligible for NG task → both candidates compete, random winner).
+    // Create a second validator as competing candidate (OFFLINE → ineligible,
+    // so `validator` wins deterministically regardless of slot).
     let validator2 = Keypair::new();
     process(
         ctx,
@@ -29477,14 +29478,38 @@ async fn phase10_route(
     .await
     .expect("fund validator2");
     phase7_init_validator(ctx, payer, &validator2).await;
-    // validator2 has jurisdiction NG = required NG → passes_jurisdiction → eligible.
-    phase10_set_jurisdiction(ctx, &validator2, *b"NG").await;
+    // validator2 OFFLINE → fails passes_availability → ineligible → validator wins deterministically.
     let (profile2_pk, _) = validator_profile_pda(&validator2.pubkey());
     let (avail2_pk, _) = validator_availability_pda(&validator2.pubkey());
+    let mut data2 = discriminator("global", "set_validator_availability").to_vec();
+    data2.push(availability_status::OFFLINE);
+    process(
+        ctx,
+        &validator2,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(avail2_pk, false),
+                AccountMeta::new_readonly(profile2_pk, false),
+                AccountMeta::new(validator2.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: data2,
+        },
+    )
+    .await
+    .expect("set validator2 offline");
 
     // Try both candidates as `chosen`; exactly one will match the on-chain
-    // random winner (slot-derived). A failed route_task leaves no assignment,
-    // so we can retry with the other candidate.
+    // random winner (slot-derived). solana-program-test advances slot by 1 for
+    // `set_vrf_authority` inside process_route, so add 1 to the read slot.
+    let slot = ctx
+        .banks_client
+        .get_sysvar::<solana_sdk::sysvar::clock::Clock>()
+        .await
+        .unwrap()
+        .slot
+        + 1;
     let oracle = Keypair::new();
     let randomness = vrf_randomness(&oracle, &task_id);
     let mut succeeded = false;
