@@ -356,8 +356,14 @@ fn parse_claim(data: &[u8]) -> Option<ParsedClaim> {
         return None;
     }
     let created_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -461,8 +467,14 @@ fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
         return None;
     }
     let elevation_min_mm = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -471,8 +483,14 @@ fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
         return None;
     }
     let elevation_max_mm = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -481,7 +499,10 @@ fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
         return None;
     }
     let geometry_version_count = u32::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
     ]);
     offset += 4;
 
@@ -498,8 +519,14 @@ fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
         return None;
     }
     let created_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -508,8 +535,14 @@ fn parse_spatial_asset(data: &[u8]) -> Option<ParsedSpatialAsset> {
         return None;
     }
     let updated_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
 
     Some(ParsedSpatialAsset {
@@ -607,7 +640,10 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
         return None;
     }
     let version = u32::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
     ]);
     offset += 4;
 
@@ -642,8 +678,8 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
     if data.len() < offset + storage_ref_len {
         return None;
     }
-    let storage_reference = String::from_utf8_lossy(&data[offset..offset + storage_ref_len])
-        .to_string();
+    let storage_reference =
+        String::from_utf8_lossy(&data[offset..offset + storage_ref_len]).to_string();
     offset += storage_ref_len;
 
     // submitted_by [u8; 32]
@@ -659,8 +695,14 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
         return None;
     }
     let submitted_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -684,8 +726,14 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
         return None;
     }
     let verified_at = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -702,8 +750,14 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
         return None;
     }
     let elevation_min_mm = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -712,8 +766,14 @@ fn parse_geometry_version(data: &[u8]) -> Option<ParsedGeometryVersion> {
         return None;
     }
     let elevation_max_mm = i64::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+        data[offset + 4],
+        data[offset + 5],
+        data[offset + 6],
+        data[offset + 7],
     ]);
     offset += 8;
 
@@ -1425,16 +1485,8 @@ async fn upsert_claim(
     _signature: &str,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
-    let claim_id_hex: String = claim
-        .claim_id
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
-    let parcel_hex: String = claim
-        .parcel
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let claim_id_hex: String = claim.claim_id.iter().map(|b| format!("{b:02x}")).collect();
+    let parcel_hex: String = claim.parcel.iter().map(|b| format!("{b:02x}")).collect();
     let submitted_by_hex: String = claim
         .submitted_by
         .iter()
@@ -1545,30 +1597,23 @@ async fn upsert_spatial_asset(
     _signature: &str,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
-    let parcel_hex: String = asset
-        .parcel
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
-    let authority_hex: String = asset
-        .authority
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let parcel_hex: String = asset.parcel.iter().map(|b| format!("{b:02x}")).collect();
+    let authority_hex: String = asset.authority.iter().map(|b| format!("{b:02x}")).collect();
     let latest_geometry_hex: String = asset
         .latest_geometry
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
 
-    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM spatial_assets_onchain WHERE pubkey = $1")
-        .bind(&pubkey_str)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| {
-            warn!("check existing spatial_asset {pubkey} failed: {e:?}");
-            anyhow::anyhow!("check existing spatial_asset {pubkey}: {e}")
-        })?;
+    let exists: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM spatial_assets_onchain WHERE pubkey = $1")
+            .bind(&pubkey_str)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                warn!("check existing spatial_asset {pubkey} failed: {e:?}");
+                anyhow::anyhow!("check existing spatial_asset {pubkey}: {e}")
+            })?;
 
     if let Some(_id) = exists {
         sqlx::query(
@@ -1646,16 +1691,8 @@ async fn upsert_geometry_version(
     _signature: &str,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
-    let asset_hex: String = version
-        .asset
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
-    let parcel_hex: String = version
-        .parcel
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let asset_hex: String = version.asset.iter().map(|b| format!("{b:02x}")).collect();
+    let parcel_hex: String = version.parcel.iter().map(|b| format!("{b:02x}")).collect();
     let geometry_hash_hex: String = version
         .geometry_hash
         .iter()
@@ -1676,20 +1713,17 @@ async fn upsert_geometry_version(
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    let attestors_hex: Vec<String> = version
-        .attestors
-        .iter()
-        .map(|a| a.clone())
-        .collect();
+    let attestors_hex: Vec<String> = version.attestors.iter().map(|a| a.clone()).collect();
 
-    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM geometry_versions_onchain WHERE pubkey = $1")
-        .bind(&pubkey_str)
-        .fetch_optional(&state.pool)
-        .await
-        .map_err(|e| {
-            warn!("check existing geometry_version {pubkey} failed: {e:?}");
-            anyhow::anyhow!("check existing geometry_version {pubkey}: {e}")
-        })?;
+    let exists: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM geometry_versions_onchain WHERE pubkey = $1")
+            .bind(&pubkey_str)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                warn!("check existing geometry_version {pubkey} failed: {e:?}");
+                anyhow::anyhow!("check existing geometry_version {pubkey}: {e}")
+            })?;
 
     if let Some(_id) = exists {
         sqlx::query(

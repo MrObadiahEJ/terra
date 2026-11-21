@@ -316,7 +316,11 @@ pub fn filter_eligible(candidates: &[Pubkey], is_ok: impl Fn(&Pubkey) -> bool) -
 /// order-independent). Intended for off-chain API discovery or a future
 /// on-chain `route_task_discovered` instruction.
 pub fn discover_candidates(
-    validators: &[(Pubkey, bool /* has_required_capability */, u16 /* reputation */)],
+    validators: &[(
+        Pubkey,
+        bool, /* has_required_capability */
+        u16,  /* reputation */
+    )],
     required_capability: Option<u8>,
     max_candidates: usize,
 ) -> Vec<Pubkey> {
@@ -543,8 +547,7 @@ pub fn route_task(
     // Evaluate eligibility for every candidate.
     // Track capability level per eligible candidate so we can enforce the
     // premium-category guarantee (≥2 validators per requested capability).
-    let mut eligible: Vec<(Pubkey, Option<u8>)> =
-        Vec::with_capacity(candidates.len());
+    let mut eligible: Vec<(Pubkey, Option<u8>)> = Vec::with_capacity(candidates.len());
     for (i, cand) in candidates.iter().enumerate() {
         let base = i * stride;
         let profile_ai = &ctx.remaining_accounts[base];
@@ -660,14 +663,8 @@ pub fn route_task(
     // at least 2 eligible validators must carry it. Prevents a requester from
     // cornering a category by listing a single friendly validator.
     if need_cap {
-        let cap_count = eligible
-            .iter()
-            .filter(|(_, level)| level.is_some())
-            .count();
-        require!(
-            cap_count >= 2,
-            TerraError::InsufficientCategoryCoverage
-        );
+        let cap_count = eligible.iter().filter(|(_, level)| level.is_some()).count();
+        require!(cap_count >= 2, TerraError::InsufficientCategoryCoverage);
     }
 
     let eligible_pubkeys: Vec<Pubkey> = eligible.iter().map(|(pk, _)| *pk).collect();

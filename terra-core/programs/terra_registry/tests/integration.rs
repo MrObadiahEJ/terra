@@ -26346,8 +26346,7 @@ async fn phase6_route_single_candidate_assigns() {
     assert_eq!(assignment.task_id, task_id);
     // With 2 candidates the winner is randomized; either validator may win.
     assert!(
-        assignment.validator == validator.pubkey()
-            || assignment.validator == validator2.pubkey(),
+        assignment.validator == validator.pubkey() || assignment.validator == validator2.pubkey(),
         "winner should be one of the two eligible candidates, got {}",
         assignment.validator
     );
