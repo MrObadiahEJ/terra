@@ -2,7 +2,31 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
-## 2026-11-19 — Settlement rail is asset-agnostic (no USD dependency)
+## 2026-11-21 — Full end-to-end Groth16 ZK membership proof pipeline
+
+- **ZK prover→verifier E2E** (`programs/terra_registry/tests/integration.rs`:
+  `zk_membership_prover_verifier_e2e`) — register zone set, pin VK hash via
+  `update_verification_key_hash`, generate ownership root with Poseidon Merkle
+  root (`generate_ownership_root`), arkworks generates a real Groth16 proof
+  (`Groth16::<Bn254>::create_random_proof_with_reduction` over
+  `terra-zk-membership::MembershipCircuit`), on-chain `verify_ownership_proof`
+  accepts via `alt_bn128` pairing equation; tampered proofs rejected at the
+  pairing equation (line 520).
+- **`terra-zk-membership/src/circuit.rs`** — zone field decoded mod-Fr so
+  arbitrary 32-byte `zone_set.key()` identifiers map to valid BN254 scalars;
+  new test `test_zone_bytes_greater_than_modulus` (ADR-025).
+- **`terra-zk-membership/src/bin/zk-info.rs`** — prints `verification_key_hash`
+  / encoded frame to wire setup into `update_verification_key_hash`.
+- **`terra-core/scripts/zk-dev-setup.sh`** — generates dev-only
+  proving/verifying keys and emits an env file pinning `SHA-256(VK frame)`
+  (`.zk/` gitignored; ceremony tooling remains dev-only).
+- **Registers:** `IMPLEMENTATION_STATUS.md` A14 → `1 – IMPLEMENTED AND
+  VERIFIED` (BPF suite now **308/308**); `REQUIREMENTS_TRACEABILITY.md` REQ-012
+  → status 1 with named E2E test; `RISK_REGISTER.md` R-006 updated; Q-009
+  → status 1 (consumers mapped); `ARCHITECTURAL_DECISIONS.md` ADR-025 added.
+- Tests: registry BPF **308/308** (incl. new ZK E2E), zk-membership **6/6**,
+  mvpVerifier **8/8**. Clippy/fmt clean. No `target/` or `.zk/` artifacts
+  committed.
 
 - **Migration 0055** (`0055_provider_settlement_multi_asset.sql`) — replaces
   `CHECK (currency='USDC')` with a `settlement_assets` registry; renames

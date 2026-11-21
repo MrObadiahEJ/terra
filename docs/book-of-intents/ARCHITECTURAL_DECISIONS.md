@@ -390,3 +390,35 @@ protocol queries remain a trustworthy record of evidence-bearing components.
 **Evidence:** `docs/app-overlay-anchoring.md`,
 `terra-core/api/src/routes/components.rs` (provenance guard + test),
 `terra-core/geo-engine/src/component_package.rs` (RFC-015 conformance).
+
+## ADR-025 — Zone identifiers decoded mod-Fr; framed Groth16 v1 for devnet ZK
+**Date:** 2026-11-21 · **Status:** Accepted
+**Context:** `terra-zk-membership::MembershipCircuit` proves Merkle membership over
+BN254 scalar fields. A zone identifier is arbitrary 32-byte data from
+`zone_set.key()`, which may exceed the Fr modulus; feeding raw little-endian
+bytes into `Fr::from_bytes` silently truncates on overflow, producing a
+witness the verifier recomputes differently and causing `cs.is_satisfied()` to
+fail. Separately, the on-chain Groth16 verifier needs a pinned verification
+key and a bounded frame before accepting any proof.
+**Decision:** (1) Decode zone bytes with `Fr::from_be_bytes_mod_order` (mod-order
+reduction) so any 32-byte zone identifier maps to a valid field element;
+tested by `test_zone_bytes_greater_than_modulus`. (2) Keep framed Groth16 v1
+for devnet: `proof_data` frame carries Ed25519 signature + hash-pinned VK +
+Groth16 proof; `verify_ownership_proof` re-computes the statement from
+`zone_set.key()`/`prover.key()`, checks `algorithm_id == POSEIDON_GROTH16`,
+verifies the Ed25519 signature via the Solana precompile, and runs the
+BN254 pairing equation `e(A,B)·e(-α,β)·e(-L,γ)·e(-C,δ) == 1` through
+`alt_bn128` syscalls. Trusted-setup ceremony tooling is dev-only
+(`scripts/zk-dev-setup.sh`, `.zk/` gitignored); production ceremony
+(Groth16 MPC / PLONK universal SRS / transparent proofs) deferred to Q-006
+gate.
+**Alternatives:** `Fr::from_bytes` strict (rejected: fails on arbitrary zone
+bytes); raw zone bytes as circuit input without framing (rejected: no VK
+binding / signature attestation); Halo2/PLONK now (rejected: higher on-chain
+verification cost and no ceremony tooling in repo).
+**Consequences:** zone identifiers are arbitrary 32-byte values; on-chain
+statement re-derivation binds zone, root, version, nullifier, prover, purpose
+and disclosure type; proofs are valid only for the exact pinned VK. No
+live-cluster run yet (B6/Q-001). **Evidence:** `zk-membership/src/circuit.rs`;
+`terra_registry/src/zk/mod.rs` L381–613; integration test
+`zk_membership_prover_verifier_e2e`; OPEN_QUESTIONS Q-009.

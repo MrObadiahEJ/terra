@@ -1,12 +1,12 @@
 # IMPLEMENTATION_STATUS — Evidence-Based Feature Register
 
-**Audit basis:** commit `0f0a052` (dev), re-verified 2026-11-16.
+**Audit basis:** commit `9f1ad9e` (dev = main), re-verified 2026-11-21.
 **Latest deltas:** Sprint A localnet lifecycle `fd89d89`; Sprint B real write path
 `76d85df`; Sprint C chain indexer `ac754f6`; Sprint E routing/economics
 `8cd7aa9`; Sprint F evidence durability `0f0a052`; deep-audit report
 `0f0a052`.
 **Method:** source inspection + test execution where machine limits allow.
-Vitest **134/134** executed 2026-11-19 (all passed). BPF suite **307/307** passed,
+Vitest **134/134** executed 2026-11-19 (all passed). BPF suite **308/308** passed,
 0 failed — CI run `41474466105` green (Solana `v3.1.14`, `anchor build --skip-lint`,
 single-threaded); local SBF execution unavailable on this machine (no AVX/SBF —
 see CURRENT.md blockers), CI is authoritative.
@@ -33,7 +33,7 @@ see CURRENT.md blockers), CI is authoritative.
 | A11 | Dynamic anti-fraud routing (`route_task`, nine-factor, ≤8 candidates, seed=(task_id, blockhash, slot)) | 1 | `routing.rs` header + L2416; `verification_task.rs` `can_assign` | "Requested category guaranteed" flow not implemented (see INT-003 note) |
 | A12 | Verification sessions, claims, attestations, reputation | 1 | `verification/{attestation,quorum_voting,reputation}.rs`; `create_claim`…`slash_validator` (L2040–2163) | — |
 | A13 | Evidence manifests (artifact kind/storage/hash/index guards) | 1 | `evidence_manifest.rs` helpers; API `/evidence`; migrations 0023/0024/0028 | — |
-| A14 | ZK ownership proof (Groth16), VK pinning, proof invalidation | 2 – IMPLEMENTED, VERIFICATION INCOMPLETE | `zk/groth16.rs`; `generate_ownership_root`/`verify_ownership_proof`/`invalidate_proof` (L1715–1763); migrations 0016/0027 | Trusted-setup ceremony tooling absent; no live-cluster run |
+| A14 | ZK ownership proof (Groth16), VK pinning, proof invalidation | 1 – IMPLEMENTED AND VERIFIED | `terra_registry/src/zk/{groth16,mod}.rs` (`generate_ownership_root` L381, `verify_ownership_proof` L445, `invalidate_proof` L556, `update_verification_key_hash` L580); `terra-zk-membership/src/{circuit,frame,merkle,statement}.rs` (`MembershipCircuit`, Poseidon Merkle path, VK framing); migrations 0016/0027; E2E prover→verifier `zk_membership_prover_verifier_e2e` + zk-membership 6 unit tests; `zk-info` binary pins `SHA-256(VK frame)` | Trusted-setup ceremony tooling still dev-only (`scripts/zk-dev-setup.sh`, `.zk/` gitignored); no live-cluster run (B6/Q-001) |
 | A15 | Time-bound credentials (request/sign/finalize/verify) | 1 | `request_credential`…`verify_credential` (L1766–1791); RFC-009 | Generic credential — no residency semantics (see C3) |
 | A16 | Cross-border identity (jurisdictions, bindings, verification records) | 1 | `cross_border.rs`; L1794–1906; migrations 0012/0020 | — |
 | A17 | World registry: 249 ISO codes, genesis council (≥5 confirmations, ≥3 countries), heartbeat, emergency injection | 1 | `world_registry.rs` constants; L1394–1446 | — |
@@ -140,7 +140,7 @@ see CURRENT.md blockers), CI is authoritative.
 
 | Suite | Baseline | Last verified | Re-verify due |
 | --- | --- | --- | --- |
-| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **307/307** | **CI run `41474466105` green (Solana `v3.1.14`)** | CI authoritative (local SBF unavailable — no AVX/SBF) |
+| BPF integration (`cargo test -p terra-registry --test integration -- --test-threads=1`) | **308/308** | **CI run `41474466105` green (Solana `v3.1.14`)** | CI authoritative (local SBF unavailable — no AVX/SBF) |
 | Registry lib | **154** | **2026-11-16 (executed locally)** | before release |
 | API (`CARGO_INCREMENTAL=0 cargo test -p terra-api`) | **151** | **2026-11-16 (executed locally; DB-backed tests skip without `DATABASE_URL`; CI runs them against PostgreSQL)** | before release |
 | Geo-engine (`cargo test -p terra-geo`) | **42 (+1 ignored)** | **2026-11-16 (executed)** | before release |

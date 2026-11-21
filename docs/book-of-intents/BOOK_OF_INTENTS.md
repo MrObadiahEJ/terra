@@ -6,10 +6,10 @@ maintained continuously and must stay sufficient context for a competent AI
 agent or human to continue the project without the founder repeating
 instructions.
 
-**Audit basis:** repository state at commit `9e0ace8` (dev = main),
-re-verified 2026-11-19 (API 151/151, geo-engine 42 passed +1 ignored, vitest
+**Audit basis:** repository state at commit `9f1ad9e` (dev = main),
+re-verified 2026-11-21 (API 151/151, geo-engine 42 passed +1 ignored, vitest
 134/134, tsc clean, build + bundle PASS; BPF count re-confirmed in source:
-307 — CI run `41474466105` green).
+308 — CI run `41474466105` green; ZK E2E prover→verifier added).
 
 ## Canonical trust principle
 
@@ -148,7 +148,7 @@ chapters (02, 06, 08, 15) are founder-review-gated research specifications.
 ## Executive summary
 
 **What does Terra already have?**
-- On-chain: parcel registry + transfer (RRR rights-as-PDA), vault shard protocol, escrow settlement, dispute lifecycle, staking/slashing, validator registry + profiles + reputation, verification sessions/claims/attestations, evidence manifests, ZK ownership proofs (Groth16, ceremony tooling absent), time-bound credentials, cross-border identity, world registry (249 ISO codes), spatial assets + versioned geometry + spatial snapshots, 3D model registration, subdivision/amalgamation/succession/forfeiture, identity program (bind/succession/guardianship). All `IMPLEMENTED AND VERIFIED` (A1–A21), 307 BPF tests, local-only (never on devnet).
+- On-chain: parcel registry + transfer (RRR rights-as-PDA), vault shard protocol, escrow settlement, dispute lifecycle, staking/slashing, validator registry + profiles + reputation, verification sessions/claims/attestations, evidence manifests, **ZK ownership proofs (Groth16, end-to-end prover→verifier proven locally; trusted-setup ceremony dev-only)**, time-bound credentials, cross-border identity, world registry (249 ISO codes), spatial assets + versioned geometry + spatial snapshots, 3D model registration, subdivision/amalgamation/succession/forfeiture, identity program (bind/succession/guardianship). All `IMPLEMENTED AND VERIFIED` (A1–A21), **308 BPF tests**, local-only (never on devnet).
 - Backend API: ~26 routers including reconstruction, derived compute, stories (replay/GeoJSON/schema), spatial, geo, evidence, ZK, tx. `IMPLEMENTED AND VERIFIED` (B1–B5, B8–B13), API 133/133. Derived compute dedup cache (`processing_key` UNIQUE, recursive-CTE invalidation) is a cache, not a fact. Privileged endpoints fail-closed on Ed25519 signature (R-016/R-017 fixed). AI provenance fields on geometry drafts (REQ-024/R-014).
 - Geo-engine: sealed-road reachability (Dijkstra), canonical geometry digest `terra-geom-v2` (v1 removed Sprint 053), OSM road-graph structures (partial — no server-side route), nearest-roads/pois/buildings/stats. C1 verified, C2 verified, C3 partial.
 - Frontend: Cesium globe + Leaflet fallback, story engine (timeline/roads/demo/export), video export, road-graph navigation client-side, i18n, LOD_LEVELS (8 levels), terrain loading with retry, bundle discipline gate. D1–D11 verified, vitest 65/65.

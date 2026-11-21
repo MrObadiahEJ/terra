@@ -22,7 +22,7 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 | REQ-009 | Escrow safety (state machine, windows, mutual cancel) | P1 | 1 | RFC-004 | `escrow.rs` 8 instructions | BPF escrow suites + CDP smoke |
 | REQ-010 | Cross-jurisdiction identity with expiry/revocation | P1 | 1 | RFC-006 | `cross_border.rs`; migrations 0012/0020 | BPF cross-border suites |
 | REQ-011 | Recoverability (guardianship, succession, emergency injection) | P1 | 1 | RFC-010 | `recovery.rs`; identity `guardianship.rs`/`succession.rs` | BPF recovery/identity suites |
-| REQ-012 | Selective disclosure for ownership claims | P1 | 2 | RFC-011 | `zk/groth16.rs`, VK pinning (0027) | on-chain verify path exists; ceremony tooling + live validation missing |
+| REQ-012 | Selective disclosure for ownership claims | P1 | 1 | RFC-011 | `terra_registry/src/zk/{groth16,mod}.rs` (verify via `alt_bn128` pairing equation `e(A,B)·e(-α,β)·e(-L,γ)·e(-C,δ) == 1`) + `terra-zk-membership` (`MembershipCircuit`, Poseidon Merkle path, VK framing); VK pinning (0027) | `zk_membership_prover_verifier_e2e` end-to-end prover→verifier; zk-membership 6 unit tests pass; ceremony tooling dev-only |
 | REQ-013 | GIS interoperability (PostGIS mirror as read model) | P1 | 3 | RFC-012; migration 0017 | `api/routes/*` (25 routers), migrations 0004/0017/0030 | API suite; mirror hash-anchoring of every row not implemented |
 | REQ-014 | Replayable spatial narratives (deterministic stories) | P1 | 1 | RFC-014 Ph.01 | `story/timeline.ts`, `routes/stories.rs`, migration 0032 | vitest 44/44; API story tests |
 | REQ-015 | Journey navigation with honest method labels | P1 | 1 | RFC-014 Ph.02 | `story/roads.ts` (client-side); method `road-graph`/`great-circle` | vitest roads suite |
@@ -75,8 +75,10 @@ Status uses the 7-level vocabulary ([BOOK_OF_INTENTS.md](BOOK_OF_INTENTS.md)).
 ## Orphan / drift checks (per directive §14)
 
 - **Implemented without a requirement:** settlement center UI (covered under
-  REQ-008/009 as evidence surfaces — no orphan). `zk-membership` crate: verify
-  its consumers before release (flagged Q-009).
+  REQ-008/009 as evidence surfaces — no orphan). `zk-membership` crate: consumer
+  mapped — terra_registry BPF integration test `zk_membership_prover_verifier_e2e`
+  uses it as the prover for `verify_ownership_proof` (flagged Q-009, now
+  addressed).
 - **Requirements with no implementation:** REQ-020…REQ-022 are `SPECIFIED ONLY`
   (chapters + intents + acceptance criteria written; ⚠ founder review flags
   pending on Q-003/Q-004). REQ-023 is `RESEARCH REQUIRED` (Q-005 hard gate).
