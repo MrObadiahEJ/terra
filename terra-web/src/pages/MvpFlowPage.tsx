@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   ArrowRight,
   CheckCircle2,
   Clock,
+  ExternalLink,
   FileText,
   Fingerprint,
   MapPin,
@@ -18,7 +20,14 @@ import { connection, useWallet } from '../lib/wallet'
 import { TERRA_PROGRAM_ID } from '../lib/constants'
 import idl from '../idl/terra_registry.json'
 import { digest, sdJwtDigest } from '../lib/lifecyclePlan'
-import { bytesToHex, residencyMessage, verifyEd25519 } from '../lib/mvpVerifier'
+import {
+  bytesToHex,
+  canonicalVcMessage,
+  residencyMessage,
+  verifyEd25519,
+  verifyCompletePresentation,
+  type VerificationBundle,
+} from '../lib/mvpVerifier'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 
 // ---------------------------------------------------------------------------
@@ -59,6 +68,7 @@ type VC = {
   expirationDate: number
   sdJwtDigest: string
   selectiveDisclosure: boolean
+  issuerSignature?: string
 }
 
 const DEMO_PARCELS: Parcel[] = [
@@ -81,6 +91,7 @@ function formatTimestamp(ts: number): string {
 
 
 export default function MvpFlowPage() {
+  const navigate = useNavigate()
   const { publicKey, connected, anchorWallet, send, signMessage } = useWallet()
   const { setVisible: setWalletModalVisible } = useWalletModal()
   const [step, setStep] = useState<FlowStep>('surveyor')
@@ -238,6 +249,25 @@ export default function MvpFlowPage() {
       const tx = new Transaction().add(regIx, claimIx, obsIx, attIx)
       await send(tx)
 
+      let issuerSignature = ''
+      if (signMessage) {
+        try {
+          const msg = canonicalVcMessage({
+            vcType,
+            issuer: surveyorPk.toBase58(),
+            credentialSubject: claimPk.toBase58(),
+            observation: observationPk.toBase58(),
+            issuanceDate,
+            expirationDate,
+            sdJwtDigest: bytesToHex(vcDigest),
+          })
+          const sig = await signMessage(msg)
+          issuerSignature = bytesToHex(sig)
+        } catch {
+          // On-chain tx signature serves as programmatic anchor
+        }
+      }
+
       setVc({
         vcType,
         issuer: surveyorPk.toBase58(),
@@ -247,6 +277,7 @@ export default function MvpFlowPage() {
         expirationDate,
         sdJwtDigest: bytesToHex(vcDigest),
         selectiveDisclosure: false,
+        issuerSignature,
       })
       setStep('vc')
     } catch (err) {
@@ -254,7 +285,7 @@ export default function MvpFlowPage() {
     } finally {
       setBusy(false)
     }
-  }, [anchorWallet, send, publicKey, selectedParcel])
+  }, [anchorWallet, send, signMessage, publicKey, selectedParcel])
 
   // Step 2: Owner+tenant dual-sign residency proof. Both parties sign the
   // exact same canonical message (RFC-018 §4, Step 2).
@@ -307,91 +338,34 @@ export default function MvpFlowPage() {
     }
   }, [signMessage, publicKey, residencyProof])
 
-  // Step 3: Mock verifier — cryptographic VC + residency verification
+  // Step 4: Standalone verifier — cryptographic VC + residency verification
   const handleVerify = useCallback(async () => {
     if (!vc || !residencyProof || !selectedParcel) return
     setVerificationResult('checking')
     setBusy(true)
     try {
-      await new Promise((r) => setTimeout(r, 300)) // small delay for UX
-
-      const now = Math.floor(Date.now() / 1000)
-      const programId = new PublicKey(TERRA_PROGRAM_ID)
-      const claimPk = new PublicKey(vc.credentialSubject)
-      const issuerPk = new PublicKey(vc.issuer)
-      const observationPk = new PublicKey(vc.observation)
-
-      // 1. Read the attestation anchored on chain and check that the VC
-      //    presented here is exactly the one the program stored.
-      const attestationPk = PublicKey.findProgramAddressSync(
-        [new TextEncoder().encode('verification_attestation'), claimPk.toBuffer(), issuerPk.toBuffer()],
-        programId,
-      )[0]
-      const info = await connection.getAccountInfo(attestationPk)
-      let attestationValid = false
-      if (info && info.owner.equals(programId)) {
-        const coder = new BorshCoder(idl as never)
-        const onChain = coder.accounts.decode('VerificationAttestation', info.data)
-        attestationValid =
-          onChain.claim.equals(claimPk) &&
-          onChain.validator.equals(issuerPk) &&
-          onChain.observation.equals(observationPk) &&
-          onChain.vcType === vc.vcType &&
-          Number(onChain.issuanceDate) === vc.issuanceDate &&
-          Number(onChain.expirationDate) === vc.expirationDate &&
-          bytesToHex(onChain.sdJwtDigest) === vc.sdJwtDigest &&
-          Boolean(onChain.selectiveDisclosure) === vc.selectiveDisclosure
+      const bundle: VerificationBundle = {
+        parcelId: selectedParcel.id,
+        vc,
+        residencyProof,
       }
+      localStorage.setItem('terra_mvp_presentation_bundle', JSON.stringify(bundle))
 
-      // 2. Recompute the canonical SD-JWT digest from the credential fields
-      //    and require it to match both the VC and the on-chain anchor.
-      const recomputed = bytesToHex(
-        await sdJwtDigest(
-          claimPk,
-          issuerPk,
-          observationPk,
-          claimPk,
-          vc.vcType,
-          vc.issuanceDate,
-          vc.expirationDate,
-        ),
-      )
-      const vcDigestValid = /^[0-9a-f]{64}$/.test(vc.sdJwtDigest) &&
-        recomputed === vc.sdJwtDigest
-
-      // 3. VC validity window.
-      const vcNotExpired = vc.expirationDate > now
-      const vcNotFuture = vc.issuanceDate <= now
-
-      // 4. Residency proof: both signatures must verify against their
-      //    declared Ed25519 pubkeys over the same canonical message.
-      const timestampFresh = Math.abs(now - residencyProof.timestamp) <= 600
-      const message = residencyMessage(residencyProof)
-      const ownerSignatureValid = verifyEd25519(
-        residencyProof.ownerPubkey,
-        message,
-        residencyProof.ownerSignature,
-      )
-      const tenantSignatureValid = verifyEd25519(
-        residencyProof.tenantPubkey,
-        message,
-        residencyProof.tenantSignature,
-      )
-      const residencyValid =
-        ownerSignatureValid &&
-        tenantSignatureValid &&
-        residencyProof.parcelId === selectedParcel.id &&
-        timestampFresh
-
-      // 5. All checks must pass.
-      const allValid =
-        attestationValid &&
-        vcDigestValid &&
-        vcNotExpired &&
-        vcNotFuture &&
-        residencyValid
-
-      setVerificationResult(allValid ? 'valid' : 'invalid')
+      const programId = new PublicKey(TERRA_PROGRAM_ID)
+      const report = await verifyCompletePresentation(bundle, connection, programId)
+      setVerificationResult(report.overallValid ? 'valid' : 'invalid')
+      if (!report.overallValid) {
+        const failures = [
+          !report.issuerSignature.valid && 'Invalid issuer signature',
+          !report.sdJwtDisclosure.valid && 'SD-JWT digest mismatch',
+          !report.residencyDualSign.valid && 'Residency dual-signature failure',
+          !report.temporalValidity.valid && 'Temporal validity or freshness window failure',
+          report.onChainAnchorAndQuorum && !report.onChainAnchorAndQuorum.valid && report.onChainAnchorAndQuorum.details,
+        ].filter(Boolean)
+        setError(failures.join('; ') || 'Verification failed')
+      } else {
+        setError(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
       setVerificationResult('invalid')
@@ -414,7 +388,7 @@ export default function MvpFlowPage() {
     surveyor: '1 · Surveyor Attests',
     vc: '2 · W3C VC Issued',
     residency: '3 · Dual-Sign Residency',
-    verify: '4 · Mock Verifier',
+    verify: '4 · Standalone Verifier',
     complete: '5 · Complete',
   }
 
@@ -422,7 +396,7 @@ export default function MvpFlowPage() {
     surveyor: 'Select a parcel and have the licensed surveyor issue a W3C Verifiable Credential (SD-JWT) anchored on-chain.',
     vc: 'The VC is anchored on-chain with its SD-JWT digest. Selective disclosure is available for privacy-preserving verification.',
     residency: 'Owner and tenant each sign the residency proof with their wallet keys. Both signatures are required.',
-    verify: 'The mock verifier checks the VC digest against the on-chain anchor and validates both residency signatures.',
+    verify: 'The standalone verifier validates VC issuer signature, SD-JWT selective disclosure, dual residency signatures, and on-chain quorum.',
     complete: 'MVP flow complete — one parcel, one VC, one dual-signed residency proof, one verified presentation.',
   }
 
@@ -771,7 +745,7 @@ export default function MvpFlowPage() {
                 </div>
               </div>
             </div>
-            <div className="mvp-card-actions">
+            <div className="mvp-card-actions flex flex-wrap gap-2 items-center">
               {verificationResult === 'valid' ? (
                 <button
                   className="btn btn-primary"
@@ -786,7 +760,23 @@ export default function MvpFlowPage() {
                   onClick={handleVerify}
                   disabled={busy}
                 >
-                  {busy ? 'Verifying…' : 'Run Mock Verification'}
+                  {busy ? 'Verifying…' : 'Run Standalone Verification'}
+                </button>
+              )}
+              {vc && residencyProof && selectedParcel && (
+                <button
+                  className="btn btn-secondary flex items-center gap-1.5"
+                  onClick={() => {
+                    const bundle: VerificationBundle = {
+                      parcelId: selectedParcel.id,
+                      vc,
+                      residencyProof,
+                    }
+                    localStorage.setItem('terra_mvp_presentation_bundle', JSON.stringify(bundle))
+                    navigate('/verify', { state: { bundle } })
+                  }}
+                >
+                  <ExternalLink size={14} /> Open in Standalone Verifier (/verify)
                 </button>
               )}
               <button className="btn btn-ghost ml-2" onClick={restart}>

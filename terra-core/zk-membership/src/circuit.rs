@@ -102,7 +102,7 @@ impl ConstraintSynthesizer<Fr> for MembershipCircuit {
 
         let root = field_from_be_bytes(&statement_bytes[ROOT_OFFSET..ROOT_OFFSET + 32])?;
         enforce_canonical_field_encoding(&root, &statement_bytes[ROOT_OFFSET..ROOT_OFFSET + 32])?;
-        let zone = field_from_be_bytes(&statement_bytes[ZONE_OFFSET..ZONE_OFFSET + 32])?;
+        let zone = field_from_be_bytes_mod_order(&statement_bytes[ZONE_OFFSET..ZONE_OFFSET + 32])?;
         let version = field_from_le_bytes(&statement_bytes[VERSION_OFFSET..VERSION_OFFSET + 4])?;
         let nullifier =
             field_from_be_bytes(&statement_bytes[NULLIFIER_OFFSET..NULLIFIER_OFFSET + 32])?;
@@ -214,6 +214,20 @@ fn poseidon_pair_gadget(
         state = mixed;
     }
     Ok(state[0].clone())
+}
+
+fn field_from_be_bytes_mod_order(bytes: &[UInt8<Fr>]) -> Result<FpVar<Fr>, SynthesisError> {
+    let mut bits = Vec::with_capacity(bytes.len() * 8);
+    for byte in bytes.iter().rev() {
+        bits.extend(byte.to_bits_le()?);
+    }
+    let mut power = Fr::from(1u64);
+    let mut sum = FpVar::zero();
+    for bit in bits {
+        sum += FpVar::from(bit) * power;
+        power = power + power;
+    }
+    Ok(sum)
 }
 
 fn field_from_be_bytes(bytes: &[UInt8<Fr>]) -> Result<FpVar<Fr>, SynthesisError> {
@@ -352,5 +366,37 @@ mod tests {
             "{:?}",
             cs.which_is_unsatisfied()
         );
+    }
+
+    #[test]
+    fn test_zone_bytes_greater_than_modulus() {
+        let secret = Fr::from(123456u64);
+        let zone_bytes = [0x99u8; 32]; // > r (BN254 Fr modulus)
+        let zone = Fr::from_be_bytes_mod_order(&zone_bytes);
+        let path = MerklePath {
+            siblings: (0..TREE_DEPTH)
+                .map(|level| Fr::from((level + 1) as u64))
+                .collect(),
+            indices: (0..TREE_DEPTH).map(|level| level % 2 == 1).collect(),
+        };
+        let root = crate::merkle::compute_root(secret, &path).unwrap();
+        let root_bytes = field_to_be(&root);
+        let nullifier = derive_nullifier(secret, zone, root, 3).unwrap();
+        let statement = canonical_ownership_statement(
+            &zone_bytes,
+            &root_bytes,
+            3,
+            &field_to_be(&nullifier),
+            &[8u8; 32],
+            "membership",
+            0,
+        )
+        .unwrap();
+
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        MembershipCircuit::new(Some(statement), Some(secret), Some(path))
+            .generate_constraints(cs.clone())
+            .unwrap();
+        assert!(cs.is_satisfied().unwrap());
     }
 }

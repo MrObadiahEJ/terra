@@ -7,14 +7,14 @@
 export type TerraRegistry = {
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
   "metadata": {
-    "name": "terraRegistry",
+    "name": "terra_registry",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "Created with Anchor"
   },
   "instructions": [
     {
-      "name": "acceptEscrow",
+      "name": "accept_escrow",
       "discriminator": [
         193,
         2,
@@ -27,7 +27,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -67,7 +67,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -105,7 +105,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "addEvidence",
+      "name": "add_evidence",
       "discriminator": [
         205,
         19,
@@ -139,12 +139,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -155,17 +155,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "evidenceType",
+          "name": "evidence_type",
           "type": "u8"
         },
         {
-          "name": "contentHash",
+          "name": "content_hash",
           "type": {
             "array": [
               "u8",
@@ -174,17 +174,17 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "storageReference",
+          "name": "storage_reference",
           "type": "string"
         },
         {
-          "name": "observedAt",
+          "name": "observed_at",
           "type": "i64"
         }
       ]
     },
     {
-      "name": "addEvidenceArtifact",
+      "name": "add_evidence_artifact",
       "discriminator": [
         168,
         32,
@@ -229,7 +229,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "artifactIndex"
+                "path": "artifact_index"
               }
             ]
           }
@@ -263,18 +263,18 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "manifest.taskId",
-                "account": "evidenceManifest"
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
               },
               {
                 "kind": "account",
                 "path": "manifest.submitter",
-                "account": "evidenceManifest"
+                "account": "EvidenceManifest"
               },
               {
                 "kind": "account",
                 "path": "manifest.nonce",
-                "account": "evidenceManifest"
+                "account": "EvidenceManifest"
               }
             ]
           }
@@ -294,8 +294,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "manifest.taskId",
-                "account": "evidenceManifest"
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
               }
             ]
           }
@@ -306,13 +306,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "artifactIndex",
+          "name": "artifact_index",
           "type": "u16"
         },
         {
@@ -328,7 +328,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "contentHash",
+          "name": "content_hash",
           "type": {
             "array": [
               "u8",
@@ -337,13 +337,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "storageReference",
+          "name": "storage_reference",
           "type": "string"
         }
       ]
     },
     {
-      "name": "addSecondValidator",
+      "name": "add_second_validator",
       "discriminator": [
         117,
         163,
@@ -370,14 +370,14 @@ export type TerraRegistry = {
           "name": "candidate"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "addTaskRequirement",
+      "name": "add_task_requirement",
       "discriminator": [
         181,
         37,
@@ -409,8 +409,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -421,25 +421,25 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "reqIndex",
+          "name": "req_index",
           "type": "u8"
         },
         {
-          "name": "capabilityCode",
+          "name": "capability_code",
           "type": "u8"
         },
         {
-          "name": "minReputation",
+          "name": "min_reputation",
           "type": "u16"
         },
         {
-          "name": "minTier",
+          "name": "min_tier",
           "type": "u8"
         },
         {
@@ -452,29 +452,29 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "radiusM",
+          "name": "radius_m",
           "type": "u32"
         },
         {
-          "name": "centerLatE7",
+          "name": "center_lat_e7",
           "type": "i32"
         },
         {
-          "name": "centerLonE7",
+          "name": "center_lon_e7",
           "type": "i32"
         },
         {
-          "name": "independenceBps",
+          "name": "independence_bps",
           "type": "u16"
         },
         {
-          "name": "confidenceTargetBps",
+          "name": "confidence_target_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "addThirdValidator",
+      "name": "add_third_validator",
       "discriminator": [
         106,
         119,
@@ -499,7 +499,7 @@ export type TerraRegistry = {
           "name": "candidate"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -511,7 +511,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "addValidatorToRegistry",
+      "name": "add_validator_to_registry",
       "discriminator": [
         117,
         200,
@@ -528,9 +528,9 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "adminSigner",
+          "name": "admin_signer",
           "docs": [
-            "Admin signer — required in bootstrap mode, ignored in peer-consensus",
+            "Admin signer \u2014 required in bootstrap mode, ignored in peer-consensus",
             "(the endorsement account carries authority instead)."
           ],
           "writable": true,
@@ -582,7 +582,7 @@ export type TerraRegistry = {
           "name": "validator"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -594,7 +594,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "adjudicateDispute",
+      "name": "adjudicate_dispute",
       "discriminator": [
         0,
         67,
@@ -629,8 +629,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "dispute.caseHash",
-                "account": "dispute"
+                "path": "dispute.case_hash",
+                "account": "Dispute"
               }
             ]
           }
@@ -654,7 +654,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -692,7 +692,7 @@ export type TerraRegistry = {
         {
           "name": "authority",
           "docs": [
-            "Court authority or designated adjudicator — must be registry admin."
+            "Court authority or designated adjudicator \u2014 must be registry admin."
           ],
           "signer": true
         }
@@ -703,13 +703,17 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "newOwner",
+          "name": "new_owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "remedy_geometry_version",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "adminVerifyValidatorCapability",
+      "name": "admin_verify_validator_capability",
       "discriminator": [
         136,
         212,
@@ -754,7 +758,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -796,7 +800,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "capabilityCode",
+          "name": "capability_code",
           "type": "u8"
         },
         {
@@ -804,7 +808,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -815,7 +819,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "allocateCountry",
+      "name": "allocate_country",
       "discriminator": [
         110,
         200,
@@ -828,7 +832,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "worldRegistry",
+          "name": "world_registry",
           "writable": true
         },
         {
@@ -838,7 +842,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "countryCode",
+          "name": "country_code",
           "type": {
             "array": [
               "u8",
@@ -847,13 +851,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "approvedAdmin",
+          "name": "approved_admin",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "amalgamateParcels",
+      "name": "amalgamate_parcels",
       "discriminator": [
         169,
         18,
@@ -866,7 +870,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "resultParcel",
+          "name": "result_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -883,16 +887,16 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "resultParcel.id",
-                "account": "parcel"
+                "path": "result_parcel.id",
+                "account": "Parcel"
               }
             ]
           }
         },
         {
-          "name": "resultOwnership",
+          "name": "result_ownership",
           "docs": [
-            "Ownership right of the result parcel — authority must control it."
+            "Ownership right of the result parcel \u2014 authority must control it."
           ],
           "pda": {
             "seeds": [
@@ -912,13 +916,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "resultParcel"
+                "path": "result_parcel"
               }
             ]
           }
         },
         {
-          "name": "sourceParcel",
+          "name": "source_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -935,16 +939,16 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "sourceParcel.id",
-                "account": "parcel"
+                "path": "source_parcel.id",
+                "account": "Parcel"
               }
             ]
           }
         },
         {
-          "name": "sourceOwnership",
+          "name": "source_ownership",
           "docs": [
-            "Ownership right of the source parcel — authority must control it too."
+            "Ownership right of the source parcel \u2014 authority must control it too."
           ],
           "pda": {
             "seeds": [
@@ -964,13 +968,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "sourceParcel"
+                "path": "source_parcel"
               }
             ]
           }
         },
         {
-          "name": "amalgamationRecord",
+          "name": "amalgamation_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -993,11 +997,11 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "resultParcel"
+                "path": "result_parcel"
               },
               {
                 "kind": "account",
-                "path": "sourceParcel"
+                "path": "source_parcel"
               }
             ]
           }
@@ -1008,13 +1012,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newGeometryHash",
+          "name": "new_geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -1025,7 +1029,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "appealDecision",
+      "name": "appeal_decision",
       "discriminator": [
         221,
         132,
@@ -1078,7 +1082,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1094,7 +1098,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "appendGeometryVersion",
+      "name": "append_geometry_version",
       "discriminator": [
         130,
         154,
@@ -1132,13 +1136,13 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "asset.parcel",
-                "account": "spatialAsset"
+                "account": "SpatialAsset"
               }
             ]
           }
         },
         {
-          "name": "geometryVersion",
+          "name": "geometry_version",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1169,8 +1173,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "asset.geometryVersionCount",
-                "account": "spatialAsset"
+                "path": "asset.geometry_version_count",
+                "account": "SpatialAsset"
               }
             ]
           }
@@ -1181,13 +1185,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "geometryHash",
+          "name": "geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -1204,25 +1208,25 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "storageReference",
+          "name": "storage_reference",
           "type": "string"
         },
         {
-          "name": "elevationMinMm",
-          "type": "i32"
+          "name": "elevation_min_mm",
+          "type": "i64"
         },
         {
-          "name": "elevationMaxMm",
-          "type": "i32"
+          "name": "elevation_max_mm",
+          "type": "i64"
         },
         {
-          "name": "elevationSource",
+          "name": "elevation_source",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "appendGeometryVersionFromEvidence",
+      "name": "append_geometry_version_from_evidence",
       "docs": [
         "Anchor a geometry version from an evidence manifest (RFC-013 Phase B)."
       ],
@@ -1263,13 +1267,13 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "asset.parcel",
-                "account": "spatialAsset"
+                "account": "SpatialAsset"
               }
             ]
           }
         },
         {
-          "name": "geometryVersion",
+          "name": "geometry_version",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1300,8 +1304,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "asset.geometryVersionCount",
-                "account": "spatialAsset"
+                "path": "asset.geometry_version_count",
+                "account": "SpatialAsset"
               }
             ]
           }
@@ -1334,18 +1338,18 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "manifest.taskId",
-                "account": "evidenceManifest"
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
               },
               {
                 "kind": "account",
                 "path": "manifest.submitter",
-                "account": "evidenceManifest"
+                "account": "EvidenceManifest"
               },
               {
                 "kind": "account",
                 "path": "manifest.nonce",
-                "account": "evidenceManifest"
+                "account": "EvidenceManifest"
               }
             ]
           }
@@ -1365,8 +1369,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "manifest.taskId",
-                "account": "evidenceManifest"
+                "path": "manifest.task_id",
+                "account": "EvidenceManifest"
               }
             ]
           }
@@ -1377,13 +1381,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "geometryHash",
+          "name": "geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -1400,25 +1404,25 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "storageReference",
+          "name": "storage_reference",
           "type": "string"
         },
         {
-          "name": "elevationMinMm",
-          "type": "i32"
+          "name": "elevation_min_mm",
+          "type": "i64"
         },
         {
-          "name": "elevationMaxMm",
-          "type": "i32"
+          "name": "elevation_max_mm",
+          "type": "i64"
         },
         {
-          "name": "elevationSource",
+          "name": "elevation_source",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "assignReviewer",
+      "name": "assign_reviewer",
       "discriminator": [
         50,
         160,
@@ -1473,7 +1477,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "reviewerReputation",
+          "name": "reviewer_reputation",
           "pda": {
             "seeds": [
               {
@@ -1517,14 +1521,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "assignTaskValidator",
+      "name": "assign_task_validator",
       "discriminator": [
         217,
         224,
@@ -1563,8 +1567,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               },
               {
                 "kind": "account",
@@ -1589,8 +1593,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -1604,13 +1608,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -1621,11 +1625,11 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "attachParcel",
+      "name": "attach_parcel",
       "docs": [
         "Attach a parcel to an identity (the person behind its holder wallet).",
         "Only the current ownership holder may do this, and only for an identity",
-        "whose owner wallet matches. The identity link is provenance — it never",
+        "whose owner wallet matches. The identity link is provenance \u2014 it never",
         "becomes the ownership record."
       ],
       "discriminator": [
@@ -1658,7 +1662,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -1699,7 +1703,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "authorizeVaultAccess",
+      "name": "authorize_vault_access",
       "discriminator": [
         241,
         177,
@@ -1712,7 +1716,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -1749,7 +1753,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -1763,7 +1767,7 @@ export type TerraRegistry = {
           "type": "i64"
         },
         {
-          "name": "offChainNonce",
+          "name": "off_chain_nonce",
           "type": {
             "array": [
               "u8",
@@ -1774,7 +1778,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "bindCrossBorderIdentity",
+      "name": "bind_cross_border_identity",
       "discriminator": [
         221,
         72,
@@ -1823,7 +1827,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "identityHash"
+                "path": "identity_hash"
               }
             ]
           }
@@ -1841,13 +1845,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "credentialCommitment",
+          "name": "credential_commitment",
           "type": {
             "array": [
               "u8",
@@ -1856,11 +1860,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "proofData",
+          "name": "proof_data",
           "type": "bytes"
         },
         {
-          "name": "nullifierNonce",
+          "name": "nullifier_nonce",
           "type": {
             "array": [
               "u8",
@@ -1869,11 +1873,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         },
         {
-          "name": "identityHash",
+          "name": "identity_hash",
           "type": {
             "array": [
               "u8",
@@ -1884,7 +1888,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "bootstrapSelfProclaim",
+      "name": "bootstrap_self_proclaim",
       "discriminator": [
         150,
         57,
@@ -1906,13 +1910,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "countryCode",
+          "name": "country_code",
           "type": {
             "array": [
               "u8",
@@ -1923,7 +1927,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "cancelDispute",
+      "name": "cancel_dispute",
       "discriminator": [
         23,
         155,
@@ -1958,8 +1962,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "dispute.caseHash",
-                "account": "dispute"
+                "path": "dispute.case_hash",
+                "account": "Dispute"
               }
             ]
           }
@@ -1983,7 +1987,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -2021,7 +2025,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "cancelEscrow",
+      "name": "cancel_escrow",
       "discriminator": [
         156,
         203,
@@ -2034,7 +2038,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2057,7 +2061,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "escrowVault",
+          "name": "escrow_vault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2080,7 +2084,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "escrowRecord"
+                "path": "escrow_record"
               }
             ]
           }
@@ -2104,7 +2108,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -2119,14 +2123,14 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "cancelShardRotation",
+      "name": "cancel_shard_rotation",
       "discriminator": [
         41,
         160,
@@ -2143,7 +2147,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord"
+          "name": "vault_record"
         },
         {
           "name": "canceller",
@@ -2151,14 +2155,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "cancelTask",
+      "name": "cancel_task",
       "discriminator": [
         69,
         228,
@@ -2186,8 +2190,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -2199,7 +2203,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -2210,7 +2214,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "castAppealVote",
+      "name": "cast_appeal_vote",
       "discriminator": [
         76,
         236,
@@ -2246,7 +2250,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "review.report",
-                "account": "reviewCase"
+                "account": "ReviewCase"
               }
             ]
           }
@@ -2267,7 +2271,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "castFraudVote",
+      "name": "cast_fraud_vote",
       "discriminator": [
         55,
         195,
@@ -2303,7 +2307,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "review.report",
-                "account": "reviewCase"
+                "account": "ReviewCase"
               }
             ]
           }
@@ -2324,7 +2328,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "castQuorumVote",
+      "name": "cast_quorum_vote",
       "discriminator": [
         27,
         98,
@@ -2337,7 +2341,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "quorumVote",
+          "name": "quorum_vote",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2414,12 +2418,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -2430,19 +2434,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "voteChoice",
+          "name": "vote_choice",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "castReviewVote",
+      "name": "cast_review_vote",
       "discriminator": [
         254,
         48,
@@ -2510,7 +2514,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "checkQuorumReachable",
+      "name": "check_quorum_reachable",
       "discriminator": [
         236,
         95,
@@ -2556,7 +2560,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "claimRewards",
+      "name": "claim_rewards",
       "discriminator": [
         4,
         144,
@@ -2569,7 +2573,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "validatorStake",
+          "name": "validator_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2595,7 +2599,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -2605,7 +2609,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2626,13 +2630,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -2667,18 +2671,18 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "claimSuccessionWithParcels",
+      "name": "claim_succession_with_parcels",
       "docs": [
         "Claim a succession AND transfer every ownership right it covers in one",
         "atomic step (B6 boundary rule: identity state is only ever *composed*",
-        "from this program — never written directly).",
+        "from this program \u2014 never written directly).",
         "",
         "The identity-side claim runs as a CPI into",
         "`terra_identity::claim_succession`, which enforces its own guards,",
@@ -2689,7 +2693,7 @@ export type TerraRegistry = {
         "",
         "`remaining_accounts` = ownership Rights PDAs (`[\"ownership\", parcel]`).",
         "Each must be held either by the previous identity-owner wallet",
-        "(re-pointed to the successor) or by the Identity PDA itself (skipped —",
+        "(re-pointed to the successor) or by the Identity PDA itself (skipped \u2014",
         "it already follows the identity). If the CPI fails, no rights are",
         "written; if a rights write fails, the CPI rolls back. Atomic."
       ],
@@ -2720,11 +2724,11 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "identityProgram",
+          "name": "identity_program",
           "docs": [
             "transaction so the CPI can resolve the callee program."
           ]
@@ -2733,7 +2737,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "claimTask",
+      "name": "claim_task",
       "discriminator": [
         49,
         222,
@@ -2772,8 +2776,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               },
               {
                 "kind": "account",
@@ -2798,8 +2802,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -2810,13 +2814,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -2827,7 +2831,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claimTaskReward",
+      "name": "claim_task_reward",
       "discriminator": [
         105,
         212,
@@ -2869,19 +2873,19 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               },
               {
                 "kind": "account",
                 "path": "assignment.validator",
-                "account": "taskAssignment"
+                "account": "TaskAssignment"
               }
             ]
           }
         },
         {
-          "name": "taskEscrow",
+          "name": "task_escrow",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2903,8 +2907,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -2938,13 +2942,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "taskEscrow"
+                "path": "task_escrow"
               }
             ]
           }
         },
         {
-          "name": "coverageIncentive",
+          "name": "coverage_incentive",
           "pda": {
             "seeds": [
               {
@@ -2974,7 +2978,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "rewardAllocation",
+          "name": "reward_allocation",
           "writable": true,
           "pda": {
             "seeds": [
@@ -3002,8 +3006,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               },
               {
                 "kind": "account",
@@ -3044,14 +3048,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "closeVerificationSession",
+      "name": "close_verification_session",
       "discriminator": [
         188,
         203,
@@ -3096,18 +3100,18 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "session.sessionId",
-                "account": "verificationSession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
         },
         {
-          "name": "sessionTracker",
+          "name": "session_tracker",
           "docs": [
             "Must match the tracker for this claim."
           ],
@@ -3143,7 +3147,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               }
             ]
           }
@@ -3155,13 +3159,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "finalStatus",
+          "name": "final_status",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "confirmGenesis",
+      "name": "confirm_genesis",
       "discriminator": [
         116,
         83,
@@ -3174,11 +3178,11 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "genesisRequest",
+          "name": "genesis_request",
           "writable": true
         },
         {
-          "name": "worldRegistry",
+          "name": "world_registry",
           "pda": {
             "seeds": [
               {
@@ -3210,7 +3214,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "confirmerCountry",
+          "name": "confirmer_country",
           "type": {
             "array": [
               "u8",
@@ -3221,7 +3225,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "confirmNomination",
+      "name": "confirm_nomination",
       "discriminator": [
         216,
         43,
@@ -3249,7 +3253,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "createClaim",
+      "name": "create_claim",
       "discriminator": [
         71,
         122,
@@ -3282,7 +3286,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "claimId"
+                "path": "claim_id"
               }
             ]
           }
@@ -3305,7 +3309,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -3316,13 +3320,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "claimId",
+          "name": "claim_id",
           "type": {
             "array": [
               "u8",
@@ -3331,11 +3335,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "claimType",
+          "name": "claim_type",
           "type": "u8"
         },
         {
-          "name": "statementHash",
+          "name": "statement_hash",
           "type": {
             "array": [
               "u8",
@@ -3344,7 +3348,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "parcelType",
+          "name": "parcel_type",
           "type": "u8"
         },
         {
@@ -3359,7 +3363,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "createCrossBorderBinding",
+      "name": "create_cross_border_binding",
       "discriminator": [
         165,
         96,
@@ -3403,38 +3407,38 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "countryMin"
+                "path": "country_min"
               },
               {
                 "kind": "arg",
-                "path": "countryMax"
+                "path": "country_max"
               }
             ]
           }
         },
         {
-          "name": "jurisdictionMin"
+          "name": "jurisdiction_min"
         },
         {
-          "name": "jurisdictionMax"
+          "name": "jurisdiction_max"
         },
         {
-          "name": "authorityMin",
+          "name": "authority_min",
           "writable": true,
           "signer": true
         },
         {
-          "name": "authorityMax",
+          "name": "authority_max",
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "countryMin",
+          "name": "country_min",
           "type": {
             "array": [
               "u8",
@@ -3443,7 +3447,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "countryMax",
+          "name": "country_max",
           "type": {
             "array": [
               "u8",
@@ -3452,13 +3456,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         }
       ]
     },
     {
-      "name": "createEscrow",
+      "name": "create_escrow",
       "discriminator": [
         253,
         215,
@@ -3471,7 +3475,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -3494,7 +3498,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "escrowVault",
+          "name": "escrow_vault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -3517,7 +3521,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "escrowRecord"
+                "path": "escrow_record"
               }
             ]
           }
@@ -3541,7 +3545,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -3577,7 +3581,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -3593,7 +3597,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "createGuardianClaim",
+      "name": "create_guardian_claim",
       "discriminator": [
         220,
         101,
@@ -3606,7 +3610,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "guardianClaim",
+          "name": "guardian_claim",
           "writable": true,
           "pda": {
             "seeds": [
@@ -3653,12 +3657,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -3702,13 +3706,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "caseHash",
+          "name": "case_hash",
           "type": {
             "array": [
               "u8",
@@ -3717,13 +3721,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "guardianType",
+          "name": "guardian_type",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "createRegistry",
+      "name": "create_registry",
       "discriminator": [
         210,
         219,
@@ -3772,14 +3776,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "createReviewCase",
+      "name": "create_review_case",
       "discriminator": [
         121,
         220,
@@ -3792,7 +3796,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "reviewCase",
+          "name": "review_case",
           "writable": true,
           "pda": {
             "seeds": [
@@ -3866,7 +3870,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -3878,10 +3882,10 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "createSpatialSnapshot",
+      "name": "create_spatial_snapshot",
       "docs": [
         "Freeze a point-in-time copy of the asset's spatial indexes",
-        "(RFC-012 §5 `SpatialSnapshot`, RFC-013 §8.5 — snapshots copy the",
+        "(RFC-012 \u00a75 `SpatialSnapshot`, RFC-013 \u00a78.5 \u2014 snapshots copy the",
         "cursor; later appends never mutate them)."
       ],
       "discriminator": [
@@ -3921,7 +3925,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "asset.parcel",
-                "account": "spatialAsset"
+                "account": "SpatialAsset"
               }
             ]
           }
@@ -4000,7 +4004,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "meta.count",
-                "account": "spatialSnapshotMeta"
+                "account": "SpatialSnapshotMeta"
               }
             ]
           }
@@ -4011,7 +4015,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -4023,7 +4027,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "createStakePool",
+      "name": "create_stake_pool",
       "discriminator": [
         198,
         175,
@@ -4036,7 +4040,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -4066,7 +4070,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4087,7 +4091,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
@@ -4098,19 +4102,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "rewardRateBps",
+          "name": "reward_rate_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "createValidatorRelationshipEdge",
+      "name": "create_validator_relationship_edge",
       "discriminator": [
         174,
         195,
@@ -4127,7 +4131,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "fromProfile",
+          "name": "from_profile",
           "pda": {
             "seeds": [
               {
@@ -4154,13 +4158,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "fromWallet"
+                "path": "from_wallet"
               }
             ]
           }
         },
         {
-          "name": "toProfile",
+          "name": "to_profile",
           "pda": {
             "seeds": [
               {
@@ -4187,35 +4191,35 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "toProfile.wallet",
-                "account": "validatorProfile"
+                "path": "to_profile.wallet",
+                "account": "ValidatorProfile"
               }
             ]
           }
         },
         {
-          "name": "fromWallet",
+          "name": "from_wallet",
           "writable": true,
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "edgeType",
+          "name": "edge_type",
           "type": "u8"
         },
         {
-          "name": "weightBps",
+          "name": "weight_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "createVault",
+      "name": "create_vault",
       "discriminator": [
         29,
         237,
@@ -4228,7 +4232,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4265,17 +4269,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "ciphertextCid",
+          "name": "ciphertext_cid",
           "type": "string"
         },
         {
-          "name": "ciphertextHash",
+          "name": "ciphertext_hash",
           "type": {
             "array": [
               "u8",
@@ -4284,17 +4288,17 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "algorithmId",
+          "name": "algorithm_id",
           "type": "u8"
         },
         {
-          "name": "storageUris",
+          "name": "storage_uris",
           "type": {
             "vec": "string"
           }
         },
         {
-          "name": "shardHolders",
+          "name": "shard_holders",
           "type": {
             "vec": "pubkey"
           }
@@ -4306,7 +4310,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "createVerificationTask",
+      "name": "create_verification_task",
       "discriminator": [
         117,
         19,
@@ -4334,7 +4338,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               }
             ]
           }
@@ -4345,13 +4349,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -4364,11 +4368,11 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "taskClass",
+          "name": "task_class",
           "type": "u8"
         },
         {
-          "name": "rewardLamports",
+          "name": "reward_lamports",
           "type": "u64"
         },
         {
@@ -4376,7 +4380,7 @@ export type TerraRegistry = {
           "type": "i64"
         },
         {
-          "name": "descriptionHash",
+          "name": "description_hash",
           "type": {
             "array": [
               "u8",
@@ -4385,13 +4389,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "requiredValidators",
+          "name": "required_validators",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "createWorldRegistry",
+      "name": "create_world_registry",
       "discriminator": [
         124,
         83,
@@ -4404,7 +4408,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "worldRegistry",
+          "name": "world_registry",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4436,14 +4440,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "declareValidatorCapability",
+      "name": "declare_validator_capability",
       "discriminator": [
         13,
         57,
@@ -4498,13 +4502,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "capabilityCode",
+          "name": "capability_code",
           "type": "u8"
         },
         {
@@ -4512,7 +4516,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -4523,7 +4527,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "depositEscrow",
+      "name": "deposit_escrow",
       "discriminator": [
         226,
         112,
@@ -4536,7 +4540,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4559,7 +4563,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "escrowVault",
+          "name": "escrow_vault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4582,7 +4586,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "escrowRecord"
+                "path": "escrow_record"
               }
             ]
           }
@@ -4605,7 +4609,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -4616,19 +4620,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "depositAmount",
+          "name": "deposit_amount",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "depositStake",
+      "name": "deposit_stake",
       "discriminator": [
         160,
         167,
@@ -4641,7 +4645,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -4671,7 +4675,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4692,13 +4696,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "validatorStake",
+          "name": "validator_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4724,7 +4728,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -4739,7 +4743,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -4751,7 +4755,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "dismissReport",
+      "name": "dismiss_report",
       "discriminator": [
         17,
         115,
@@ -4764,7 +4768,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "slashingReport",
+          "name": "slashing_report",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4790,23 +4794,23 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.reporter",
-                "account": "slashingReport"
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.evidenceHash",
-                "account": "slashingReport"
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
               }
             ]
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "pda": {
             "seeds": [
               {
@@ -4826,13 +4830,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -4873,7 +4877,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "disputeEscrow",
+      "name": "dispute_escrow",
       "discriminator": [
         198,
         174,
@@ -4886,7 +4890,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -4927,7 +4931,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -4955,7 +4959,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "caseHash"
+                "path": "case_hash"
               }
             ]
           }
@@ -4966,13 +4970,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "caseHash",
+          "name": "case_hash",
           "type": {
             "array": [
               "u8",
@@ -4996,7 +5000,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "disputeGuardianClaim",
+      "name": "dispute_guardian_claim",
       "discriminator": [
         156,
         186,
@@ -5009,7 +5013,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "guardianClaim",
+          "name": "guardian_claim",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5034,8 +5038,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "guardianClaim.claim",
-                "account": "guardianClaim"
+                "path": "guardian_claim.claim",
+                "account": "GuardianClaim"
               }
             ]
           }
@@ -5081,7 +5085,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "disputeSlashing",
+      "name": "dispute_slashing",
       "discriminator": [
         119,
         42,
@@ -5094,7 +5098,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "slashingReport",
+          "name": "slashing_report",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5120,23 +5124,23 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.reporter",
-                "account": "slashingReport"
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.evidenceHash",
-                "account": "slashingReport"
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
               }
             ]
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "pda": {
             "seeds": [
               {
@@ -5156,13 +5160,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -5198,13 +5202,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "appealReason",
+          "name": "appeal_reason",
           "type": "string"
         }
       ]
     },
     {
-      "name": "distributeRewards",
+      "name": "distribute_rewards",
       "discriminator": [
         97,
         6,
@@ -5217,7 +5221,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5238,13 +5242,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -5284,14 +5288,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "emergencyProtect",
+      "name": "emergency_protect",
       "discriminator": [
         79,
         181,
@@ -5350,7 +5354,7 @@ export type TerraRegistry = {
           "name": "subject"
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -5362,7 +5366,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "endorseShardRotation",
+      "name": "endorse_shard_rotation",
       "discriminator": [
         132,
         217,
@@ -5379,7 +5383,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord"
+          "name": "vault_record"
         },
         {
           "name": "subject"
@@ -5389,14 +5393,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "endorseValidatorAdd",
+      "name": "endorse_validator_add",
       "discriminator": [
         42,
         252,
@@ -5446,7 +5450,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "endorsement.proposed",
-                "account": "validatorEndorsement"
+                "account": "ValidatorEndorsement"
               }
             ]
           }
@@ -5462,7 +5466,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "endorseValidatorRemoval",
+      "name": "endorse_validator_removal",
       "discriminator": [
         88,
         47,
@@ -5512,7 +5516,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "endorsement.proposed",
-                "account": "validatorEndorsement"
+                "account": "ValidatorEndorsement"
               }
             ]
           }
@@ -5528,7 +5532,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "executeEmergencyInjection",
+      "name": "execute_emergency_injection",
       "discriminator": [
         170,
         146,
@@ -5541,7 +5545,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "emergencyInjection",
+          "name": "emergency_injection",
           "writable": true
         },
         {
@@ -5576,7 +5580,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newValidatorActivity",
+          "name": "new_validator_activity",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5609,8 +5613,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "emergencyInjection.candidate",
-                "account": "emergencyInjection"
+                "path": "emergency_injection.candidate",
+                "account": "EmergencyInjection"
               }
             ]
           }
@@ -5621,14 +5625,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "executeJudgment",
+      "name": "execute_judgment",
       "discriminator": [
         78,
         95,
@@ -5663,8 +5667,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "dispute.caseHash",
-                "account": "dispute"
+                "path": "dispute.case_hash",
+                "account": "Dispute"
               }
             ]
           }
@@ -5688,7 +5692,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -5757,7 +5761,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "executeShardRotation",
+      "name": "execute_shard_rotation",
       "discriminator": [
         241,
         227,
@@ -5774,7 +5778,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -5783,14 +5787,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "expireEscrow",
+      "name": "expire_escrow",
       "discriminator": [
         49,
         150,
@@ -5803,7 +5807,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5844,7 +5848,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -5855,14 +5859,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "fileChallenge",
+      "name": "file_challenge",
       "discriminator": [
         200,
         165,
@@ -5895,7 +5899,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "claimAccount"
+                "path": "claim_account"
               },
               {
                 "kind": "account",
@@ -5905,7 +5909,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "claimAccount",
+          "name": "claim_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -5921,13 +5925,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "claimAccount.parcel",
-                "account": "claim"
+                "path": "claim_account.parcel",
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claimAccount.claimId",
-                "account": "claim"
+                "path": "claim_account.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -5938,13 +5942,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "challengeHash",
+          "name": "challenge_hash",
           "type": {
             "array": [
               "u8",
@@ -5953,13 +5957,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "requiredVotes",
+          "name": "required_votes",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "fileDispute",
+      "name": "file_dispute",
       "discriminator": [
         210,
         63,
@@ -5994,7 +5998,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "caseHash"
+                "path": "case_hash"
               }
             ]
           }
@@ -6018,7 +6022,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -6084,13 +6088,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "caseHash",
+          "name": "case_hash",
           "type": {
             "array": [
               "u8",
@@ -6110,11 +6114,15 @@ export type TerraRegistry = {
               8
             ]
           }
+        },
+        {
+          "name": "bond_lamports",
+          "type": "u64"
         }
       ]
     },
     {
-      "name": "fileFraudAppeal",
+      "name": "file_fraud_appeal",
       "discriminator": [
         223,
         21,
@@ -6171,7 +6179,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -6181,7 +6189,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -6196,7 +6204,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "finalizeAppeal",
+      "name": "finalize_appeal",
       "discriminator": [
         104,
         61,
@@ -6217,7 +6225,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "reviewerReputation",
+          "name": "reviewer_reputation",
           "pda": {
             "seeds": [
               {
@@ -6258,19 +6266,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "upheldAppeal",
+          "name": "upheld_appeal",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "finalizeAppealReview",
+      "name": "finalize_appeal_review",
       "discriminator": [
         175,
         147,
@@ -6329,17 +6337,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "appeal.restriction",
-                "account": "appeal"
+                "account": "Appeal"
               },
               {
                 "kind": "account",
                 "path": "appeal.appellant",
-                "account": "appeal"
+                "account": "Appeal"
               },
               {
                 "kind": "account",
                 "path": "appeal.nonce",
-                "account": "appeal"
+                "account": "Appeal"
               }
             ]
           }
@@ -6377,17 +6385,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "report.accused",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.reporter",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.nonce",
-                "account": "fraudReport"
+                "account": "FraudReport"
               }
             ]
           }
@@ -6398,14 +6406,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "finalizeCredential",
+      "name": "finalize_credential",
       "discriminator": [
         159,
         151,
@@ -6418,7 +6426,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "credentialRequest",
+          "name": "credential_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -6447,14 +6455,14 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "credentialRequest.requestHash",
-                "account": "credentialRequest"
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
               }
             ]
           }
         },
         {
-          "name": "thresholdCredential",
+          "name": "threshold_credential",
           "writable": true,
           "pda": {
             "seeds": [
@@ -6485,8 +6493,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "credentialRequest.requestHash",
-                "account": "credentialRequest"
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
               }
             ]
           }
@@ -6527,14 +6535,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "finalizeDecision",
+      "name": "finalize_decision",
       "discriminator": [
         205,
         130,
@@ -6645,7 +6653,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "privacyState",
+          "name": "privacy_state",
           "docs": [
             "Privacy state for the subject, written when the decision is finalized.",
             "PDA: [\"privacy_state\", subject, version]"
@@ -6658,7 +6666,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -6674,7 +6682,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "finalizeFraudReview",
+      "name": "finalize_fraud_review",
       "discriminator": [
         83,
         178,
@@ -6739,17 +6747,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "report.accused",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.reporter",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.nonce",
-                "account": "fraudReport"
+                "account": "FraudReport"
               }
             ]
           }
@@ -6792,7 +6800,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "report.accused",
-                "account": "fraudReport"
+                "account": "FraudReport"
               }
             ]
           }
@@ -6803,14 +6811,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "finalizeQuorum",
+      "name": "finalize_quorum",
       "discriminator": [
         150,
         75,
@@ -6869,12 +6877,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -6883,7 +6891,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "freezeParcel",
+      "name": "freeze_parcel",
       "discriminator": [
         245,
         48,
@@ -6918,8 +6926,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "dispute.caseHash",
-                "account": "dispute"
+                "path": "dispute.case_hash",
+                "account": "Dispute"
               }
             ]
           }
@@ -6943,7 +6951,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -6956,7 +6964,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "fundTaskEscrow",
+      "name": "fund_task_escrow",
       "discriminator": [
         129,
         231,
@@ -6996,14 +7004,14 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
         },
         {
-          "name": "feePolicy",
+          "name": "fee_policy",
           "pda": {
             "seeds": [
               {
@@ -7025,7 +7033,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "taskEscrow",
+          "name": "task_escrow",
           "writable": true,
           "pda": {
             "seeds": [
@@ -7047,8 +7055,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -7082,7 +7090,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "taskEscrow"
+                "path": "task_escrow"
               }
             ]
           }
@@ -7119,14 +7127,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "generateOwnershipRoot",
+      "name": "generate_ownership_root",
       "discriminator": [
         111,
         202,
@@ -7139,7 +7147,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "zoneSet",
+          "name": "zone_set",
           "writable": true,
           "pda": {
             "seeds": [
@@ -7158,14 +7166,14 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet.zoneId",
-                "account": "zoneSet"
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
               }
             ]
           }
         },
         {
-          "name": "ownershipRoot",
+          "name": "ownership_root",
           "writable": true,
           "pda": {
             "seeds": [
@@ -7190,7 +7198,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet"
+                "path": "zone_set"
               }
             ]
           }
@@ -7239,7 +7247,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "newMerkleRoot",
+          "name": "new_merkle_root",
           "type": {
             "array": [
               "u8",
@@ -7248,11 +7256,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newSnapshotCid",
+          "name": "new_snapshot_cid",
           "type": "string"
         },
         {
-          "name": "newSnapshotHash",
+          "name": "new_snapshot_hash",
           "type": {
             "array": [
               "u8",
@@ -7261,11 +7269,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "commitmentCount",
+          "name": "commitment_count",
           "type": "u32"
         },
         {
-          "name": "authoritySignature",
+          "name": "authority_signature",
           "type": {
             "array": [
               "u8",
@@ -7276,7 +7284,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "grantConditionalRight",
+      "name": "grant_conditional_right",
       "discriminator": [
         203,
         9,
@@ -7307,7 +7315,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -7347,7 +7355,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -7357,7 +7365,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "rightsKind",
+          "name": "rights_kind",
           "type": "u8"
         },
         {
@@ -7365,19 +7373,19 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         },
         {
-          "name": "conditionDeadline",
+          "name": "condition_deadline",
           "type": "i64"
         },
         {
-          "name": "conditionDesc",
+          "name": "condition_desc",
           "type": "string"
         },
         {
-          "name": "gracePeriodSecs",
+          "name": "grace_period_secs",
           "type": "i64"
         },
         {
@@ -7387,14 +7395,14 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "grantIdentityRight",
+      "name": "grant_identity_right",
       "docs": [
         "Grant an identity-based right on a parcel. Only the current holder",
         "of the canonical ownership right may sign. The `identity` must be a",
         "valid Identity PDA.",
         "",
         "Identity is a separate binding/provenance layer: this creates the",
-        "optional identity↔parcel link (`IdentityRights`), it is never the",
+        "optional identity\u2194parcel link (`IdentityRights`), it is never the",
         "ownership record itself (ownership lives at `[\"ownership\", parcel]`).",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`."
@@ -7429,7 +7437,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -7463,7 +7471,7 @@ export type TerraRegistry = {
           "name": "identity"
         },
         {
-          "name": "identityRights",
+          "name": "identity_rights",
           "writable": true
         },
         {
@@ -7472,17 +7480,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "rightsKind",
+          "name": "rights_kind",
           "type": "u8"
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         },
         {
@@ -7492,13 +7500,13 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "grantRight",
+      "name": "grant_right",
       "docs": [
         "Grant a non-ownership right on a parcel to `holder`. Holder-only.",
         "",
         "`nonce` must equal the parcel's current `rights_count`, which is",
         "incremented so every right gets a unique PDA. OWNERSHIP is excluded",
-        "here — it lives solely at the canonical `[\"ownership\", parcel]` PDA",
+        "here \u2014 it lives solely at the canonical `[\"ownership\", parcel]` PDA",
         "and only moves via `transfer_parcel`."
       ],
       "discriminator": [
@@ -7531,7 +7539,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -7571,7 +7579,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -7581,7 +7589,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "rightsKind",
+          "name": "rights_kind",
           "type": "u8"
         },
         {
@@ -7589,7 +7597,7 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         },
         {
@@ -7612,7 +7620,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "activityTracker",
+          "name": "activity_tracker",
           "writable": true
         },
         {
@@ -7653,7 +7661,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "initSpatialAsset",
+      "name": "init_spatial_asset",
       "discriminator": [
         202,
         140,
@@ -7716,7 +7724,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -7727,7 +7735,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -7737,17 +7745,17 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "elevationMinMm",
-          "type": "i32"
+          "name": "elevation_min_mm",
+          "type": "i64"
         },
         {
-          "name": "elevationMaxMm",
-          "type": "i32"
+          "name": "elevation_max_mm",
+          "type": "i64"
         }
       ]
     },
     {
-      "name": "initValidatorProfile",
+      "name": "init_validator_profile",
       "discriminator": [
         135,
         94,
@@ -7799,13 +7807,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "identityHash",
+          "name": "identity_hash",
           "type": {
             "array": [
               "u8",
@@ -7820,7 +7828,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "initVrfAuthority",
+      "name": "init_vrf_authority",
       "docs": [
         "Set or rotate the allowlisted VRF oracle authority. Registry admin only."
       ],
@@ -7836,7 +7844,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vrfAuthority",
+          "name": "vrf_authority",
           "writable": true,
           "pda": {
             "seeds": [
@@ -7897,7 +7905,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -7909,7 +7917,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "initializeValidatorReputation",
+      "name": "initialize_validator_reputation",
       "discriminator": [
         199,
         93,
@@ -7997,14 +8005,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "initiateShardRotation",
+      "name": "initiate_shard_rotation",
       "discriminator": [
         48,
         48,
@@ -8048,17 +8056,17 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "vaultRecord"
+                "path": "vault_record"
               },
               {
                 "kind": "arg",
-                "path": "newCiphertextHash"
+                "path": "new_ciphertext_hash"
               }
             ]
           }
         },
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -8067,13 +8075,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newCiphertextHash",
+          "name": "new_ciphertext_hash",
           "type": {
             "array": [
               "u8",
@@ -8082,19 +8090,19 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newShardHolders",
+          "name": "new_shard_holders",
           "type": {
             "vec": "pubkey"
           }
         },
         {
-          "name": "newThreshold",
+          "name": "new_threshold",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "initiateUnbonding",
+      "name": "initiate_unbonding",
       "discriminator": [
         75,
         33,
@@ -8107,7 +8115,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "validatorStake",
+          "name": "validator_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8133,7 +8141,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -8143,7 +8151,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "pda": {
             "seeds": [
               {
@@ -8163,13 +8171,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -8206,7 +8214,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "invalidateProof",
+      "name": "invalidate_proof",
       "discriminator": [
         122,
         166,
@@ -8219,7 +8227,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "zoneSet",
+          "name": "zone_set",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8238,8 +8246,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet.zoneId",
-                "account": "zoneSet"
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
               }
             ]
           }
@@ -8281,13 +8289,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "staleVersion",
+          "name": "stale_version",
           "type": "u32"
         }
       ]
     },
     {
-      "name": "judicialForfeiture",
+      "name": "judicial_forfeiture",
       "docs": [
         "Force-transfer a parcel's ownership away from a non-compliant owner, per",
         "a court order. This is deliberately heavier than a normal transfer:",
@@ -8295,10 +8303,10 @@ export type TerraRegistry = {
         "sign this transaction themselves, and the order is bound to a",
         "`case_hash` (e.g. SHA-256 of the court order document) for auditability.",
         "F4: every declared validator must also be a member of the on-chain",
-        "`ValidatorRegistry` — a self-declared key set can never form a quorum.",
+        "`ValidatorRegistry` \u2014 a self-declared key set can never form a quorum.",
         "",
         "This is how validators collectively inform the chain that land no longer",
-        "belongs to someone who refuses to release it — e.g. repossession by a",
+        "belongs to someone who refuses to release it \u2014 e.g. repossession by a",
         "government, or a court ruling that title passed to another person."
       ],
       "discriminator": [
@@ -8331,7 +8339,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -8404,13 +8412,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "caseHash",
+          "name": "case_hash",
           "type": {
             "array": [
               "u8",
@@ -8419,7 +8427,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newOwner",
+          "name": "new_owner",
           "type": "pubkey"
         },
         {
@@ -8438,7 +8446,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "linkCrossBorderToSession",
+      "name": "link_cross_border_to_session",
       "discriminator": [
         237,
         10,
@@ -8451,7 +8459,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "crossBorderVerification",
+          "name": "cross_border_verification",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8512,12 +8520,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -8554,12 +8562,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "session.sessionId",
-                "account": "verificationSession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
@@ -8573,14 +8581,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "migrateRights",
+      "name": "migrate_rights",
       "discriminator": [
         81,
         152,
@@ -8593,7 +8601,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "oldParcel",
+          "name": "old_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8610,8 +8618,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "oldParcel.id",
-                "account": "parcel"
+                "path": "old_parcel.id",
+                "account": "Parcel"
               }
             ]
           }
@@ -8636,13 +8644,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "oldParcel"
+                "path": "old_parcel"
               }
             ]
           }
         },
         {
-          "name": "newParcel",
+          "name": "new_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8659,8 +8667,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "newParcel.id",
-                "account": "parcel"
+                "path": "new_parcel.id",
+                "account": "Parcel"
               }
             ]
           }
@@ -8671,14 +8679,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "mutualCancelEscrow",
+      "name": "mutual_cancel_escrow",
       "discriminator": [
         241,
         12,
@@ -8691,7 +8699,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8714,7 +8722,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "escrowVault",
+          "name": "escrow_vault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -8737,7 +8745,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "escrowRecord"
+                "path": "escrow_record"
               }
             ]
           }
@@ -8761,7 +8769,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -8775,14 +8783,14 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "nominateValidator",
+      "name": "nominate_validator",
       "discriminator": [
         54,
         117,
@@ -8845,7 +8853,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -8855,7 +8863,7 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "documentsHash",
+          "name": "documents_hash",
           "type": {
             "array": [
               "u8",
@@ -8864,7 +8872,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "locationHash",
+          "name": "location_hash",
           "type": {
             "array": [
               "u8",
@@ -8873,7 +8881,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "countryCode",
+          "name": "country_code",
           "type": {
             "array": [
               "u8",
@@ -8882,7 +8890,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "recentBlockhash",
+          "name": "recent_blockhash",
           "type": {
             "array": [
               "u8",
@@ -8893,7 +8901,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "openAppealReview",
+      "name": "open_appeal_review",
       "discriminator": [
         84,
         185,
@@ -8924,17 +8932,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "appeal.restriction",
-                "account": "appeal"
+                "account": "Appeal"
               },
               {
                 "kind": "account",
                 "path": "appeal.appellant",
-                "account": "appeal"
+                "account": "Appeal"
               },
               {
                 "kind": "account",
                 "path": "appeal.nonce",
-                "account": "appeal"
+                "account": "Appeal"
               }
             ]
           }
@@ -9010,14 +9018,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "openFraudReview",
+      "name": "open_fraud_review",
       "discriminator": [
         111,
         26,
@@ -9054,17 +9062,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "report.accused",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.reporter",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.nonce",
-                "account": "fraudReport"
+                "account": "FraudReport"
               }
             ]
           }
@@ -9137,14 +9145,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "openVerificationSession",
+      "name": "open_verification_session",
       "discriminator": [
         233,
         132,
@@ -9192,7 +9200,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "sessionId"
+                "path": "session_id"
               }
             ]
           }
@@ -9214,18 +9222,18 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
         },
         {
-          "name": "sessionTracker",
+          "name": "session_tracker",
           "docs": [
             "Singleton guard: enforces single active session per claim."
           ],
@@ -9271,13 +9279,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "sessionId",
+          "name": "session_id",
           "type": {
             "array": [
               "u8",
@@ -9286,7 +9294,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "parcelType",
+          "name": "parcel_type",
           "type": "u8"
         },
         {
@@ -9301,7 +9309,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "pauseProgram",
+      "name": "pause_program",
       "discriminator": [
         91,
         86,
@@ -9325,7 +9333,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "pingShard",
+      "name": "ping_shard",
       "discriminator": [
         148,
         232,
@@ -9338,7 +9346,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "vaultRecord",
+          "name": "vault_record",
           "writable": true
         },
         {
@@ -9346,14 +9354,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "proposeValidator",
+      "name": "propose_validator",
       "discriminator": [
         177,
         134,
@@ -9420,7 +9428,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -9432,7 +9440,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "proposeValidatorRemoval",
+      "name": "propose_validator_removal",
       "discriminator": [
         217,
         106,
@@ -9499,7 +9507,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -9511,7 +9519,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "queueEmergencyInjection",
+      "name": "queue_emergency_injection",
       "discriminator": [
         153,
         11,
@@ -9524,7 +9532,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "emergencyInjection",
+          "name": "emergency_injection",
           "writable": true,
           "pda": {
             "seeds": [
@@ -9599,7 +9607,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -9611,7 +9619,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quoteTaskResources",
+      "name": "quote_task_resources",
       "discriminator": [
         185,
         225,
@@ -9652,8 +9660,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -9664,19 +9672,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "resourceCost",
+          "name": "resource_cost",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "reactivateObserver",
+      "name": "reactivate_observer",
       "discriminator": [
         31,
         227,
@@ -9709,7 +9717,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "observer.wallet",
-                "account": "observer"
+                "account": "Observer"
               }
             ]
           }
@@ -9751,7 +9759,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "rebindCrossBorderIdentity",
+      "name": "rebind_cross_border_identity",
       "discriminator": [
         144,
         28,
@@ -9764,11 +9772,11 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "oldBinding",
+          "name": "old_binding",
           "writable": true
         },
         {
-          "name": "newBinding",
+          "name": "new_binding",
           "writable": true,
           "pda": {
             "seeds": [
@@ -9804,8 +9812,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "oldBinding.identityHash",
-                "account": "jurisdictionBinding"
+                "path": "old_binding.identity_hash",
+                "account": "JurisdictionBinding"
               }
             ]
           }
@@ -9823,13 +9831,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "credentialCommitment",
+          "name": "credential_commitment",
           "type": {
             "array": [
               "u8",
@@ -9838,11 +9846,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "proofData",
+          "name": "proof_data",
           "type": "bytes"
         },
         {
-          "name": "nullifierNonce",
+          "name": "nullifier_nonce",
           "type": {
             "array": [
               "u8",
@@ -9851,13 +9859,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": "i64"
         }
       ]
     },
     {
-      "name": "recordAttestationOutcome",
+      "name": "record_attestation_outcome",
       "discriminator": [
         61,
         154,
@@ -9902,7 +9910,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "reputation.validator",
-                "account": "validatorReputation"
+                "account": "ValidatorReputation"
               }
             ]
           }
@@ -9950,7 +9958,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "recordAuditEntry",
+      "name": "record_audit_entry",
       "discriminator": [
         187,
         75,
@@ -9963,7 +9971,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "auditEntry",
+          "name": "audit_entry",
           "writable": true,
           "pda": {
             "seeds": [
@@ -10007,7 +10015,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -10021,15 +10029,15 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "fromStatus",
+          "name": "from_status",
           "type": "u8"
         },
         {
-          "name": "toStatus",
+          "name": "to_status",
           "type": "u8"
         },
         {
-          "name": "metadataHash",
+          "name": "metadata_hash",
           "type": {
             "array": [
               "u8",
@@ -10040,7 +10048,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "recordAuditEvent",
+      "name": "record_audit_event",
       "discriminator": [
         123,
         52,
@@ -10053,7 +10061,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "auditEvent",
+          "name": "audit_event",
           "writable": true,
           "pda": {
             "seeds": [
@@ -10093,7 +10101,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -10113,7 +10121,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "recordCrossBorderVerification",
+      "name": "record_cross_border_verification",
       "discriminator": [
         243,
         167,
@@ -10162,7 +10170,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               },
               {
                 "kind": "arg",
@@ -10186,7 +10194,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               }
             ]
           }
@@ -10220,7 +10228,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               },
               {
                 "kind": "arg",
@@ -10271,13 +10279,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -10286,7 +10294,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "reqIndex",
+          "name": "req_index",
           "type": "u8"
         },
         {
@@ -10296,7 +10304,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "recordSessionAttestation",
+      "name": "record_session_attestation",
       "discriminator": [
         210,
         151,
@@ -10341,18 +10349,18 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "session.sessionId",
-                "account": "verificationSession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
         },
         {
-          "name": "sessionTracker",
+          "name": "session_tracker",
           "docs": [
             "Must match the tracker for this claim (cleared when quorum reached)."
           ],
@@ -10388,7 +10396,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               }
             ]
           }
@@ -10433,13 +10441,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "isConfirmatory",
+          "name": "is_confirmatory",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "recordSessionEvidence",
+      "name": "record_session_evidence",
       "discriminator": [
         251,
         34,
@@ -10484,12 +10492,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "session.sessionId",
-                "account": "verificationSession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
@@ -10535,7 +10543,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "recordSessionObservation",
+      "name": "record_session_observation",
       "discriminator": [
         90,
         81,
@@ -10580,12 +10588,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "session.claim",
-                "account": "verificationSession"
+                "account": "VerificationSession"
               },
               {
                 "kind": "account",
-                "path": "session.sessionId",
-                "account": "verificationSession"
+                "path": "session.session_id",
+                "account": "VerificationSession"
               }
             ]
           }
@@ -10631,7 +10639,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "refundTaskEscrow",
+      "name": "refund_task_escrow",
       "discriminator": [
         67,
         95,
@@ -10647,7 +10655,7 @@ export type TerraRegistry = {
           "name": "task"
         },
         {
-          "name": "taskEscrow",
+          "name": "task_escrow",
           "writable": true,
           "pda": {
             "seeds": [
@@ -10669,8 +10677,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -10704,7 +10712,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "taskEscrow"
+                "path": "task_escrow"
               }
             ]
           }
@@ -10715,17 +10723,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "register3dModel",
+      "name": "register_3d_model",
       "docs": [
         "Register an off-chain 3D model claim against an anchored geometry",
-        "version (RFC-012 §5 `ThreeDModel`, Design Rule 10 — never on-chain",
+        "version (RFC-012 \u00a75 `ThreeDModel`, Design Rule 10 \u2014 never on-chain",
         "geometry, only hash + storage_reference)."
       ],
       "discriminator": [
@@ -10765,7 +10773,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "asset.parcel",
-                "account": "spatialAsset"
+                "account": "SpatialAsset"
               }
             ]
           }
@@ -10838,7 +10846,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "meta.count",
-                "account": "threeDModelMeta"
+                "account": "ThreeDModelMeta"
               }
             ]
           }
@@ -10849,13 +10857,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "modelHash",
+          "name": "model_hash",
           "type": {
             "array": [
               "u8",
@@ -10864,21 +10872,21 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "storageReference",
+          "name": "storage_reference",
           "type": "string"
         },
         {
-          "name": "modelFormat",
+          "name": "model_format",
           "type": "u8"
         },
         {
-          "name": "geometryVersion",
+          "name": "geometry_version",
           "type": "u32"
         }
       ]
     },
     {
-      "name": "registerDevice",
+      "name": "register_device",
       "discriminator": [
         210,
         151,
@@ -10921,7 +10929,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "deviceNonce"
+                "path": "device_nonce"
               }
             ]
           }
@@ -10932,17 +10940,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "deviceNonce",
+          "name": "device_nonce",
           "type": "u16"
         },
         {
-          "name": "deviceKey",
+          "name": "device_key",
           "type": "pubkey"
         },
         {
@@ -10954,13 +10962,13 @@ export type TerraRegistry = {
           "type": "u64"
         },
         {
-          "name": "metadataRef",
+          "name": "metadata_ref",
           "type": "string"
         }
       ]
     },
     {
-      "name": "registerJurisdiction",
+      "name": "register_jurisdiction",
       "discriminator": [
         6,
         255,
@@ -10996,7 +11004,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "countryCode"
+                "path": "country_code"
               }
             ]
           }
@@ -11037,13 +11045,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "countryCode",
+          "name": "country_code",
           "type": {
             "array": [
               "u8",
@@ -11052,19 +11060,19 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "jurisdictionName",
+          "name": "jurisdiction_name",
           "type": "string"
         },
         {
-          "name": "credentialSchemaCid",
+          "name": "credential_schema_cid",
           "type": "string"
         },
         {
-          "name": "revocationRegistry",
+          "name": "revocation_registry",
           "type": "pubkey"
         },
         {
-          "name": "verificationKeyHash",
+          "name": "verification_key_hash",
           "type": {
             "array": [
               "u8",
@@ -11073,13 +11081,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "algorithmId",
+          "name": "algorithm_id",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "registerObserver",
+      "name": "register_observer",
       "discriminator": [
         95,
         238,
@@ -11122,7 +11130,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -11134,7 +11142,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "registerParcel",
+      "name": "register_parcel",
       "docs": [
         "Register a new parcel on-chain. The signer receives the canonical",
         "ownership right (`Rights` PDA at `[\"ownership\", parcel]`), which is",
@@ -11185,7 +11193,7 @@ export type TerraRegistry = {
         {
           "name": "ownership",
           "docs": [
-            "The canonical ownership right (RRR: this — not the parcel — is the",
+            "The canonical ownership right (RRR: this \u2014 not the parcel \u2014 is the",
             "ownership record). Created in the same instruction as the parcel."
           ],
           "writable": true,
@@ -11213,7 +11221,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -11232,7 +11240,7 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "geometryHash",
+          "name": "geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -11243,7 +11251,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "registerZoneSet",
+      "name": "register_zone_set",
       "discriminator": [
         161,
         121,
@@ -11286,10 +11294,10 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "zoneId"
+          "name": "zone_id"
         },
         {
-          "name": "zoneSet",
+          "name": "zone_set",
           "writable": true,
           "pda": {
             "seeds": [
@@ -11308,13 +11316,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneId"
+                "path": "zone_id"
               }
             ]
           }
         },
         {
-          "name": "ownershipRoot",
+          "name": "ownership_root",
           "writable": true,
           "pda": {
             "seeds": [
@@ -11339,7 +11347,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet"
+                "path": "zone_set"
               }
             ]
           }
@@ -11350,17 +11358,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "snapshotCid",
+          "name": "snapshot_cid",
           "type": "string"
         },
         {
-          "name": "snapshotHash",
+          "name": "snapshot_hash",
           "type": {
             "array": [
               "u8",
@@ -11371,7 +11379,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rehabilitateRestriction",
+      "name": "rehabilitate_restriction",
       "discriminator": [
         161,
         98,
@@ -11412,17 +11420,17 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "report.accused",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.reporter",
-                "account": "fraudReport"
+                "account": "FraudReport"
               },
               {
                 "kind": "account",
                 "path": "report.nonce",
-                "account": "fraudReport"
+                "account": "FraudReport"
               }
             ]
           }
@@ -11471,14 +11479,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "removeValidatorFromRegistry",
+      "name": "remove_validator_from_registry",
       "discriminator": [
         62,
         197,
@@ -11495,7 +11503,7 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "adminSigner",
+          "name": "admin_signer",
           "signer": true
         },
         {
@@ -11552,7 +11560,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "renewRight",
+      "name": "renew_right",
       "discriminator": [
         244,
         248,
@@ -11586,7 +11594,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -11631,7 +11639,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -11641,17 +11649,17 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "newExpiresAt",
+          "name": "new_expires_at",
           "type": "i64"
         },
         {
-          "name": "newNotes",
+          "name": "new_notes",
           "type": "string"
         }
       ]
     },
     {
-      "name": "reportEquivocation",
+      "name": "report_equivocation",
       "discriminator": [
         140,
         250,
@@ -11664,7 +11672,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "pda": {
             "seeds": [
               {
@@ -11684,13 +11692,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -11720,7 +11728,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "offenderStake",
+          "name": "offender_stake",
           "pda": {
             "seeds": [
               {
@@ -11745,18 +11753,18 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "offenderStake.validator",
-                "account": "validatorStake"
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
               }
             ]
           }
         },
         {
-          "name": "slashingReport",
+          "name": "slashing_report",
           "writable": true,
           "pda": {
             "seeds": [
@@ -11782,7 +11790,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -11790,7 +11798,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "evidenceHash"
+                "path": "evidence_hash"
               }
             ]
           }
@@ -11801,13 +11809,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -11816,7 +11824,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "offenseDetails",
+          "name": "offense_details",
           "type": {
             "array": [
               "u8",
@@ -11827,7 +11835,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reportValidatorOffense",
+      "name": "report_validator_offense",
       "discriminator": [
         26,
         28,
@@ -11840,7 +11848,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "pda": {
             "seeds": [
               {
@@ -11860,13 +11868,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -11896,7 +11904,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "offenderStake",
+          "name": "offender_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -11922,18 +11930,18 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "offenderStake.validator",
-                "account": "validatorStake"
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
               }
             ]
           }
         },
         {
-          "name": "slashingReport",
+          "name": "slashing_report",
           "writable": true,
           "pda": {
             "seeds": [
@@ -11959,7 +11967,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -11967,7 +11975,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "evidenceHash"
+                "path": "evidence_hash"
               }
             ]
           }
@@ -11978,17 +11986,17 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "offenseKind",
+          "name": "offense_kind",
           "type": "u8"
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -11997,7 +12005,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "offenseDetails",
+          "name": "offense_details",
           "type": {
             "array": [
               "u8",
@@ -12008,7 +12016,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "requestCredential",
+      "name": "request_credential",
       "discriminator": [
         250,
         55,
@@ -12021,7 +12029,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "credentialRequest",
+          "name": "credential_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -12050,7 +12058,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "requestHash"
+                "path": "request_hash"
               }
             ]
           }
@@ -12086,7 +12094,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "regionRegistry"
+          "name": "region_registry"
         },
         {
           "name": "prover",
@@ -12094,13 +12102,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "requestHash",
+          "name": "request_hash",
           "type": {
             "array": [
               "u8",
@@ -12113,13 +12121,13 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "disclosureType",
+          "name": "disclosure_type",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "requestGenesis",
+      "name": "request_genesis",
       "discriminator": [
         21,
         184,
@@ -12132,7 +12140,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "genesisRequest",
+          "name": "genesis_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -12158,13 +12166,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "countryCode"
+                "path": "country_code"
               }
             ]
           }
         },
         {
-          "name": "worldRegistry",
+          "name": "world_registry",
           "pda": {
             "seeds": [
               {
@@ -12195,13 +12203,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "countryCode",
+          "name": "country_code",
           "type": {
             "array": [
               "u8",
@@ -12212,7 +12220,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "resolveGuardianClaim",
+      "name": "resolve_guardian_claim",
       "discriminator": [
         125,
         182,
@@ -12225,7 +12233,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "guardianClaim",
+          "name": "guardian_claim",
           "writable": true,
           "pda": {
             "seeds": [
@@ -12250,8 +12258,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "guardianClaim.claim",
-                "account": "guardianClaim"
+                "path": "guardian_claim.claim",
+                "account": "GuardianClaim"
               }
             ]
           }
@@ -12297,7 +12305,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "revokeCrossBorder",
+      "name": "revoke_cross_border",
       "discriminator": [
         32,
         235,
@@ -12310,7 +12318,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "crossBorderVerification",
+          "name": "cross_border_verification",
           "writable": true,
           "pda": {
             "seeds": [
@@ -12346,8 +12354,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "crossBorderVerification.binding",
-                "account": "crossBorderVerification"
+                "path": "cross_border_verification.binding",
+                "account": "CrossBorderVerification"
               }
             ]
           }
@@ -12389,7 +12397,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "revokeIdentityRight",
+      "name": "revoke_identity_right",
       "docs": [
         "Revoke an identity-based right. The original granter may revoke."
       ],
@@ -12423,13 +12431,13 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
         },
         {
-          "name": "identityRights",
+          "name": "identity_rights",
           "writable": true
         },
         {
@@ -12441,19 +12449,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "rightsKind",
+          "name": "rights_kind",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "revokeJurisdictionalIdentity",
+      "name": "revoke_jurisdictional_identity",
       "discriminator": [
         196,
         187,
@@ -12480,7 +12488,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -12492,13 +12500,13 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "revokeRight",
+      "name": "revoke_right",
       "docs": [
         "Revoke a previously granted (non-ownership) right. The current parcel",
         "holder or the original granter may revoke. The account is closed and",
         "its lamports returned. The parcel's rights counter is decremented so",
         "the freed nonce can be reused by a future grant (safe: the old account",
-        "no longer exists). The canonical ownership right is not revocable —",
+        "no longer exists). The canonical ownership right is not revocable \u2014",
         "it only moves via `transfer_parcel`."
       ],
       "discriminator": [
@@ -12531,7 +12539,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -12571,19 +12579,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "nonce",
+          "name": "_nonce",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "rotateDeviceKey",
+      "name": "rotate_device_key",
       "discriminator": [
         96,
         133,
@@ -12623,12 +12631,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "device.owner",
-                "account": "deviceIdentity"
+                "account": "DeviceIdentity"
               },
               {
                 "kind": "account",
-                "path": "device.deviceNonce",
-                "account": "deviceIdentity"
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
               }
             ]
           }
@@ -12640,13 +12648,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "newDeviceKey",
+          "name": "new_device_key",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "routeTask",
+      "name": "route_task",
       "discriminator": [
         10,
         69,
@@ -12685,11 +12693,11 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               },
               {
                 "kind": "arg",
-                "path": "chosen"
+                "path": "_chosen"
               }
             ]
           }
@@ -12710,7 +12718,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               }
             ]
           }
@@ -12730,14 +12738,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
           "name": "oracle"
         },
         {
-          "name": "vrfAuthority",
+          "name": "vrf_authority",
           "docs": [
             "Admin-allowlisted VRF authority. `route_task` requires `oracle` to",
             "match this account's `authority` field."
@@ -12775,7 +12783,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -12784,7 +12792,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "reqIndex",
+          "name": "req_index",
           "type": "u8"
         },
         {
@@ -12798,11 +12806,11 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "competitorCount",
+          "name": "competitor_count",
           "type": "u16"
         },
         {
-          "name": "vrfRandomness",
+          "name": "vrf_randomness",
           "type": {
             "array": [
               "u8",
@@ -12811,7 +12819,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "oracleSignature",
+          "name": "oracle_signature",
           "type": {
             "array": [
               "u8",
@@ -12822,7 +12830,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "setCoverageIncentive",
+      "name": "set_coverage_incentive",
       "discriminator": [
         240,
         111,
@@ -12835,7 +12843,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "coverageIncentive",
+          "name": "coverage_incentive",
           "writable": true,
           "pda": {
             "seeds": [
@@ -12901,35 +12909,35 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "demandBps",
+          "name": "demand_bps",
           "type": "u16"
         },
         {
-          "name": "deficitBps",
+          "name": "deficit_bps",
           "type": "u16"
         },
         {
-          "name": "difficultyBps",
+          "name": "difficulty_bps",
           "type": "u16"
         },
         {
-          "name": "strategicBps",
+          "name": "strategic_bps",
           "type": "u16"
         },
         {
-          "name": "maxSubsidyBps",
+          "name": "max_subsidy_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "setCrossBorderBindingStatus",
+      "name": "set_cross_border_binding_status",
       "discriminator": [
         192,
         154,
@@ -12946,10 +12954,10 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "jurisdictionMin"
+          "name": "jurisdiction_min"
         },
         {
-          "name": "jurisdictionMax"
+          "name": "jurisdiction_max"
         },
         {
           "name": "authority",
@@ -12964,7 +12972,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "setDeviceCalibration",
+      "name": "set_device_calibration",
       "discriminator": [
         117,
         26,
@@ -13004,12 +13012,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "device.owner",
-                "account": "deviceIdentity"
+                "account": "DeviceIdentity"
               },
               {
                 "kind": "account",
-                "path": "device.deviceNonce",
-                "account": "deviceIdentity"
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
               }
             ]
           }
@@ -13021,7 +13029,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "calibrationHash",
+          "name": "calibration_hash",
           "type": {
             "array": [
               "u8",
@@ -13030,13 +13038,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "calibratedAt",
+          "name": "calibrated_at",
           "type": "i64"
         }
       ]
     },
     {
-      "name": "setDeviceStatus",
+      "name": "set_device_status",
       "discriminator": [
         151,
         78,
@@ -13076,12 +13084,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "device.owner",
-                "account": "deviceIdentity"
+                "account": "DeviceIdentity"
               },
               {
                 "kind": "account",
-                "path": "device.deviceNonce",
-                "account": "deviceIdentity"
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
               }
             ]
           }
@@ -13099,7 +13107,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "setFeePolicy",
+      "name": "set_fee_policy",
       "discriminator": [
         91,
         32,
@@ -13112,7 +13120,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "feePolicy",
+          "name": "fee_policy",
           "writable": true,
           "pda": {
             "seeds": [
@@ -13170,19 +13178,19 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "feeBps",
+          "name": "fee_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "setQuorumConfig",
+      "name": "set_quorum_config",
       "discriminator": [
         10,
         126,
@@ -13234,13 +13242,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "parcelType",
+          "name": "parcel_type",
           "type": "u8"
         },
         {
@@ -13253,17 +13261,17 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "requiredAttestations",
+          "name": "required_attestations",
           "type": "u8"
         },
         {
-          "name": "requiredConfidence",
+          "name": "required_confidence",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "setValidatorActive",
+      "name": "set_validator_active",
       "discriminator": [
         211,
         189,
@@ -13276,7 +13284,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "activityTracker",
+          "name": "activity_tracker",
           "writable": true,
           "pda": {
             "seeds": [
@@ -13324,7 +13332,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -13334,13 +13342,13 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "isActive",
+          "name": "is_active",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "setValidatorAvailability",
+      "name": "set_validator_availability",
       "discriminator": [
         136,
         107,
@@ -13387,7 +13395,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -13431,7 +13439,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -13443,7 +13451,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "setValidatorJurisdiction",
+      "name": "set_validator_jurisdiction",
       "docs": [
         "Declare / update the validator's operating jurisdiction (RFC-012 Phase 10)."
       ],
@@ -13510,7 +13518,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "setValidatorPresence",
+      "name": "set_validator_presence",
       "discriminator": [
         201,
         97,
@@ -13553,7 +13561,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -13597,21 +13605,21 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "latitudeE7",
+          "name": "latitude_e7",
           "type": "i32"
         },
         {
-          "name": "longitudeE7",
+          "name": "longitude_e7",
           "type": "i32"
         },
         {
-          "name": "accuracyM",
+          "name": "accuracy_m",
           "type": "u16"
         },
         {
@@ -13619,13 +13627,13 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "confidenceBps",
+          "name": "confidence_bps",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "setValidatorProfileTier",
+      "name": "set_validator_profile_tier",
       "discriminator": [
         95,
         3,
@@ -13667,7 +13675,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -13715,7 +13723,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "settleEscrow",
+      "name": "settle_escrow",
       "discriminator": [
         22,
         135,
@@ -13728,7 +13736,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "escrowRecord",
+          "name": "escrow_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -13751,7 +13759,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "escrowVault",
+          "name": "escrow_vault",
           "writable": true,
           "pda": {
             "seeds": [
@@ -13774,7 +13782,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "escrowRecord"
+                "path": "escrow_record"
               }
             ]
           }
@@ -13798,7 +13806,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -13844,14 +13852,14 @@ export type TerraRegistry = {
           "writable": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "signCredential",
+      "name": "sign_credential",
       "discriminator": [
         43,
         172,
@@ -13864,7 +13872,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "credentialRequest",
+          "name": "credential_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -13893,8 +13901,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "credentialRequest.requestHash",
-                "account": "credentialRequest"
+                "path": "credential_request.request_hash",
+                "account": "CredentialRequest"
               }
             ]
           }
@@ -13930,14 +13938,14 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "validatorSigner",
+          "name": "validator_signer",
           "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "slashValidator",
+      "name": "slash_validator",
       "discriminator": [
         238,
         57,
@@ -13982,7 +13990,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "reputation.validator",
-                "account": "validatorReputation"
+                "account": "ValidatorReputation"
               }
             ]
           }
@@ -14024,13 +14032,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "reputationPenalty",
+          "name": "reputation_penalty",
           "type": "u16"
         }
       ]
     },
     {
-      "name": "subdivideParcel",
+      "name": "subdivide_parcel",
       "discriminator": [
         179,
         231,
@@ -14043,7 +14051,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "originalParcel",
+          "name": "original_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -14060,8 +14068,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "originalParcel.id",
-                "account": "parcel"
+                "path": "original_parcel.id",
+                "account": "Parcel"
               }
             ]
           }
@@ -14089,13 +14097,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "originalParcel"
+                "path": "original_parcel"
               }
             ]
           }
         },
         {
-          "name": "subParcel",
+          "name": "sub_parcel",
           "writable": true,
           "pda": {
             "seeds": [
@@ -14112,15 +14120,15 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "newId"
+                "path": "new_id"
               }
             ]
           }
         },
         {
-          "name": "subOwnership",
+          "name": "sub_ownership",
           "docs": [
-            "The sub-parcel's canonical ownership right — inherited from the",
+            "The sub-parcel's canonical ownership right \u2014 inherited from the",
             "original parcel's holder in the same instruction."
           ],
           "writable": true,
@@ -14142,13 +14150,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "subParcel"
+                "path": "sub_parcel"
               }
             ]
           }
         },
         {
-          "name": "subdivisionRecord",
+          "name": "subdivision_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -14170,11 +14178,11 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "originalParcel"
+                "path": "original_parcel"
               },
               {
                 "kind": "account",
-                "path": "subParcel"
+                "path": "sub_parcel"
               }
             ]
           }
@@ -14183,7 +14191,7 @@ export type TerraRegistry = {
           "name": "claim",
           "docs": [
             "Verified surveyor claim for the original parcel: the surveyor flow",
-            "(`create_claim(SUBDIVISION) → evidence → observations → verify_claim`)",
+            "(`create_claim(SUBDIVISION) \u2192 evidence \u2192 observations \u2192 verify_claim`)",
             "replaces the deprecated parcel-`Attestation` gate."
           ],
           "pda": {
@@ -14200,11 +14208,11 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "originalParcel"
+                "path": "original_parcel"
               },
               {
                 "kind": "arg",
-                "path": "claimId"
+                "path": "claim_id"
               }
             ]
           }
@@ -14215,13 +14223,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newId",
+          "name": "new_id",
           "type": {
             "array": [
               "u8",
@@ -14230,11 +14238,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newName",
+          "name": "new_name",
           "type": "string"
         },
         {
-          "name": "newGeometryHash",
+          "name": "new_geometry_hash",
           "type": {
             "array": [
               "u8",
@@ -14243,7 +14251,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "claimId",
+          "name": "claim_id",
           "type": {
             "array": [
               "u8",
@@ -14254,7 +14262,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitEvidenceManifest",
+      "name": "submit_evidence_manifest",
       "discriminator": [
         232,
         67,
@@ -14295,7 +14303,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               },
               {
                 "kind": "account",
@@ -14323,7 +14331,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               }
             ]
           }
@@ -14334,13 +14342,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -14357,7 +14365,7 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "rootHash",
+          "name": "root_hash",
           "type": {
             "array": [
               "u8",
@@ -14368,7 +14376,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitFraudReport",
+      "name": "submit_fraud_report",
       "discriminator": [
         31,
         239,
@@ -14426,7 +14434,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -14436,7 +14444,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -14445,7 +14453,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "reasonCode",
+          "name": "reason_code",
           "type": "u8"
         },
         {
@@ -14453,13 +14461,13 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "capabilityCode",
+          "name": "capability_code",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "submitJurisdictionalRestriction",
+      "name": "submit_jurisdictional_restriction",
       "discriminator": [
         171,
         42,
@@ -14520,7 +14528,7 @@ export type TerraRegistry = {
           ]
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -14530,7 +14538,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "restrictionType",
+          "name": "restriction_type",
           "type": "u8"
         },
         {
@@ -14538,7 +14546,7 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "requestedRemedy",
+          "name": "requested_remedy",
           "type": "u8"
         },
         {
@@ -14551,7 +14559,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "expiresAt",
+          "name": "expires_at",
           "type": {
             "option": "i64"
           }
@@ -14559,7 +14567,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitObservation",
+      "name": "submit_observation",
       "discriminator": [
         109,
         4,
@@ -14621,12 +14629,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -14637,7 +14645,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -14656,7 +14664,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "findingsHash",
+          "name": "findings_hash",
           "type": {
             "array": [
               "u8",
@@ -14669,7 +14677,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "signatureHash",
+          "name": "signature_hash",
           "type": {
             "array": [
               "u8",
@@ -14680,7 +14688,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitObservationV2",
+      "name": "submit_observation_v2",
       "discriminator": [
         255,
         214,
@@ -14718,7 +14726,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               },
               {
                 "kind": "account",
@@ -14746,7 +14754,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "taskId"
+                "path": "task_id"
               }
             ]
           }
@@ -14760,13 +14768,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -14783,7 +14791,7 @@ export type TerraRegistry = {
           "type": "pubkey"
         },
         {
-          "name": "captureDevice",
+          "name": "capture_device",
           "type": "pubkey"
         },
         {
@@ -14804,11 +14812,11 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "observedAt",
+          "name": "observed_at",
           "type": "i64"
         },
         {
-          "name": "findingsHash",
+          "name": "findings_hash",
           "type": {
             "array": [
               "u8",
@@ -14817,7 +14825,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "evidenceHash",
+          "name": "evidence_hash",
           "type": {
             "array": [
               "u8",
@@ -14830,7 +14838,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "signatureHash",
+          "name": "signature_hash",
           "type": {
             "array": [
               "u8",
@@ -14841,7 +14849,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitPrivacyRequest",
+      "name": "submit_privacy_request",
       "discriminator": [
         73,
         68,
@@ -14854,7 +14862,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "privacyRequest",
+          "name": "privacy_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -14905,7 +14913,7 @@ export type TerraRegistry = {
           ]
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -14915,7 +14923,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "requestType",
+          "name": "request_type",
           "type": "u8"
         },
         {
@@ -14923,7 +14931,7 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "requestedRemedy",
+          "name": "requested_remedy",
           "type": "u8"
         },
         {
@@ -14942,7 +14950,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitSecurityRequest",
+      "name": "submit_security_request",
       "discriminator": [
         151,
         173,
@@ -14955,7 +14963,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "securityRequest",
+          "name": "security_request",
           "writable": true,
           "pda": {
             "seeds": [
@@ -14997,7 +15005,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -15007,7 +15015,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "requestType",
+          "name": "request_type",
           "type": "u8"
         },
         {
@@ -15015,7 +15023,7 @@ export type TerraRegistry = {
           "type": "string"
         },
         {
-          "name": "requestedRemedy",
+          "name": "requested_remedy",
           "type": "u8"
         },
         {
@@ -15034,7 +15042,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitTaskResult",
+      "name": "submit_task_result",
       "discriminator": [
         39,
         108,
@@ -15073,13 +15081,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               },
               {
                 "kind": "account",
                 "path": "assignment.validator",
-                "account": "taskAssignment"
+                "account": "TaskAssignment"
               }
             ]
           }
@@ -15100,8 +15108,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "task.taskId",
-                "account": "verificationTask"
+                "path": "task.task_id",
+                "account": "VerificationTask"
               }
             ]
           }
@@ -15113,7 +15121,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "taskId",
+          "name": "task_id",
           "type": {
             "array": [
               "u8",
@@ -15126,7 +15134,7 @@ export type TerraRegistry = {
           "type": "u8"
         },
         {
-          "name": "resultHash",
+          "name": "result_hash",
           "type": {
             "array": [
               "u8",
@@ -15137,7 +15145,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "submitVerificationAttestation",
+      "name": "submit_verification_attestation",
       "discriminator": [
         104,
         215,
@@ -15212,12 +15220,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -15259,29 +15267,29 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "vcType",
+          "name": "vc_type",
           "type": "string"
         },
         {
-          "name": "credentialSubject",
+          "name": "credential_subject",
           "type": "pubkey"
         },
         {
-          "name": "issuanceDate",
+          "name": "issuance_date",
           "type": "i64"
         },
         {
-          "name": "expirationDate",
+          "name": "expiration_date",
           "type": "i64"
         },
         {
-          "name": "sdJwtDigest",
+          "name": "sd_jwt_digest",
           "type": {
             "array": [
               "u8",
@@ -15290,13 +15298,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "selectiveDisclosure",
+          "name": "selective_disclosure",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "suspendObserver",
+      "name": "suspend_observer",
       "discriminator": [
         187,
         179,
@@ -15329,7 +15337,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "observer.wallet",
-                "account": "observer"
+                "account": "Observer"
               }
             ]
           }
@@ -15371,7 +15379,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "suspendValidatorAvailability",
+      "name": "suspend_validator_availability",
       "discriminator": [
         202,
         137,
@@ -15418,7 +15426,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -15452,7 +15460,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "profile.wallet",
-                "account": "validatorProfile"
+                "account": "ValidatorProfile"
               }
             ]
           }
@@ -15493,14 +15501,14 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "sweepExpiredRights",
+      "name": "sweep_expired_rights",
       "discriminator": [
         174,
         5,
@@ -15534,7 +15542,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -15569,7 +15577,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -15581,7 +15589,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "transferParcel",
+      "name": "transfer_parcel",
       "docs": [
         "Transfer the ownership right of a parcel to `new_owner`. Only the",
         "current holder can sign (wallet holder or, via the identity overlay,",
@@ -15617,7 +15625,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -15653,13 +15661,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "newOwner"
+          "name": "new_owner"
         }
       ],
       "args": []
     },
     {
-      "name": "unpauseProgram",
+      "name": "unpause_program",
       "discriminator": [
         43,
         162,
@@ -15683,7 +15691,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "updateDevice",
+      "name": "update_device",
       "discriminator": [
         30,
         154,
@@ -15723,12 +15731,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "device.owner",
-                "account": "deviceIdentity"
+                "account": "DeviceIdentity"
               },
               {
                 "kind": "account",
-                "path": "device.deviceNonce",
-                "account": "deviceIdentity"
+                "path": "device.device_nonce",
+                "account": "DeviceIdentity"
               }
             ]
           }
@@ -15744,13 +15752,13 @@ export type TerraRegistry = {
           "type": "u64"
         },
         {
-          "name": "metadataRef",
+          "name": "metadata_ref",
           "type": "string"
         }
       ]
     },
     {
-      "name": "updateInfrastructure",
+      "name": "update_infrastructure",
       "docs": [
         "Set the parcel's infrastructure flag bitmask together with the canonical",
         "access digest produced by the off-chain validation engine. Holder-only.",
@@ -15788,7 +15796,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -15829,7 +15837,7 @@ export type TerraRegistry = {
           "type": "u16"
         },
         {
-          "name": "accessHash",
+          "name": "access_hash",
           "type": {
             "array": [
               "u8",
@@ -15840,7 +15848,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "updateJurisdiction",
+      "name": "update_jurisdiction",
       "discriminator": [
         172,
         83,
@@ -15861,13 +15869,13 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "newVerificationKeyHash",
+          "name": "new_verification_key_hash",
           "type": {
             "option": {
               "array": [
@@ -15878,13 +15886,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "newRevocationRegistry",
+          "name": "new_revocation_registry",
           "type": {
             "option": "pubkey"
           }
         },
         {
-          "name": "newStatus",
+          "name": "new_status",
           "type": {
             "option": "u8"
           }
@@ -15892,7 +15900,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "updateStatus",
+      "name": "update_status",
       "docs": [
         "Update a parcel's status (e.g. for-sale). Holder-only."
       ],
@@ -15926,7 +15934,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "parcel.id",
-                "account": "parcel"
+                "account": "Parcel"
               }
             ]
           }
@@ -15969,7 +15977,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "updateValidatorProfile",
+      "name": "update_validator_profile",
       "discriminator": [
         31,
         20,
@@ -16022,7 +16030,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "identityHash",
+          "name": "identity_hash",
           "type": {
             "array": [
               "u8",
@@ -16037,7 +16045,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "updateVerificationKeyHash",
+      "name": "update_verification_key_hash",
       "discriminator": [
         139,
         196,
@@ -16050,7 +16058,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "zoneSet",
+          "name": "zone_set",
           "pda": {
             "seeds": [
               {
@@ -16068,14 +16076,14 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet.zoneId",
-                "account": "zoneSet"
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
               }
             ]
           }
         },
         {
-          "name": "ownershipRoot",
+          "name": "ownership_root",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16100,7 +16108,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet"
+                "path": "zone_set"
               }
             ]
           }
@@ -16142,7 +16150,7 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "newVerificationKeyHash",
+          "name": "new_verification_key_hash",
           "type": {
             "array": [
               "u8",
@@ -16153,10 +16161,10 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verify3dModel",
+      "name": "verify_3d_model",
       "docs": [
         "A registered validator attests a registered model's hash",
-        "(claim → fact, same split as geometry verification)."
+        "(claim \u2192 fact, same split as geometry verification)."
       ],
       "discriminator": [
         218,
@@ -16195,12 +16203,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "model.asset",
-                "account": "threeDModel"
+                "account": "ThreeDModel"
               },
               {
                 "kind": "account",
-                "path": "model.modelVersion",
-                "account": "threeDModel"
+                "path": "model.model_version",
+                "account": "ThreeDModel"
               }
             ]
           }
@@ -16246,7 +16254,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyAndSlash",
+      "name": "verify_and_slash",
       "discriminator": [
         247,
         117,
@@ -16259,7 +16267,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "slashingReport",
+          "name": "slashing_report",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16285,23 +16293,23 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.reporter",
-                "account": "slashingReport"
+                "path": "slashing_report.reporter",
+                "account": "SlashingReport"
               },
               {
                 "kind": "account",
-                "path": "slashingReport.evidenceHash",
-                "account": "slashingReport"
+                "path": "slashing_report.evidence_hash",
+                "account": "SlashingReport"
               }
             ]
           }
         },
         {
-          "name": "offenderStake",
+          "name": "offender_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16327,18 +16335,18 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
-                "path": "offenderStake.validator",
-                "account": "validatorStake"
+                "path": "offender_stake.validator",
+                "account": "ValidatorStake"
               }
             ]
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16359,13 +16367,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -16402,7 +16410,7 @@ export type TerraRegistry = {
           "name": "treasury",
           "docs": [
             "Treasury PDA receiving slashed lamports. Constrained to a deterministic",
-            "PDA derived from the authority registry — no one can redirect funds to",
+            "PDA derived from the authority registry \u2014 no one can redirect funds to",
             "an arbitrary wallet."
           ],
           "writable": true,
@@ -16423,7 +16431,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
@@ -16437,7 +16445,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyClaim",
+      "name": "verify_claim",
       "discriminator": [
         35,
         121,
@@ -16467,12 +16475,12 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "claim.parcel",
-                "account": "claim"
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claim.claimId",
-                "account": "claim"
+                "path": "claim.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -16481,7 +16489,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyCredential",
+      "name": "verify_credential",
       "discriminator": [
         139,
         189,
@@ -16494,11 +16502,11 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "thresholdCredential",
+          "name": "threshold_credential",
           "writable": true
         },
         {
-          "name": "nullifierRecord",
+          "name": "nullifier_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16529,8 +16537,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "thresholdCredential.nullifierHash",
-                "account": "thresholdCredential"
+                "path": "threshold_credential.nullifier_hash",
+                "account": "ThresholdCredential"
               }
             ]
           }
@@ -16571,7 +16579,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
@@ -16584,13 +16592,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "proofData",
+          "name": "proof_data",
           "type": "bytes"
         }
       ]
     },
     {
-      "name": "verifyCrossBorder",
+      "name": "verify_cross_border",
       "discriminator": [
         84,
         43,
@@ -16603,7 +16611,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "crossBorderVerification",
+          "name": "cross_border_verification",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16639,8 +16647,8 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "crossBorderVerification.binding",
-                "account": "crossBorderVerification"
+                "path": "cross_border_verification.binding",
+                "account": "CrossBorderVerification"
               }
             ]
           }
@@ -16686,7 +16694,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyDevice",
+      "name": "verify_device",
       "discriminator": [
         103,
         113,
@@ -16743,7 +16751,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyGeometryVersion",
+      "name": "verify_geometry_version",
       "docs": [
         "A registered validator attests the version; `verified` flips when",
         "the append-time quorum threshold is reached (RFC-013 Phase B)."
@@ -16760,7 +16768,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "geometryVersion",
+          "name": "geometry_version",
           "writable": true,
           "pda": {
             "seeds": [
@@ -16787,13 +16795,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "geometryVersion.asset",
-                "account": "geometryVersion"
+                "path": "geometry_version.asset",
+                "account": "GeometryVersion"
               },
               {
                 "kind": "account",
-                "path": "geometryVersion.version",
-                "account": "geometryVersion"
+                "path": "geometry_version.version",
+                "account": "GeometryVersion"
               }
             ]
           }
@@ -16824,7 +16832,7 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "asset.parcel",
-                "account": "spatialAsset"
+                "account": "SpatialAsset"
               }
             ]
           }
@@ -16870,7 +16878,7 @@ export type TerraRegistry = {
       "args": []
     },
     {
-      "name": "verifyJurisdictionMembership",
+      "name": "verify_jurisdiction_membership",
       "discriminator": [
         130,
         50,
@@ -16927,13 +16935,13 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "offChainNonce",
+          "name": "off_chain_nonce",
           "type": {
             "array": [
               "u8",
@@ -16944,7 +16952,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verifyOwnershipProof",
+      "name": "verify_ownership_proof",
       "discriminator": [
         114,
         247,
@@ -16957,7 +16965,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "zoneSet",
+          "name": "zone_set",
           "pda": {
             "seeds": [
               {
@@ -16975,14 +16983,14 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet.zoneId",
-                "account": "zoneSet"
+                "path": "zone_set.zone_id",
+                "account": "ZoneSet"
               }
             ]
           }
         },
         {
-          "name": "ownershipRoot",
+          "name": "ownership_root",
           "pda": {
             "seeds": [
               {
@@ -17006,13 +17014,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "zoneSet"
+                "path": "zone_set"
               }
             ]
           }
         },
         {
-          "name": "nullifierRecord",
+          "name": "nullifier_record",
           "writable": true,
           "pda": {
             "seeds": [
@@ -17032,7 +17040,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "arg",
-                "path": "nullifierHash"
+                "path": "nullifier_hash"
               }
             ]
           }
@@ -17046,7 +17054,7 @@ export type TerraRegistry = {
           "name": "authority",
           "docs": [
             "Zone authority co-sign: every accepted proof is explicitly attested.",
-            "`proof_data` is a framed v1 payload (RFC-011 §6.3): the prover's",
+            "`proof_data` is a framed v1 payload (RFC-011 \u00a76.3): the prover's",
             "Ed25519 statement signature, the hash-pinned Groth16 verification",
             "key, and the Groth16 proof verified via the `alt_bn128` group",
             "operations syscalls. The production membership circuit and trusted",
@@ -17055,7 +17063,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
@@ -17068,11 +17076,11 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "proofData",
+          "name": "proof_data",
           "type": "bytes"
         },
         {
-          "name": "nullifierHash",
+          "name": "nullifier_hash",
           "type": {
             "array": [
               "u8",
@@ -17081,21 +17089,21 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "rootVersion",
+          "name": "root_version",
           "type": "u32"
         },
         {
-          "name": "proofPurpose",
+          "name": "proof_purpose",
           "type": "string"
         },
         {
-          "name": "disclosureType",
+          "name": "disclosure_type",
           "type": "u8"
         }
       ]
     },
     {
-      "name": "voteChallenge",
+      "name": "vote_challenge",
       "discriminator": [
         198,
         76,
@@ -17129,18 +17137,18 @@ export type TerraRegistry = {
               {
                 "kind": "account",
                 "path": "challenge.claim",
-                "account": "challenge"
+                "account": "Challenge"
               },
               {
                 "kind": "account",
                 "path": "challenge.challenger",
-                "account": "challenge"
+                "account": "Challenge"
               }
             ]
           }
         },
         {
-          "name": "claimAccount",
+          "name": "claim_account",
           "writable": true,
           "pda": {
             "seeds": [
@@ -17156,13 +17164,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "claimAccount.parcel",
-                "account": "claim"
+                "path": "claim_account.parcel",
+                "account": "Claim"
               },
               {
                 "kind": "account",
-                "path": "claimAccount.claimId",
-                "account": "claim"
+                "path": "claim_account.claim_id",
+                "account": "Claim"
               }
             ]
           }
@@ -17204,13 +17212,13 @@ export type TerraRegistry = {
       ],
       "args": [
         {
-          "name": "voteUphold",
+          "name": "vote_uphold",
           "type": "bool"
         }
       ]
     },
     {
-      "name": "withdrawStake",
+      "name": "withdraw_stake",
       "discriminator": [
         153,
         8,
@@ -17223,7 +17231,7 @@ export type TerraRegistry = {
       ],
       "accounts": [
         {
-          "name": "validatorStake",
+          "name": "validator_stake",
           "writable": true,
           "pda": {
             "seeds": [
@@ -17249,7 +17257,7 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "stakePool"
+                "path": "stake_pool"
               },
               {
                 "kind": "account",
@@ -17259,7 +17267,7 @@ export type TerraRegistry = {
           }
         },
         {
-          "name": "stakePool",
+          "name": "stake_pool",
           "writable": true,
           "pda": {
             "seeds": [
@@ -17280,13 +17288,13 @@ export type TerraRegistry = {
               },
               {
                 "kind": "account",
-                "path": "regionRegistry"
+                "path": "region_registry"
               }
             ]
           }
         },
         {
-          "name": "regionRegistry",
+          "name": "region_registry",
           "pda": {
             "seeds": [
               {
@@ -17321,7 +17329,7 @@ export type TerraRegistry = {
           "signer": true
         },
         {
-          "name": "systemProgram",
+          "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -17330,7 +17338,7 @@ export type TerraRegistry = {
   ],
   "accounts": [
     {
-      "name": "amalgamationRecord",
+      "name": "AmalgamationRecord",
       "discriminator": [
         4,
         242,
@@ -17343,7 +17351,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "appeal",
+      "name": "Appeal",
       "discriminator": [
         155,
         196,
@@ -17356,7 +17364,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "auditEntry",
+      "name": "AuditEntry",
       "discriminator": [
         254,
         88,
@@ -17369,7 +17377,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "capabilityRestriction",
+      "name": "CapabilityRestriction",
       "discriminator": [
         74,
         254,
@@ -17382,7 +17390,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "challenge",
+      "name": "Challenge",
       "discriminator": [
         119,
         250,
@@ -17395,7 +17403,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claim",
+      "name": "Claim",
       "discriminator": [
         155,
         70,
@@ -17408,7 +17416,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claimSessionTracker",
+      "name": "ClaimSessionTracker",
       "discriminator": [
         210,
         191,
@@ -17421,7 +17429,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "coverageIncentive",
+      "name": "CoverageIncentive",
       "discriminator": [
         122,
         104,
@@ -17434,7 +17442,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialNullifier",
+      "name": "CredentialNullifier",
       "discriminator": [
         242,
         184,
@@ -17447,7 +17455,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialRequest",
+      "name": "CredentialRequest",
       "discriminator": [
         13,
         77,
@@ -17460,7 +17468,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderBinding",
+      "name": "CrossBorderBinding",
       "discriminator": [
         90,
         184,
@@ -17473,7 +17481,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderSpanRecord",
+      "name": "CrossBorderSpanRecord",
       "discriminator": [
         224,
         66,
@@ -17486,7 +17494,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderVerification",
+      "name": "CrossBorderVerification",
       "discriminator": [
         183,
         6,
@@ -17499,7 +17507,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceIdentity",
+      "name": "DeviceIdentity",
       "discriminator": [
         6,
         98,
@@ -17512,7 +17520,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "dispute",
+      "name": "Dispute",
       "discriminator": [
         36,
         49,
@@ -17525,7 +17533,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyInjection",
+      "name": "EmergencyInjection",
       "discriminator": [
         101,
         247,
@@ -17538,7 +17546,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyProtection",
+      "name": "EmergencyProtection",
       "discriminator": [
         172,
         134,
@@ -17551,7 +17559,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowRecord",
+      "name": "EscrowRecord",
       "discriminator": [
         174,
         124,
@@ -17564,7 +17572,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidence",
+      "name": "Evidence",
       "discriminator": [
         160,
         73,
@@ -17577,7 +17585,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidenceArtifact",
+      "name": "EvidenceArtifact",
       "discriminator": [
         18,
         40,
@@ -17590,7 +17598,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidenceManifest",
+      "name": "EvidenceManifest",
       "discriminator": [
         9,
         190,
@@ -17603,7 +17611,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "feePolicy",
+      "name": "FeePolicy",
       "discriminator": [
         98,
         183,
@@ -17616,7 +17624,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudReport",
+      "name": "FraudReport",
       "discriminator": [
         136,
         69,
@@ -17629,7 +17637,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "genesisRequest",
+      "name": "GenesisRequest",
       "discriminator": [
         37,
         134,
@@ -17642,7 +17650,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "geometryVersion",
+      "name": "GeometryVersion",
       "discriminator": [
         78,
         143,
@@ -17655,7 +17663,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "guardianClaim",
+      "name": "GuardianClaim",
       "discriminator": [
         75,
         164,
@@ -17668,7 +17676,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "identityRights",
+      "name": "IdentityRights",
       "discriminator": [
         80,
         133,
@@ -17681,7 +17689,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdiction",
+      "name": "Jurisdiction",
       "discriminator": [
         151,
         118,
@@ -17694,7 +17702,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionBinding",
+      "name": "JurisdictionBinding",
       "discriminator": [
         35,
         9,
@@ -17707,7 +17715,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionalRestrictionRequest",
+      "name": "JurisdictionalRestrictionRequest",
       "discriminator": [
         41,
         159,
@@ -17720,7 +17728,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "nullifierRecord",
+      "name": "NullifierRecord",
       "discriminator": [
         56,
         18,
@@ -17733,7 +17741,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observation",
+      "name": "Observation",
       "discriminator": [
         109,
         190,
@@ -17746,7 +17754,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observationV2",
+      "name": "ObservationV2",
       "discriminator": [
         194,
         12,
@@ -17759,7 +17767,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observer",
+      "name": "Observer",
       "discriminator": [
         82,
         255,
@@ -17772,7 +17780,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "ownershipRoot",
+      "name": "OwnershipRoot",
       "discriminator": [
         130,
         74,
@@ -17785,7 +17793,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcel",
+      "name": "Parcel",
       "discriminator": [
         149,
         167,
@@ -17798,7 +17806,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "privacyRequest",
+      "name": "PrivacyRequest",
       "discriminator": [
         108,
         60,
@@ -17811,7 +17819,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "privacyState",
+      "name": "PrivacyState",
       "discriminator": [
         57,
         131,
@@ -17824,7 +17832,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumConfig",
+      "name": "QuorumConfig",
       "discriminator": [
         20,
         13,
@@ -17837,7 +17845,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumTally",
+      "name": "QuorumTally",
       "discriminator": [
         224,
         79,
@@ -17850,7 +17858,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumVote",
+      "name": "QuorumVote",
       "discriminator": [
         6,
         0,
@@ -17863,7 +17871,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "resourceQuote",
+      "name": "ResourceQuote",
       "discriminator": [
         12,
         173,
@@ -17876,7 +17884,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reviewCase",
+      "name": "ReviewCase",
       "discriminator": [
         91,
         9,
@@ -17889,7 +17897,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rewardAllocation",
+      "name": "RewardAllocation",
       "discriminator": [
         126,
         230,
@@ -17902,7 +17910,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rights",
+      "name": "Rights",
       "discriminator": [
         79,
         187,
@@ -17915,7 +17923,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityAppeal",
+      "name": "SecurityAppeal",
       "discriminator": [
         125,
         1,
@@ -17928,7 +17936,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityAuditEvent",
+      "name": "SecurityAuditEvent",
       "discriminator": [
         20,
         158,
@@ -17941,7 +17949,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityDecision",
+      "name": "SecurityDecision",
       "discriminator": [
         205,
         222,
@@ -17954,7 +17962,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityRequest",
+      "name": "SecurityRequest",
       "discriminator": [
         85,
         161,
@@ -17967,7 +17975,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityReviewAssignment",
+      "name": "SecurityReviewAssignment",
       "discriminator": [
         179,
         187,
@@ -17980,7 +17988,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityReviewCase",
+      "name": "SecurityReviewCase",
       "discriminator": [
         65,
         3,
@@ -17993,7 +18001,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "slashingReport",
+      "name": "SlashingReport",
       "discriminator": [
         73,
         176,
@@ -18006,7 +18014,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "spatialAsset",
+      "name": "SpatialAsset",
       "discriminator": [
         143,
         133,
@@ -18019,7 +18027,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "spatialSnapshot",
+      "name": "SpatialSnapshot",
       "discriminator": [
         156,
         60,
@@ -18032,7 +18040,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "spatialSnapshotMeta",
+      "name": "SpatialSnapshotMeta",
       "discriminator": [
         123,
         54,
@@ -18045,7 +18053,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "stakePool",
+      "name": "StakePool",
       "discriminator": [
         121,
         34,
@@ -18058,7 +18066,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "subdivisionRecord",
+      "name": "SubdivisionRecord",
       "discriminator": [
         9,
         214,
@@ -18071,7 +18079,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskAssignment",
+      "name": "TaskAssignment",
       "discriminator": [
         89,
         239,
@@ -18084,7 +18092,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskEscrow",
+      "name": "TaskEscrow",
       "discriminator": [
         209,
         72,
@@ -18097,7 +18105,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskRequirement",
+      "name": "TaskRequirement",
       "discriminator": [
         70,
         172,
@@ -18110,7 +18118,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "threeDModel",
+      "name": "ThreeDModel",
       "discriminator": [
         117,
         174,
@@ -18123,7 +18131,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "threeDModelMeta",
+      "name": "ThreeDModelMeta",
       "discriminator": [
         231,
         80,
@@ -18136,7 +18144,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "thresholdCredential",
+      "name": "ThresholdCredential",
       "discriminator": [
         217,
         121,
@@ -18149,7 +18157,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorActivityTracker",
+      "name": "ValidatorActivityTracker",
       "discriminator": [
         45,
         51,
@@ -18162,7 +18170,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorAvailability",
+      "name": "ValidatorAvailability",
       "discriminator": [
         113,
         127,
@@ -18175,7 +18183,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorCapability",
+      "name": "ValidatorCapability",
       "discriminator": [
         119,
         194,
@@ -18188,7 +18196,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorEndorsement",
+      "name": "ValidatorEndorsement",
       "discriminator": [
         140,
         204,
@@ -18201,7 +18209,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorNomination",
+      "name": "ValidatorNomination",
       "discriminator": [
         210,
         142,
@@ -18214,7 +18222,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorPresence",
+      "name": "ValidatorPresence",
       "discriminator": [
         49,
         114,
@@ -18227,7 +18235,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorProfile",
+      "name": "ValidatorProfile",
       "discriminator": [
         50,
         223,
@@ -18240,7 +18248,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorRegistry",
+      "name": "ValidatorRegistry",
       "discriminator": [
         168,
         113,
@@ -18253,7 +18261,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorRelationshipEdge",
+      "name": "ValidatorRelationshipEdge",
       "discriminator": [
         128,
         240,
@@ -18266,7 +18274,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorReputation",
+      "name": "ValidatorReputation",
       "discriminator": [
         151,
         57,
@@ -18279,7 +18287,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorStake",
+      "name": "ValidatorStake",
       "discriminator": [
         95,
         210,
@@ -18292,7 +18300,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultRecord",
+      "name": "VaultRecord",
       "discriminator": [
         47,
         1,
@@ -18305,7 +18313,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultShardRotation",
+      "name": "VaultShardRotation",
       "discriminator": [
         33,
         187,
@@ -18318,7 +18326,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationAttestation",
+      "name": "VerificationAttestation",
       "discriminator": [
         231,
         126,
@@ -18331,7 +18339,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationSession",
+      "name": "VerificationSession",
       "discriminator": [
         247,
         69,
@@ -18344,7 +18352,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationTask",
+      "name": "VerificationTask",
       "discriminator": [
         96,
         182,
@@ -18357,7 +18365,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vrfAuthority",
+      "name": "VrfAuthority",
       "discriminator": [
         38,
         133,
@@ -18370,7 +18378,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "worldRegistry",
+      "name": "WorldRegistry",
       "discriminator": [
         222,
         41,
@@ -18383,7 +18391,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "zoneSet",
+      "name": "ZoneSet",
       "discriminator": [
         57,
         110,
@@ -18398,7 +18406,7 @@ export type TerraRegistry = {
   ],
   "events": [
     {
-      "name": "appealDecided",
+      "name": "AppealDecided",
       "discriminator": [
         112,
         92,
@@ -18411,7 +18419,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "appealFiled",
+      "name": "AppealFiled",
       "discriminator": [
         87,
         171,
@@ -18424,7 +18432,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "appealReviewOpened",
+      "name": "AppealReviewOpened",
       "discriminator": [
         158,
         228,
@@ -18437,7 +18445,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "auditEntryRecorded",
+      "name": "AuditEntryRecorded",
       "discriminator": [
         216,
         172,
@@ -18450,7 +18458,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "capabilityRestrictionApplied",
+      "name": "CapabilityRestrictionApplied",
       "discriminator": [
         224,
         226,
@@ -18463,7 +18471,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "capabilityRestrictionLifted",
+      "name": "CapabilityRestrictionLifted",
       "discriminator": [
         227,
         47,
@@ -18476,7 +18484,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "challengeFiled",
+      "name": "ChallengeFiled",
       "discriminator": [
         76,
         64,
@@ -18489,7 +18497,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "challengeResolved",
+      "name": "ChallengeResolved",
       "discriminator": [
         100,
         153,
@@ -18502,7 +18510,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "challengeVoteRecorded",
+      "name": "ChallengeVoteRecorded",
       "discriminator": [
         154,
         43,
@@ -18515,7 +18523,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claimCreated",
+      "name": "ClaimCreated",
       "discriminator": [
         12,
         137,
@@ -18528,7 +18536,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claimRejected",
+      "name": "ClaimRejected",
       "discriminator": [
         108,
         107,
@@ -18541,7 +18549,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "claimVerified",
+      "name": "ClaimVerified",
       "discriminator": [
         90,
         196,
@@ -18554,7 +18562,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "countryAllocated",
+      "name": "CountryAllocated",
       "discriminator": [
         194,
         247,
@@ -18567,7 +18575,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "coverageIncentiveSet",
+      "name": "CoverageIncentiveSet",
       "discriminator": [
         49,
         181,
@@ -18580,7 +18588,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialIssued",
+      "name": "CredentialIssued",
       "discriminator": [
         194,
         216,
@@ -18593,7 +18601,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialRequested",
+      "name": "CredentialRequested",
       "discriminator": [
         240,
         139,
@@ -18606,7 +18614,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialSigned",
+      "name": "CredentialSigned",
       "discriminator": [
         14,
         163,
@@ -18619,7 +18627,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "credentialVerified",
+      "name": "CredentialVerified",
       "discriminator": [
         242,
         32,
@@ -18632,7 +18640,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderBindingCreated",
+      "name": "CrossBorderBindingCreated",
       "discriminator": [
         16,
         33,
@@ -18645,7 +18653,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderBindingStatusChanged",
+      "name": "CrossBorderBindingStatusChanged",
       "discriminator": [
         107,
         106,
@@ -18658,7 +18666,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderIdentityBound",
+      "name": "CrossBorderIdentityBound",
       "discriminator": [
         19,
         25,
@@ -18671,7 +18679,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderIdentityRebound",
+      "name": "CrossBorderIdentityRebound",
       "discriminator": [
         7,
         57,
@@ -18684,7 +18692,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderLinked",
+      "name": "CrossBorderLinked",
       "discriminator": [
         85,
         22,
@@ -18697,7 +18705,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderRevoked",
+      "name": "CrossBorderRevoked",
       "discriminator": [
         56,
         162,
@@ -18710,7 +18718,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderVerificationRecorded",
+      "name": "CrossBorderVerificationRecorded",
       "discriminator": [
         255,
         211,
@@ -18723,7 +18731,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "crossBorderVerified",
+      "name": "CrossBorderVerified",
       "discriminator": [
         22,
         74,
@@ -18736,7 +18744,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceCalibrationSet",
+      "name": "DeviceCalibrationSet",
       "discriminator": [
         92,
         152,
@@ -18749,7 +18757,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceKeyRotated",
+      "name": "DeviceKeyRotated",
       "discriminator": [
         220,
         43,
@@ -18762,7 +18770,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceRegistered",
+      "name": "DeviceRegistered",
       "discriminator": [
         221,
         90,
@@ -18775,7 +18783,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceStatusChanged",
+      "name": "DeviceStatusChanged",
       "discriminator": [
         47,
         92,
@@ -18788,7 +18796,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceUpdated",
+      "name": "DeviceUpdated",
       "discriminator": [
         19,
         61,
@@ -18801,7 +18809,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "deviceVerified",
+      "name": "DeviceVerified",
       "discriminator": [
         119,
         100,
@@ -18814,7 +18822,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "disputeAdjudicated",
+      "name": "DisputeAdjudicated",
       "discriminator": [
         181,
         107,
@@ -18827,7 +18835,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "disputeCancelled",
+      "name": "DisputeCancelled",
       "discriminator": [
         38,
         80,
@@ -18840,7 +18848,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "disputeFiled",
+      "name": "DisputeFiled",
       "discriminator": [
         201,
         119,
@@ -18853,7 +18861,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyInjectionExecuted",
+      "name": "EmergencyInjectionExecuted",
       "discriminator": [
         66,
         71,
@@ -18866,7 +18874,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyInjectionQueued",
+      "name": "EmergencyInjectionQueued",
       "discriminator": [
         85,
         13,
@@ -18879,7 +18887,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyProtectionLifted",
+      "name": "EmergencyProtectionLifted",
       "discriminator": [
         8,
         25,
@@ -18892,7 +18900,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "emergencyProtectionStarted",
+      "name": "EmergencyProtectionStarted",
       "discriminator": [
         135,
         38,
@@ -18905,7 +18913,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "equivocationReported",
+      "name": "EquivocationReported",
       "discriminator": [
         136,
         91,
@@ -18918,7 +18926,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowAccepted",
+      "name": "EscrowAccepted",
       "discriminator": [
         129,
         122,
@@ -18931,7 +18939,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowCancelled",
+      "name": "EscrowCancelled",
       "discriminator": [
         98,
         241,
@@ -18944,7 +18952,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowCreated",
+      "name": "EscrowCreated",
       "discriminator": [
         70,
         127,
@@ -18957,7 +18965,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowDeposited",
+      "name": "EscrowDeposited",
       "discriminator": [
         28,
         193,
@@ -18970,7 +18978,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowDisputed",
+      "name": "EscrowDisputed",
       "discriminator": [
         132,
         73,
@@ -18983,7 +18991,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowExpired",
+      "name": "EscrowExpired",
       "discriminator": [
         189,
         22,
@@ -18996,7 +19004,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "escrowSettled",
+      "name": "EscrowSettled",
       "discriminator": [
         97,
         27,
@@ -19009,7 +19017,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidenceAdded",
+      "name": "EvidenceAdded",
       "discriminator": [
         124,
         213,
@@ -19022,7 +19030,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidenceArtifactAdded",
+      "name": "EvidenceArtifactAdded",
       "discriminator": [
         17,
         174,
@@ -19035,7 +19043,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "evidenceManifestSubmitted",
+      "name": "EvidenceManifestSubmitted",
       "discriminator": [
         239,
         142,
@@ -19048,7 +19056,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "feePolicySet",
+      "name": "FeePolicySet",
       "discriminator": [
         201,
         223,
@@ -19061,7 +19069,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudAppealDecided",
+      "name": "FraudAppealDecided",
       "discriminator": [
         24,
         216,
@@ -19074,7 +19082,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudAppealFiled",
+      "name": "FraudAppealFiled",
       "discriminator": [
         251,
         135,
@@ -19087,7 +19095,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudReportSubmitted",
+      "name": "FraudReportSubmitted",
       "discriminator": [
         18,
         15,
@@ -19100,7 +19108,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudReviewFinalized",
+      "name": "FraudReviewFinalized",
       "discriminator": [
         196,
         214,
@@ -19113,7 +19121,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudReviewOpened",
+      "name": "FraudReviewOpened",
       "discriminator": [
         35,
         186,
@@ -19126,7 +19134,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "fraudVoteCast",
+      "name": "FraudVoteCast",
       "discriminator": [
         30,
         73,
@@ -19139,7 +19147,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "genesisConfirmed",
+      "name": "GenesisConfirmed",
       "discriminator": [
         216,
         113,
@@ -19152,7 +19160,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "genesisFinalized",
+      "name": "GenesisFinalized",
       "discriminator": [
         95,
         88,
@@ -19165,7 +19173,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "genesisRequested",
+      "name": "GenesisRequested",
       "discriminator": [
         117,
         141,
@@ -19178,7 +19186,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "geometryVersionAppended",
+      "name": "GeometryVersionAppended",
       "discriminator": [
         80,
         64,
@@ -19191,7 +19199,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "geometryVersionAttested",
+      "name": "GeometryVersionAttested",
       "discriminator": [
         200,
         92,
@@ -19204,7 +19212,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "geometryVersionVerified",
+      "name": "GeometryVersionVerified",
       "discriminator": [
         169,
         60,
@@ -19217,7 +19225,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "guardianClaimCreated",
+      "name": "GuardianClaimCreated",
       "discriminator": [
         101,
         249,
@@ -19230,7 +19238,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "guardianClaimDisputed",
+      "name": "GuardianClaimDisputed",
       "discriminator": [
         54,
         233,
@@ -19243,7 +19251,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "guardianClaimResolved",
+      "name": "GuardianClaimResolved",
       "discriminator": [
         80,
         117,
@@ -19256,7 +19264,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "identityRightGranted",
+      "name": "IdentityRightGranted",
       "discriminator": [
         35,
         127,
@@ -19269,7 +19277,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "identityRightRevoked",
+      "name": "IdentityRightRevoked",
       "discriminator": [
         73,
         23,
@@ -19282,7 +19290,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "infrastructureUpdated",
+      "name": "InfrastructureUpdated",
       "discriminator": [
         198,
         12,
@@ -19295,7 +19303,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "judgmentExecuted",
+      "name": "JudgmentExecuted",
       "discriminator": [
         142,
         230,
@@ -19308,7 +19316,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionIdentityRevoked",
+      "name": "JurisdictionIdentityRevoked",
       "discriminator": [
         38,
         53,
@@ -19321,7 +19329,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionMembershipVerified",
+      "name": "JurisdictionMembershipVerified",
       "discriminator": [
         18,
         92,
@@ -19334,7 +19342,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionRegistered",
+      "name": "JurisdictionRegistered",
       "discriminator": [
         128,
         39,
@@ -19347,7 +19355,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionUpdated",
+      "name": "JurisdictionUpdated",
       "discriminator": [
         231,
         40,
@@ -19360,7 +19368,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "jurisdictionalRestrictionSubmitted",
+      "name": "JurisdictionalRestrictionSubmitted",
       "discriminator": [
         203,
         141,
@@ -19373,7 +19381,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "nominationConfirmed",
+      "name": "NominationConfirmed",
       "discriminator": [
         231,
         5,
@@ -19386,7 +19394,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observationSubmitted",
+      "name": "ObservationSubmitted",
       "discriminator": [
         108,
         255,
@@ -19399,7 +19407,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observationV2Submitted",
+      "name": "ObservationV2Submitted",
       "discriminator": [
         220,
         139,
@@ -19412,7 +19420,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observerRegistered",
+      "name": "ObserverRegistered",
       "discriminator": [
         33,
         248,
@@ -19425,7 +19433,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "observerStatusChanged",
+      "name": "ObserverStatusChanged",
       "discriminator": [
         144,
         198,
@@ -19438,7 +19446,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "ownershipProofVerified",
+      "name": "OwnershipProofVerified",
       "discriminator": [
         133,
         80,
@@ -19451,7 +19459,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "ownershipRootUpdated",
+      "name": "OwnershipRootUpdated",
       "discriminator": [
         194,
         16,
@@ -19464,7 +19472,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelAttached",
+      "name": "ParcelAttached",
       "discriminator": [
         92,
         181,
@@ -19477,7 +19485,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelForfeited",
+      "name": "ParcelForfeited",
       "discriminator": [
         169,
         221,
@@ -19490,7 +19498,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelFrozen",
+      "name": "ParcelFrozen",
       "discriminator": [
         1,
         224,
@@ -19503,7 +19511,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelRegistered",
+      "name": "ParcelRegistered",
       "discriminator": [
         135,
         44,
@@ -19516,7 +19524,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelSubdivided",
+      "name": "ParcelSubdivided",
       "discriminator": [
         226,
         169,
@@ -19529,7 +19537,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelTransferred",
+      "name": "ParcelTransferred",
       "discriminator": [
         242,
         85,
@@ -19542,7 +19550,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "parcelsAmalgamated",
+      "name": "ParcelsAmalgamated",
       "discriminator": [
         223,
         144,
@@ -19555,7 +19563,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "privacyRequestSubmitted",
+      "name": "PrivacyRequestSubmitted",
       "discriminator": [
         222,
         168,
@@ -19568,7 +19576,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "programPaused",
+      "name": "ProgramPaused",
       "discriminator": [
         247,
         9,
@@ -19581,7 +19589,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "programUnpaused",
+      "name": "ProgramUnpaused",
       "discriminator": [
         193,
         183,
@@ -19594,7 +19602,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "proofVersionInvalidated",
+      "name": "ProofVersionInvalidated",
       "discriminator": [
         218,
         103,
@@ -19607,7 +19615,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumConfigSet",
+      "name": "QuorumConfigSet",
       "discriminator": [
         127,
         51,
@@ -19620,7 +19628,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumReachabilityChecked",
+      "name": "QuorumReachabilityChecked",
       "discriminator": [
         50,
         201,
@@ -19633,7 +19641,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumReached",
+      "name": "QuorumReached",
       "discriminator": [
         234,
         207,
@@ -19646,7 +19654,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "quorumVoteCast",
+      "name": "QuorumVoteCast",
       "discriminator": [
         102,
         60,
@@ -19659,7 +19667,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "registryCreated",
+      "name": "RegistryCreated",
       "discriminator": [
         155,
         150,
@@ -19672,7 +19680,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reportDismissed",
+      "name": "ReportDismissed",
       "discriminator": [
         181,
         63,
@@ -19685,7 +19693,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reputationSlashed",
+      "name": "ReputationSlashed",
       "discriminator": [
         171,
         140,
@@ -19698,7 +19706,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reviewCaseCreated",
+      "name": "ReviewCaseCreated",
       "discriminator": [
         241,
         37,
@@ -19711,7 +19719,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reviewVoteCast",
+      "name": "ReviewVoteCast",
       "discriminator": [
         122,
         233,
@@ -19724,7 +19732,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "reviewerAssigned",
+      "name": "ReviewerAssigned",
       "discriminator": [
         167,
         205,
@@ -19737,7 +19745,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rewardsClaimed",
+      "name": "RewardsClaimed",
       "discriminator": [
         75,
         98,
@@ -19750,7 +19758,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rewardsDistributed",
+      "name": "RewardsDistributed",
       "discriminator": [
         11,
         43,
@@ -19763,7 +19771,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightGranted",
+      "name": "RightGranted",
       "discriminator": [
         251,
         86,
@@ -19776,7 +19784,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightRenewed",
+      "name": "RightRenewed",
       "discriminator": [
         55,
         0,
@@ -19789,7 +19797,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightRevoked",
+      "name": "RightRevoked",
       "discriminator": [
         67,
         219,
@@ -19802,7 +19810,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightStatusTransition",
+      "name": "RightStatusTransition",
       "discriminator": [
         75,
         178,
@@ -19815,7 +19823,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightsMigrated",
+      "name": "RightsMigrated",
       "discriminator": [
         105,
         144,
@@ -19828,7 +19836,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rightsMigrationComplete",
+      "name": "RightsMigrationComplete",
       "discriminator": [
         244,
         52,
@@ -19841,7 +19849,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "rotationEndorsed",
+      "name": "RotationEndorsed",
       "discriminator": [
         238,
         193,
@@ -19854,7 +19862,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityAuditRecorded",
+      "name": "SecurityAuditRecorded",
       "discriminator": [
         143,
         102,
@@ -19867,7 +19875,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityDecisionFinalized",
+      "name": "SecurityDecisionFinalized",
       "discriminator": [
         66,
         125,
@@ -19880,7 +19888,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "securityRequestSubmitted",
+      "name": "SecurityRequestSubmitted",
       "discriminator": [
         183,
         166,
@@ -19893,7 +19901,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardPinged",
+      "name": "ShardPinged",
       "discriminator": [
         114,
         228,
@@ -19906,7 +19914,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationCancelled",
+      "name": "ShardRotationCancelled",
       "discriminator": [
         148,
         213,
@@ -19919,7 +19927,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationExecuted",
+      "name": "ShardRotationExecuted",
       "discriminator": [
         207,
         240,
@@ -19932,7 +19940,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "shardRotationInitiated",
+      "name": "ShardRotationInitiated",
       "discriminator": [
         193,
         160,
@@ -19945,7 +19953,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "slashingAppealed",
+      "name": "SlashingAppealed",
       "discriminator": [
         40,
         35,
@@ -19958,7 +19966,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "spatialAssetCreated",
+      "name": "SpatialAssetCreated",
       "discriminator": [
         92,
         105,
@@ -19971,7 +19979,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "spatialSnapshotCreated",
+      "name": "SpatialSnapshotCreated",
       "discriminator": [
         74,
         109,
@@ -19984,7 +19992,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "stakeDeposited",
+      "name": "StakeDeposited",
       "discriminator": [
         69,
         152,
@@ -19997,7 +20005,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "stakePoolCreated",
+      "name": "StakePoolCreated",
       "discriminator": [
         80,
         44,
@@ -20010,7 +20018,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "stakeWithdrawn",
+      "name": "StakeWithdrawn",
       "discriminator": [
         33,
         120,
@@ -20023,7 +20031,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "successionParcelsTransferred",
+      "name": "SuccessionParcelsTransferred",
       "discriminator": [
         185,
         213,
@@ -20036,7 +20044,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskAssigned",
+      "name": "TaskAssigned",
       "discriminator": [
         67,
         8,
@@ -20049,7 +20057,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskCancelled",
+      "name": "TaskCancelled",
       "discriminator": [
         158,
         101,
@@ -20062,7 +20070,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskEscrowFunded",
+      "name": "TaskEscrowFunded",
       "discriminator": [
         212,
         62,
@@ -20075,7 +20083,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskEscrowRefunded",
+      "name": "TaskEscrowRefunded",
       "discriminator": [
         148,
         42,
@@ -20088,7 +20096,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskRequirementAdded",
+      "name": "TaskRequirementAdded",
       "discriminator": [
         210,
         120,
@@ -20101,7 +20109,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskResourcesQuoted",
+      "name": "TaskResourcesQuoted",
       "discriminator": [
         80,
         109,
@@ -20114,7 +20122,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskResultSubmitted",
+      "name": "TaskResultSubmitted",
       "discriminator": [
         138,
         65,
@@ -20127,7 +20135,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskRewardClaimed",
+      "name": "TaskRewardClaimed",
       "discriminator": [
         185,
         139,
@@ -20140,7 +20148,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "taskRouted",
+      "name": "TaskRouted",
       "discriminator": [
         180,
         115,
@@ -20153,7 +20161,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "threeDModelRegistered",
+      "name": "ThreeDModelRegistered",
       "discriminator": [
         107,
         244,
@@ -20166,7 +20174,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "threeDModelVerified",
+      "name": "ThreeDModelVerified",
       "discriminator": [
         13,
         186,
@@ -20179,7 +20187,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "unbondingInitiated",
+      "name": "UnbondingInitiated",
       "discriminator": [
         119,
         120,
@@ -20192,7 +20200,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorActiveSet",
+      "name": "ValidatorActiveSet",
       "discriminator": [
         140,
         223,
@@ -20205,7 +20213,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorAdded",
+      "name": "ValidatorAdded",
       "discriminator": [
         67,
         26,
@@ -20218,7 +20226,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorAvailabilityChanged",
+      "name": "ValidatorAvailabilityChanged",
       "discriminator": [
         149,
         204,
@@ -20231,7 +20239,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorCapabilityDeclared",
+      "name": "ValidatorCapabilityDeclared",
       "discriminator": [
         147,
         147,
@@ -20244,7 +20252,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorEndorsed",
+      "name": "ValidatorEndorsed",
       "discriminator": [
         117,
         229,
@@ -20257,7 +20265,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorJailed",
+      "name": "ValidatorJailed",
       "discriminator": [
         219,
         171,
@@ -20270,7 +20278,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorJurisdictionSet",
+      "name": "ValidatorJurisdictionSet",
       "discriminator": [
         146,
         222,
@@ -20283,7 +20291,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorNominated",
+      "name": "ValidatorNominated",
       "discriminator": [
         112,
         168,
@@ -20296,7 +20304,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorNominationFinalized",
+      "name": "ValidatorNominationFinalized",
       "discriminator": [
         102,
         105,
@@ -20309,7 +20317,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorPresenceUpdated",
+      "name": "ValidatorPresenceUpdated",
       "discriminator": [
         34,
         86,
@@ -20322,7 +20330,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorProfileInitialized",
+      "name": "ValidatorProfileInitialized",
       "discriminator": [
         249,
         2,
@@ -20335,7 +20343,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorProfileTierChanged",
+      "name": "ValidatorProfileTierChanged",
       "discriminator": [
         208,
         17,
@@ -20348,7 +20356,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorProfileUpdated",
+      "name": "ValidatorProfileUpdated",
       "discriminator": [
         40,
         88,
@@ -20361,7 +20369,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorRelationshipEdgeCreated",
+      "name": "ValidatorRelationshipEdgeCreated",
       "discriminator": [
         32,
         95,
@@ -20374,7 +20382,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorRemoved",
+      "name": "ValidatorRemoved",
       "discriminator": [
         133,
         140,
@@ -20387,7 +20395,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorReputationInitialized",
+      "name": "ValidatorReputationInitialized",
       "discriminator": [
         214,
         137,
@@ -20400,7 +20408,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "validatorSlashed",
+      "name": "ValidatorSlashed",
       "discriminator": [
         1,
         160,
@@ -20413,7 +20421,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultAccessAuthorized",
+      "name": "VaultAccessAuthorized",
       "discriminator": [
         76,
         112,
@@ -20426,7 +20434,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vaultCreated",
+      "name": "VaultCreated",
       "discriminator": [
         117,
         25,
@@ -20439,7 +20447,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationAttestationSubmitted",
+      "name": "VerificationAttestationSubmitted",
       "discriminator": [
         67,
         110,
@@ -20452,7 +20460,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationKeyUpdated",
+      "name": "VerificationKeyUpdated",
       "discriminator": [
         186,
         219,
@@ -20465,7 +20473,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationSessionClosed",
+      "name": "VerificationSessionClosed",
       "discriminator": [
         63,
         201,
@@ -20478,7 +20486,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationSessionOpened",
+      "name": "VerificationSessionOpened",
       "discriminator": [
         97,
         6,
@@ -20491,7 +20499,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "verificationTaskCreated",
+      "name": "VerificationTaskCreated",
       "discriminator": [
         225,
         37,
@@ -20504,7 +20512,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "vrfAuthoritySet",
+      "name": "VrfAuthoritySet",
       "discriminator": [
         14,
         131,
@@ -20517,7 +20525,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "worldRegistryCreated",
+      "name": "WorldRegistryCreated",
       "discriminator": [
         18,
         158,
@@ -20530,7 +20538,7 @@ export type TerraRegistry = {
       ]
     },
     {
-      "name": "zoneSetRegistered",
+      "name": "ZoneSetRegistered",
       "discriminator": [
         83,
         7,
@@ -20546,1358 +20554,1363 @@ export type TerraRegistry = {
   "errors": [
     {
       "code": 6000,
-      "name": "invalidId",
+      "name": "InvalidId",
       "msg": "Parcel id cannot be all zeros"
     },
     {
       "code": 6001,
-      "name": "emptyName",
+      "name": "EmptyName",
       "msg": "Parcel name cannot be empty"
     },
     {
       "code": 6002,
-      "name": "emptyGeometryHash",
+      "name": "EmptyGeometryHash",
       "msg": "Geometry hash is required"
     },
     {
       "code": 6003,
-      "name": "notOwner",
+      "name": "NotOwner",
       "msg": "Only the current owner can perform this action"
     },
     {
       "code": 6004,
-      "name": "invalidStatus",
+      "name": "InvalidStatus",
       "msg": "Invalid parcel status"
     },
     {
       "code": 6005,
-      "name": "invalidRightKind",
+      "name": "InvalidRightKind",
       "msg": "Invalid right kind"
     },
     {
       "code": 6006,
-      "name": "invalidNonce",
+      "name": "InvalidNonce",
       "msg": "Nonce does not match the parcel's rights_count"
     },
     {
       "code": 6007,
-      "name": "rightsLimitExceeded",
+      "name": "RightsLimitExceeded",
       "msg": "Rights limit reached"
     },
     {
       "code": 6008,
-      "name": "notesTooLong",
+      "name": "NotesTooLong",
       "msg": "Notes exceed the maximum length of 128"
     },
     {
       "code": 6009,
-      "name": "invalidExpiry",
+      "name": "InvalidExpiry",
       "msg": "Expiry must be in the future"
     },
     {
       "code": 6010,
-      "name": "notAuthorized",
+      "name": "NotAuthorized",
       "msg": "Not authorized to perform this action"
     },
     {
       "code": 6011,
-      "name": "invalidInfrastructureFlags",
+      "name": "InvalidInfrastructureFlags",
       "msg": "Invalid infrastructure flags"
     },
     {
       "code": 6012,
-      "name": "emptyAccessHash",
+      "name": "EmptyAccessHash",
       "msg": "Access hash is required"
     },
     {
       "code": 6013,
-      "name": "emptySpecifier",
+      "name": "EmptySpecifier",
       "msg": "Attestation specifier is required"
     },
     {
       "code": 6014,
-      "name": "emptyContentHash",
+      "name": "EmptyContentHash",
       "msg": "Content hash is required"
     },
     {
       "code": 6015,
-      "name": "noValidators",
+      "name": "NoValidators",
       "msg": "Attestation requires at least one validator"
     },
     {
       "code": 6016,
-      "name": "invalidThreshold",
+      "name": "InvalidThreshold",
       "msg": "Required threshold exceeds the number of validators"
     },
     {
       "code": 6017,
-      "name": "emptyIdentityHash",
+      "name": "EmptyIdentityHash",
       "msg": "Identity hash is required"
     },
     {
       "code": 6018,
-      "name": "emptyRecovery",
+      "name": "EmptyRecovery",
       "msg": "Recovery wallet is required"
     },
     {
       "code": 6019,
-      "name": "identityMismatch",
+      "name": "IdentityMismatch",
       "msg": "Identity owner does not match the acting holder"
     },
     {
       "code": 6020,
-      "name": "emptySuccessor",
+      "name": "EmptySuccessor",
       "msg": "Successor wallet is required"
     },
     {
       "code": 6021,
-      "name": "invalidSuccessionKind",
+      "name": "InvalidSuccessionKind",
       "msg": "Invalid succession kind"
     },
     {
       "code": 6022,
-      "name": "successorIsOwner",
+      "name": "SuccessorIsOwner",
       "msg": "Successor must differ from the current owner"
     },
     {
       "code": 6023,
-      "name": "successionAlreadyEffective",
+      "name": "SuccessionAlreadyEffective",
       "msg": "Succession has already become effective"
     },
     {
       "code": 6024,
-      "name": "notSuccessor",
+      "name": "NotSuccessor",
       "msg": "Only the named successor may claim this succession"
     },
     {
       "code": 6025,
-      "name": "successionNotYetEffective",
+      "name": "SuccessionNotYetEffective",
       "msg": "Succession is not yet effective"
     },
     {
       "code": 6026,
-      "name": "attestationMismatch",
+      "name": "AttestationMismatch",
       "msg": "Attestation does not belong to this parcel"
     },
     {
       "code": 6027,
-      "name": "insufficientValidations",
+      "name": "InsufficientValidations",
       "msg": "Succession requires validator endorsements before it can be claimed"
     },
     {
       "code": 6028,
-      "name": "notValidator",
+      "name": "NotValidator",
       "msg": "Signing wallet is not a declared validator for this succession"
     },
     {
       "code": 6029,
-      "name": "validationLimitReached",
+      "name": "ValidationLimitReached",
       "msg": "No more validators may endorse this succession (limit reached)"
     },
     {
       "code": 6030,
-      "name": "emptyCaseHash",
+      "name": "EmptyCaseHash",
       "msg": "Court case hash is required"
     },
     {
       "code": 6031,
-      "name": "emptyNewOwner",
+      "name": "EmptyNewOwner",
       "msg": "New forfeiture owner is required"
     },
     {
       "code": 6032,
-      "name": "insufficientValidatorSigners",
+      "name": "InsufficientValidatorSigners",
       "msg": "Not enough validator signers to forfeit this parcel"
     },
     {
       "code": 6033,
-      "name": "ownerCannotSelfForfeit",
+      "name": "OwnerCannotSelfForfeit",
       "msg": "The current owner cannot self-forfeit their own parcel"
     },
     {
       "code": 6034,
-      "name": "validatorOwnsAsset",
+      "name": "ValidatorOwnsAsset",
       "msg": "A validator cannot be the owner of the asset being validated"
     },
     {
       "code": 6035,
-      "name": "vaultAlreadyExists",
+      "name": "VaultAlreadyExists",
       "msg": "Vault already exists for this subject"
     },
     {
       "code": 6036,
-      "name": "vaultNotFound",
+      "name": "VaultNotFound",
       "msg": "Vault not found"
     },
     {
       "code": 6037,
-      "name": "thresholdExceedsHolders",
+      "name": "ThresholdExceedsHolders",
       "msg": "Threshold exceeds the number of shard holders"
     },
     {
       "code": 6038,
-      "name": "notShardHolder",
+      "name": "NotShardHolder",
       "msg": "Signer is not a shard holder for this vault"
     },
     {
       "code": 6039,
-      "name": "notActiveValidator",
+      "name": "NotActiveValidator",
       "msg": "Signer is not an active validator in this vault"
     },
     {
       "code": 6040,
-      "name": "ciphertextHashRequired",
+      "name": "CiphertextHashRequired",
       "msg": "Ciphertext hash cannot be all zeros"
     },
     {
       "code": 6041,
-      "name": "cidRequired",
+      "name": "CidRequired",
       "msg": "Ciphertext CID cannot be empty"
     },
     {
       "code": 6042,
-      "name": "expiryTooFar",
+      "name": "ExpiryTooFar",
       "msg": "Expiry must be within 24 hours from now"
     },
     {
       "code": 6043,
-      "name": "expiryInPast",
+      "name": "ExpiryInPast",
       "msg": "Expiry must be in the future"
     },
     {
       "code": 6044,
-      "name": "nonceRequired",
+      "name": "NonceRequired",
       "msg": "Nonce cannot be all zeros"
     },
     {
       "code": 6045,
-      "name": "rotationNotFound",
+      "name": "RotationNotFound",
       "msg": "No pending rotation exists for this vault"
     },
     {
       "code": 6046,
-      "name": "rotationAlreadyFinalized",
+      "name": "RotationAlreadyFinalized",
       "msg": "Rotation has already been executed or cancelled"
     },
     {
       "code": 6047,
-      "name": "rotationNotYetEffective",
+      "name": "RotationNotYetEffective",
       "msg": "Rotation time lock has not yet expired"
     },
     {
       "code": 6048,
-      "name": "quorumNotMetForRotation",
+      "name": "QuorumNotMetForRotation",
       "msg": "Not enough endorsements for rotation (need ceil(2n/3))"
     },
     {
       "code": 6049,
-      "name": "alreadyEndorsedRotation",
+      "name": "AlreadyEndorsedRotation",
       "msg": "Validator has already endorsed this rotation"
     },
     {
       "code": 6050,
-      "name": "selfEndorsementNotAllowed",
+      "name": "SelfEndorsementNotAllowed",
       "msg": "Initiator cannot endorse their own rotation"
     },
     {
       "code": 6051,
-      "name": "pendingRotationExists",
+      "name": "PendingRotationExists",
       "msg": "A pending rotation already exists for this vault"
     },
     {
       "code": 6052,
-      "name": "pingIntervalNotElapsed",
+      "name": "PingIntervalNotElapsed",
       "msg": "Ping interval has not yet elapsed"
     },
     {
       "code": 6053,
-      "name": "algorithmNotSupported",
+      "name": "AlgorithmNotSupported",
       "msg": "Encryption algorithm is not supported"
     },
     {
       "code": 6054,
-      "name": "tooManyStorageUris",
+      "name": "TooManyStorageUris",
       "msg": "Storage URIs exceed the maximum count"
     },
     {
       "code": 6055,
-      "name": "tooManyShardHolders",
+      "name": "TooManyShardHolders",
       "msg": "Shard holders exceed the maximum count"
     },
     {
       "code": 6056,
-      "name": "nonceAlreadyUsed",
+      "name": "NonceAlreadyUsed",
       "msg": "This nonce has already been used for this vault"
     },
     {
       "code": 6057,
-      "name": "notAuthorizedToCreate",
+      "name": "NotAuthorizedToCreate",
       "msg": "Only the registry admin or subject's recovery wallet can create a vault"
     },
     {
       "code": 6058,
-      "name": "notAuthorizedToCancel",
+      "name": "NotAuthorizedToCancel",
       "msg": "Only the admin or initiator can cancel a rotation"
     },
     {
       "code": 6059,
-      "name": "newThresholdExceedsHolders",
+      "name": "NewThresholdExceedsHolders",
       "msg": "New threshold exceeds the number of new shard holders"
     },
     {
       "code": 6060,
-      "name": "invalidDisputeStatus",
+      "name": "InvalidDisputeStatus",
       "msg": "Invalid dispute status for this operation"
     },
     {
       "code": 6061,
-      "name": "disputeExpired",
+      "name": "DisputeExpired",
       "msg": "Dispute has expired (90-day window elapsed)"
     },
     {
       "code": 6062,
-      "name": "invalidDisputeOutcome",
+      "name": "InvalidDisputeOutcome",
       "msg": "Invalid dispute outcome"
     },
     {
       "code": 6063,
-      "name": "invalidEscrowStatus",
+      "name": "InvalidEscrowStatus",
       "msg": "Invalid escrow status for this operation"
     },
     {
       "code": 6064,
-      "name": "invalidEscrowAmount",
+      "name": "InvalidEscrowAmount",
       "msg": "Escrow amount is outside the allowed range"
     },
     {
       "code": 6065,
-      "name": "selfDealingNotAllowed",
+      "name": "SelfDealingNotAllowed",
       "msg": "Buyer wallet cannot be the same as the seller"
     },
     {
       "code": 6066,
-      "name": "notDesignatedBuyer",
+      "name": "NotDesignatedBuyer",
       "msg": "Signer is not the designated buyer for this escrow"
     },
     {
       "code": 6067,
-      "name": "notDesignatedSeller",
+      "name": "NotDesignatedSeller",
       "msg": "Signer is not the designated seller for this escrow"
     },
     {
       "code": 6068,
-      "name": "depositExceedsAmount",
+      "name": "DepositExceedsAmount",
       "msg": "Deposit would exceed the escrow amount"
     },
     {
       "code": 6069,
-      "name": "insufficientDeposit",
-      "msg": "Full deposit not yet received — seller cannot accept"
+      "name": "InsufficientDeposit",
+      "msg": "Full deposit not yet received \u2014 seller cannot accept"
     },
     {
       "code": 6070,
-      "name": "settlementNotYetEffective",
+      "name": "SettlementNotYetEffective",
       "msg": "Settlement window has not yet expired"
     },
     {
       "code": 6071,
-      "name": "parcelStillOwnedBySeller",
+      "name": "ParcelStillOwnedBySeller",
       "msg": "Seller no longer owns the parcel at settlement time"
     },
     {
       "code": 6072,
-      "name": "cancelWindowExpired",
-      "msg": "Buyer grace period has expired — cannot cancel"
+      "name": "CancelWindowExpired",
+      "msg": "Buyer grace period has expired \u2014 cannot cancel"
     },
     {
       "code": 6073,
-      "name": "cancelWindowNotExpired",
-      "msg": "Cancel window has not yet expired — escrow not stale"
+      "name": "CancelWindowNotExpired",
+      "msg": "Cancel window has not yet expired \u2014 escrow not stale"
     },
     {
       "code": 6074,
-      "name": "depositExists",
+      "name": "DepositExists",
       "msg": "Cannot cancel: deposit already exists"
     },
     {
       "code": 6075,
-      "name": "notPartyToEscrow",
+      "name": "NotPartyToEscrow",
       "msg": "Signer is not a party to this escrow"
     },
     {
       "code": 6076,
-      "name": "parcelAlreadyInEscrow",
+      "name": "ParcelAlreadyInEscrow",
       "msg": "Parcel is already in an escrow"
     },
     {
       "code": 6077,
-      "name": "escrowAmountTooLow",
+      "name": "EscrowAmountTooLow",
       "msg": "Minimum escrow amount is 0.1 SOL"
     },
     {
       "code": 6078,
-      "name": "escrowAmountTooHigh",
+      "name": "EscrowAmountTooHigh",
       "msg": "Maximum escrow amount is 1,000,000 SOL"
     },
     {
       "code": 6079,
-      "name": "emptyBuyer",
+      "name": "EmptyBuyer",
       "msg": "Buyer wallet address is required"
     },
     {
       "code": 6080,
-      "name": "cannotRenewRevokedRight",
+      "name": "CannotRenewRevokedRight",
       "msg": "Cannot renew a revoked right"
     },
     {
       "code": 6081,
-      "name": "cannotRenewAlreadyRenewed",
+      "name": "CannotRenewAlreadyRenewed",
       "msg": "Cannot renew an already-renewed right"
     },
     {
       "code": 6082,
-      "name": "renewalMustExtendExpiry",
+      "name": "RenewalMustExtendExpiry",
       "msg": "Renewal must extend the expiry, not shorten it"
     },
     {
       "code": 6083,
-      "name": "invalidRightStatus",
+      "name": "InvalidRightStatus",
       "msg": "Invalid right status for this operation"
     },
     {
       "code": 6084,
-      "name": "permanentRightNotSweepable",
+      "name": "PermanentRightNotSweepable",
       "msg": "Permanent rights (expires_at=0) cannot be swept"
     },
     {
       "code": 6085,
-      "name": "conditionDeadlineAfterExpiry",
+      "name": "ConditionDeadlineAfterExpiry",
       "msg": "Condition deadline must be before the expiry"
     },
     {
       "code": 6086,
-      "name": "invalidGracePeriod",
+      "name": "InvalidGracePeriod",
       "msg": "Invalid grace period"
     },
     {
       "code": 6087,
-      "name": "invalidProofData",
+      "name": "InvalidProofData",
       "msg": "Invalid proof data"
     },
     {
       "code": 6088,
-      "name": "invalidJurisdictionStatus",
+      "name": "InvalidJurisdictionStatus",
       "msg": "Jurisdiction is not active"
     },
     {
       "code": 6089,
-      "name": "bindingRevoked",
+      "name": "BindingRevoked",
       "msg": "Binding has been revoked"
     },
     {
       "code": 6090,
-      "name": "bindingExpired",
+      "name": "BindingExpired",
       "msg": "Binding has expired"
     },
     {
       "code": 6091,
-      "name": "bindingAlreadyRevoked",
+      "name": "BindingAlreadyRevoked",
       "msg": "Binding is already revoked"
     },
     {
       "code": 6092,
-      "name": "nullifierCollision",
+      "name": "NullifierCollision",
       "msg": "Nullifier collision detected"
     },
     {
       "code": 6093,
-      "name": "invalidParcelStatus",
+      "name": "InvalidParcelStatus",
       "msg": "Parcel is not in the correct status for this operation"
     },
     {
       "code": 6094,
-      "name": "invalidGeometryHash",
+      "name": "InvalidGeometryHash",
       "msg": "Parcel geometry hash is invalid"
     },
     {
       "code": 6095,
-      "name": "rightsMigrationFailed",
+      "name": "RightsMigrationFailed",
       "msg": "Rights migration failed"
     },
     {
       "code": 6096,
-      "name": "attestationMigrationFailed",
+      "name": "AttestationMigrationFailed",
       "msg": "Attestation migration failed"
     },
     {
       "code": 6097,
-      "name": "subdivisionRecordExists",
+      "name": "SubdivisionRecordExists",
       "msg": "Subdivision record already exists for this pair"
     },
     {
       "code": 6098,
-      "name": "amalgamationRecordExists",
+      "name": "AmalgamationRecordExists",
       "msg": "Amalgamation record already exists for this pair"
     },
     {
       "code": 6099,
-      "name": "insufficientStake",
+      "name": "InsufficientStake",
       "msg": "Insufficient stake for this operation"
     },
     {
       "code": 6100,
-      "name": "stakeAlreadyActive",
-      "msg": "Stake is already active — cannot deposit again"
+      "name": "StakeAlreadyActive",
+      "msg": "Stake is already active \u2014 cannot deposit again"
     },
     {
       "code": 6101,
-      "name": "unbondingInProgress",
-      "msg": "Unbonding is in progress — cannot deposit or withdraw"
+      "name": "UnbondingInProgress",
+      "msg": "Unbonding is in progress \u2014 cannot deposit or withdraw"
     },
     {
       "code": 6102,
-      "name": "unbondingNotComplete",
+      "name": "UnbondingNotComplete",
       "msg": "Unbonding period has not yet completed"
     },
     {
       "code": 6103,
-      "name": "selfReportNotAllowed",
+      "name": "SelfReportNotAllowed",
       "msg": "Self-reporting is not allowed"
     },
     {
       "code": 6104,
-      "name": "guardianshipGraceTooShort",
+      "name": "GuardianshipGraceTooShort",
       "msg": "Guardianship grace period is below the 90-day minimum"
     },
     {
       "code": 6105,
-      "name": "guardianshipThresholdTooLow",
+      "name": "GuardianshipThresholdTooLow",
       "msg": "Guardianship requires at least 3 validator endorsements"
     },
     {
       "code": 6106,
-      "name": "nullifierAlreadyUsed",
+      "name": "NullifierAlreadyUsed",
       "msg": "Proof has already been used (nullifier recorded)"
     },
     {
       "code": 6107,
-      "name": "rootVersionMismatch",
+      "name": "RootVersionMismatch",
       "msg": "Proof references a stale or unknown root version"
     },
     {
       "code": 6108,
-      "name": "unauthorizedZoneAuthority",
+      "name": "UnauthorizedZoneAuthority",
       "msg": "Signer is not the zone authority"
     },
     {
       "code": 6109,
-      "name": "emptyZoneSet",
+      "name": "EmptyZoneSet",
       "msg": "Zone has no commitments to prove against"
     },
     {
       "code": 6110,
-      "name": "invalidProofPurpose",
+      "name": "InvalidProofPurpose",
       "msg": "Proof purpose is missing or too long"
     },
     {
       "code": 6111,
-      "name": "proofTooLarge",
+      "name": "ProofTooLarge",
       "msg": "Proof data is empty or exceeds the maximum size"
     },
     {
       "code": 6112,
-      "name": "invalidDisclosureType",
+      "name": "InvalidDisclosureType",
       "msg": "Disclosure type must be 0 (membership), 1 (range), or 2 (count)"
     },
     {
       "code": 6113,
-      "name": "invalidOffenseType",
+      "name": "InvalidOffenseType",
       "msg": "Offense type must be 0 (equivocation), 1 (liveness), or 2 (collusion)"
     },
     {
       "code": 6114,
-      "name": "invalidRegistryMode",
+      "name": "InvalidRegistryMode",
       "msg": "Registry is not in the required mode for this operation"
     },
     {
       "code": 6115,
-      "name": "noProposalFound",
+      "name": "NoProposalFound",
       "msg": "No validator endorsement proposal exists for this candidate"
     },
     {
       "code": 6116,
-      "name": "wrongOnboardingStage",
+      "name": "WrongOnboardingStage",
       "msg": "Wrong onboarding stage for this bootstrap operation"
     },
     {
       "code": 6117,
-      "name": "sponsorCannotConfirm",
+      "name": "SponsorCannotConfirm",
       "msg": "Sponsor cannot confirm their own nomination"
     },
     {
       "code": 6118,
-      "name": "invalidCountryCode",
+      "name": "InvalidCountryCode",
       "msg": "Invalid ISO 3166-1 alpha-2 country code"
     },
     {
       "code": 6119,
-      "name": "countryAlreadyAllocated",
+      "name": "CountryAlreadyAllocated",
       "msg": "Country code has already been allocated"
     },
     {
       "code": 6120,
-      "name": "countryNotAllocated",
+      "name": "CountryNotAllocated",
       "msg": "Country is not allocated to this admin"
     },
     {
       "code": 6121,
-      "name": "confirmersNotDiverseEnough",
+      "name": "ConfirmersNotDiverseEnough",
       "msg": "Genesis confirmers are not from enough distinct countries"
     },
     {
       "code": 6122,
-      "name": "emergencyTimelockNotElapsed",
+      "name": "EmergencyTimelockNotElapsed",
       "msg": "Emergency injection timelock has not yet elapsed"
     },
     {
       "code": 6123,
-      "name": "insufficientEndorsements",
+      "name": "InsufficientEndorsements",
       "msg": "Insufficient validator endorsements for threshold credential"
     },
     {
       "code": 6124,
-      "name": "programPaused",
-      "msg": "Program is paused — state-changing operations are frozen"
+      "name": "ProgramPaused",
+      "msg": "Program is paused \u2014 state-changing operations are frozen"
     },
     {
       "code": 6125,
-      "name": "programNotPaused",
+      "name": "ProgramNotPaused",
       "msg": "Program is not paused"
     },
     {
       "code": 6126,
-      "name": "programAlreadyPaused",
+      "name": "ProgramAlreadyPaused",
       "msg": "Program is already paused"
     },
     {
       "code": 6127,
-      "name": "guardianshipAlreadyActive",
+      "name": "GuardianshipAlreadyActive",
       "msg": "A revocation request is already pending for this identity"
     },
     {
       "code": 6128,
-      "name": "emptyClaimId",
+      "name": "EmptyClaimId",
       "msg": "Claim id cannot be all zeros"
     },
     {
       "code": 6129,
-      "name": "invalidClaimType",
+      "name": "InvalidClaimType",
       "msg": "Invalid claim type"
     },
     {
       "code": 6130,
-      "name": "emptyStatementHash",
+      "name": "EmptyStatementHash",
       "msg": "Statement hash is required"
     },
     {
       "code": 6131,
-      "name": "invalidClaimStatus",
+      "name": "InvalidClaimStatus",
       "msg": "Invalid claim status for this operation"
     },
     {
       "code": 6132,
-      "name": "notClaimSubmitter",
+      "name": "NotClaimSubmitter",
       "msg": "Only the claim submitter can add evidence"
     },
     {
       "code": 6133,
-      "name": "invalidEvidenceType",
+      "name": "InvalidEvidenceType",
       "msg": "Invalid evidence type"
     },
     {
       "code": 6134,
-      "name": "emptyStorageReference",
+      "name": "EmptyStorageReference",
       "msg": "Storage reference is required"
     },
     {
       "code": 6135,
-      "name": "invalidConfidence",
+      "name": "InvalidConfidence",
       "msg": "Confidence must be between 0 and 100"
     },
     {
       "code": 6136,
-      "name": "invalidAttestationResult",
+      "name": "InvalidAttestationResult",
       "msg": "Invalid attestation result"
     },
     {
       "code": 6137,
-      "name": "quorumNotReached",
+      "name": "QuorumNotReached",
       "msg": "Attestation quorum not yet reached"
     },
     {
       "code": 6138,
-      "name": "claimAlreadyVerified",
+      "name": "ClaimAlreadyVerified",
       "msg": "Claim already verified"
     },
     {
       "code": 6139,
-      "name": "invalidRequiredAttestations",
+      "name": "InvalidRequiredAttestations",
       "msg": "Required attestations must be at least 1"
     },
     {
       "code": 6140,
-      "name": "invalidSessionStatus",
+      "name": "InvalidSessionStatus",
       "msg": "Session is not in a valid state for this operation"
     },
     {
       "code": 6141,
-      "name": "validatorNotActive",
+      "name": "ValidatorNotActive",
       "msg": "Validator is not active"
     },
     {
       "code": 6142,
-      "name": "challengeAlreadyResolved",
+      "name": "ChallengeAlreadyResolved",
       "msg": "Challenge has already been resolved"
     },
     {
       "code": 6143,
-      "name": "invalidQuorumConfig",
+      "name": "InvalidQuorumConfig",
       "msg": "Quorum configuration is invalid"
     },
     {
       "code": 6144,
-      "name": "validatorJailed",
+      "name": "ValidatorJailed",
       "msg": "Validator is jailed or slashed and cannot attest"
     },
     {
       "code": 6145,
-      "name": "observerNotActive",
+      "name": "ObserverNotActive",
       "msg": "Observer is not active"
     },
     {
       "code": 6146,
-      "name": "observerNotSuspended",
+      "name": "ObserverNotSuspended",
       "msg": "Observer is not suspended"
     },
     {
       "code": 6147,
-      "name": "invalidGuardianType",
+      "name": "InvalidGuardianType",
       "msg": "Invalid guardian type"
     },
     {
       "code": 6148,
-      "name": "invalidGuardianClaimStatus",
+      "name": "InvalidGuardianClaimStatus",
       "msg": "Invalid guardian claim status"
     },
     {
       "code": 6149,
-      "name": "invalidCrossBorderStatus",
+      "name": "InvalidCrossBorderStatus",
       "msg": "Invalid cross-border verification status"
     },
     {
       "code": 6150,
-      "name": "invalidAuditAction",
+      "name": "InvalidAuditAction",
       "msg": "Invalid audit action"
     },
     {
       "code": 6151,
-      "name": "invalidQuorumVoteChoice",
+      "name": "InvalidQuorumVoteChoice",
       "msg": "Invalid quorum vote choice"
     },
     {
       "code": 6152,
-      "name": "quorumAlreadyResolved",
+      "name": "QuorumAlreadyResolved",
       "msg": "Quorum already resolved"
     },
     {
       "code": 6153,
-      "name": "identityRightsAlreadyExists",
+      "name": "IdentityRightsAlreadyExists",
       "msg": "Identity rights account already exists for this identity/parcel/kind"
     },
     {
       "code": 6154,
-      "name": "identityRightsNotFound",
+      "name": "IdentityRightsNotFound",
       "msg": "Identity rights not found or inactive"
     },
     {
       "code": 6155,
-      "name": "notDesignatedOffender",
+      "name": "NotDesignatedOffender",
       "msg": "Signer is not the designated offender"
     },
     {
       "code": 6156,
-      "name": "wrongEndorsementAction",
+      "name": "WrongEndorsementAction",
       "msg": "Endorsement action does not match the requested governance operation"
     },
     {
       "code": 6157,
-      "name": "missingReputation",
+      "name": "MissingReputation",
       "msg": "Validator reputation account must be provided for attestation"
     },
     {
       "code": 6158,
-      "name": "attestationDigestMismatch",
+      "name": "AttestationDigestMismatch",
       "msg": "Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence"
     },
     {
       "code": 6159,
-      "name": "vcTypeTooLong",
+      "name": "VcTypeTooLong",
       "msg": "VC type exceeds maximum length"
     },
     {
       "code": 6160,
-      "name": "invalidVcValidity",
+      "name": "InvalidVcValidity",
       "msg": "VC issuance_date must not be after expiration_date"
     },
     {
       "code": 6161,
-      "name": "sdJwtDigestMismatch",
+      "name": "SdJwtDigestMismatch",
       "msg": "SD-JWT digest does not match the canonical digest over VC fields"
     },
     {
       "code": 6162,
-      "name": "duplicateValidator",
+      "name": "DuplicateValidator",
       "msg": "Duplicate validator in the declared validator set"
     },
     {
       "code": 6163,
-      "name": "stringTooLong",
+      "name": "StringTooLong",
       "msg": "Profile note exceeds maximum length"
     },
     {
       "code": 6164,
-      "name": "invalidProfileTier",
+      "name": "InvalidProfileTier",
       "msg": "Invalid validator profile tier"
     },
     {
       "code": 6165,
-      "name": "invalidPresenceProvenance",
+      "name": "InvalidPresenceProvenance",
       "msg": "Invalid presence provenance code"
     },
     {
       "code": 6166,
-      "name": "invalidPresenceFix",
+      "name": "InvalidPresenceFix",
       "msg": "Presence fix is outside valid geographic bounds"
     },
     {
       "code": 6167,
-      "name": "invalidAvailabilityStatus",
+      "name": "InvalidAvailabilityStatus",
       "msg": "Invalid availability status"
     },
     {
       "code": 6168,
-      "name": "invalidCapabilityCode",
+      "name": "InvalidCapabilityCode",
       "msg": "Invalid capability code"
     },
     {
       "code": 6169,
-      "name": "invalidCapabilityLevel",
+      "name": "InvalidCapabilityLevel",
       "msg": "Invalid capability level"
     },
     {
       "code": 6170,
-      "name": "invalidEdgeType",
+      "name": "InvalidEdgeType",
       "msg": "Invalid relationship edge type"
     },
     {
       "code": 6171,
-      "name": "selfRelationshipEdge",
+      "name": "SelfRelationshipEdge",
       "msg": "Self-relationship edges are not allowed"
     },
     {
       "code": 6172,
-      "name": "invalidTaskClass",
+      "name": "InvalidTaskClass",
       "msg": "Invalid task class"
     },
     {
       "code": 6173,
-      "name": "invalidTaskStatus",
+      "name": "InvalidTaskStatus",
       "msg": "Invalid task status"
     },
     {
       "code": 6174,
-      "name": "invalidTaskOutcome",
+      "name": "InvalidTaskOutcome",
       "msg": "Invalid task outcome"
     },
     {
       "code": 6175,
-      "name": "taskDeadlinePassed",
+      "name": "TaskDeadlinePassed",
       "msg": "Task deadline has passed"
     },
     {
       "code": 6176,
-      "name": "taskNotOpen",
+      "name": "TaskNotOpen",
       "msg": "Task is not open for assignment"
     },
     {
       "code": 6177,
-      "name": "taskAlreadyFinalized",
+      "name": "TaskAlreadyFinalized",
       "msg": "Task is already finalized"
     },
     {
       "code": 6178,
-      "name": "notTaskRequester",
+      "name": "NotTaskRequester",
       "msg": "Signer is not the task requester"
     },
     {
       "code": 6179,
-      "name": "notTaskAssignee",
+      "name": "NotTaskAssignee",
       "msg": "Signer is not an assigned validator for this task"
     },
     {
       "code": 6180,
-      "name": "taskAlreadyAssigned",
+      "name": "TaskAlreadyAssigned",
       "msg": "Task already has the required number of assignments"
     },
     {
       "code": 6181,
-      "name": "selfTaskAssignment",
+      "name": "SelfTaskAssignment",
       "msg": "Requester cannot be assigned to their own task"
     },
     {
       "code": 6182,
-      "name": "requirementIndexMismatch",
+      "name": "RequirementIndexMismatch",
       "msg": "Requirement index must append sequentially"
     },
     {
       "code": 6183,
-      "name": "invalidTaskRequirement",
+      "name": "InvalidTaskRequirement",
       "msg": "Invalid task requirement field or task id"
     },
     {
       "code": 6184,
-      "name": "taskRequirementsFull",
+      "name": "TaskRequirementsFull",
       "msg": "Task has reached the maximum number of requirements"
     },
     {
       "code": 6185,
-      "name": "invalidObservationSource",
+      "name": "InvalidObservationSource",
       "msg": "Invalid observation source"
     },
     {
       "code": 6186,
-      "name": "invalidObservationProvenance",
+      "name": "InvalidObservationProvenance",
       "msg": "Invalid observation provenance"
     },
     {
       "code": 6187,
-      "name": "invalidEvidenceArtifactKind",
+      "name": "InvalidEvidenceArtifactKind",
       "msg": "Invalid evidence artifact kind"
     },
     {
       "code": 6188,
-      "name": "evidenceIndexMismatch",
+      "name": "EvidenceIndexMismatch",
       "msg": "Evidence artifact index does not match manifest count"
     },
     {
       "code": 6189,
-      "name": "evidenceManifestFull",
+      "name": "EvidenceManifestFull",
       "msg": "Evidence manifest has reached the maximum number of artifacts"
     },
     {
       "code": 6190,
-      "name": "validatorNotEligible",
+      "name": "ValidatorNotEligible",
       "msg": "Validator failed multi-factor eligibility filters"
     },
     {
       "code": 6191,
-      "name": "notRouteWinner",
+      "name": "NotRouteWinner",
       "msg": "Chosen candidate is not the randomized route winner"
     },
     {
       "code": 6192,
-      "name": "tooManyRouteCandidates",
+      "name": "TooManyRouteCandidates",
       "msg": "Too many route candidates or invalid competitor count"
     },
     {
       "code": 6193,
-      "name": "routeAccountMismatch",
+      "name": "RouteAccountMismatch",
       "msg": "Route remaining_accounts do not match candidate list"
     },
     {
       "code": 6194,
-      "name": "invalidFraudReason",
+      "name": "InvalidFraudReason",
       "msg": "Invalid fraud reason code"
     },
     {
       "code": 6195,
-      "name": "invalidFraudStatus",
+      "name": "InvalidFraudStatus",
       "msg": "Fraud status does not allow this transition"
     },
     {
       "code": 6196,
-      "name": "selfFraudReport",
+      "name": "SelfFraudReport",
       "msg": "Reporters cannot file fraud against themselves"
     },
     {
       "code": 6197,
-      "name": "committeeTooSmall",
+      "name": "CommitteeTooSmall",
       "msg": "Too few eligible well-reputed validators for a committee"
     },
     {
       "code": 6198,
-      "name": "reviewAlreadyDecided",
+      "name": "ReviewAlreadyDecided",
       "msg": "Review already has a final decision"
     },
     {
       "code": 6199,
-      "name": "notCommitteeMember",
+      "name": "NotCommitteeMember",
       "msg": "Signer is not a member of this review committee"
     },
     {
       "code": 6200,
-      "name": "duplicateCommitteeVote",
+      "name": "DuplicateCommitteeVote",
       "msg": "This committee member has already voted"
     },
     {
       "code": 6201,
-      "name": "reviewNotFinalizable",
+      "name": "ReviewNotFinalizable",
       "msg": "Not every committee member has voted yet"
     },
     {
       "code": 6202,
-      "name": "invalidRestrictionStatus",
+      "name": "InvalidRestrictionStatus",
       "msg": "Invalid capability restriction status"
     },
     {
       "code": 6203,
-      "name": "restrictionNotActive",
+      "name": "RestrictionNotActive",
       "msg": "Restriction is not active"
     },
     {
       "code": 6204,
-      "name": "appealWindowClosed",
+      "name": "AppealWindowClosed",
       "msg": "Appeal window for this restriction has not opened"
     },
     {
       "code": 6205,
-      "name": "notRestrictedWallet",
+      "name": "NotRestrictedWallet",
       "msg": "Signer is not the restricted wallet"
     },
     {
       "code": 6206,
-      "name": "invalidAppealStatus",
+      "name": "InvalidAppealStatus",
       "msg": "Invalid fraud appeal status"
     },
     {
       "code": 6207,
-      "name": "rehabTooEarly",
+      "name": "RehabTooEarly",
       "msg": "Rehabilitation period for this restriction has not elapsed"
     },
     {
       "code": 6208,
-      "name": "capabilityRestricted",
+      "name": "CapabilityRestricted",
       "msg": "Active capability restriction blocks this route"
     },
     {
       "code": 6209,
-      "name": "invalidFeeBps",
+      "name": "InvalidFeeBps",
       "msg": "Protocol fee exceeds the maximum allowed bps"
     },
     {
       "code": 6210,
-      "name": "feePolicyNotInitialized",
+      "name": "FeePolicyNotInitialized",
       "msg": "Fee policy has not been initialized"
     },
     {
       "code": 6211,
-      "name": "invalidCoverageParams",
+      "name": "InvalidCoverageParams",
       "msg": "Invalid coverage incentive parameters"
     },
     {
       "code": 6212,
-      "name": "coverageIncentiveNotInitialized",
+      "name": "CoverageIncentiveNotInitialized",
       "msg": "Coverage incentive has not been initialized"
     },
     {
       "code": 6213,
-      "name": "quoteAlreadyExists",
+      "name": "QuoteAlreadyExists",
       "msg": "A resource quote already exists for this task"
     },
     {
       "code": 6214,
-      "name": "resourceQuoteMissing",
+      "name": "ResourceQuoteMissing",
       "msg": "Resource quote is missing for this task"
     },
     {
       "code": 6215,
-      "name": "escrowAlreadyFunded",
+      "name": "EscrowAlreadyFunded",
       "msg": "Task escrow is already funded"
     },
     {
       "code": 6216,
-      "name": "taskNotCompleted",
+      "name": "TaskNotCompleted",
       "msg": "Task is not completed"
     },
     {
       "code": 6217,
-      "name": "assignmentNotSubmitted",
+      "name": "AssignmentNotSubmitted",
       "msg": "Validator has not submitted a result for this task"
     },
     {
       "code": 6218,
-      "name": "escrowNotFunded",
+      "name": "EscrowNotFunded",
       "msg": "Task escrow is not funded or already fully released"
     },
     {
       "code": 6219,
-      "name": "rewardAlreadyClaimed",
+      "name": "RewardAlreadyClaimed",
       "msg": "This validator already claimed the task reward"
     },
     {
       "code": 6220,
-      "name": "escrowNotRefundable",
-      "msg": "Task is still active — escrow is not refundable"
+      "name": "EscrowNotRefundable",
+      "msg": "Task is still active \u2014 escrow is not refundable"
     },
     {
       "code": 6221,
-      "name": "claimWindowNotClosed",
+      "name": "ClaimWindowNotClosed",
       "msg": "Claim window for this completed task is still open"
     },
     {
       "code": 6222,
-      "name": "nothingToRefund",
+      "name": "NothingToRefund",
       "msg": "No refundable lamports remain in the escrow vault"
     },
     {
       "code": 6223,
-      "name": "deviceMetadataTooLong",
+      "name": "DeviceMetadataTooLong",
       "msg": "Device metadata reference exceeds the maximum length"
     },
     {
       "code": 6224,
-      "name": "invalidDeviceKey",
+      "name": "InvalidDeviceKey",
       "msg": "Device key must not be the zero key"
     },
     {
       "code": 6225,
-      "name": "invalidDeviceStatus",
+      "name": "InvalidDeviceStatus",
       "msg": "Invalid device status value"
     },
     {
       "code": 6226,
-      "name": "deviceRevoked",
-      "msg": "Device is revoked — this operation is no longer allowed"
+      "name": "DeviceRevoked",
+      "msg": "Device is revoked \u2014 this operation is no longer allowed"
     },
     {
       "code": 6227,
-      "name": "notDeviceOwner",
+      "name": "NotDeviceOwner",
       "msg": "Signer is not the device owner"
     },
     {
       "code": 6228,
-      "name": "invalidJurisdictionPair",
+      "name": "InvalidJurisdictionPair",
       "msg": "Country pair is invalid (equal, reversed, or mismatched)"
     },
     {
       "code": 6229,
-      "name": "invalidBindingStatus",
+      "name": "InvalidBindingStatus",
       "msg": "Invalid cross-border binding status value"
     },
     {
       "code": 6230,
-      "name": "sameJurisdiction",
+      "name": "SameJurisdiction",
       "msg": "Verification must span two different jurisdictions"
     },
     {
       "code": 6231,
-      "name": "jurisdictionMismatch",
+      "name": "JurisdictionMismatch",
       "msg": "Jurisdiction accounts or binding do not match the required pair"
     },
     {
       "code": 6232,
-      "name": "invalidBindingExpiry",
+      "name": "InvalidBindingExpiry",
       "msg": "Cross-border binding expiry must be in the future (or 0)"
     },
     {
       "code": 6233,
-      "name": "undeclaredJurisdiction",
+      "name": "UndeclaredJurisdiction",
       "msg": "Validator profile or requirement jurisdiction is undeclared"
     },
     {
       "code": 6234,
-      "name": "invalidSpatialDimension",
+      "name": "InvalidSpatialDimension",
       "msg": "Spatial dimension must be 0 (2D), 1 (2.5D) or 2 (3D)"
     },
     {
       "code": 6235,
-      "name": "invalidGeometrySource",
+      "name": "InvalidGeometrySource",
       "msg": "Unknown geometry source"
     },
     {
       "code": 6236,
-      "name": "geometryVersionMismatch",
+      "name": "GeometryVersionMismatch",
       "msg": "Geometry version index or parent asset does not match"
     },
     {
       "code": 6237,
-      "name": "geometryVersionsFull",
+      "name": "GeometryVersionsFull",
       "msg": "Spatial asset has reached the maximum number of geometry versions"
     },
     {
       "code": 6238,
-      "name": "invalidElevationRange",
+      "name": "InvalidElevationRange",
       "msg": "Elevation range is invalid (min > max)"
     },
     {
       "code": 6239,
-      "name": "geometryAlreadyVerified",
+      "name": "GeometryAlreadyVerified",
       "msg": "Geometry version is already verified"
     },
     {
       "code": 6240,
-      "name": "invalidElevationSource",
+      "name": "InvalidElevationSource",
       "msg": "Unknown elevation source, or provenance does not match the layer dimension"
     },
     {
       "code": 6241,
-      "name": "geometryAlreadyAttested",
+      "name": "GeometryAlreadyAttested",
       "msg": "Validator has already attested this geometry version"
     },
     {
       "code": 6242,
-      "name": "emptyEvidenceManifest",
+      "name": "EmptyEvidenceManifest",
       "msg": "Evidence manifest has no artifacts to anchor a version from"
     },
     {
       "code": 6243,
-      "name": "geometryQuorumFull",
+      "name": "GeometryQuorumFull",
       "msg": "Geometry version quorum list has no free attestation slot"
     },
     {
       "code": 6244,
-      "name": "invalidModelFormat",
+      "name": "InvalidModelFormat",
       "msg": "Unknown 3D model format, or format is the UNKNOWN placeholder"
     },
     {
       "code": 6245,
-      "name": "threeDModelsFull",
+      "name": "ThreeDModelsFull",
       "msg": "Spatial asset has reached the maximum number of 3D models"
     },
     {
       "code": 6246,
-      "name": "modelGeometryVersionMismatch",
+      "name": "ModelGeometryVersionMismatch",
       "msg": "Model geometry version does not exist in the asset's version history"
     },
     {
       "code": 6247,
-      "name": "threeDModelAlreadyVerified",
+      "name": "ThreeDModelAlreadyVerified",
       "msg": "3D model is already verified"
     },
     {
       "code": 6248,
-      "name": "spatialSnapshotsFull",
+      "name": "SpatialSnapshotsFull",
       "msg": "Spatial asset has reached the maximum number of snapshots"
     },
     {
       "code": 6249,
-      "name": "invalidSnapshotLabel",
+      "name": "InvalidSnapshotLabel",
       "msg": "Snapshot label is too long"
     },
     {
       "code": 6250,
-      "name": "invalidRequestDescription",
+      "name": "InvalidRequestDescription",
       "msg": "Request description is too long"
     },
     {
       "code": 6251,
-      "name": "invalidRemedyType",
+      "name": "InvalidRemedyType",
       "msg": "Invalid remedy type"
     },
     {
       "code": 6252,
-      "name": "invalidRestrictionType",
+      "name": "InvalidRestrictionType",
       "msg": "Invalid restriction type"
     },
     {
       "code": 6253,
-      "name": "requestNotOpen",
+      "name": "RequestNotOpen",
       "msg": "Request is not open"
     },
     {
       "code": 6254,
-      "name": "requestExpired",
+      "name": "RequestExpired",
       "msg": "Request has expired"
     },
     {
       "code": 6255,
-      "name": "invalidReviewVote",
+      "name": "InvalidReviewVote",
       "msg": "Invalid review vote"
     },
     {
       "code": 6256,
-      "name": "alreadyVoted",
+      "name": "AlreadyVoted",
       "msg": "Already voted on this case"
     },
     {
       "code": 6257,
-      "name": "caseAlreadyDecided",
+      "name": "CaseAlreadyDecided",
       "msg": "Case is already decided"
     },
     {
       "code": 6258,
-      "name": "reviewerInsufficientReputation",
+      "name": "ReviewerInsufficientReputation",
       "msg": "Reviewer has insufficient reputation"
     },
     {
       "code": 6259,
-      "name": "securityQuorumNotReached",
+      "name": "SecurityQuorumNotReached",
       "msg": "Security quorum not reached"
     },
     {
       "code": 6260,
-      "name": "decisionNotAppealable",
+      "name": "DecisionNotAppealable",
       "msg": "Decision is not appealable"
     },
     {
       "code": 6261,
-      "name": "reasonTooLong",
+      "name": "ReasonTooLong",
       "msg": "Reason is too long"
     },
     {
       "code": 6262,
-      "name": "appealAlreadyDecided",
+      "name": "AppealAlreadyDecided",
       "msg": "Appeal is already decided"
     },
     {
       "code": 6263,
-      "name": "appealDecisionMismatch",
+      "name": "AppealDecisionMismatch",
       "msg": "Appeal decision account does not match appeal"
     },
     {
       "code": 6264,
-      "name": "protectionAlreadyActive",
+      "name": "ProtectionAlreadyActive",
       "msg": "Emergency protection is already active"
     },
     {
       "code": 6265,
-      "name": "protectionExpired",
+      "name": "ProtectionExpired",
       "msg": "Emergency protection has expired"
     },
     {
       "code": 6266,
-      "name": "candidateCannotBeOracle",
+      "name": "CandidateCannotBeOracle",
       "msg": "Candidate validator cannot serve as VRF oracle"
     },
     {
       "code": 6267,
-      "name": "requesterCannotBeOracle",
+      "name": "RequesterCannotBeOracle",
       "msg": "Requester cannot serve as VRF oracle"
     },
     {
       "code": 6268,
-      "name": "invalidVrfRandomness",
+      "name": "InvalidVrfRandomness",
       "msg": "Invalid VRF oracle signature or forged randomness"
     },
     {
       "code": 6269,
-      "name": "vrfAuthorityMismatch",
+      "name": "VrfAuthorityMismatch",
       "msg": "VRF oracle is not the allowlisted authority"
+    },
+    {
+      "code": 6270,
+      "name": "InvalidBond",
+      "msg": "Dispute bond must be greater than zero"
     }
   ],
   "types": [
     {
-      "name": "amalgamationRecord",
+      "name": "AmalgamationRecord",
       "docs": [
         "One record per source parcel being merged into a result parcel.",
         "",
@@ -21907,21 +21920,21 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "resultParcel",
+            "name": "result_parcel",
             "docs": [
               "The merged result parcel's PDA key."
             ],
             "type": "pubkey"
           },
           {
-            "name": "sourceParcel",
+            "name": "source_parcel",
             "docs": [
               "A source parcel being merged in."
             ],
             "type": "pubkey"
           },
           {
-            "name": "sourceGeometryHash",
+            "name": "source_geometry_hash",
             "docs": [
               "Source's geometry hash at time of amalgamation."
             ],
@@ -21933,7 +21946,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "resultGeometryHash",
+            "name": "result_geometry_hash",
             "docs": [
               "Result's geometry hash."
             ],
@@ -21945,25 +21958,25 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "rightsMerged",
+            "name": "rights_merged",
             "docs": [
               "Whether rights from this source have been merged."
             ],
             "type": "bool"
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "docs": [
               "Wallet that initiated the amalgamation."
             ],
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "completedAt",
+            "name": "completed_at",
             "docs": [
               "When merge finished (0 if in progress)."
             ],
@@ -21980,7 +21993,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "appeal",
+      "name": "Appeal",
       "docs": [
         "Due-process appeal against an active CapabilityRestriction.",
         "PDA: `[\"appeal\", restriction, appellant, nonce]`"
@@ -22001,7 +22014,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "type": {
               "array": [
                 "u8",
@@ -22018,18 +22031,18 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "decidedAt",
+            "name": "decided_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "appealDecided",
+      "name": "AppealDecided",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22046,14 +22059,14 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "appealFiled",
+      "name": "AppealFiled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22070,14 +22083,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "appealReviewOpened",
+      "name": "AppealReviewOpened",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22090,14 +22103,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "committeeSize",
+            "name": "committee_size",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "auditEntry",
+      "name": "AuditEntry",
       "docs": [
         "Append-only audit log of all verification state transitions.",
         "",
@@ -22128,14 +22141,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "fromStatus",
+            "name": "from_status",
             "docs": [
               "Previous status value."
             ],
             "type": "u8"
           },
           {
-            "name": "toStatus",
+            "name": "to_status",
             "docs": [
               "New status value."
             ],
@@ -22149,7 +22162,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "metadataHash",
+            "name": "metadata_hash",
             "docs": [
               "Optional metadata hash (sha-256 of additional context)."
             ],
@@ -22168,12 +22181,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "auditEntryRecorded",
+      "name": "AuditEntryRecorded",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "auditEntry",
+            "name": "audit_entry",
             "type": "pubkey"
           },
           {
@@ -22189,11 +22202,11 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "fromStatus",
+            "name": "from_status",
             "type": "u8"
           },
           {
-            "name": "toStatus",
+            "name": "to_status",
             "type": "u8"
           },
           {
@@ -22208,9 +22221,9 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "capabilityRestriction",
+      "name": "CapabilityRestriction",
       "docs": [
-        "Partial capability downgrade — NOT a ban, NOT a jail (Design Rule 13).",
+        "Partial capability downgrade \u2014 NOT a ban, NOT a jail (Design Rule 13).",
         "PDA: `[\"capability_restriction\", wallet, capability_code]`"
       ],
       "type": {
@@ -22221,7 +22234,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
@@ -22229,7 +22242,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "maxLevel",
+            "name": "max_level",
             "type": "u8"
           },
           {
@@ -22237,30 +22250,30 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "appliedAt",
+            "name": "applied_at",
             "type": "i64"
           },
           {
-            "name": "appealOpensAt",
+            "name": "appeal_opens_at",
             "type": "i64"
           },
           {
-            "name": "rehabEligibleAt",
+            "name": "rehab_eligible_at",
             "type": "i64"
           },
           {
-            "name": "liftedAt",
+            "name": "lifted_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "capabilityRestrictionApplied",
+      "name": "CapabilityRestrictionApplied",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22273,11 +22286,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
-            "name": "maxLevel",
+            "name": "max_level",
             "type": "u8"
           },
           {
@@ -22288,7 +22301,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "capabilityRestrictionLifted",
+      "name": "CapabilityRestrictionLifted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22301,7 +22314,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
@@ -22312,7 +22325,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "challenge",
+      "name": "Challenge",
       "docs": [
         "An on-chain challenge to a verified claim. Anyone may challenge a",
         "verified claim by providing evidence. Validators review and vote.",
@@ -22337,7 +22350,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "challengeHash",
+            "name": "challenge_hash",
             "docs": [
               "SHA-256 of the off-chain challenge document / evidence."
             ],
@@ -22356,21 +22369,21 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "upholdVotes",
+            "name": "uphold_votes",
             "docs": [
               "Number of validators who voted to uphold."
             ],
             "type": "u8"
           },
           {
-            "name": "overturnVotes",
+            "name": "overturn_votes",
             "docs": [
               "Number of validators who voted to overturn."
             ],
             "type": "u8"
           },
           {
-            "name": "requiredVotes",
+            "name": "required_votes",
             "docs": [
               "Required votes to resolve."
             ],
@@ -22386,22 +22399,22 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "reviewDeadline",
+            "name": "review_deadline",
             "type": "i64"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "challengeFiled",
+      "name": "ChallengeFiled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22418,7 +22431,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "challengeHash",
+            "name": "challenge_hash",
             "type": {
               "array": [
                 "u8",
@@ -22427,14 +22440,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "reviewDeadline",
+            "name": "review_deadline",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "challengeResolved",
+      "name": "ChallengeResolved",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22451,14 +22464,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "challengeVoteRecorded",
+      "name": "ChallengeVoteRecorded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22471,27 +22484,27 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "voteUphold",
+            "name": "vote_uphold",
             "type": "bool"
           },
           {
-            "name": "upholdVotes",
+            "name": "uphold_votes",
             "type": "u8"
           },
           {
-            "name": "overturnVotes",
+            "name": "overturn_votes",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "claim",
+      "name": "Claim",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "claimId",
+            "name": "claim_id",
             "docs": [
               "Unique claim identifier (caller-provided, e.g. SHA-256 of the statement)."
             ],
@@ -22510,14 +22523,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "claimType",
+            "name": "claim_type",
             "docs": [
               "Type of claim (see claim_type constants)."
             ],
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "docs": [
               "Participant who submitted the claim."
             ],
@@ -22531,7 +22544,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "statementHash",
+            "name": "statement_hash",
             "docs": [
               "sha-256 hash of the off-chain claim statement / document."
             ],
@@ -22550,46 +22563,46 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "evidenceCount",
+            "name": "evidence_count",
             "docs": [
               "Number of evidence items attached to this claim."
             ],
             "type": "u8"
           },
           {
-            "name": "observationCount",
+            "name": "observation_count",
             "docs": [
               "Number of observations submitted for this claim."
             ],
             "type": "u8"
           },
           {
-            "name": "attestationCount",
+            "name": "attestation_count",
             "docs": [
               "Number of attestations submitted for this claim."
             ],
             "type": "u8"
           },
           {
-            "name": "requiredAttestations",
+            "name": "required_attestations",
             "docs": [
-              "Quorum threshold — number of attestations needed to verify."
+              "Quorum threshold \u2014 number of attestations needed to verify."
             ],
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "claimCreated",
+      "name": "ClaimCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22602,7 +22615,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "claimId",
+            "name": "claim_id",
             "type": {
               "array": [
                 "u8",
@@ -22611,15 +22624,15 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "claimType",
+            "name": "claim_type",
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "type": "pubkey"
           },
           {
-            "name": "statementHash",
+            "name": "statement_hash",
             "type": {
               "array": [
                 "u8",
@@ -22631,7 +22644,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "claimRejected",
+      "name": "ClaimRejected",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22647,7 +22660,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "claimSessionTracker",
+      "name": "ClaimSessionTracker",
       "docs": [
         "Singleton guard PDA that tracks which session is currently active for a",
         "given claim. Prevents opening multiple concurrent verification sessions",
@@ -22666,7 +22679,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "activeSession",
+            "name": "active_session",
             "docs": [
               "The currently active session (zero key = no active session)."
             ],
@@ -22683,7 +22696,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "claimVerified",
+      "name": "ClaimVerified",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22696,31 +22709,31 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "claimType",
+            "name": "claim_type",
             "type": "u8"
           },
           {
-            "name": "attestationCount",
+            "name": "attestation_count",
             "type": "u8"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "countryAllocated",
+      "name": "CountryAllocated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "worldRegistry",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -22729,19 +22742,19 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "approvedAdmin",
+            "name": "approved_admin",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "countryAllocation",
+      "name": "CountryAllocation",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "countryCode",
+            "name": "country_code",
             "docs": [
               "ISO 3166-1 alpha-2 country code."
             ],
@@ -22753,7 +22766,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "approvedAdmin",
+            "name": "approved_admin",
             "docs": [
               "Admin wallet approved to create this country's ValidatorRegistry."
             ],
@@ -22763,7 +22776,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "coverageIncentive",
+      "name": "CoverageIncentive",
       "docs": [
         "Global coverage-incentive parameters.",
         "",
@@ -22777,49 +22790,49 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "demandBps",
+            "name": "demand_bps",
             "docs": [
               "Baseline demand contribution (bps)."
             ],
             "type": "u16"
           },
           {
-            "name": "deficitBps",
+            "name": "deficit_bps",
             "docs": [
               "Coverage-deficit contribution (bps)."
             ],
             "type": "u16"
           },
           {
-            "name": "difficultyBps",
+            "name": "difficulty_bps",
             "docs": [
-              "Base difficulty contribution; scaled ×required_validators (cap 4)."
+              "Base difficulty contribution; scaled \u00d7required_validators (cap 4)."
             ],
             "type": "u16"
           },
           {
-            "name": "strategicBps",
+            "name": "strategic_bps",
             "docs": [
               "Strategic-importance contribution for strategic task classes."
             ],
             "type": "u16"
           },
           {
-            "name": "maxSubsidyBps",
+            "name": "max_subsidy_bps",
             "docs": [
               "Hard cap applied after summing all contributions."
             ],
             "type": "u16"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "coverageIncentiveSet",
+      "name": "CoverageIncentiveSet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -22828,35 +22841,35 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "demandBps",
+            "name": "demand_bps",
             "type": "u16"
           },
           {
-            "name": "deficitBps",
+            "name": "deficit_bps",
             "type": "u16"
           },
           {
-            "name": "difficultyBps",
+            "name": "difficulty_bps",
             "type": "u16"
           },
           {
-            "name": "strategicBps",
+            "name": "strategic_bps",
             "type": "u16"
           },
           {
-            "name": "maxSubsidyBps",
+            "name": "max_subsidy_bps",
             "type": "u16"
           }
         ]
       }
     },
     {
-      "name": "credentialIssued",
+      "name": "CredentialIssued",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "credentialHash",
+            "name": "credential_hash",
             "type": {
               "array": [
                 "u8",
@@ -22873,11 +22886,11 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "signerCount",
+            "name": "signer_count",
             "type": "u8"
           },
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -22886,19 +22899,19 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "issuedAt",
+            "name": "issued_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "credentialNullifier",
+      "name": "CredentialNullifier",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -22911,19 +22924,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "consumedAt",
+            "name": "consumed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "credentialRequest",
+      "name": "CredentialRequest",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "requestHash",
+            "name": "request_hash",
             "type": {
               "array": [
                 "u8",
@@ -22940,11 +22953,11 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "disclosureType",
+            "name": "disclosure_type",
             "type": "u8"
           },
           {
-            "name": "regionRegistry",
+            "name": "region_registry",
             "type": "pubkey"
           },
           {
@@ -22964,23 +22977,23 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "credentialRequested",
+      "name": "CredentialRequested",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "requestHash",
+            "name": "request_hash",
             "type": {
               "array": [
                 "u8",
@@ -22997,23 +23010,23 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "regionRegistry",
+            "name": "region_registry",
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "credentialSigned",
+      "name": "CredentialSigned",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "requestHash",
+            "name": "request_hash",
             "type": {
               "array": [
                 "u8",
@@ -23026,7 +23039,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "signersCount",
+            "name": "signers_count",
             "type": "u8"
           },
           {
@@ -23037,12 +23050,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "credentialVerified",
+      "name": "CredentialVerified",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "credentialHash",
+            "name": "credential_hash",
             "type": {
               "array": [
                 "u8",
@@ -23051,7 +23064,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -23068,15 +23081,15 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "disclosureType",
+            "name": "disclosure_type",
             "type": "u8"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           },
           {
-            "name": "proofHash",
+            "name": "proof_hash",
             "type": {
               "array": [
                 "u8",
@@ -23088,11 +23101,11 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "crossBorderBinding",
+      "name": "CrossBorderBinding",
       "docs": [
-        "Jurisdiction-to-jurisdiction recognition link (RFC-012 §5 `CrossBorderBinding`).",
+        "Jurisdiction-to-jurisdiction recognition link (RFC-012 \u00a75 `CrossBorderBinding`).",
         "",
-        "PDA: `[\"cross_border_binding\", country_min, country_max]` — the country pair",
+        "PDA: `[\"cross_border_binding\", country_min, country_max]` \u2014 the country pair",
         "is stored canonically ordered, so one PDA exists per unordered pair and",
         "routing can derive it from `TaskRequirement.jurisdiction` + profile",
         "jurisdiction without extra lookups."
@@ -23101,7 +23114,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "countryMin",
+            "name": "country_min",
             "docs": [
               "Smaller of the two ISO 3166-1 alpha-2 codes (2 bytes)."
             ],
@@ -23113,7 +23126,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "countryMax",
+            "name": "country_max",
             "docs": [
               "Larger of the two codes."
             ],
@@ -23125,14 +23138,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "jurisdictionMin",
+            "name": "jurisdiction_min",
             "docs": [
               "Jurisdiction PDA of `country_min`."
             ],
             "type": "pubkey"
           },
           {
-            "name": "jurisdictionMax",
+            "name": "jurisdiction_max",
             "docs": [
               "Jurisdiction PDA of `country_max`."
             ],
@@ -23141,30 +23154,30 @@ export type TerraRegistry = {
           {
             "name": "status",
             "docs": [
-              "`binding_status` — ACTIVE / SUSPENDED / REVOKED (terminal)."
+              "`binding_status` \u2014 ACTIVE / SUSPENDED / REVOKED (terminal)."
             ],
             "type": "u8"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "Unix expiry (0 = none)."
             ],
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderBindingCreated",
+      "name": "CrossBorderBindingCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23173,7 +23186,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "countryMin",
+            "name": "country_min",
             "type": {
               "array": [
                 "u8",
@@ -23182,7 +23195,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "countryMax",
+            "name": "country_max",
             "type": {
               "array": [
                 "u8",
@@ -23191,18 +23204,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderBindingStatusChanged",
+      "name": "CrossBorderBindingStatusChanged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23215,18 +23228,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "updatedBy",
+            "name": "updated_by",
             "type": "pubkey"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderIdentityBound",
+      "name": "CrossBorderIdentityBound",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23235,7 +23248,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "type": {
               "array": [
                 "u8",
@@ -23248,27 +23261,27 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "boundAt",
+            "name": "bound_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderIdentityRebound",
+      "name": "CrossBorderIdentityRebound",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "oldBinding",
+            "name": "old_binding",
             "type": "pubkey"
           },
           {
-            "name": "newBinding",
+            "name": "new_binding",
             "type": "pubkey"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "type": {
               "array": [
                 "u8",
@@ -23281,19 +23294,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "boundAt",
+            "name": "bound_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderLinked",
+      "name": "CrossBorderLinked",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "crossBorderVerification",
+            "name": "cross_border_verification",
             "type": "pubkey"
           },
           {
@@ -23313,23 +23326,23 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "linkedBy",
+            "name": "linked_by",
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderRevoked",
+      "name": "CrossBorderRevoked",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "crossBorderVerification",
+            "name": "cross_border_verification",
             "type": "pubkey"
           },
           {
@@ -23341,17 +23354,17 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "revokedAt",
+            "name": "revoked_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderSpanRecord",
+      "name": "CrossBorderSpanRecord",
       "docs": [
-        "A verification that spanned two jurisdictions (RFC-012 §5",
-        "`CrossBorderVerification`) — the auditable record that a validator from",
+        "A verification that spanned two jurisdictions (RFC-012 \u00a75",
+        "`CrossBorderVerification`) \u2014 the auditable record that a validator from",
         "`country_home` produced a result for a task requiring `country_required`",
         "under an ACTIVE `CrossBorderBinding`.",
         "",
@@ -23361,7 +23374,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -23374,11 +23387,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "reqIndex",
+            "name": "req_index",
             "type": "u8"
           },
           {
-            "name": "countryHome",
+            "name": "country_home",
             "docs": [
               "The validator's declared `ValidatorProfile.jurisdiction`."
             ],
@@ -23390,7 +23403,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "countryRequired",
+            "name": "country_required",
             "docs": [
               "The task requirement's jurisdiction."
             ],
@@ -23409,14 +23422,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "recordedAt",
+            "name": "recorded_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderVerification",
+      "name": "CrossBorderVerification",
       "docs": [
         "Bridges cross-border identity bindings into the verification pipeline.",
         "",
@@ -23461,25 +23474,25 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "docs": [
               "Who verified this binding."
             ],
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderVerificationRecorded",
+      "name": "CrossBorderVerificationRecorded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23488,7 +23501,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -23501,7 +23514,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "countryHome",
+            "name": "country_home",
             "type": {
               "array": [
                 "u8",
@@ -23510,7 +23523,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "countryRequired",
+            "name": "country_required",
             "type": {
               "array": [
                 "u8",
@@ -23523,19 +23536,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "recordedAt",
+            "name": "recorded_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "crossBorderVerified",
+      "name": "CrossBorderVerified",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "crossBorderVerification",
+            "name": "cross_border_verification",
             "type": "pubkey"
           },
           {
@@ -23547,18 +23560,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "type": "pubkey"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceCalibrationSet",
+      "name": "DeviceCalibrationSet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23571,7 +23584,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "calibrationHash",
+            "name": "calibration_hash",
             "type": {
               "array": [
                 "u8",
@@ -23580,17 +23593,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "calibratedAt",
+            "name": "calibrated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceIdentity",
+      "name": "DeviceIdentity",
       "docs": [
         "A registered capture device (phone, GNSS receiver, drone, survey",
-        "instrument, 3D scanner, …) owned by a wallet.",
+        "instrument, 3D scanner, \u2026) owned by a wallet.",
         "",
         "PDA: `[\"device_identity\", owner, device_nonce]`"
       ],
@@ -23605,14 +23618,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "deviceNonce",
+            "name": "device_nonce",
             "docs": [
-              "PDA seed companion — one device per (owner, nonce)."
+              "PDA seed companion \u2014 one device per (owner, nonce)."
             ],
             "type": "u16"
           },
           {
-            "name": "deviceKey",
+            "name": "device_key",
             "docs": [
               "The device's Ed25519 public key (signs observation envelopes)."
             ],
@@ -23633,14 +23646,14 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "metadataRef",
+            "name": "metadata_ref",
             "docs": [
               "Model/firmware metadata reference (IPFS CID or URL)."
             ],
             "type": "string"
           },
           {
-            "name": "calibrationHash",
+            "name": "calibration_hash",
             "docs": [
               "SHA-256 of the latest calibration certificate (all-zero = never)."
             ],
@@ -23652,7 +23665,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "calibratedAt",
+            "name": "calibrated_at",
             "docs": [
               "When the calibration certificate was issued (0 = never)."
             ],
@@ -23661,44 +23674,44 @@ export type TerraRegistry = {
           {
             "name": "status",
             "docs": [
-              "`device_status` — ACTIVE / SUSPENDED / REVOKED."
+              "`device_status` \u2014 ACTIVE / SUSPENDED / REVOKED."
             ],
             "type": "u8"
           },
           {
             "name": "verified",
             "docs": [
-              "A validator has verified this registration (claim ≠ fact until then)."
+              "A validator has verified this registration (claim \u2260 fact until then)."
             ],
             "type": "bool"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "docs": [
               "Validator wallet that last verified."
             ],
             "type": "pubkey"
           },
           {
-            "name": "verifyVersion",
+            "name": "verify_version",
             "docs": [
               "Monotonic counter, bumped on each verification."
             ],
             "type": "u32"
           },
           {
-            "name": "registeredAt",
+            "name": "registered_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceKeyRotated",
+      "name": "DeviceKeyRotated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23711,22 +23724,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldDeviceKey",
+            "name": "old_device_key",
             "type": "pubkey"
           },
           {
-            "name": "newDeviceKey",
+            "name": "new_device_key",
             "type": "pubkey"
           },
           {
-            "name": "rotatedAt",
+            "name": "rotated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceRegistered",
+      "name": "DeviceRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23739,7 +23752,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "deviceKey",
+            "name": "device_key",
             "type": "pubkey"
           },
           {
@@ -23747,14 +23760,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "registeredAt",
+            "name": "registered_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceStatusChanged",
+      "name": "DeviceStatusChanged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23767,22 +23780,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldStatus",
+            "name": "old_status",
             "type": "u8"
           },
           {
-            "name": "newStatus",
+            "name": "new_status",
             "type": "u8"
           },
           {
-            "name": "changedAt",
+            "name": "changed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceUpdated",
+      "name": "DeviceUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23799,14 +23812,14 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "deviceVerified",
+      "name": "DeviceVerified",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23815,22 +23828,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "type": "pubkey"
           },
           {
-            "name": "verifyVersion",
+            "name": "verify_version",
             "type": "u32"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "dispute",
+      "name": "Dispute",
       "docs": [
         "An on-chain dispute record bound to a parcel.",
         "",
@@ -23848,14 +23861,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "filedBy",
+            "name": "filed_by",
             "docs": [
               "The wallet that filed the dispute."
             ],
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "docs": [
               "SHA-256 of the off-chain court document / complaint."
             ],
@@ -23869,7 +23882,7 @@ export type TerraRegistry = {
           {
             "name": "status",
             "docs": [
-              "Current dispute status (FILED → FROZEN → ADJUDICATED → EXECUTED)."
+              "Current dispute status (FILED \u2192 FROZEN \u2192 ADJUDICATED \u2192 EXECUTED)."
             ],
             "type": "u8"
           },
@@ -23881,7 +23894,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "declaredCount",
+            "name": "declared_count",
             "docs": [
               "Number of validators declared at filing time (NOT actual signatures collected)."
             ],
@@ -23900,11 +23913,11 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "presentValidators",
+            "name": "present_validators",
             "docs": [
               "Validators that actually co-signed (recorded at freeze/adjudicate).",
               "Unlike `validators` (declared at filing), this is on-chain proof of",
-              "who testified — events alone are not reliably indexable."
+              "who testified \u2014 events alone are not reliably indexable."
             ],
             "type": {
               "array": [
@@ -23914,43 +23927,74 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "presentCount",
+            "name": "present_count",
             "docs": [
               "How many entries of `present_validators` are populated."
             ],
             "type": "u8"
           },
           {
-            "name": "filedAt",
+            "name": "filed_at",
             "type": "i64"
           },
           {
-            "name": "frozenAt",
+            "name": "frozen_at",
             "type": "i64"
           },
           {
-            "name": "adjudicatedAt",
+            "name": "adjudicated_at",
             "type": "i64"
           },
           {
             "name": "outcome",
             "docs": [
-              "Outcome of adjudication (OWNER_WINS or OWNER_LOSES). Set at adjudication."
+              "Outcome of adjudication (OWNER_WINS / OWNER_LOSES / BOUNDARY_ADJUSTED /",
+              "OVERLAP_SPLIT / EASEMENT_RECOGNIZED / COEXISTENCE). Set at adjudication."
             ],
             "type": "u8"
           },
           {
-            "name": "newOwner",
+            "name": "new_owner",
             "docs": [
               "New owner if outcome is OWNER_LOSES. Set at adjudication."
             ],
             "type": "pubkey"
+          },
+          {
+            "name": "bond_lamports",
+            "docs": [
+              "Bond lamports posted by the filer at filing (permissionless gate).",
+              "Refunded on filer win / partial remedy; slashed on filer loss."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bond_refund_to",
+            "docs": [
+              "Wallet to receive the bond refund (defaults to filer at filing)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bond_resolved",
+            "docs": [
+              "Whether the bond has been refunded or slashed (resolved)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "remedy_geometry_version",
+            "docs": [
+              "Geometry-version remedy reference for partial remedies",
+              "(BOUNDARY_ADJUSTED / OVERLAP_SPLIT / EASEMENT_RECOGNIZED)."
+            ],
+            "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "disputeAdjudicated",
+      "name": "DisputeAdjudicated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23967,18 +24011,22 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "newOwner",
+            "name": "new_owner",
             "type": "pubkey"
           },
           {
-            "name": "adjudicatedAt",
+            "name": "adjudicated_at",
             "type": "i64"
+          },
+          {
+            "name": "remedy_geometry_version",
+            "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "disputeCancelled",
+      "name": "DisputeCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -23991,14 +24039,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "cancelledBy",
+            "name": "cancelled_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "disputeFiled",
+      "name": "DisputeFiled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24011,11 +24059,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "filedBy",
+            "name": "filed_by",
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "type": {
               "array": [
                 "u8",
@@ -24028,14 +24076,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "declaredCount",
+            "name": "declared_count",
             "type": "u8"
+          },
+          {
+            "name": "bond_lamports",
+            "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "emergencyInjection",
+      "name": "EmergencyInjection",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24047,7 +24099,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "requestedBy",
+            "name": "requested_by",
             "docs": [
               "Admin who queued the injection."
             ],
@@ -24061,7 +24113,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "executeAfter",
+            "name": "execute_after",
             "docs": [
               "Unix timestamp after which the injection can be executed."
             ],
@@ -24078,7 +24130,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "emergencyInjectionExecuted",
+      "name": "EmergencyInjectionExecuted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24091,18 +24143,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "executedBy",
+            "name": "executed_by",
             "type": "pubkey"
           },
           {
-            "name": "newValidatorCount",
+            "name": "new_validator_count",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "emergencyInjectionQueued",
+      "name": "EmergencyInjectionQueued",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24115,18 +24167,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "requestedBy",
+            "name": "requested_by",
             "type": "pubkey"
           },
           {
-            "name": "executeAfter",
+            "name": "execute_after",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "emergencyProtection",
+      "name": "EmergencyProtection",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24143,11 +24195,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
@@ -24158,7 +24210,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "emergencyProtectionLifted",
+      "name": "EmergencyProtectionLifted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24175,14 +24227,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "liftedAt",
+            "name": "lifted_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "emergencyProtectionStarted",
+      "name": "EmergencyProtectionStarted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24199,23 +24251,23 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "equivocationReported",
+      "name": "EquivocationReported",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -24227,7 +24279,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "type": {
               "array": [
                 "u8",
@@ -24239,7 +24291,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "escrowAccepted",
+      "name": "EscrowAccepted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24256,18 +24308,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "acceptedAt",
+            "name": "accepted_at",
             "type": "i64"
           },
           {
-            "name": "settleDeadline",
+            "name": "settle_deadline",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "escrowCancelled",
+      "name": "EscrowCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24280,14 +24332,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "cancelledBy",
+            "name": "cancelled_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "escrowCreated",
+      "name": "EscrowCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24312,14 +24364,14 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "escrowDeposited",
+      "name": "EscrowDeposited",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24336,18 +24388,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "depositAmount",
+            "name": "deposit_amount",
             "type": "u64"
           },
           {
-            "name": "totalDeposited",
+            "name": "total_deposited",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "escrowDisputed",
+      "name": "EscrowDisputed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24364,7 +24416,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "type": {
               "array": [
                 "u8",
@@ -24380,7 +24432,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "escrowExpired",
+      "name": "EscrowExpired",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24393,14 +24445,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "expiredAt",
+            "name": "expired_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "escrowRecord",
+      "name": "EscrowRecord",
       "docs": [
         "An on-chain escrow record for a parcel sale.",
         "",
@@ -24438,7 +24490,7 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "depositAmount",
+            "name": "deposit_amount",
             "docs": [
               "Amount deposited so far by buyer."
             ],
@@ -24459,33 +24511,33 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "depositedAt",
+            "name": "deposited_at",
             "type": "i64"
           },
           {
-            "name": "acceptedAt",
+            "name": "accepted_at",
             "type": "i64"
           },
           {
-            "name": "settleDeadline",
+            "name": "settle_deadline",
             "docs": [
               "accepted_at + SETTLEMENT_WINDOW_SECS"
             ],
             "type": "i64"
           },
           {
-            "name": "cancelDeadline",
+            "name": "cancel_deadline",
             "docs": [
               "created_at + CANCEL_WINDOW_SECS"
             ],
             "type": "i64"
           },
           {
-            "name": "disputeCaseHash",
+            "name": "dispute_case_hash",
             "docs": [
               "Case hash if dispute filed (0 if none)."
             ],
@@ -24500,7 +24552,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "escrowSettled",
+      "name": "EscrowSettled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24525,14 +24577,14 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "settledAt",
+            "name": "settled_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "evidence",
+      "name": "Evidence",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24551,21 +24603,21 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "docs": [
               "Participant who submitted this evidence."
             ],
             "type": "pubkey"
           },
           {
-            "name": "evidenceType",
+            "name": "evidence_type",
             "docs": [
               "Type of evidence (see evidence_type constants)."
             ],
             "type": "u8"
           },
           {
-            "name": "contentHash",
+            "name": "content_hash",
             "docs": [
               "sha-256 hash of the off-chain evidence content."
             ],
@@ -24577,18 +24629,19 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "storageReference",
+            "name": "storage_reference",
             "docs": [
-              "Storage reference (IPFS CID, URL, or content address)."
+              "Storage reference (IPFS CID, URL, or content address). Widened to 256",
+              "chars so signed URLs (S3 pre-signed, R2, gateway tokens) fit."
             ],
             "type": "string"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "observedAt",
+            "name": "observed_at",
             "docs": [
               "When the evidence was originally observed (off-chain), if applicable."
             ],
@@ -24598,7 +24651,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "evidenceAdded",
+      "name": "EvidenceAdded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24615,15 +24668,15 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "evidenceType",
+            "name": "evidence_type",
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "type": "pubkey"
           },
           {
-            "name": "contentHash",
+            "name": "content_hash",
             "type": {
               "array": [
                 "u8",
@@ -24635,7 +24688,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "evidenceArtifact",
+      "name": "EvidenceArtifact",
       "docs": [
         "One artifact inside a manifest (photo / document / video / model / geometry).",
         "",
@@ -24652,7 +24705,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "artifactIndex",
+            "name": "artifact_index",
             "docs": [
               "Append-only index within the manifest (PDA seed)."
             ],
@@ -24668,19 +24721,19 @@ export type TerraRegistry = {
           {
             "name": "source",
             "docs": [
-              "Capture source — one of `observation_source` (reused for provenance richness)."
+              "Capture source \u2014 one of `observation_source` (reused for provenance richness)."
             ],
             "type": "u8"
           },
           {
             "name": "provenance",
             "docs": [
-              "Provenance — one of `observation_provenance`."
+              "Provenance \u2014 one of `observation_provenance`."
             ],
             "type": "u8"
           },
           {
-            "name": "contentHash",
+            "name": "content_hash",
             "docs": [
               "sha256 of the artifact bytes / content envelope."
             ],
@@ -24692,21 +24745,21 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "storageReference",
+            "name": "storage_reference",
             "docs": [
-              "IPFS CID, URL, or content address (≤128 bytes)."
+              "IPFS CID, URL, or content address (\u2264128 bytes)."
             ],
             "type": "string"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "evidenceArtifactAdded",
+      "name": "EvidenceArtifactAdded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24719,7 +24772,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -24728,7 +24781,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "artifactIndex",
+            "name": "artifact_index",
             "type": "u16"
           },
           {
@@ -24747,7 +24800,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "evidenceManifest",
+      "name": "EvidenceManifest",
       "docs": [
         "Structured list of evidence artifacts for a verification task.",
         "",
@@ -24757,7 +24810,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "docs": [
               "Task this manifest supports."
             ],
@@ -24790,14 +24843,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "artifactCount",
+            "name": "artifact_count",
             "docs": [
               "Number of artifacts appended so far (0..=MAX_MANIFEST_ARTIFACTS)."
             ],
             "type": "u16"
           },
           {
-            "name": "rootHash",
+            "name": "root_hash",
             "docs": [
               "Pre-declared or rolling manifest root hash (sha256 of artifact set).",
               "May be zero at open; clients recompute/verify off-chain."
@@ -24810,14 +24863,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "evidenceManifestSubmitted",
+      "name": "EvidenceManifestSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24826,7 +24879,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -24850,7 +24903,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "feePolicy",
+      "name": "FeePolicy",
       "docs": [
         "Global protocol fee rules.",
         "",
@@ -24867,21 +24920,21 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "feeBps",
+            "name": "fee_bps",
             "docs": [
               "Protocol fee in bps, charged on top of every task escrow funding."
             ],
             "type": "u16"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "feePolicySet",
+      "name": "FeePolicySet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24890,14 +24943,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "feeBps",
+            "name": "fee_bps",
             "type": "u16"
           }
         ]
       }
     },
     {
-      "name": "fraudAppealDecided",
+      "name": "FraudAppealDecided",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24913,7 +24966,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "fraudAppealFiled",
+      "name": "FraudAppealFiled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -24933,7 +24986,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "fraudReport",
+      "name": "FraudReport",
       "docs": [
         "Accusation with evidence. Permissionless to file; never auto-punishes.",
         "PDA: `[\"fraud_report\", accused, reporter, nonce]`"
@@ -24954,7 +25007,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "type": {
               "array": [
                 "u8",
@@ -24963,7 +25016,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "reasonCode",
+            "name": "reason_code",
             "type": "u8"
           },
           {
@@ -24975,22 +25028,22 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "fraudReportSubmitted",
+      "name": "FraudReportSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25007,18 +25060,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "reasonCode",
+            "name": "reason_code",
             "type": "u8"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "fraudReviewFinalized",
+      "name": "FraudReviewFinalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25035,18 +25088,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "votesUpheld",
+            "name": "votes_upheld",
             "type": "u8"
           },
           {
-            "name": "votesDismissed",
+            "name": "votes_dismissed",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "fraudReviewOpened",
+      "name": "FraudReviewOpened",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25063,14 +25116,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "committeeSize",
+            "name": "committee_size",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "fraudVoteCast",
+      "name": "FraudVoteCast",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25087,14 +25140,14 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "votesCast",
+            "name": "votes_cast",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "genesisConfirmation",
+      "name": "GenesisConfirmation",
       "docs": [
         "Record of a cross-country genesis confirmation."
       ],
@@ -25109,7 +25162,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "docs": [
               "Country code of the confirming validator."
             ],
@@ -25124,16 +25177,16 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "genesisConfirmed",
+      "name": "GenesisConfirmed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "worldRegistry",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -25146,7 +25199,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "confirmerCountry",
+            "name": "confirmer_country",
             "type": {
               "array": [
                 "u8",
@@ -25155,7 +25208,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "confirmationsCount",
+            "name": "confirmations_count",
             "type": "u8"
           },
           {
@@ -25166,16 +25219,16 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "genesisFinalized",
+      "name": "GenesisFinalized",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "worldRegistry",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -25188,19 +25241,19 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "distinctCountries",
+            "name": "distinct_countries",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "genesisRequest",
+      "name": "GenesisRequest",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "countryCode",
+            "name": "country_code",
             "docs": [
               "The country being genesis'd."
             ],
@@ -25212,7 +25265,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requestedBy",
+            "name": "requested_by",
             "docs": [
               "Admin requesting genesis (must match allocation)."
             ],
@@ -25226,7 +25279,7 @@ export type TerraRegistry = {
             "type": {
               "vec": {
                 "defined": {
-                  "name": "genesisConfirmation"
+                  "name": "GenesisConfirmation"
                 }
               }
             }
@@ -25239,23 +25292,23 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "genesisRequested",
+      "name": "GenesisRequested",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "worldRegistry",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -25264,17 +25317,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requestedBy",
+            "name": "requested_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "geometryVersion",
+      "name": "GeometryVersion",
       "docs": [
         "One append-only entry in a spatial asset's geometry history",
-        "(RFC-012 §5 `GeometryVersion`).",
+        "(RFC-012 \u00a75 `GeometryVersion`).",
         "",
         "PDA: `[\"geometry_version\", asset, version_le_bytes]`."
       ],
@@ -25303,7 +25356,7 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "geometryHash",
+            "name": "geometry_hash",
             "docs": [
               "SHA-256 canonical digest of the off-chain geometry document."
             ],
@@ -25329,43 +25382,43 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "storageReference",
+            "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 128 chars."
+              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 512 chars."
             ],
             "type": "string"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "docs": [
               "Whoever paid to anchor this claim (permissionless)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "submittedAt",
+            "name": "submitted_at",
             "type": "i64"
           },
           {
             "name": "verified",
             "docs": [
-              "Claim → fact: true once `attest_count >= required` validators attested."
+              "Claim \u2192 fact: true once `attest_count >= required` validators attested."
             ],
             "type": "bool"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "docs": [
               "Validator whose attestation completed the quorum (zero until verified)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           },
           {
-            "name": "evidenceManifest",
+            "name": "evidence_manifest",
             "docs": [
               "EvidenceManifest this version was anchored from",
               "(`Pubkey::default()` = standalone permissionless append)."
@@ -25373,19 +25426,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "elevationMinMm",
+            "name": "elevation_min_mm",
             "docs": [
               "This version's elevation envelope, millimetres (both 0 when",
               "`elevation_source == elevation_source::NONE`)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
-            "name": "elevationMaxMm",
-            "type": "i32"
+            "name": "elevation_max_mm",
+            "type": "i64"
           },
           {
-            "name": "elevationSource",
+            "name": "elevation_source",
             "docs": [
               "`elevation_source` provenance code for the Z values above."
             ],
@@ -25403,7 +25456,7 @@ export type TerraRegistry = {
             "name": "attestors",
             "docs": [
               "Unique validator attestors so far (zero-filled padding after",
-              "`attest_count`; append-only — slots are never reused)."
+              "`attest_count`; append-only \u2014 slots are never reused)."
             ],
             "type": {
               "array": [
@@ -25413,7 +25466,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "attestCount",
+            "name": "attest_count",
             "docs": [
               "Confirmed attestations so far (0..=required until verified)."
             ],
@@ -25423,12 +25476,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "geometryVersionAppended",
+      "name": "GeometryVersionAppended",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "geometryVersion",
+            "name": "geometry_version",
             "type": "pubkey"
           },
           {
@@ -25440,7 +25493,7 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "geometryHash",
+            "name": "geometry_hash",
             "type": {
               "array": [
                 "u8",
@@ -25457,27 +25510,27 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "type": "pubkey"
           },
           {
-            "name": "submittedAt",
+            "name": "submitted_at",
             "type": "i64"
           },
           {
-            "name": "evidenceManifest",
+            "name": "evidence_manifest",
             "type": "pubkey"
           },
           {
-            "name": "elevationMinMm",
-            "type": "i32"
+            "name": "elevation_min_mm",
+            "type": "i64"
           },
           {
-            "name": "elevationMaxMm",
-            "type": "i32"
+            "name": "elevation_max_mm",
+            "type": "i64"
           },
           {
-            "name": "elevationSource",
+            "name": "elevation_source",
             "type": "u8"
           },
           {
@@ -25488,12 +25541,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "geometryVersionAttested",
+      "name": "GeometryVersionAttested",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "geometryVersion",
+            "name": "geometry_version",
             "type": "pubkey"
           },
           {
@@ -25505,7 +25558,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "attestCount",
+            "name": "attest_count",
             "type": "u8"
           },
           {
@@ -25516,12 +25569,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "geometryVersionVerified",
+      "name": "GeometryVersionVerified",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "geometryVersion",
+            "name": "geometry_version",
             "type": "pubkey"
           },
           {
@@ -25529,15 +25582,15 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "type": "pubkey"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           },
           {
-            "name": "attestCount",
+            "name": "attest_count",
             "type": "u8"
           },
           {
@@ -25548,7 +25601,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "guardianClaim",
+      "name": "GuardianClaim",
       "docs": [
         "Bridge between the guardian/court system and the verification pipeline.",
         "When a guardianship event occurs (e.g. court-ordered guardianship via",
@@ -25575,14 +25628,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "triggeredBy",
+            "name": "triggered_by",
             "docs": [
               "Who triggered the guardianship (court/guardian wallet)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "docs": [
               "SHA-256 of the court case document."
             ],
@@ -25594,7 +25647,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "guardianType",
+            "name": "guardian_type",
             "docs": [
               "Guardian type (0=court, 1=council, 2=emergency)."
             ],
@@ -25608,23 +25661,23 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "guardianClaimCreated",
+      "name": "GuardianClaimCreated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "guardianClaim",
+            "name": "guardian_claim",
             "type": "pubkey"
           },
           {
@@ -25636,11 +25689,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "triggeredBy",
+            "name": "triggered_by",
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "type": {
               "array": [
                 "u8",
@@ -25649,23 +25702,23 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "guardianType",
+            "name": "guardian_type",
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "guardianClaimDisputed",
+      "name": "GuardianClaimDisputed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "guardianClaim",
+            "name": "guardian_claim",
             "type": "pubkey"
           },
           {
@@ -25677,19 +25730,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "disputedAt",
+            "name": "disputed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "guardianClaimResolved",
+      "name": "GuardianClaimResolved",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "guardianClaim",
+            "name": "guardian_claim",
             "type": "pubkey"
           },
           {
@@ -25701,14 +25754,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "identityRightGranted",
+      "name": "IdentityRightGranted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25721,14 +25774,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "identityRightRevoked",
+      "name": "IdentityRightRevoked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25741,20 +25794,20 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "identityRights",
+      "name": "IdentityRights",
       "docs": [
         "An identity-based right that links an Identity PDA to a Parcel.",
         "",
         "This is the foundation for replacing raw wallet ownership (`Parcel.owner`)",
         "with identity-centric ownership. Rather than a wallet pubkey holding a right,",
-        "the Identity PDA is the holder — making rights portable across wallets.",
+        "the Identity PDA is the holder \u2014 making rights portable across wallets.",
         "",
         "PDA: `[\"identity_rights\", identity, parcel, rights_kind]`.",
         "One IdentityRights per (identity, parcel, kind) is allowed."
@@ -25777,7 +25830,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "docs": [
               "Right kind (OWNERSHIP, USAGE, EASEMENT, etc.)."
             ],
@@ -25791,11 +25844,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "Unix timestamp; 0 means no expiration."
             ],
@@ -25816,7 +25869,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "infrastructureUpdated",
+      "name": "InfrastructureUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25829,7 +25882,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "accessHash",
+            "name": "access_hash",
             "type": {
               "array": [
                 "u8",
@@ -25841,7 +25894,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "judgmentExecuted",
+      "name": "JudgmentExecuted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -25858,18 +25911,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "newOwner",
+            "name": "new_owner",
             "type": "pubkey"
           },
           {
-            "name": "executedAt",
+            "name": "executed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "jurisdiction",
+      "name": "Jurisdiction",
       "docs": [
         "A registered jurisdiction (country/zone) in the cross-border identity system.",
         "",
@@ -25879,7 +25932,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "countryCode",
+            "name": "country_code",
             "docs": [
               "ISO 3166-1 alpha-2 padded to 16 bytes (e.g. b\"KE\\x00...\" for Kenya)."
             ],
@@ -25898,28 +25951,28 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "jurisdictionName",
+            "name": "jurisdiction_name",
             "docs": [
               "Human-readable name (max 64 chars)."
             ],
             "type": "string"
           },
           {
-            "name": "credentialSchemaCid",
+            "name": "credential_schema_cid",
             "docs": [
               "IPFS CID of the W3C Verifiable Credential schema."
             ],
             "type": "string"
           },
           {
-            "name": "revocationRegistry",
+            "name": "revocation_registry",
             "docs": [
               "On-chain or oracle reference for revocation checks."
             ],
             "type": "pubkey"
           },
           {
-            "name": "verificationKeyHash",
+            "name": "verification_key_hash",
             "docs": [
               "SHA-256 of the ZK verification key for this jurisdiction's circuit."
             ],
@@ -25931,7 +25984,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "docs": [
               "0 = Groth16, 1 = FRI-STARK."
             ],
@@ -25945,18 +25998,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionBinding",
+      "name": "JurisdictionBinding",
       "docs": [
         "Binds a person (via identity_hash) to a jurisdiction with a ZK proof.",
         "",
@@ -25966,7 +26019,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "docs": [
               "The identity_hash from the existing Identity account."
             ],
@@ -25978,14 +26031,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "jurisdictionKey",
+            "name": "jurisdiction_key",
             "docs": [
               "The Jurisdiction PDA this binding belongs to."
             ],
             "type": "pubkey"
           },
           {
-            "name": "credentialCommitment",
+            "name": "credential_commitment",
             "docs": [
               "Pedersen commitment to the credential."
             ],
@@ -26009,21 +26062,21 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "proofData",
+            "name": "proof_data",
             "docs": [
               "The serialized ZK proof (max 512 bytes)."
             ],
             "type": "bytes"
           },
           {
-            "name": "proofVersion",
+            "name": "proof_version",
             "docs": [
               "Version of the proof circuit (for future upgrades)."
             ],
             "type": "u8"
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "docs": [
               "0 = Groth16, 1 = FRI-STARK."
             ],
@@ -26037,28 +26090,28 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "revokedAt",
+            "name": "revoked_at",
             "docs": [
               "Timestamp of revocation (0 if not revoked)."
             ],
             "type": "i64"
           },
           {
-            "name": "revokedBy",
+            "name": "revoked_by",
             "docs": [
               "Who revoked this binding."
             ],
             "type": "pubkey"
           },
           {
-            "name": "boundAt",
+            "name": "bound_at",
             "docs": [
               "When the binding was created."
             ],
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "Optional expiry (0 = no expiry)."
             ],
@@ -26074,7 +26127,7 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "docs": [
               "Validator that last verified this binding."
             ],
@@ -26091,7 +26144,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "jurisdictionIdentityRevoked",
+      "name": "JurisdictionIdentityRevoked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26100,7 +26153,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "type": {
               "array": [
                 "u8",
@@ -26117,18 +26170,18 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "revokedBy",
+            "name": "revoked_by",
             "type": "pubkey"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionMembershipVerified",
+      "name": "JurisdictionMembershipVerified",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26137,7 +26190,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "type": {
               "array": [
                 "u8",
@@ -26158,14 +26211,14 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionRegistered",
+      "name": "JurisdictionRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26174,7 +26227,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -26187,14 +26240,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionUpdated",
+      "name": "JurisdictionUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26203,14 +26256,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "updatedBy",
+            "name": "updated_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionalRestrictionRequest",
+      "name": "JurisdictionalRestrictionRequest",
       "docs": [
         "A jurisdictional restriction request from an authenticated authority.",
         "PDA: `[\"jurisdiction\", authority, subject, nonce]`"
@@ -26231,7 +26284,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "restrictionType",
+            "name": "restriction_type",
             "type": "u8"
           },
           {
@@ -26239,7 +26292,7 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "requestedRemedy",
+            "name": "requested_remedy",
             "type": "u8"
           },
           {
@@ -26256,24 +26309,24 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": {
               "option": "i64"
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "jurisdictionalRestrictionSubmitted",
+      "name": "JurisdictionalRestrictionSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26290,7 +26343,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "restrictionType",
+            "name": "restriction_type",
             "type": "u8"
           },
           {
@@ -26298,14 +26351,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "nominationConfirmed",
+      "name": "NominationConfirmed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26322,11 +26375,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "isPhysical",
+            "name": "is_physical",
             "type": "bool"
           },
           {
-            "name": "confirmationsCount",
+            "name": "confirmations_count",
             "type": "u8"
           },
           {
@@ -26337,12 +26390,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "nullifierRecord",
+      "name": "NullifierRecord",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -26351,11 +26404,11 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "rootVersion",
+            "name": "root_version",
             "type": "u32"
           },
           {
@@ -26363,19 +26416,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "proofPurpose",
+            "name": "proof_purpose",
             "type": "string"
           },
           {
-            "name": "disclosureType",
+            "name": "disclosure_type",
             "type": "u8"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           },
           {
-            "name": "proofHash",
+            "name": "proof_hash",
             "type": {
               "array": [
                 "u8",
@@ -26387,7 +26440,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "observation",
+      "name": "Observation",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26406,7 +26459,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "observedAt",
+            "name": "observed_at",
             "docs": [
               "When the observation was made."
             ],
@@ -26432,7 +26485,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "findingsHash",
+            "name": "findings_hash",
             "docs": [
               "Free-form findings hash (sha-256 of detailed findings document)."
             ],
@@ -26451,7 +26504,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "signatureHash",
+            "name": "signature_hash",
             "docs": [
               "sha-256 of the signed observation payload (for signature verification)."
             ],
@@ -26463,14 +26516,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "observationSubmitted",
+      "name": "ObservationSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26498,13 +26551,13 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "observationV2",
+      "name": "ObservationV2",
       "docs": [
         "Multi-source observation of a task subject.",
         "",
         "PDA: `[\"observation_v2\", task_id, observer, nonce]`",
         "",
-        "Roles (Design Rule 7): `subject` ≠ `capture_device` ≠ `observer`",
+        "Roles (Design Rule 7): `subject` \u2260 `capture_device` \u2260 `observer`",
         "(submitter). A document owned by Alice (`subject`), photographed on",
         "Bob's phone (`capture_device`), submitted by Charlie (`observer`)."
       ],
@@ -26512,7 +26565,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "docs": [
               "Task this observation supports."
             ],
@@ -26540,12 +26593,12 @@ export type TerraRegistry = {
           {
             "name": "subject",
             "docs": [
-              "What is observed — claim, parcel, identity, or other account key."
+              "What is observed \u2014 claim, parcel, identity, or other account key."
             ],
             "type": "pubkey"
           },
           {
-            "name": "captureDevice",
+            "name": "capture_device",
             "docs": [
               "Device that captured the raw signal / image (may equal observer)."
             ],
@@ -26578,14 +26631,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "observedAt",
+            "name": "observed_at",
             "docs": [
               "When the phenomenon was observed (device clock / capture time)."
             ],
             "type": "i64"
           },
           {
-            "name": "findingsHash",
+            "name": "findings_hash",
             "docs": [
               "sha256 of findings / structured observation payload."
             ],
@@ -26597,7 +26650,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "docs": [
               "sha256 of evidence pre-image (manifest root; Phase 5 expands)."
             ],
@@ -26611,12 +26664,12 @@ export type TerraRegistry = {
           {
             "name": "confidence",
             "docs": [
-              "Confidence 0–100."
+              "Confidence 0\u2013100."
             ],
             "type": "u8"
           },
           {
-            "name": "signatureHash",
+            "name": "signature_hash",
             "docs": [
               "sha256 of signed observation envelope (device or submitter signature)."
             ],
@@ -26628,14 +26681,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "observationV2Submitted",
+      "name": "ObservationV2Submitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26644,7 +26697,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -26661,7 +26714,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "captureDevice",
+            "name": "capture_device",
             "type": "pubkey"
           },
           {
@@ -26684,7 +26737,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "observer",
+      "name": "Observer",
       "docs": [
         "An on-chain observer (non-validator participant) who can submit",
         "observations for claims.",
@@ -26716,32 +26769,32 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "totalObservations",
+            "name": "total_observations",
             "docs": [
               "Total observations submitted."
             ],
             "type": "u64"
           },
           {
-            "name": "confirmedObservations",
+            "name": "confirmed_observations",
             "docs": [
               "Observations that were confirmed by quorum."
             ],
             "type": "u64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "observerRegistered",
+      "name": "ObserverRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26758,14 +26811,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "registeredAt",
+            "name": "registered_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "observerStatusChanged",
+      "name": "ObserverStatusChanged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -26782,19 +26835,19 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ownershipProofVerified",
+      "name": "OwnershipProofVerified",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -26803,19 +26856,19 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "rootVersion",
+            "name": "root_version",
             "type": "u32"
           },
           {
-            "name": "proofPurpose",
+            "name": "proof_purpose",
             "type": "string"
           },
           {
-            "name": "disclosureType",
+            "name": "disclosure_type",
             "type": "u8"
           },
           {
@@ -26823,23 +26876,23 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ownershipRoot",
+      "name": "OwnershipRoot",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "merkleRoot",
+            "name": "merkle_root",
             "type": {
               "array": [
                 "u8",
@@ -26852,19 +26905,19 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "commitmentCount",
+            "name": "commitment_count",
             "type": "u32"
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           },
           {
-            "name": "snapshotCid",
+            "name": "snapshot_cid",
             "type": "string"
           },
           {
-            "name": "snapshotHash",
+            "name": "snapshot_hash",
             "type": {
               "array": [
                 "u8",
@@ -26873,7 +26926,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "authoritySignature",
+            "name": "authority_signature",
             "type": {
               "array": [
                 "u8",
@@ -26882,7 +26935,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "verificationKeyHash",
+            "name": "verification_key_hash",
             "type": {
               "array": [
                 "u8",
@@ -26891,27 +26944,27 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ownershipRootUpdated",
+      "name": "OwnershipRootUpdated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "newMerkleRoot",
+            "name": "new_merkle_root",
             "type": {
               "array": [
                 "u8",
@@ -26924,18 +26977,18 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "commitmentCount",
+            "name": "commitment_count",
             "type": "u32"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "parcel",
+      "name": "Parcel",
       "docs": [
         "A parcel of land.",
         "",
@@ -26962,7 +27015,7 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "geometryHash",
+            "name": "geometry_hash",
             "type": {
               "array": [
                 "u8",
@@ -26975,7 +27028,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "rightsCount",
+            "name": "rights_count",
             "docs": [
               "Count of the parcel's non-ownership Rights PDAs (`[\"rights\", parcel,",
               "nonce]`): `grant_right` requires `nonce == rights_count` and",
@@ -26985,11 +27038,11 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "infrastructureFlags",
+            "name": "infrastructure_flags",
             "type": "u16"
           },
           {
-            "name": "accessHash",
+            "name": "access_hash",
             "docs": [
               "sha-256 canonical digest over the off-chain infra/access validation",
               "(parcel id, flags, reachability metrics). Tamper-evidence anchor."
@@ -27002,18 +27055,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "parcelAttached",
+      "name": "ParcelAttached",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27033,7 +27086,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelForfeited",
+      "name": "ParcelForfeited",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27042,7 +27095,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "caseHash",
+            "name": "case_hash",
             "type": {
               "array": [
                 "u8",
@@ -27070,7 +27123,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelFrozen",
+      "name": "ParcelFrozen",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27083,14 +27136,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "frozenAt",
+            "name": "frozen_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "parcelRegistered",
+      "name": "ParcelRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27111,20 +27164,20 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelSubdivided",
+      "name": "ParcelSubdivided",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "originalParcel",
+            "name": "original_parcel",
             "type": "pubkey"
           },
           {
-            "name": "subParcel",
+            "name": "sub_parcel",
             "type": "pubkey"
           },
           {
-            "name": "newGeometryHash",
+            "name": "new_geometry_hash",
             "type": {
               "array": [
                 "u8",
@@ -27133,14 +27186,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "parcelTransferred",
+      "name": "ParcelTransferred",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27165,20 +27218,20 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "parcelsAmalgamated",
+      "name": "ParcelsAmalgamated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "resultParcel",
+            "name": "result_parcel",
             "type": "pubkey"
           },
           {
-            "name": "sourceParcel",
+            "name": "source_parcel",
             "type": "pubkey"
           },
           {
-            "name": "newGeometryHash",
+            "name": "new_geometry_hash",
             "type": {
               "array": [
                 "u8",
@@ -27187,14 +27240,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "privacyRequest",
+      "name": "PrivacyRequest",
       "docs": [
         "A privacy protection request for a specific subject.",
         "PDA: `[\"privacy_request\", requester, subject, nonce]`"
@@ -27215,7 +27268,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "requestType",
+            "name": "request_type",
             "type": "u8"
           },
           {
@@ -27223,7 +27276,7 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "requestedRemedy",
+            "name": "requested_remedy",
             "type": "u8"
           },
           {
@@ -27244,22 +27297,22 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "privacyRequestSubmitted",
+      "name": "PrivacyRequestSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27276,7 +27329,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "requestType",
+            "name": "request_type",
             "type": "u8"
           },
           {
@@ -27284,14 +27337,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "privacyState",
+      "name": "PrivacyState",
       "docs": [
         "Privacy state for a subject (component, asset, document, etc.).",
         "Versioned so consumers can tell available/restricted/superseded without",
@@ -27317,30 +27370,30 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "restrictionRequest",
+            "name": "restriction_request",
             "type": {
               "option": "pubkey"
             }
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": {
               "option": "i64"
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "programPaused",
+      "name": "ProgramPaused",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27353,14 +27406,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "pausedAt",
+            "name": "paused_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "programUnpaused",
+      "name": "ProgramUnpaused",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27373,38 +27426,38 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "unpausedAt",
+            "name": "unpaused_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "proofVersionInvalidated",
+      "name": "ProofVersionInvalidated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "staleVersion",
+            "name": "stale_version",
             "type": "u32"
           },
           {
-            "name": "currentVersion",
+            "name": "current_version",
             "type": "u32"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "quorumConfig",
+      "name": "QuorumConfig",
       "docs": [
         "On-chain quorum configuration. Defines how many attestations and what",
         "confidence level are required to verify a claim of a given type, in",
@@ -27416,7 +27469,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "parcelType",
+            "name": "parcel_type",
             "docs": [
               "Parcel type this config applies to (0 = global default)."
             ],
@@ -27435,39 +27488,39 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requiredAttestations",
+            "name": "required_attestations",
             "docs": [
               "Number of attestations required."
             ],
             "type": "u8"
           },
           {
-            "name": "requiredConfidence",
+            "name": "required_confidence",
             "docs": [
               "Minimum confidence level (0-100) required from each attestation."
             ],
             "type": "u8"
           },
           {
-            "name": "setBy",
+            "name": "set_by",
             "docs": [
               "Who set this config."
             ],
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "quorumConfigSet",
+      "name": "QuorumConfigSet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27476,7 +27529,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "parcelType",
+            "name": "parcel_type",
             "type": "u8"
           },
           {
@@ -27489,22 +27542,22 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requiredAttestations",
+            "name": "required_attestations",
             "type": "u8"
           },
           {
-            "name": "requiredConfidence",
+            "name": "required_confidence",
             "type": "u8"
           },
           {
-            "name": "setBy",
+            "name": "set_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "quorumReachabilityChecked",
+      "name": "QuorumReachabilityChecked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27513,26 +27566,26 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "totalValidators",
+            "name": "total_validators",
             "type": "u8"
           },
           {
-            "name": "activeCount",
+            "name": "active_count",
             "type": "u8"
           },
           {
-            "name": "requiredEndorsements",
+            "name": "required_endorsements",
             "type": "u8"
           },
           {
-            "name": "quorumReachable",
+            "name": "quorum_reachable",
             "type": "bool"
           }
         ]
       }
     },
     {
-      "name": "quorumReached",
+      "name": "QuorumReached",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27541,26 +27594,26 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "confirmWeight",
+            "name": "confirm_weight",
             "type": "u16"
           },
           {
-            "name": "quorumThreshold",
+            "name": "quorum_threshold",
             "type": "u16"
           },
           {
-            "name": "totalVotes",
+            "name": "total_votes",
             "type": "u8"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "quorumTally",
+      "name": "QuorumTally",
       "docs": [
         "Aggregated quorum tally for a claim.",
         "",
@@ -27577,42 +27630,42 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "totalWeight",
+            "name": "total_weight",
             "docs": [
               "Total weight of all votes."
             ],
             "type": "u16"
           },
           {
-            "name": "confirmWeight",
+            "name": "confirm_weight",
             "docs": [
               "Weight of confirm votes."
             ],
             "type": "u16"
           },
           {
-            "name": "disputeWeight",
+            "name": "dispute_weight",
             "docs": [
               "Weight of dispute votes."
             ],
             "type": "u16"
           },
           {
-            "name": "abstainWeight",
+            "name": "abstain_weight",
             "docs": [
               "Weight of abstain votes."
             ],
             "type": "u16"
           },
           {
-            "name": "totalVotes",
+            "name": "total_votes",
             "docs": [
               "Total number of votes cast."
             ],
             "type": "u8"
           },
           {
-            "name": "quorumThreshold",
+            "name": "quorum_threshold",
             "docs": [
               "Required weight to pass quorum."
             ],
@@ -27626,18 +27679,18 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "quorumVote",
+      "name": "QuorumVote",
       "docs": [
         "A weighted vote cast by a validator on a claim.",
         "",
@@ -27675,21 +27728,21 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "stakeAmount",
+            "name": "stake_amount",
             "docs": [
               "SOL staked at time of vote (if applicable, 0 otherwise)."
             ],
             "type": "u64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "quorumVoteCast",
+      "name": "QuorumVoteCast",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27710,22 +27763,22 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "confirmWeight",
+            "name": "confirm_weight",
             "type": "u16"
           },
           {
-            "name": "disputeWeight",
+            "name": "dispute_weight",
             "type": "u16"
           },
           {
-            "name": "totalVotes",
+            "name": "total_votes",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "registryCreated",
+      "name": "RegistryCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27745,12 +27798,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "reportDismissed",
+      "name": "ReportDismissed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -27765,7 +27818,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "reputationSlashed",
+      "name": "ReputationSlashed",
       "docs": [
         "Reputation slash (score hits 0). Distinct from staking `ValidatorSlashed`",
         "so Anchor IDL event discriminators stay unique."
@@ -27778,20 +27831,20 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "reputationScore",
+            "name": "reputation_score",
             "type": "u16"
           },
           {
-            "name": "slashedAt",
+            "name": "slashed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "resourceQuote",
+      "name": "ResourceQuote",
       "docs": [
-        "Requester's estimated resource cost for a task (travel, materials, …).",
+        "Requester's estimated resource cost for a task (travel, materials, \u2026).",
         "",
         "PDA: `[\"resource_quote\", task_id]`"
       ],
@@ -27799,7 +27852,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -27822,21 +27875,21 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "resourceCost",
+            "name": "resource_cost",
             "docs": [
               "Estimated resource cost in lamports (funded alongside the reward)."
             ],
             "type": "u64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "reviewCase",
+      "name": "ReviewCase",
       "docs": [
         "Independent review of a FraudReport by a random well-reputed committee.",
         "PDA: `[\"review_case\", report]`"
@@ -27868,15 +27921,15 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "votesCast",
+            "name": "votes_cast",
             "type": "u8"
           },
           {
-            "name": "votesUpheld",
+            "name": "votes_upheld",
             "type": "u8"
           },
           {
-            "name": "votesDismissed",
+            "name": "votes_dismissed",
             "type": "u8"
           },
           {
@@ -27884,18 +27937,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "openedAt",
+            "name": "opened_at",
             "type": "i64"
           },
           {
-            "name": "decidedAt",
+            "name": "decided_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "reviewCaseCreated",
+      "name": "ReviewCaseCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27916,18 +27969,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "committeeSize",
+            "name": "committee_size",
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "reviewVoteCast",
+      "name": "ReviewVoteCast",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27944,18 +27997,18 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "votesUpheld",
+            "name": "votes_upheld",
             "type": "u8"
           },
           {
-            "name": "votesDismissed",
+            "name": "votes_dismissed",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "reviewerAssigned",
+      "name": "ReviewerAssigned",
       "type": {
         "kind": "struct",
         "fields": [
@@ -27972,14 +28025,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "assignedAt",
+            "name": "assigned_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "rewardAllocation",
+      "name": "RewardAllocation",
       "docs": [
         "Distribution record for one validator's claim on a task escrow.",
         "",
@@ -27989,7 +28042,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -28006,37 +28059,37 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "basePaid",
+            "name": "base_paid",
             "docs": [
               "Base share paid from the escrow vault."
             ],
             "type": "u64"
           },
           {
-            "name": "subsidyPaid",
+            "name": "subsidy_paid",
             "docs": [
               "Coverage subsidy paid from the treasury."
             ],
             "type": "u64"
           },
           {
-            "name": "totalPaid",
+            "name": "total_paid",
             "type": "u64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "rewardsClaimed",
+      "name": "RewardsClaimed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -28051,27 +28104,27 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rewardsDistributed",
+      "name": "RewardsDistributed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
-            "name": "periodReward",
+            "name": "period_reward",
             "type": "u64"
           },
           {
-            "name": "totalStaked",
+            "name": "total_staked",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "rightGranted",
+      "name": "RightGranted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28080,7 +28133,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -28091,7 +28144,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightRenewed",
+      "name": "RightRenewed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28100,7 +28153,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldRights",
+            "name": "old_rights",
             "type": "pubkey"
           },
           {
@@ -28112,22 +28165,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldExpiresAt",
+            "name": "old_expires_at",
             "type": "i64"
           },
           {
-            "name": "newExpiresAt",
+            "name": "new_expires_at",
             "type": "i64"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "rightRevoked",
+      "name": "RightRevoked",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28136,7 +28189,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -28147,7 +28200,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightStatusTransition",
+      "name": "RightStatusTransition",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28164,26 +28217,26 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldStatus",
+            "name": "old_status",
             "type": "u8"
           },
           {
-            "name": "newStatus",
+            "name": "new_status",
             "type": "u8"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "rights",
+      "name": "Rights",
       "docs": [
         "A right attached to a parcel (ownership, usage, easement, ...).",
         "",
@@ -28198,7 +28251,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -28217,11 +28270,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "Unix timestamp; 0 means no expiration."
             ],
@@ -28239,7 +28292,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "gracePeriodSecs",
+            "name": "grace_period_secs",
             "docs": [
               "Grace period in seconds after expiry (0 = no grace). Set at grant time."
             ],
@@ -28249,20 +28302,20 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightsMigrated",
+      "name": "RightsMigrated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "oldParcel",
+            "name": "old_parcel",
             "type": "pubkey"
           },
           {
-            "name": "newParcel",
+            "name": "new_parcel",
             "type": "pubkey"
           },
           {
-            "name": "rightsKind",
+            "name": "rights_kind",
             "type": "u8"
           },
           {
@@ -28277,16 +28330,16 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rightsMigrationComplete",
+      "name": "RightsMigrationComplete",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "oldParcel",
+            "name": "old_parcel",
             "type": "pubkey"
           },
           {
-            "name": "newParcel",
+            "name": "new_parcel",
             "type": "pubkey"
           },
           {
@@ -28297,7 +28350,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "rotationEndorsed",
+      "name": "RotationEndorsed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28306,7 +28359,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -28319,7 +28372,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "endorsementsCount",
+            "name": "endorsements_count",
             "type": "u8"
           },
           {
@@ -28330,7 +28383,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "securityAppeal",
+      "name": "SecurityAppeal",
       "docs": [
         "Appeal of a security/privacy decision.",
         "PDA: `[\"appeal\", decision, appellant]`"
@@ -28359,11 +28412,11 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "type": {
               "option": "i64"
             }
@@ -28372,7 +28425,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "securityAuditEvent",
+      "name": "SecurityAuditEvent",
       "docs": [
         "Immutable audit event for security/privacy decisions.",
         "PDA: `[\"audit_event\", entity, sequence]`"
@@ -28408,12 +28461,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "securityAuditRecorded",
+      "name": "SecurityAuditRecorded",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "auditEvent",
+            "name": "audit_event",
             "type": "pubkey"
           },
           {
@@ -28440,7 +28493,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "securityDecision",
+      "name": "SecurityDecision",
       "docs": [
         "Finalized decision on a security/privacy request.",
         "PDA: `[\"decision\", request]`"
@@ -28465,7 +28518,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "restrictionScope",
+            "name": "restriction_scope",
             "type": {
               "array": [
                 "u8",
@@ -28474,24 +28527,24 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": {
               "option": "i64"
             }
           },
           {
-            "name": "decidedAt",
+            "name": "decided_at",
             "type": "i64"
           },
           {
-            "name": "decidedBy",
+            "name": "decided_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "securityDecisionFinalized",
+      "name": "SecurityDecisionFinalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28516,14 +28569,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "decidedAt",
+            "name": "decided_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "securityRequest",
+      "name": "SecurityRequest",
       "docs": [
         "A security/privacy request submitted by a requester with legitimate",
         "standing. PDA: `[\"security_request\", requester, nonce]`"
@@ -28544,7 +28597,7 @@ export type TerraRegistry = {
             "type": "u16"
           },
           {
-            "name": "requestType",
+            "name": "request_type",
             "type": "u8"
           },
           {
@@ -28552,7 +28605,7 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "requestedRemedy",
+            "name": "requested_remedy",
             "type": "u8"
           },
           {
@@ -28573,22 +28626,22 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "securityRequestSubmitted",
+      "name": "SecurityRequestSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28605,7 +28658,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "requestType",
+            "name": "request_type",
             "type": "u8"
           },
           {
@@ -28613,14 +28666,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "securityReviewAssignment",
+      "name": "SecurityReviewAssignment",
       "docs": [
         "Reviewer assignment for a review case.",
         "PDA: `[\"review_assignment\", case, reviewer]`"
@@ -28645,20 +28698,20 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "votedAt",
+            "name": "voted_at",
             "type": {
               "option": "i64"
             }
           },
           {
-            "name": "assignedAt",
+            "name": "assigned_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "securityReviewCase",
+      "name": "SecurityReviewCase",
       "docs": [
         "Independent review case for a security/privacy request.",
         "PDA: `[\"review_case\", request]`"
@@ -28679,15 +28732,15 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "committeeSize",
+            "name": "committee_size",
             "type": "u8"
           },
           {
-            "name": "votesUpheld",
+            "name": "votes_upheld",
             "type": "u8"
           },
           {
-            "name": "votesDismissed",
+            "name": "votes_dismissed",
             "type": "u8"
           },
           {
@@ -28695,20 +28748,20 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "finalizedAt",
+            "name": "finalized_at",
             "type": {
               "option": "i64"
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "shardPinged",
+      "name": "ShardPinged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28721,14 +28774,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "pingedAt",
+            "name": "pinged_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "shardRotationCancelled",
+      "name": "ShardRotationCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28737,7 +28790,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -28746,14 +28799,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "cancelledBy",
+            "name": "cancelled_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "shardRotationExecuted",
+      "name": "ShardRotationExecuted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28762,7 +28815,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -28771,18 +28824,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newVersion",
+            "name": "new_version",
             "type": "u32"
           },
           {
-            "name": "newThreshold",
+            "name": "new_threshold",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "shardRotationInitiated",
+      "name": "ShardRotationInitiated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -28791,7 +28844,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldCiphertextHash",
+            "name": "old_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -28800,7 +28853,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -28809,23 +28862,23 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "slashingAppealed",
+      "name": "SlashingAppealed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -28833,14 +28886,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "appealReason",
+            "name": "appeal_reason",
             "type": "string"
           }
         ]
       }
     },
     {
-      "name": "slashingReport",
+      "name": "SlashingReport",
       "docs": [
         "One record per slashing report.",
         "",
@@ -28850,7 +28903,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "docs": [
               "StakePool key."
             ],
@@ -28864,7 +28917,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "docs": [
               "SHA-256 of the evidence payload."
             ],
@@ -28883,14 +28936,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "offenseType",
+            "name": "offense_type",
             "docs": [
               "0=equivocation, 1=liveness, 2=collusion."
             ],
             "type": "u8"
           },
           {
-            "name": "offenseDetails",
+            "name": "offense_details",
             "docs": [
               "Bounded details (e.g., two conflicting parcel hashes)."
             ],
@@ -28902,7 +28955,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "reporterBond",
+            "name": "reporter_bond",
             "docs": [
               "SOL bonded by reporter (for false-report penalty)."
             ],
@@ -28916,21 +28969,21 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "filedAt",
+            "name": "filed_at",
             "docs": [
               "When the report was filed."
             ],
             "type": "i64"
           },
           {
-            "name": "appealDeadline",
+            "name": "appeal_deadline",
             "docs": [
               "filed_at + APPEAL_WINDOW_SECS."
             ],
             "type": "i64"
           },
           {
-            "name": "resolvedAt",
+            "name": "resolved_at",
             "docs": [
               "When the report was resolved (0 if pending)."
             ],
@@ -28940,11 +28993,11 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "spatialAsset",
+      "name": "SpatialAsset",
       "docs": [
-        "The 3D/4D extension of a parcel (RFC-012 §5 `SpatialAsset`).",
+        "The 3D/4D extension of a parcel (RFC-012 \u00a75 `SpatialAsset`).",
         "",
-        "PDA: `[\"spatial_asset\", parcel]` — exactly one per parcel."
+        "PDA: `[\"spatial_asset\", parcel]` \u2014 exactly one per parcel."
       ],
       "type": {
         "kind": "struct",
@@ -28971,28 +29024,28 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "elevationMinMm",
+            "name": "elevation_min_mm",
             "docs": [
               "Minimum elevation of the asset envelope, millimetres (may be < 0)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
-            "name": "elevationMaxMm",
+            "name": "elevation_max_mm",
             "docs": [
               "Maximum elevation of the asset envelope, millimetres (>= min)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
-            "name": "geometryVersionCount",
+            "name": "geometry_version_count",
             "docs": [
               "Append-only cursor: next version index (0..=MAX_GEOMETRY_VERSIONS)."
             ],
             "type": "u32"
           },
           {
-            "name": "latestGeometry",
+            "name": "latest_geometry",
             "docs": [
               "Geometry hash of the newest version (all-zero until the first append)."
             ],
@@ -29004,18 +29057,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "spatialAssetCreated",
+      "name": "SpatialAssetCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29032,17 +29085,17 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "spatialSnapshot",
+      "name": "SpatialSnapshot",
       "docs": [
         "A frozen copy of a spatial asset's indexes at one instant",
-        "(RFC-012 §5 `SpatialSnapshot`).",
+        "(RFC-012 \u00a75 `SpatialSnapshot`).",
         "",
         "PDA: `[\"spatial_snapshot\", asset, snapshot_index_le_bytes]`."
       ],
@@ -29064,14 +29117,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "snapshotIndex",
+            "name": "snapshot_index",
             "docs": [
               "0-based append index (from [`SpatialSnapshotMeta`])."
             ],
             "type": "u32"
           },
           {
-            "name": "geometryVersionCount",
+            "name": "geometry_version_count",
             "docs": [
               "Geometry cursor copied at creation: versions `[0, N)` existed then.",
               "Never changes afterwards (append-only history is safe to replay)."
@@ -29079,7 +29132,7 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "latestGeometry",
+            "name": "latest_geometry",
             "docs": [
               "Latest geometry hash at snapshot time (all-zero if none yet)."
             ],
@@ -29098,15 +29151,15 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "elevationMinMm",
+            "name": "elevation_min_mm",
             "docs": [
               "Asset elevation envelope copied at creation, millimetres."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
-            "name": "elevationMaxMm",
-            "type": "i32"
+            "name": "elevation_max_mm",
+            "type": "i64"
           },
           {
             "name": "label",
@@ -29116,21 +29169,21 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "createdBy",
+            "name": "created_by",
             "docs": [
               "Whoever paid to create this snapshot (permissionless)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "spatialSnapshotCreated",
+      "name": "SpatialSnapshotCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29147,38 +29200,38 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "snapshotIndex",
+            "name": "snapshot_index",
             "type": "u32"
           },
           {
-            "name": "geometryVersionCount",
+            "name": "geometry_version_count",
             "type": "u32"
           },
           {
-            "name": "labelLen",
+            "name": "label_len",
             "docs": [
               "UTF-8 byte length of the label (the event never carries the string",
-              "itself — read it from the account)."
+              "itself \u2014 read it from the account)."
             ],
             "type": "u8"
           },
           {
-            "name": "createdBy",
+            "name": "created_by",
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "spatialSnapshotMeta",
+      "name": "SpatialSnapshotMeta",
       "docs": [
         "Append-only cursor for a spatial asset's snapshots.",
         "",
-        "PDA: `[\"spatial_snapshot_meta\", asset]` — created lazily on the first",
+        "PDA: `[\"spatial_snapshot_meta\", asset]` \u2014 created lazily on the first",
         "snapshot (`init_if_needed`), so `SpatialAsset`'s deployed layout is",
         "untouched."
       ],
@@ -29203,12 +29256,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "stakeDeposited",
+      "name": "StakeDeposited",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -29223,7 +29276,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "stakePool",
+      "name": "StakePool",
       "docs": [
         "One stake pool per region, derived from the ValidatorRegistry key.",
         "",
@@ -29233,35 +29286,35 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "regionRegistry",
+            "name": "region_registry",
             "docs": [
               "ValidatorRegistry key for this region."
             ],
             "type": "pubkey"
           },
           {
-            "name": "totalStaked",
+            "name": "total_staked",
             "docs": [
               "Total SOL staked across all validators (lamports)."
             ],
             "type": "u64"
           },
           {
-            "name": "rewardRateBps",
+            "name": "reward_rate_bps",
             "docs": [
               "Annual reward rate in basis points (e.g., 500 = 5%)."
             ],
             "type": "u16"
           },
           {
-            "name": "accumulatedRewards",
+            "name": "accumulated_rewards",
             "docs": [
               "Total rewards accrued but not yet distributed (lamports)."
             ],
             "type": "u64"
           },
           {
-            "name": "rewardPerTokenStored",
+            "name": "reward_per_token_stored",
             "docs": [
               "Global reward-per-token accumulator, scaled by REWARD_PRECISION (1e9).",
               "When distribute_rewards fires: rpt += period_reward * PRECISION / total_staked.",
@@ -29270,57 +29323,57 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "lastRewardDistribution",
+            "name": "last_reward_distribution",
             "docs": [
               "Timestamp of last reward distribution."
             ],
             "type": "i64"
           },
           {
-            "name": "slashCount",
+            "name": "slash_count",
             "docs": [
               "Total slashing events executed."
             ],
             "type": "u32"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "stakePoolCreated",
+      "name": "StakePoolCreated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
-            "name": "regionRegistry",
+            "name": "region_registry",
             "type": "pubkey"
           },
           {
-            "name": "rewardRateBps",
+            "name": "reward_rate_bps",
             "type": "u16"
           }
         ]
       }
     },
     {
-      "name": "stakeWithdrawn",
+      "name": "StakeWithdrawn",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -29335,7 +29388,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "subdivisionRecord",
+      "name": "SubdivisionRecord",
       "docs": [
         "One record per sub-parcel, linking it back to the original parcel.",
         "",
@@ -29345,21 +29398,21 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "originalParcel",
+            "name": "original_parcel",
             "docs": [
               "The parent parcel's PDA key."
             ],
             "type": "pubkey"
           },
           {
-            "name": "subParcel",
+            "name": "sub_parcel",
             "docs": [
               "The child sub-parcel's PDA key."
             ],
             "type": "pubkey"
           },
           {
-            "name": "originalGeometryHash",
+            "name": "original_geometry_hash",
             "docs": [
               "Parent's geometry hash at time of subdivision."
             ],
@@ -29371,7 +29424,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newGeometryHash",
+            "name": "new_geometry_hash",
             "docs": [
               "Child's geometry hash."
             ],
@@ -29383,32 +29436,32 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "surveyClaim",
+            "name": "survey_claim",
             "docs": [
               "Verified SUBDIVISION claim PDA that recorded surveyor sign-off."
             ],
             "type": "pubkey"
           },
           {
-            "name": "rightsMigrated",
+            "name": "rights_migrated",
             "docs": [
               "Whether rights have been migrated to the sub-parcel."
             ],
             "type": "bool"
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "docs": [
               "Wallet that initiated the subdivision."
             ],
             "type": "pubkey"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "completedAt",
+            "name": "completed_at",
             "docs": [
               "When migration finished (0 if in progress)."
             ],
@@ -29425,7 +29478,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "successionParcelsTransferred",
+      "name": "SuccessionParcelsTransferred",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29445,7 +29498,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "taskAssigned",
+      "name": "TaskAssigned",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29454,7 +29507,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29467,14 +29520,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "assignedBy",
+            "name": "assigned_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "taskAssignment",
+      "name": "TaskAssignment",
       "docs": [
         "Selected validator for a task (requester assignment or self-claim).",
         "",
@@ -29484,7 +29537,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29507,7 +29560,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "assignedBy",
+            "name": "assigned_by",
             "docs": [
               "Who performed the assignment: requester = assign, validator = claim."
             ],
@@ -29521,25 +29574,25 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "assignedAt",
+            "name": "assigned_at",
             "type": "i64"
           },
           {
-            "name": "submittedAt",
+            "name": "submitted_at",
             "docs": [
               "0 until `submit_task_result`."
             ],
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "taskCancelled",
+      "name": "TaskCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29548,7 +29601,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29561,24 +29614,24 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "cancelledAt",
+            "name": "cancelled_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "taskEscrow",
+      "name": "TaskEscrow",
       "docs": [
         "Locked funds for a verification task.",
         "",
-        "PDA: `[\"task_escrow\", task_id]` — vault PDA: `[\"task_escrow_vault\", escrow]`"
+        "PDA: `[\"task_escrow\", task_id]` \u2014 vault PDA: `[\"task_escrow_vault\", escrow]`"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29609,7 +29662,7 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "feePaid",
+            "name": "fee_paid",
             "docs": [
               "Protocol fee paid to the treasury at funding time."
             ],
@@ -29623,7 +29676,7 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "releasedCount",
+            "name": "released_count",
             "docs": [
               "How many validator shares have been claimed."
             ],
@@ -29637,22 +29690,22 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "fundedAt",
+            "name": "funded_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "taskEscrowFunded",
+      "name": "TaskEscrowFunded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29665,7 +29718,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29682,14 +29735,14 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "feePaid",
+            "name": "fee_paid",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "taskEscrowRefunded",
+      "name": "TaskEscrowRefunded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29702,7 +29755,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29722,7 +29775,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "taskRequirement",
+      "name": "TaskRequirement",
       "docs": [
         "One row of eligibility / evidence constraints for a task.",
         "",
@@ -29732,7 +29785,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29741,28 +29794,28 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "reqIndex",
+            "name": "req_index",
             "docs": [
-              "Append-only index (0, 1, … requirement_count-1)."
+              "Append-only index (0, 1, \u2026 requirement_count-1)."
             ],
             "type": "u8"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "docs": [
               "Required capability (`capability_code`) or `CAPABILITY_ANY`."
             ],
             "type": "u8"
           },
           {
-            "name": "minReputation",
+            "name": "min_reputation",
             "docs": [
               "Minimum legacy `ValidatorReputation.reputation_score` (0 = none)."
             ],
             "type": "u16"
           },
           {
-            "name": "minTier",
+            "name": "min_tier",
             "docs": [
               "Minimum `ValidatorProfile.tier` (0 = any)."
             ],
@@ -29781,46 +29834,46 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "radiusM",
+            "name": "radius_m",
             "docs": [
               "Max distance from center in meters; 0 = no geographic constraint."
             ],
             "type": "u32"
           },
           {
-            "name": "centerLatE7",
+            "name": "center_lat_e7",
             "docs": [
               "Geographic center (degrees * 1e7) when `radius_m > 0`."
             ],
             "type": "i32"
           },
           {
-            "name": "centerLonE7",
+            "name": "center_lon_e7",
             "type": "i32"
           },
           {
-            "name": "independenceBps",
+            "name": "independence_bps",
             "docs": [
               "Preferred independence (relationship-graph) threshold in bps (0 = none)."
             ],
             "type": "u16"
           },
           {
-            "name": "confidenceTargetBps",
+            "name": "confidence_target_bps",
             "docs": [
-              "Minimum confidence the result should target (0–10000 bps)."
+              "Minimum confidence the result should target (0\u201310000 bps)."
             ],
             "type": "u16"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "taskRequirementAdded",
+      "name": "TaskRequirementAdded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29829,7 +29882,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29838,26 +29891,26 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "reqIndex",
+            "name": "req_index",
             "type": "u8"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
-            "name": "minReputation",
+            "name": "min_reputation",
             "type": "u16"
           },
           {
-            "name": "minTier",
+            "name": "min_tier",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "taskResourcesQuoted",
+      "name": "TaskResourcesQuoted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29866,7 +29919,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29879,14 +29932,14 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "resourceCost",
+            "name": "resource_cost",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "taskResultSubmitted",
+      "name": "TaskResultSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29895,7 +29948,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29912,7 +29965,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "resultCount",
+            "name": "result_count",
             "type": "u8"
           },
           {
@@ -29923,7 +29976,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "taskRewardClaimed",
+      "name": "TaskRewardClaimed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29936,7 +29989,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29949,18 +30002,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "basePaid",
+            "name": "base_paid",
             "type": "u64"
           },
           {
-            "name": "subsidyPaid",
+            "name": "subsidy_paid",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "taskRouted",
+      "name": "TaskRouted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -29969,7 +30022,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -29982,29 +30035,29 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "reqIndex",
+            "name": "req_index",
             "type": "u8"
           },
           {
-            "name": "eligibleCount",
+            "name": "eligible_count",
             "type": "u16"
           },
           {
-            "name": "competitorCount",
+            "name": "competitor_count",
             "type": "u16"
           },
           {
-            "name": "drawBps",
+            "name": "draw_bps",
             "type": "u16"
           }
         ]
       }
     },
     {
-      "name": "threeDModel",
+      "name": "ThreeDModel",
       "docs": [
         "One append-only entry in a spatial asset's 3D model history",
-        "(RFC-012 §5 `ThreeDModel`).",
+        "(RFC-012 \u00a75 `ThreeDModel`).",
         "",
         "PDA: `[\"three_d_model\", asset, model_version_le_bytes]`."
       ],
@@ -30026,22 +30079,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "modelVersion",
+            "name": "model_version",
             "docs": [
               "0-based append index (from `ThreeDModelMeta`)."
             ],
             "type": "u32"
           },
           {
-            "name": "geometryVersion",
+            "name": "geometry_version",
             "docs": [
-              "Geometry version this model was reconstructed from (provenance —",
+              "Geometry version this model was reconstructed from (provenance \u2014",
               "always < `asset.geometry_version_count` at registration time)."
             ],
             "type": "u32"
           },
           {
-            "name": "modelHash",
+            "name": "model_hash",
             "docs": [
               "SHA-256 canonical digest of the off-chain model bundle."
             ],
@@ -30053,57 +30106,58 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "storageReference",
+            "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars."
+              "Off-chain pointer (tileset URL / IPFS CID / storage key). Widened to",
+              "256 chars to accommodate signed URLs (CIDs alone fit in 128)."
             ],
             "type": "string"
           },
           {
-            "name": "modelFormat",
+            "name": "model_format",
             "docs": [
               "`model_format` code of the referenced bundle."
             ],
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "docs": [
               "Whoever paid to register this claim (permissionless)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "submittedAt",
+            "name": "submitted_at",
             "type": "i64"
           },
           {
             "name": "verified",
             "docs": [
-              "Claim → fact: true once a registered validator verified the hash."
+              "Claim \u2192 fact: true once a registered validator verified the hash."
             ],
             "type": "bool"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "docs": [
               "Validator who verified (zero until verified)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "threeDModelMeta",
+      "name": "ThreeDModelMeta",
       "docs": [
         "Append-only cursor for a spatial asset's 3D models.",
         "",
-        "PDA: `[\"three_d_model_meta\", asset]` — created lazily on the first",
+        "PDA: `[\"three_d_model_meta\", asset]` \u2014 created lazily on the first",
         "registration (`init_if_needed`), so `SpatialAsset`'s deployed layout is",
         "untouched."
       ],
@@ -30128,7 +30182,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "threeDModelRegistered",
+      "name": "ThreeDModelRegistered",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30145,15 +30199,15 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "modelVersion",
+            "name": "model_version",
             "type": "u32"
           },
           {
-            "name": "geometryVersion",
+            "name": "geometry_version",
             "type": "u32"
           },
           {
-            "name": "modelHash",
+            "name": "model_hash",
             "type": {
               "array": [
                 "u8",
@@ -30162,22 +30216,22 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "modelFormat",
+            "name": "model_format",
             "type": "u8"
           },
           {
-            "name": "submittedBy",
+            "name": "submitted_by",
             "type": "pubkey"
           },
           {
-            "name": "submittedAt",
+            "name": "submitted_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "threeDModelVerified",
+      "name": "ThreeDModelVerified",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30190,23 +30244,23 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "verifiedBy",
+            "name": "verified_by",
             "type": "pubkey"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "thresholdCredential",
+      "name": "ThresholdCredential",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "credentialHash",
+            "name": "credential_hash",
             "type": {
               "array": [
                 "u8",
@@ -30223,15 +30277,15 @@ export type TerraRegistry = {
             "type": "string"
           },
           {
-            "name": "disclosureType",
+            "name": "disclosure_type",
             "type": "u8"
           },
           {
-            "name": "regionRegistry",
+            "name": "region_registry",
             "type": "pubkey"
           },
           {
-            "name": "aggregateSignature",
+            "name": "aggregate_signature",
             "type": "bytes"
           },
           {
@@ -30241,11 +30295,11 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "signerCount",
+            "name": "signer_count",
             "type": "u8"
           },
           {
-            "name": "nullifierHash",
+            "name": "nullifier_hash",
             "type": {
               "array": [
                 "u8",
@@ -30262,19 +30316,19 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "issuedAt",
+            "name": "issued_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "unbondingInitiated",
+      "name": "UnbondingInitiated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -30289,7 +30343,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorActiveSet",
+      "name": "ValidatorActiveSet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30302,18 +30356,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "isActive",
+            "name": "is_active",
             "type": "bool"
           },
           {
-            "name": "setBy",
+            "name": "set_by",
             "type": "pubkey"
           }
         ]
       }
     },
     {
-      "name": "validatorActivityTracker",
+      "name": "ValidatorActivityTracker",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30332,16 +30386,16 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "lastActive",
+            "name": "last_active",
             "docs": [
               "Unix timestamp of last recorded activity (heartbeat or signed tx)."
             ],
             "type": "i64"
           },
           {
-            "name": "isActive",
+            "name": "is_active",
             "docs": [
-              "Soft flag — set to false by admin to forcibly exclude a validator from",
+              "Soft flag \u2014 set to false by admin to forcibly exclude a validator from",
               "quorum without removing them from the registry."
             ],
             "type": "bool"
@@ -30350,7 +30404,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorAdded",
+      "name": "ValidatorAdded",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30363,7 +30417,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "addedBy",
+            "name": "added_by",
             "type": "pubkey"
           },
           {
@@ -30374,7 +30428,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorAvailability",
+      "name": "ValidatorAvailability",
       "docs": [
         "Current availability state (distinct from reputation jail).",
         "",
@@ -30395,14 +30449,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorAvailabilityChanged",
+      "name": "ValidatorAvailabilityChanged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30415,14 +30469,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorCapability",
+      "name": "ValidatorCapability",
       "docs": [
         "Declared/verified capability for one capability code.",
         "",
@@ -30436,7 +30490,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "docs": [
               "Capability code (`capability_code`)."
             ],
@@ -30450,7 +30504,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "evidenceHash",
+            "name": "evidence_hash",
             "docs": [
               "Optional evidence hash backing a VERIFIED/TRUSTED claim (0 = none)."
             ],
@@ -30462,25 +30516,25 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "declaredAt",
+            "name": "declared_at",
             "type": "i64"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "docs": [
               "0 until verified; set when level reaches VERIFIED or above."
             ],
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorCapabilityDeclared",
+      "name": "ValidatorCapabilityDeclared",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30489,7 +30543,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "capabilityCode",
+            "name": "capability_code",
             "type": "u8"
           },
           {
@@ -30497,14 +30551,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "verifiedAt",
+            "name": "verified_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorEndorsed",
+      "name": "ValidatorEndorsed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30521,7 +30575,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "endorsementsCount",
+            "name": "endorsements_count",
             "type": "u8"
           },
           {
@@ -30532,7 +30586,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorEndorsement",
+      "name": "ValidatorEndorsement",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30574,14 +30628,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorJailed",
+      "name": "ValidatorJailed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30590,18 +30644,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "reputationScore",
+            "name": "reputation_score",
             "type": "u16"
           },
           {
-            "name": "jailedUntil",
+            "name": "jailed_until",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorJurisdictionSet",
+      "name": "ValidatorJurisdictionSet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30619,14 +30673,14 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorNominated",
+      "name": "ValidatorNominated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30643,11 +30697,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "assignedPhysicalConfirmer",
+            "name": "assigned_physical_confirmer",
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "type": {
               "array": [
                 "u8",
@@ -30659,7 +30713,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorNomination",
+      "name": "ValidatorNomination",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30671,7 +30725,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "countryCode",
+            "name": "country_code",
             "docs": [
               "Country code (ISO 3166-1 alpha-2)."
             ],
@@ -30697,7 +30751,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "documentsHash",
+            "name": "documents_hash",
             "docs": [
               "SHA-256 of the candidate's identity documents."
             ],
@@ -30709,7 +30763,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "locationHash",
+            "name": "location_hash",
             "docs": [
               "SHA-256 of a witness location report (never raw GPS)."
             ],
@@ -30721,7 +30775,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "assignedPhysicalConfirmer",
+            "name": "assigned_physical_confirmer",
             "docs": [
               "Randomly selected physical confirmer (set at nomination time via",
               "deterministic seed, NOT sponsor's choice)."
@@ -30745,14 +30799,14 @@ export type TerraRegistry = {
             "type": "bool"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorNominationFinalized",
+      "name": "ValidatorNominationFinalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30774,9 +30828,9 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorPresence",
+      "name": "ValidatorPresence",
       "docs": [
-        "Dynamic geographic presence — timestamped, confidence-scored, expiring.",
+        "Dynamic geographic presence \u2014 timestamped, confidence-scored, expiring.",
         "",
         "Never treat as immutable identity. PDA: `[\"validator_presence\", wallet]`"
       ],
@@ -30788,21 +30842,21 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "latitudeE7",
+            "name": "latitude_e7",
             "docs": [
-              "Latitude in degrees * 1e7 (i32) — compact fixed-point."
+              "Latitude in degrees * 1e7 (i32) \u2014 compact fixed-point."
             ],
             "type": "i32"
           },
           {
-            "name": "longitudeE7",
+            "name": "longitude_e7",
             "docs": [
               "Longitude in degrees * 1e7."
             ],
             "type": "i32"
           },
           {
-            "name": "accuracyM",
+            "name": "accuracy_m",
             "docs": [
               "Horizontal accuracy in meters."
             ],
@@ -30816,35 +30870,35 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "confidenceBps",
+            "name": "confidence_bps",
             "docs": [
-              "Confidence in this presence fix (0–10000 bps)."
+              "Confidence in this presence fix (0\u201310000 bps)."
             ],
             "type": "u16"
           },
           {
-            "name": "observedAt",
+            "name": "observed_at",
             "docs": [
               "When this fix was recorded."
             ],
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "docs": [
               "After this time the presence is stale (observed_at + TTL)."
             ],
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorPresenceUpdated",
+      "name": "ValidatorPresenceUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30857,20 +30911,20 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "confidenceBps",
+            "name": "confidence_bps",
             "type": "u16"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorProfile",
+      "name": "ValidatorProfile",
       "docs": [
-        "Core validator profile — identity + tier attributes (not location-bound).",
+        "Core validator profile \u2014 identity + tier attributes (not location-bound).",
         "",
         "PDA: `[\"validator_profile\", wallet]`"
       ],
@@ -30880,7 +30934,7 @@ export type TerraRegistry = {
           {
             "name": "wallet",
             "docs": [
-              "The validator's wallet (mobile participant — NOT a region)."
+              "The validator's wallet (mobile participant \u2014 NOT a region)."
             ],
             "type": "pubkey"
           },
@@ -30892,7 +30946,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "identityHash",
+            "name": "identity_hash",
             "docs": [
               "Optional link to an off-chain/on-chain identity hash (0 = unset)."
             ],
@@ -30906,7 +30960,7 @@ export type TerraRegistry = {
           {
             "name": "note",
             "docs": [
-              "Free-form operator note (device class, org, …) — not used for selection."
+              "Free-form operator note (device class, org, \u2026) \u2014 not used for selection."
             ],
             "type": "string"
           },
@@ -30914,7 +30968,7 @@ export type TerraRegistry = {
             "name": "jurisdiction",
             "docs": [
               "ISO 3166-1 alpha-2 home/operating jurisdiction (RFC-012 Phase 10);",
-              "`[0,0]` = undeclared. Self-declared claim — routing treats it as the",
+              "`[0,0]` = undeclared. Self-declared claim \u2014 routing treats it as the",
               "validator's country for jurisdiction-scoped tasks and cross-border",
               "binding checks; fraud governance handles abuse."
             ],
@@ -30926,18 +30980,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorProfileInitialized",
+      "name": "ValidatorProfileInitialized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30950,14 +31004,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "initializedAt",
+            "name": "initialized_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorProfileTierChanged",
+      "name": "ValidatorProfileTierChanged",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30966,22 +31020,22 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldTier",
+            "name": "old_tier",
             "type": "u8"
           },
           {
-            "name": "newTier",
+            "name": "new_tier",
             "type": "u8"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorProfileUpdated",
+      "name": "ValidatorProfileUpdated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -30994,14 +31048,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorRegistry",
+      "name": "ValidatorRegistry",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31022,7 +31076,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requiredEndorsements",
+            "name": "required_endorsements",
             "docs": [
               "Minimum endorsements needed for new additions in peer-consensus mode.",
               "Recomputed on every validator count change; not read from storage for",
@@ -31036,7 +31090,7 @@ export type TerraRegistry = {
               "Emergency pause flag. When true, all pausable subsystem instructions",
               "(staking, cross-border, guardian, zk, escrow, dispute) reject",
               "state-changing calls. Core parcel/identity operations authorized by",
-              "individual owners are unaffected — the admin stops processing via",
+              "individual owners are unaffected \u2014 the admin stops processing via",
               "off-chain policy."
             ],
             "type": "bool"
@@ -31049,22 +31103,22 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorRelationshipEdge",
+      "name": "ValidatorRelationshipEdge",
       "docs": [
         "Directed relationship graph edge (endorsement / co-validation / infra).",
         "",
-        "Correlation ≠ fraud — used for review, not auto-punishment (RFC-012 §6.12).",
+        "Correlation \u2260 fraud \u2014 used for review, not auto-punishment (RFC-012 \u00a76.12).",
         "PDA: `[\"validator_edge\", from, to, edge_type]`"
       ],
       "type": {
@@ -31079,32 +31133,32 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "edgeType",
+            "name": "edge_type",
             "docs": [
               "One of `relationship_edge_type`."
             ],
             "type": "u8"
           },
           {
-            "name": "weightBps",
+            "name": "weight_bps",
             "docs": [
-              "Optional strength (0–10000 bps); default 10000 for binary endorsement."
+              "Optional strength (0\u201310000 bps); default 10000 for binary endorsement."
             ],
             "type": "u16"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorRelationshipEdgeCreated",
+      "name": "ValidatorRelationshipEdgeCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31117,18 +31171,18 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "edgeType",
+            "name": "edge_type",
             "type": "u8"
           },
           {
-            "name": "weightBps",
+            "name": "weight_bps",
             "type": "u16"
           }
         ]
       }
     },
     {
-      "name": "validatorRemoved",
+      "name": "ValidatorRemoved",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31148,7 +31202,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorReputation",
+      "name": "ValidatorReputation",
       "docs": [
         "Tracks an individual validator's reputation and performance metrics.",
         "",
@@ -31172,67 +31226,67 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "totalAttestations",
+            "name": "total_attestations",
             "docs": [
               "Total attestations submitted."
             ],
             "type": "u64"
           },
           {
-            "name": "confirmedAttestations",
+            "name": "confirmed_attestations",
             "docs": [
               "Attestations that were confirmed by quorum."
             ],
             "type": "u64"
           },
           {
-            "name": "disputedAttestations",
+            "name": "disputed_attestations",
             "docs": [
               "Attestations that were disputed/challenged."
             ],
             "type": "u64"
           },
           {
-            "name": "reputationScore",
+            "name": "reputation_score",
             "docs": [
               "Reputation score in basis points (0 = slashed, 10000 = perfect)."
             ],
             "type": "u16"
           },
           {
-            "name": "jailedUntil",
+            "name": "jailed_until",
             "docs": [
               "Timestamp when the validator was jailed (0 if not jailed)."
             ],
             "type": "i64"
           },
           {
-            "name": "challengesReceived",
+            "name": "challenges_received",
             "docs": [
               "Total number of successful challenges against this validator."
             ],
             "type": "u8"
           },
           {
-            "name": "challengesRaised",
+            "name": "challenges_raised",
             "docs": [
               "Total number of challenges raised by this validator."
             ],
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorReputationInitialized",
+      "name": "ValidatorReputationInitialized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31241,19 +31295,19 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "initializedAt",
+            "name": "initialized_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "validatorSlashed",
+      "name": "ValidatorSlashed",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "type": "pubkey"
           },
           {
@@ -31261,11 +31315,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "slashAmount",
+            "name": "slash_amount",
             "type": "u64"
           },
           {
-            "name": "slashBps",
+            "name": "slash_bps",
             "type": "u16"
           },
           {
@@ -31276,7 +31330,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "validatorStake",
+      "name": "ValidatorStake",
       "docs": [
         "One record per validator per region.",
         "",
@@ -31286,7 +31340,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "stakePool",
+            "name": "stake_pool",
             "docs": [
               "StakePool key."
             ],
@@ -31300,28 +31354,28 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "stakedAmount",
+            "name": "staked_amount",
             "docs": [
               "Current stake in lamports."
             ],
             "type": "u64"
           },
           {
-            "name": "unbondingAmount",
+            "name": "unbonding_amount",
             "docs": [
               "Amount in unbonding period."
             ],
             "type": "u64"
           },
           {
-            "name": "unbondingStartsAt",
+            "name": "unbonding_starts_at",
             "docs": [
               "When unbonding began (0 if not unbonding)."
             ],
             "type": "i64"
           },
           {
-            "name": "rewardPerTokenPaid",
+            "name": "reward_per_token_paid",
             "docs": [
               "Snapshot of the pool's reward_per_token_stored at the time of last",
               "claim or deposit. Claimable = (pool.rpt - self.rpt_paid) * staked / PRECISION."
@@ -31329,7 +31383,7 @@ export type TerraRegistry = {
             "type": "u64"
           },
           {
-            "name": "slashHistory",
+            "name": "slash_history",
             "docs": [
               "Number of past slashing events (for graduated severity)."
             ],
@@ -31348,18 +31402,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "vaultAccessAuthorized",
+      "name": "VaultAccessAuthorized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31382,7 +31436,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "offChainNonce",
+            "name": "off_chain_nonce",
             "type": {
               "array": [
                 "u8",
@@ -31395,14 +31449,14 @@ export type TerraRegistry = {
             "type": "i64"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "vaultCreated",
+      "name": "VaultCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31415,7 +31469,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "ciphertextHash",
+            "name": "ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -31424,7 +31478,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           },
           {
@@ -31432,14 +31486,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "holderCount",
+            "name": "holder_count",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "vaultRecord",
+      "name": "VaultRecord",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31448,11 +31502,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "ciphertextCid",
+            "name": "ciphertext_cid",
             "type": "string"
           },
           {
-            "name": "ciphertextHash",
+            "name": "ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -31461,17 +31515,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "algorithmId",
+            "name": "algorithm_id",
             "type": "u8"
           },
           {
-            "name": "storageUris",
+            "name": "storage_uris",
             "type": {
               "vec": "string"
             }
           },
           {
-            "name": "shardHolders",
+            "name": "shard_holders",
             "type": {
               "vec": "pubkey"
             }
@@ -31485,18 +31539,18 @@ export type TerraRegistry = {
             "type": "u32"
           },
           {
-            "name": "lastPingAt",
+            "name": "last_ping_at",
             "type": "i64"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "vaultShardRotation",
+      "name": "VaultShardRotation",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31505,7 +31559,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "oldCiphertextHash",
+            "name": "old_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -31514,7 +31568,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newCiphertextHash",
+            "name": "new_ciphertext_hash",
             "type": {
               "array": [
                 "u8",
@@ -31523,17 +31577,17 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newShardHolders",
+            "name": "new_shard_holders",
             "type": {
               "vec": "pubkey"
             }
           },
           {
-            "name": "newThreshold",
+            "name": "new_threshold",
             "type": "u8"
           },
           {
-            "name": "initiatedBy",
+            "name": "initiated_by",
             "type": "pubkey"
           },
           {
@@ -31543,15 +31597,15 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requiredEndorsements",
+            "name": "required_endorsements",
             "type": "u8"
           },
           {
-            "name": "initiatedAt",
+            "name": "initiated_at",
             "type": "i64"
           },
           {
-            "name": "effectiveAt",
+            "name": "effective_at",
             "type": "i64"
           },
           {
@@ -31562,7 +31616,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "verificationAttestation",
+      "name": "VerificationAttestation",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31588,35 +31642,35 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "credentialSubject",
+            "name": "credential_subject",
             "docs": [
               "Credential subject the VC is about (parcel / owner / tenant pubkey)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "vcType",
+            "name": "vc_type",
             "docs": [
               "W3C VC type: \"VerificationAttestation\" or \"ResidencyAttestation\"."
             ],
             "type": "string"
           },
           {
-            "name": "issuanceDate",
+            "name": "issuance_date",
             "docs": [
               "VC issuance date (unix seconds)."
             ],
             "type": "i64"
           },
           {
-            "name": "expirationDate",
+            "name": "expiration_date",
             "docs": [
               "VC expiration date (unix seconds)."
             ],
             "type": "i64"
           },
           {
-            "name": "sdJwtDigest",
+            "name": "sd_jwt_digest",
             "docs": [
               "SD-JWT digest: sha-256 over the serialized SD-JWT. Anchors the full",
               "credential off-chain; selective disclosure reveals claims selectively."
@@ -31629,18 +31683,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "selectiveDisclosure",
+            "name": "selective_disclosure",
             "docs": [
               "Whether SD-JWT selective disclosure is enabled for this credential."
             ],
             "type": "bool"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "protocolVersion",
+            "name": "protocol_version",
             "docs": [
               "Protocol version for audit trail."
             ],
@@ -31650,7 +31704,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "verificationAttestationSubmitted",
+      "name": "VerificationAttestationSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31667,23 +31721,23 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "credentialSubject",
+            "name": "credential_subject",
             "type": "pubkey"
           },
           {
-            "name": "vcType",
+            "name": "vc_type",
             "type": "string"
           },
           {
-            "name": "issuanceDate",
+            "name": "issuance_date",
             "type": "i64"
           },
           {
-            "name": "expirationDate",
+            "name": "expiration_date",
             "type": "i64"
           },
           {
-            "name": "sdJwtDigest",
+            "name": "sd_jwt_digest",
             "type": {
               "array": [
                 "u8",
@@ -31692,7 +31746,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "attestationCount",
+            "name": "attestation_count",
             "type": "u8"
           },
           {
@@ -31703,16 +31757,16 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "verificationKeyUpdated",
+      "name": "VerificationKeyUpdated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "oldHash",
+            "name": "old_hash",
             "type": {
               "array": [
                 "u8",
@@ -31721,7 +31775,7 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "newHash",
+            "name": "new_hash",
             "type": {
               "array": [
                 "u8",
@@ -31730,18 +31784,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "updatedBy",
+            "name": "updated_by",
             "type": "pubkey"
           },
           {
-            "name": "blockTime",
+            "name": "block_time",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "verificationSession",
+      "name": "VerificationSession",
       "docs": [
         "A stateful session that tracks a claim through its full verification",
         "lifecycle. Links evidence, observations, and attestations. Manages",
@@ -31760,7 +31814,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "sessionId",
+            "name": "session_id",
             "docs": [
               "Unique session identifier (caller-provided)."
             ],
@@ -31779,68 +31833,68 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "openedBy",
+            "name": "opened_by",
             "docs": [
               "Participant who opened the session."
             ],
             "type": "pubkey"
           },
           {
-            "name": "evidenceCount",
+            "name": "evidence_count",
             "docs": [
               "Number of evidence items attached."
             ],
             "type": "u8"
           },
           {
-            "name": "observationCount",
+            "name": "observation_count",
             "docs": [
               "Number of observations submitted."
             ],
             "type": "u8"
           },
           {
-            "name": "attestationCount",
+            "name": "attestation_count",
             "docs": [
               "Number of confirmatory attestations."
             ],
             "type": "u8"
           },
           {
-            "name": "disputeCount",
+            "name": "dispute_count",
             "docs": [
               "Number of disconfirmatory attestations."
             ],
             "type": "u8"
           },
           {
-            "name": "requiredAttestations",
+            "name": "required_attestations",
             "docs": [
               "Required attestations for quorum."
             ],
             "type": "u8"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           },
           {
-            "name": "closedAt",
+            "name": "closed_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "verificationSessionClosed",
+      "name": "VerificationSessionClosed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31857,14 +31911,14 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "closedAt",
+            "name": "closed_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "verificationSessionOpened",
+      "name": "VerificationSessionOpened",
       "type": {
         "kind": "struct",
         "fields": [
@@ -31877,7 +31931,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "sessionId",
+            "name": "session_id",
             "type": {
               "array": [
                 "u8",
@@ -31886,18 +31940,18 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "openedBy",
+            "name": "opened_by",
             "type": "pubkey"
           },
           {
-            "name": "expiresAt",
+            "name": "expires_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "verificationTask",
+      "name": "VerificationTask",
       "docs": [
         "First-class work unit (requester, subject, class, reward, deadline).",
         "",
@@ -31907,7 +31961,7 @@ export type TerraRegistry = {
         "kind": "struct",
         "fields": [
           {
-            "name": "taskId",
+            "name": "task_id",
             "docs": [
               "Client-provided unique id (e.g. SHA-256 of the task statement)."
             ],
@@ -31928,13 +31982,13 @@ export type TerraRegistry = {
           {
             "name": "subject",
             "docs": [
-              "What the task is about — claim, parcel, identity, or other account.",
+              "What the task is about \u2014 claim, parcel, identity, or other account.",
               "Not constrained to one program (migration map: claims become subjects)."
             ],
             "type": "pubkey"
           },
           {
-            "name": "taskClass",
+            "name": "task_class",
             "docs": [
               "One of `task_class`."
             ],
@@ -31948,7 +32002,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "rewardLamports",
+            "name": "reward_lamports",
             "docs": [
               "Reward in lamports recorded for Phase 8 distribution (0 = unfunded)."
             ],
@@ -31962,7 +32016,7 @@ export type TerraRegistry = {
             "type": "i64"
           },
           {
-            "name": "descriptionHash",
+            "name": "description_hash",
             "docs": [
               "sha256 of off-chain task description / requirements narrative."
             ],
@@ -31974,28 +32028,28 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "requirementCount",
+            "name": "requirement_count",
             "docs": [
               "Number of `TaskRequirement` rows (append-only via req_index)."
             ],
             "type": "u8"
           },
           {
-            "name": "assignedCount",
+            "name": "assigned_count",
             "docs": [
               "Number of `TaskAssignment` rows created."
             ],
             "type": "u8"
           },
           {
-            "name": "requiredValidators",
+            "name": "required_validators",
             "docs": [
               "How many submitted results are needed to complete (1..=MAX_TASK_VALIDATORS)."
             ],
             "type": "u8"
           },
           {
-            "name": "resultCount",
+            "name": "result_count",
             "docs": [
               "How many results have been submitted so far."
             ],
@@ -32009,7 +32063,7 @@ export type TerraRegistry = {
             "type": "u8"
           },
           {
-            "name": "resultHash",
+            "name": "result_hash",
             "docs": [
               "Canonical hash of the aggregated result / report."
             ],
@@ -32021,15 +32075,15 @@ export type TerraRegistry = {
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           },
           {
-            "name": "completedAt",
+            "name": "completed_at",
             "docs": [
               "0 until COMPLETED."
             ],
@@ -32039,7 +32093,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "verificationTaskCreated",
+      "name": "VerificationTaskCreated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -32048,7 +32102,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskId",
+            "name": "task_id",
             "type": {
               "array": [
                 "u8",
@@ -32065,7 +32119,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "taskClass",
+            "name": "task_class",
             "type": "u8"
           },
           {
@@ -32073,14 +32127,14 @@ export type TerraRegistry = {
             "type": "i64"
           },
           {
-            "name": "requiredValidators",
+            "name": "required_validators",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "vrfAuthority",
+      "name": "VrfAuthority",
       "docs": [
         "Allowlisted VRF oracle authority. Seeded by `[b\"vrf_authority\"]`."
       ],
@@ -32102,7 +32156,7 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "docs": [
               "Unix timestamp of the last update."
             ],
@@ -32116,7 +32170,7 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "vrfAuthoritySet",
+      "name": "VrfAuthoritySet",
       "type": {
         "kind": "struct",
         "fields": [
@@ -32129,21 +32183,21 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "worldRegistry",
+      "name": "WorldRegistry",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "admin",
             "docs": [
-              "Global founder — temporary sole authority during bootstrap phase."
+              "Global founder \u2014 temporary sole authority during bootstrap phase."
             ],
             "type": "pubkey"
           },
@@ -32156,29 +32210,29 @@ export type TerraRegistry = {
             "type": {
               "vec": {
                 "defined": {
-                  "name": "countryAllocation"
+                  "name": "CountryAllocation"
                 }
               }
             }
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "worldRegistryCreated",
+      "name": "WorldRegistryCreated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "worldRegistry",
+            "name": "world_registry",
             "type": "pubkey"
           },
           {
@@ -32189,12 +32243,12 @@ export type TerraRegistry = {
       }
     },
     {
-      "name": "zoneSet",
+      "name": "ZoneSet",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneId",
+            "name": "zone_id",
             "type": "pubkey"
           },
           {
@@ -32202,35 +32256,35 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "parcelCount",
+            "name": "parcel_count",
             "type": "u32"
           },
           {
-            "name": "currentRootVersion",
+            "name": "current_root_version",
             "type": "u32"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           },
           {
-            "name": "updatedAt",
+            "name": "updated_at",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "zoneSetRegistered",
+      "name": "ZoneSetRegistered",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "zoneSet",
+            "name": "zone_set",
             "type": "pubkey"
           },
           {
-            "name": "zoneId",
+            "name": "zone_id",
             "type": "pubkey"
           },
           {
@@ -32238,11 +32292,11 @@ export type TerraRegistry = {
             "type": "pubkey"
           },
           {
-            "name": "snapshotCid",
+            "name": "snapshot_cid",
             "type": "string"
           },
           {
-            "name": "createdAt",
+            "name": "created_at",
             "type": "i64"
           }
         ]

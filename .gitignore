@@ -52,3 +52,6 @@ tmp/screenshots/
 *.swp
 .DS_Store
 Thumbs.db
+# --- ZK development setup (dev-only proving keys, never commit) ---
+.zk/
+**/.zk/

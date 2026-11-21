@@ -9288,6 +9288,7 @@ dependencies = [
  "ark-ff 0.5.0",
  "ark-groth16",
  "ark-relations",
+ "ark-snark",
  "ark-std 0.5.0",
  "borsh",
  "ed25519-dalek 2.2.0",

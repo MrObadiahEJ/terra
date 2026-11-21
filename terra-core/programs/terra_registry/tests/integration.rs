@@ -1700,6 +1700,256 @@ async fn zk_register_generate_verify_double_use() {
         .expect_err("non-authority root rotation should fail");
 }
 
+/// End-to-end ZK: the production `MembershipCircuit` (Poseidon Merkle
+/// membership proof, `terra-zk-membership`) is exercised prover→verifier.
+/// arkworks generates a real Groth16 proof for a committed statement, and
+/// the on-chain `verify_ownership_proof` accepts it (and rejects a tampered
+/// one). This closes the A14 verification gap locally; live-cluster proving
+/// remains gated on Stage 2 devnet funding (Roadmap §Stage 2).
+#[tokio::test]
+async fn zk_membership_prover_verifier_e2e() {
+    use ark_bn254::Bn254;
+    use ark_groth16::Groth16;
+    use ark_snark::{CircuitSpecificSetupSNARK, SNARK};
+    use ark_std::rand::{rngs::StdRng, SeedableRng};
+    use ed25519_dalek::Signer as _;
+    use terra_zk_membership::{
+        canonical_ownership_statement, compute_root, derive_nullifier, field_to_be, Fr,
+        MembershipCircuit, MembershipWitness, MerklePath, TREE_DEPTH,
+    };
+    use terra_zk_membership::frame::encode_frame;
+
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new().pubkey();
+    let (zone_set, _) = zone_set_pda(&zone_id);
+    let (root, _) = ownership_root_pda(&zone_set);
+    let snapshot_hash = [31u8; 32];
+
+    // register_zone_set (payer becomes zone authority).
+    let mut data = discriminator("global", "register_zone_set").to_vec();
+    data.extend_from_slice(&borsh_ser(&"QmRoot".to_string()));
+    data.extend_from_slice(&snapshot_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(zone_id, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("register_zone_set failed");
+
+    // The circuit binds the real zone-set PDA: the on-chain statement uses
+    // `ctx.accounts.zone_set.key()`, so the witness must too.
+    let zone_bytes = zone_set.to_bytes();
+    // register_zone_set starts at version 0; generate_ownership_root commits 1.
+    let version: u32 = 1;
+    let purpose = "membership";
+    let disclosure_type = zk::disclosure_type::MEMBERSHIP;
+
+    // Deterministic witness (matches the crate's proven-satisfiable fixture).
+    let secret = Fr::from(123456u64);
+    let path = MerklePath {
+        siblings: (0..TREE_DEPTH).map(|l| Fr::from((l + 1) as u64)).collect(),
+        indices: (0..TREE_DEPTH).map(|l| l % 2 == 1).collect(),
+    };
+    let computed_root = compute_root(secret, &path).expect("compute root");
+    let root_bytes = field_to_be(&computed_root);
+    let nullifier = derive_nullifier(
+        secret,
+        <Fr as ark_ff::PrimeField>::from_be_bytes_mod_order(&zone_bytes),
+        computed_root,
+        version,
+    )
+    .expect("nullifier");
+    let nullifier_bytes = field_to_be(&nullifier);
+
+    // Canonical statement binds every field the circuit checks.
+    let statement = canonical_ownership_statement(
+        &zone_bytes,
+        &root_bytes,
+        version,
+        &nullifier_bytes,
+        &payer.pubkey().to_bytes(),
+        purpose,
+        disclosure_type,
+    )
+    .expect("statement");
+
+    let setup_circuit = MembershipCircuit::new(
+        Some(statement.clone()),
+        Some(secret),
+        Some(path.clone()),
+    );
+    let mut rng = StdRng::from_seed([42u8; 32]);
+    // Local constraint sanity check before proving (mirrors
+    // terra-zk-membership's own circuit test).
+    use ark_relations::r1cs::ConstraintSystem;
+    let check_cs = ConstraintSystem::<Fr>::new_ref();
+    MembershipCircuit::new(
+        Some(statement.clone()),
+        Some(secret),
+        Some(path.clone()),
+    )
+    .generate_constraints(check_cs.clone())
+    .expect("generate constraints");
+    assert!(
+        check_cs.is_satisfied().unwrap(),
+        "circuit unsatisfied: {:?}",
+        check_cs.which_is_unsatisfied().unwrap()
+    );
+    let (proving_key, verifying_key) =
+        Groth16::<Bn254>::setup(setup_circuit, &mut rng).expect("groth16 setup");
+    let witness = MembershipWitness {
+        statement: statement.clone(),
+        secret,
+        path,
+    };
+    let proof = Groth16::<Bn254>::prove(&proving_key, witness.into_circuit(), &mut rng)
+        .expect("groth16 prove");
+
+    // Pin the verification key hash before any proof can verify.
+    let vk_bytes = terra_zk_membership::frame::serialize_verification_key(&verifying_key)
+        .expect("serialize vk");
+    let vk_hash = hash(&vk_bytes).to_bytes();
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&vk_hash);
+                d
+            },
+        },
+    )
+    .await
+    .expect("pin groth16 verification key hash failed");
+
+    // generate_ownership_root with the Poseidon Merkle root.
+    let att_sig = root_attestation_sig(&payer, &root_bytes, version);
+    let mut data = discriminator("global", "generate_ownership_root").to_vec();
+    data.extend_from_slice(&root_bytes);
+    data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
+    data.extend_from_slice(&[12u8; 32]);
+    data.extend_from_slice(&borsh_ser(&5u32));
+    data.extend_from_slice(&att_sig);
+    process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &zk::root_attestation_message(&root_bytes, version),
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("generate_ownership_root failed");
+
+    let root_acc: OwnershipRoot = read_account(&ctx, root).await;
+    assert_eq!(root_acc.version, 1);
+    assert_eq!(root_acc.commitment_count, 5);
+    assert_eq!(root_acc.merkle_root, root_bytes);
+
+    // Real prover → on-chain verifier accepts.
+    let nullifier_rec = nullifier_pda(&nullifier_bytes);
+    let sig = keypair_signing_key(&payer).sign(&statement).to_bytes();
+    let frame = encode_frame(&sig, &verifying_key, &proof).expect("encode frame");
+    assert_eq!(frame.len(), terra_zk_membership::frame::TG16_FRAME_LEN);
+
+    let verify_ix = || {
+        let mut data = discriminator("global", "verify_ownership_proof").to_vec();
+        data.extend_from_slice(&borsh_ser(&frame));
+        data.extend_from_slice(&nullifier_bytes);
+        data.extend_from_slice(&borsh_ser(&version));
+        data.extend_from_slice(&borsh_ser(&purpose.to_string()));
+        data.extend_from_slice(&borsh_ser(&disclosure_type));
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(zone_set, false),
+                AccountMeta::new_readonly(root, false),
+                AccountMeta::new(nullifier_rec.0, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        }
+    };
+
+    process_attested(&mut ctx, &payer, &payer, &statement, verify_ix())
+        .await
+        .expect("verify_ownership_proof failed");
+
+    let rec: NullifierRecord = read_account(&ctx, nullifier_rec.0).await;
+    assert_eq!(rec.prover, payer.pubkey());
+    assert_eq!(rec.root_version, version);
+
+    // Tampered statement (wrong nullifier) must be rejected: the proof was
+    // generated for the original statement digest, so a different statement
+    // fails the Groth16 pairing equation.
+    let wrong_nullifier = [14u8; 32];
+    let wrong_stmt = canonical_ownership_statement(
+        &zone_bytes,
+        &root_bytes,
+        version,
+        &wrong_nullifier,
+        &payer.pubkey().to_bytes(),
+        purpose,
+        disclosure_type,
+    )
+    .expect("wrong statement");
+    let wrong_sig = keypair_signing_key(&payer).sign(&wrong_stmt).to_bytes();
+    let wrong_frame =
+        encode_frame(&wrong_sig, &verifying_key, &proof).expect("encode wrong frame");
+    let mut wrong_data = discriminator("global", "verify_ownership_proof").to_vec();
+    wrong_data.extend_from_slice(&borsh_ser(&wrong_frame));
+    wrong_data.extend_from_slice(&wrong_nullifier);
+    wrong_data.extend_from_slice(&borsh_ser(&version));
+    wrong_data.extend_from_slice(&borsh_ser(&purpose.to_string()));
+    wrong_data.extend_from_slice(&borsh_ser(&disclosure_type));
+    let wrong_ix = Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new_readonly(zone_set, false),
+            AccountMeta::new_readonly(root, false),
+            AccountMeta::new(nullifier_pda(&wrong_nullifier).0, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: wrong_data,
+    };
+    process_attested(&mut ctx, &payer, &payer, &wrong_stmt, wrong_ix)
+        .await
+        .expect_err("tampered proof must fail");
+}
+
 #[tokio::test]
 async fn zk_groth16_verification_rejections() {
     let (mut ctx, payer) = setup().await;
