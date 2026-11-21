@@ -44,7 +44,7 @@ green on `dev` and `main` (fmt, `clippy -D warnings`, registry/identity lib
 unit tests, RFC-012 structural, geo, API unit tests incl. live-PostGIS
 migration run, frontend `tsc -b` + vitest).
 
-**Complete on `dev` (verified 2026-09-30):** RFC-012 **Phases 0–10** (architecture
+**Complete on `dev` (verified 2026-11-21):** RFC-012 **Phases 0–10** (architecture
 contract, security hardening, generalized validator PDAs, verification tasks,
 multi-source observations, evidence provenance, dynamic routing, reputation
 governance, economic/resource layer, **device identities**, **cross-border bindings**, **Vision Stage 3 Phase A — spatial assets & versioned geometry**), **Tier A1–A3** (security residuals, IDL
@@ -55,7 +55,7 @@ matrix: findings **F1–F8 all fixed**), P0-ZK real Ed25519 precompile
 verification — unique validator sets, endorsement
 action binding, account-ownership checks on `remaining_accounts` loaders,
 admin/authority constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL
-synced to source (165/71/152/247), and CI covers registry/identity lib + rfc012 +
+synced to source (177/82/165/271), and CI covers registry/identity lib + rfc012 +
 geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 **Frontend:** interactive `/lab` experiments
@@ -66,38 +66,41 @@ devnet), 3D Cesium globe with automatic 2D Leaflet fallback
 when WebGL is unavailable, bundled demo-data fallback so the globe works on any
 device without a wallet or running API, typed API client, wallet adapter.
 
-Verified tests on `dev` (2026-10-16):
+Verified tests on `dev` (2026-11-21):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 153 |
+| `terra-registry` lib unit tests | 154 |
 | `terra-registry` RFC-012 structural tests | 21 |
+| `terra-registry` BPF integration (incl. ZK E2E) | 308 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 23 |
-| `terra-api` unit tests | 111 |
+| `terra-api` unit tests | 165 |
 | `terra-geo` unit tests | 12 (+1 ignored vector-regen) |
-| `terra-web` story-engine tests (vitest) | 44 |
+| `terra-zk-membership` unit tests | 6 |
+| `terra-web` vitest | 134 |
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and frontend `tsc -b` + vitest — mirrored locally by
 `make ci` (all four jobs). Identity BPF (23) and the long-form registry BPF
-suite (307) are run locally / on demand (full registry suite ≈ 7 min with
+suite (308) are run locally / on demand (full registry suite ≈ 7 min with
 `--test-threads=1`).
 
-Registry BPF integration suite (`tests/integration.rs`, 307 tests) is
+Registry BPF integration suite (`tests/integration.rs`, 308 tests) is
 maintained and run locally; it is the long-form regression suite for all
 instruction happy paths and guard rails. Both BPF suites refuse to run
 against a stale `target/deploy/*.so` — their `setup()` guards compare
 mtimes and fail with the rebuild command (`anchor build --skip-lint`).
 
-Known limits before `main`: no devnet deployment yet (see
+Known limits before `main`: devnet deployment pending (see
 [Devnet checklist](#devnet-checklist)); ZK proof verification is
 framed `proof_data` v1 with on-chain Groth16/BN254 (RFC-011 §6.3.1,
-hash-pinned VK — the production membership circuit + trusted setup
-still need audit); time-locked paths (7-day unbonding withdraw) are
-guard-verified, not time-executed, in the harness; checked-in IDL
+hash-pinned VK — end-to-end prover→verifier E2E tested via
+`zk_membership_prover_verifier_e2e`; the production membership circuit +
+trusted setup still need external audit); time-locked paths (7-day unbonding
+withdraw) are guard-verified, not time-executed, in the harness; checked-in IDL
 (`terra-web/src/idl/terra_registry.json`) is synced to source at
-**165/71/152/247 (re-synced 2026-10-13, RFC-013 Phase C)** — re-run `make idl` / `./build.sh`
+**177/82/165/271** — re-run `make idl` / `./build.sh`
 before shipping client changes after any program edit.
 
 ### How to continue (handoff)
@@ -115,7 +118,7 @@ This repo is self-describing for a new contributor or agent — read in order:
 
 Do not invent instruction/account/event/error counts or test totals — regenerate
 from source (`rg`, `cargo test`, `make idl`) or trust the tables above (verified
-2026-09-30). Prefer small incremental commits on `dev`; keep tests green before
+2026-11-21). Prefer small incremental commits on `dev`; keep tests green before
 merging to `main`.
 
 ## Branching Strategy
@@ -151,12 +154,12 @@ peer-consensus), `quorum.rs` (unique-validator + signer dedup), `verification/*`
 (claims, sessions, challenges, reputation).
 Full specs live in [`docs/`](docs/) as `rfc-003…rfc-013`.
 
-Source counts (regenerate IDL after changes): **165 instructions · 71 account
-types · 152 events · 247 `TerraError` codes** in `terra_registry`; **8
+Source counts (regenerate IDL after changes): **177 instructions · 82 account
+types · 165 events · 271 `TerraError` codes** in `terra_registry`; **8
 instructions · 2 accounts · 8 events · 29 `IdentityError` codes** in
 `terra_identity`. Checked-in
 [`terra-web/src/idl/terra_registry.json`](terra-web/src/idl/terra_registry.json)
-matches source (RFC-013 Phase C 2026-10-13 — 165/71/152/247); re-run `make idl` after
+matches source (177/82/165/271); re-run `make idl` after
 program edits.
 
 ---
@@ -250,8 +253,8 @@ terra/
 ├── terra-core/                       # Rust workspace (terra-registry, terra-identity, terra-api, terra-geo)
 │   ├── programs/terra_registry/src/  # lib.rs + protocol modules + verification/
 │   ├── programs/terra_identity/src/  # identity, succession, guardianship
-│   ├── api/src/routes/               # 21 route modules (parcels, staking, zk_proofs, spatial, …)
-│   ├── api/migrations/               # 0001…0026 (PostGIS schema + mirrors)
+│   ├── api/src/routes/               # 34 route modules (parcels, staking, zk_proofs, spatial, …)
+│   ├── api/migrations/               # 0001…0055 (PostGIS schema + mirrors)
 │   └── geo-engine/                   # OSM graph + reachability (terra-geo)
 ├── docs/                             # VISION.md (north star) + rfc-003 … rfc-013
 └── .github/workflows/ci.yml          # fmt, clippy, lib/api tests (PostGIS svc), tsc
@@ -299,7 +302,7 @@ Build the BPF program (manifest parsing issue in Anchor requires direct
 cd terra-core
 cargo build-sbf --manifest-path programs/terra_registry/Cargo.toml
 cargo build-sbf --manifest-path programs/terra_identity/Cargo.toml
-# Long-form registry BPF suite (307 tests, ~7 min; needs built SBF):
+# Long-form registry BPF suite (308 tests, ~7 min; needs built SBF):
 cargo test -p terra-registry --test integration -- --test-threads=1
 # Identity BPF suite (23 tests):
 cargo test -p terra-identity --test integration
@@ -324,16 +327,16 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 153/153 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 154/154 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
-| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 307/307 (~7 min; run locally) |
-| Unit (API validation logic) | `cargo test -p terra-api` | 111/111 |
+| Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 308/308 (~7 min; run locally) |
+| Unit (API validation logic) | `cargo test -p terra-api` | 165/165 |
 | Geo engine pure logic | `cargo test -p terra-geo` | 12/12 (+1 ignored) |
-| ZK membership crate | `cargo test -p terra-zk-membership` | 5/5 |
-| Migrations on real PostGIS 16 | CI service + local scratch instance | 27/27 apply |
-| Frontend types + tests | `pnpm exec tsc -b` + `pnpm test` | clean / 44 pass |
+| ZK membership crate | `cargo test -p terra-zk-membership` | 6/6 |
+| Migrations on real PostGIS 16 | CI service + local scratch instance | 55/55 apply |
+| Frontend types + tests | `pnpm exec tsc -b` + `pnpm test` | clean / 134 pass |
 | Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
 
 ### Devnet checklist

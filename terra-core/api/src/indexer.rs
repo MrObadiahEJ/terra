@@ -31,8 +31,147 @@ const PARCEL_DISCRIMINATOR: [u8; 8] = [149, 167, 245, 67, 209, 244, 214, 75];
 /// SHA-256("account:VerificationAttestation")[..8]
 const VERIFICATION_ATTESTATION_DISCRIMINATOR: [u8; 8] = [231, 126, 92, 51, 84, 178, 81, 242];
 
+/// Anchor 8-byte discriminator for the `Rights` account:
+/// SHA-256("account:Rights")[..8] = 4fbb5655f3d567ea
+const RIGHTS_DISCRIMINATOR: [u8; 8] = [0x4f, 0xbb, 0x56, 0x55, 0xf3, 0xd5, 0x67, 0xea];
+
+/// Rights account kind: OWNERSHIP = 0
+const RIGHTS_KIND_OWNERSHIP: u8 = 0;
+
 /// Interval between indexer polls.
 const POLL_INTERVAL_SECS: u64 = 15;
+
+/// Parsed Rights account from on-chain data.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct ParsedRights {
+    pub parcel: [u8; 32],
+    pub rights_kind: u8,
+    pub holder: [u8; 32],
+    pub granter: [u8; 32],
+    pub created_at: i64,
+    pub expires_at: i64,
+    pub notes: String,
+    pub status: u8,
+    pub grace_period_secs: i64,
+}
+
+/// Decode a raw Anchor account buffer into a ParsedRights.
+///
+/// Anchor account layout:
+///   [0..8]   discriminator (8 bytes)
+///   [8..40]  parcel [u8; 32]
+///   [40]     rights_kind u8
+///   [41..73] holder [u8; 32]
+///   [73..105] granter [u8; 32]
+///   [105..113] created_at i64 LE
+///   [113..121] expires_at i64 LE
+///   [121] notes length (u8)
+///   [122..] notes bytes (UTF-8)
+///   then status u8, grace_period_secs i64 LE
+fn parse_rights(data: &[u8]) -> Option<ParsedRights> {
+    if data.len() < 8 {
+        return None;
+    }
+    if data[..8] != RIGHTS_DISCRIMINATOR {
+        return None;
+    }
+
+    let mut offset = 8;
+
+    // parcel [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut parcel = [0u8; 32];
+    parcel.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // rights_kind u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let rights_kind = data[offset];
+    offset += 1;
+
+    // holder [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut holder = [0u8; 32];
+    holder.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // granter [u8; 32]
+    if data.len() < offset + 32 {
+        return None;
+    }
+    let mut granter = [0u8; 32];
+    granter.copy_from_slice(&data[offset..offset + 32]);
+    offset += 32;
+
+    // created_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let created_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // expires_at i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let expires_at = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+    offset += 8;
+
+    // notes length (u8)
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let notes_len = data[offset] as usize;
+    offset += 1;
+
+    // notes (UTF-8)
+    if data.len() < offset + notes_len {
+        return None;
+    }
+    let notes = String::from_utf8_lossy(&data[offset..offset + notes_len]).to_string();
+    offset += notes_len;
+
+    // status u8
+    if data.len() < offset + 1 {
+        return None;
+    }
+    let status = data[offset];
+    offset += 1;
+
+    // grace_period_secs i64 LE
+    if data.len() < offset + 8 {
+        return None;
+    }
+    let grace_period_secs = i64::from_le_bytes([
+        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7],
+    ]);
+
+    Some(ParsedRights {
+        parcel,
+        rights_kind,
+        holder,
+        granter,
+        created_at,
+        expires_at,
+        notes,
+        status,
+        grace_period_secs,
+    })
+}
 
 /// Parsed Parcel account from on-chain data.
 ///
@@ -376,19 +515,41 @@ pub async fn run_indexer(rpc_url: String, state: Arc<AppState>) -> Result<()> {
     }
 }
 
-/// Single poll: fetch program accounts, decode parcels, upsert.
+/// Single poll: fetch program accounts, decode parcels/rights/attestations,
+/// upsert mirror rows with real slot + holder from Rights PDA.
 async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) -> Result<usize> {
+    let slot = client
+        .get_slot()
+        .with_context(|| "get_slot failed")?;
+
     let accounts = client
         .get_program_accounts(program_id)
         .with_context(|| "get_program_accounts failed")?;
 
+    // Decode all Rights accounts first, then map parcel -> holder for
+    // ownership rights (rights_kind == 0). This lets us mirror the real
+    // wallet holder instead of the PDA address.
+    let mut parcel_holder: std::collections::HashMap<[u8; 32], [u8; 32]> =
+        std::collections::HashMap::new();
+    for (_pubkey, account) in &accounts {
+        if let Some(rights) = parse_rights(&account.data) {
+            if rights.rights_kind == RIGHTS_KIND_OWNERSHIP {
+                parcel_holder.insert(rights.parcel, rights.holder);
+            }
+        }
+    }
+
     let mut upserted = 0usize;
     for (pubkey, account) in &accounts {
         if let Some(parcel) = parse_parcel(&account.data) {
-            upsert_parcel(state, pubkey, &parcel, 0, "").await?;
+            let holder = parcel_holder
+                .get(&parcel.id)
+                .copied()
+                .unwrap_or(pubkey.to_bytes());
+            upsert_parcel(state, pubkey, &parcel, &holder, slot, "").await?;
             upserted += 1;
         } else if let Some(attestation) = parse_verification_attestation(&account.data) {
-            upsert_verification_attestation(state, pubkey, &attestation, 0, "").await?;
+            upsert_verification_attestation(state, pubkey, &attestation, slot, "").await?;
             upserted += 1;
         }
     }
@@ -403,14 +564,20 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
 /// this with `parcels.id` (auto-generated UUID) + `onchain_id` (the PDA
 /// address as base58 text) plus a `parcel_ownership` row so `PARCEL_SELECT`'s
 /// JOIN finds indexed parcels.
+///
+/// On UPDATE we deliberately do NOT touch `geometry` — the on-chain Parcel
+/// account only carries a geometry hash, not the full GeoJSON, so overwriting
+/// the mirror's geometry with NULL would destroy client-supplied polygon data.
 async fn upsert_parcel(
     state: &AppState,
     pubkey: &Pubkey,
     parcel: &ParsedParcel,
-    _slot: u64,
+    holder: &[u8; 32],
+    slot: u64,
     _signature: &str,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
+    let holder_hex: String = holder.iter().map(|b| format!("{b:02x}")).collect();
 
     // geometry_hash as text (hex)
     let geometry_hash_hex: String = parcel
@@ -435,12 +602,12 @@ async fn upsert_parcel(
         })?;
 
     if let Some(parcel_id) = exists {
+        // UPDATE: preserve existing geometry (don't set to NULL).
         sqlx::query(
             r#"
             UPDATE parcels SET
                 name = $1,
                 status = $2,
-                geometry = NULL,
                 geometry_hash = $3,
                 infrastructure_flags = $4,
                 rights_count = $5,
@@ -459,8 +626,8 @@ async fn upsert_parcel(
         .bind(parcel.rights_count as i16)
         .bind(&access_hash_hex)
         .bind(parcel.updated_at as f64)
-        .bind(0i64) // chain_slot
-        .bind("") // chain_signature
+        .bind(slot as i64)
+        .bind("")
         .bind(parcel_id)
         .execute(&state.pool)
         .await
@@ -468,6 +635,17 @@ async fn upsert_parcel(
             warn!("update parcel {pubkey} failed: {e:?}");
             anyhow::anyhow!("update parcel {pubkey}: {e}")
         })?;
+
+        // Update the holder to the real wallet from the Rights PDA.
+        sqlx::query("UPDATE parcel_ownership SET holder = $1 WHERE parcel_id = $2")
+            .bind(&holder_hex)
+            .bind(parcel_id)
+            .execute(&state.pool)
+            .await
+            .map_err(|e| {
+                warn!("update parcel_ownership {pubkey} failed: {e:?}");
+                anyhow::anyhow!("update parcel_ownership {pubkey}: {e}")
+            })?;
     } else {
         let parcel_id: Uuid = sqlx::query_scalar(
             r#"
@@ -491,8 +669,8 @@ async fn upsert_parcel(
         .bind(&access_hash_hex)
         .bind(parcel.created_at as f64)
         .bind(parcel.updated_at as f64)
-        .bind(0i64) // chain_slot
-        .bind("") // chain_signature
+        .bind(slot as i64)
+        .bind("")
         .fetch_one(&state.pool)
         .await
         .map_err(|e| {
@@ -500,14 +678,11 @@ async fn upsert_parcel(
             anyhow::anyhow!("insert parcel {pubkey}: {e}")
         })?;
 
-        // Mirror the on-chain ownership into parcel_ownership so PARCEL_SELECT's
-        // JOIN finds this indexed parcel. We don't know the real wallet owner
-        // from the Parcel account alone (ownership lives in a Rights PDA), so
-        // we record the PDA address as holder and rely on /parcels/{id}/reconcile
-        // to correct it later.
+        // Mirror the on-chain ownership into parcel_ownership with the real
+        // wallet holder from the Rights PDA.
         sqlx::query("INSERT INTO parcel_ownership (parcel_id, holder) VALUES ($1, $2)")
             .bind(parcel_id)
-            .bind(&pubkey_str)
+            .bind(&holder_hex)
             .execute(&state.pool)
             .await
             .map_err(|e| {
@@ -524,7 +699,7 @@ async fn upsert_verification_attestation(
     state: &AppState,
     pubkey: &Pubkey,
     attestation: &ParsedVerificationAttestation,
-    _slot: u64,
+    slot: u64,
     _signature: &str,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
@@ -597,7 +772,7 @@ async fn upsert_verification_attestation(
         .bind(&sd_jwt_digest_hex)
         .bind(attestation.selective_disclosure)
         .bind(attestation.protocol_version as i16)
-        .bind(0i64) // chain_slot
+        .bind(slot as i64) // chain_slot
         .bind("") // chain_signature
         .bind(&pubkey_str)
         .execute(&state.pool)
@@ -632,7 +807,7 @@ async fn upsert_verification_attestation(
         .bind(&sd_jwt_digest_hex)
         .bind(attestation.selective_disclosure)
         .bind(attestation.protocol_version as i16)
-        .bind(0i64) // chain_slot
+        .bind(slot as i64) // chain_slot
         .bind("") // chain_signature
         .execute(&state.pool)
         .await
