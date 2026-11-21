@@ -24,7 +24,6 @@ import {
   bytesToHex,
   canonicalVcMessage,
   residencyMessage,
-  verifyEd25519,
   verifyCompletePresentation,
   type VerificationBundle,
 } from '../lib/mvpVerifier'

@@ -6,8 +6,6 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  Download,
-  ExternalLink,
   FileCheck,
   FileText,
   Fingerprint,
@@ -22,9 +20,6 @@ import { connection } from '../lib/wallet'
 import { TERRA_PROGRAM_ID } from '../lib/constants'
 import {
   verifyCompletePresentation,
-  computeSdJwtDigest,
-  canonicalVcMessage,
-  bytesToHex,
   type VerificationBundle,
   type VerificationReport,
 } from '../lib/mvpVerifier'

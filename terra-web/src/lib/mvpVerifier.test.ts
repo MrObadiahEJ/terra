@@ -14,6 +14,7 @@ import {
   verifyTemporalValidity,
   verifyCompletePresentation,
   type VCInput,
+  type ResidencyMessageInput,
   type ResidencyProofInput,
   type VerificationBundle,
 } from './mvpVerifier'
