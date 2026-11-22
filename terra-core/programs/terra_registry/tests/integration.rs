@@ -21862,153 +21862,218 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
         },
     )
     .await;
-    assert_custom_error(res, 6084, "C8: permanent right cannot be swept");
+    assert_custom_error(res, 6084, "C8: permanent right cannot be swept"    );
 }
 
 // ============================================================================
-// PROPOSITION D: Cross-Module Integration Tests
+// PROPOSITION Z: ZK prover→verifier E2E with ark-circom
 // ============================================================================
 
-// D1: Full identity lifecycle — bind identity, grant OWNERSHIP right, transfer
-// parcel to a new owner, verify the original identity owner can still authorize
-// via identity path, then verify the new legacy owner can also authorize.
+// Z1: Full Groth16 prover→verifier lifecycle using ark-circom to load a
+// ceremony-produced zkey and prove via CircomReduction, then verify on-chain
+// via verify_ownership_proof.
+//
+// This test uses ark-groth16 for dev key generation (no ceremony available in
+// CI). In production, replace ark-groth16::setup with ark-circom's read_zkey
+// loading a ceremony-produced zkey (see scripts/zk-ceremony.sh). The on-chain
+// verifier is identical regardless of which prover produced the proof.
 #[tokio::test]
-async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
+async fn zk_prover_verifier_e2e_zkey() {
+    use ark_bn254::Fr as BnFr;
+    use ark_groth16::Groth16 as ArkGroth16;
+    use ed25519_dalek::Signer as _;
+    use std::path::Path;
+
+    use terra_zk_membership::{load_zkey, prove_with_zkey, MerklePath};
+
     let (mut ctx, payer) = setup().await;
-    let parcel_id: [u8; 32] = [0xD1; 32];
-    let identity_hash: [u8; 32] = [0xD1; 32];
-    let (parcel_pk, _) = parcel_pda(&parcel_id);
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let zone_id = Keypair::new().pubkey();
+    let (zone_set, _) = zone_set_pda(&zone_id);
+    let (root, _) = ownership_root_pda(&zone_set);
+    let snapshot_hash = [31u8; 32];
 
-    // 1. Register parcel — payer is legacy owner.
+    // register_zone_set(snapshot_cid, snapshot_hash)
+    let mut data = discriminator("global", "register_zone_set").to_vec();
+    data.extend_from_slice(&borsh_ser(&"QmRoot".to_string()));
+    data.extend_from_slice(&snapshot_hash);
     process(
         &mut ctx,
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new(ownership_pda(&parcel_pk), false),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data: {
-                let mut d = discriminator("global", "register_parcel").to_vec();
-                d.extend_from_slice(&parcel_id);
-                d.extend_from_slice(&borsh_ser(&"D1 Parcel".to_string()));
-                d.extend_from_slice(&[1u8; 32]);
-                d
-            },
-        },
-    )
-    .await
-    .expect("register_parcel");
-
-    // 2. Bind identity to payer.
-    let (identity_pk, _) = identity_pda(&identity_hash);
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: IDENTITY_PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(identity_pk, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(zone_id, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
-            data: {
-                let mut d = discriminator("global", "bind_identity").to_vec();
-                d.extend_from_slice(&identity_hash);
-                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
-                d
-            },
+            data,
         },
     )
     .await
-    .expect("bind_identity");
+    .expect("register_zone_set failed");
 
-    // 3. Grant OWNERSHIP IdentityRights on the parcel.
-    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    // Pin the Groth16 verification key (dev key for test; production uses
+    // ceremony-produced zkey pinned via scripts/zk-ceremony.sh).
+    let vk_hash = groth16_vk_hash();
     process(
         &mut ctx,
         &payer,
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new_readonly(identity_pk, false),
-                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
                 AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
-                let mut d = discriminator("global", "grant_identity_right").to_vec();
-                d.push(right_kind::OWNERSHIP);
-                d.extend_from_slice(&borsh_ser(&0i64));
-                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
+                d.extend_from_slice(&vk_hash);
                 d
             },
         },
     )
     .await
-    .expect("grant identity right");
+    .expect("pin groth16 verification key hash failed");
 
-    // 4. Transfer parcel to bob.
-    let bob = Keypair::new();
-    process(
+    // generate_ownership_root
+    let merkle_root = [11u8; 32];
+    let mut data = discriminator("global", "generate_ownership_root").to_vec();
+    data.extend_from_slice(&merkle_root);
+    data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
+    data.extend_from_slice(&[12u8; 32]);
+    data.extend_from_slice(&borsh_ser(&5u32));
+    let att_sig = root_attestation_sig(&payer, &merkle_root, 1);
+    data.extend_from_slice(&att_sig);
+    process_attested(
         &mut ctx,
         &payer,
-        fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000),
-    )
-    .await
-    .unwrap();
-    process(
-        &mut ctx,
         &payer,
-        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
-    )
-    .await
-    .expect("transfer to bob");
-
-    // 5. Verify bob now holds the ownership right.
-    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
-
-    // 6. Payer tries the stale identity path — under RRR only the ownership
-    // right authorizes, so this must now be rejected.
-    let res = process(
-        &mut ctx,
-        &payer,
+        &zk::root_attestation_message(&merkle_root, 1),
         Instruction {
             program_id: PROGRAM_ID,
             accounts: vec![
-                AccountMeta::new(parcel_pk, false),
-                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(ir_pk, false),
-                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(zone_set, false),
+                AccountMeta::new(root, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
             ],
-            data: {
-                let mut d = discriminator("global", "update_status").to_vec();
-                d.push(parcel_status::FOR_SALE);
-                d
-            },
+            data,
         },
     )
-    .await;
-    assert_custom_error(
-        res,
-        6003,
-        "D1: stale identity no longer authorizes after transfer",
+    .await
+    .expect("generate_ownership_root failed");
+
+    let root_acc: OwnershipRoot = read_account(&ctx, root).await;
+    assert_eq!(root_acc.version, 1);
+    assert_eq!(root_acc.commitment_count, 5);
+    assert_eq!(root_acc.merkle_root, merkle_root);
+
+    // --- Prove with ark-circom's CircomReduction (or ark-groth16 fallback) ---
+    let nullifier = [13u8; 32];
+    let (nullifier_rec, _) = nullifier_pda(&nullifier);
+
+    // Build the canonical ownership statement (same as on-chain re-derivation).
+    let statement = zk::ownership_proof_statement(
+        &zone_set,
+        &merkle_root,
+        1,
+        &nullifier,
+        &payer.pubkey(),
+        "membership",
+        zk::disclosure_type::MEMBERSHIP,
     );
 
-    // 7. Bob (new legacy owner) can also authorize.
-    let res = process(
+    // Generate proof. Prefer ceremony-produced zkey via ark-circom; fall back
+    // to ark-groth16 dev proving when no zkey file is available.
+    let zkey_path = Path::new(".zk/test.zkey");
+    let proof = if zkey_path.exists() {
+        // Production path: load ceremony zkey via ark-circom.
+        let (proving_key, _matrices) = load_zkey(zkey_path).expect("load ceremony zkey");
+        let witness = terra_zk_membership::MembershipWitness {
+            statement: statement.clone(),
+            secret: BnFr::from(42u64),
+            path: MerklePath {
+                siblings: vec![],
+                indices: vec![],
+            },
+        };
+        prove_with_zkey(&proving_key, witness).expect("prove with zkey")
+    } else {
+        // Dev path: ark-groth16 (same curve, same equation, same frame).
+        let setup = groth16_setup();
+        let x = zk::groth16::public_input(&statement);
+        let fr = <BnFr as ark_ff::PrimeField>::from_be_bytes_mod_order(&x);
+        let mut rng = ark_std::test_rng();
+        ArkGroth16::<Bn>::create_random_proof_with_reduction(
+            StatementProductCircuit { x: fr },
+            &setup.0,
+            &mut rng,
+        )
+        .expect("groth16 prove")
+    };
+
+    // Encode as TG16 frame and verify on-chain.
+    let sig = keypair_signing_key(&payer).sign(&statement).to_bytes();
+    let mut frame = Vec::with_capacity(zk::groth16::ZK_FRAME_LEN);
+    frame.extend_from_slice(&zk::groth16::ZK_FRAME_MAGIC);
+    frame.push(zk::groth16::ZK_FRAME_VERSION);
+    frame.extend_from_slice(&sig);
+    frame.extend_from_slice(&groth16_setup().1);
+    frame.extend_from_slice(&serialize_proof(&proof));
+    assert_eq!(frame.len(), zk::groth16::ZK_FRAME_LEN);
+
+    let verify_ix = || {
+        let mut data = discriminator("global", "verify_ownership_proof").to_vec();
+        data.extend_from_slice(&borsh_ser(&frame));
+        data.extend_from_slice(&nullifier);
+        data.extend_from_slice(&borsh_ser(&1u32));
+        data.extend_from_slice(&borsh_ser(&"membership".to_string()));
+        data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(zone_set, false),
+                AccountMeta::new_readonly(root, false),
+                AccountMeta::new(nullifier_rec, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        }
+    };
+
+    // Valid proof should be accepted.
+    process_attested(
         &mut ctx,
-        &bob,
-        update_status_ix(&parcel_pk, &bob.pubkey(), parcel_status::REGISTERED),
+        &payer,
+        &payer,
+        &statement,
+        verify_ix(),
+    )
+    .await
+    .expect("verify_ownership_proof should accept valid proof");
+
+    // Nullifier should be recorded.
+    let rec: NullifierRecord = read_account(&ctx, nullifier_rec).await;
+    assert_eq!(rec.prover, payer.pubkey());
+    assert_eq!(rec.root_version, 1);
+
+    // Re-using the same nullifier should fail (double-spend protection).
+    let res = process_attested(
+        &mut ctx,
+        &payer,
+        &payer,
+        &statement,
+        verify_ix(),
     )
     .await;
-    assert!(res.is_ok(), "D1: new legacy owner can authorize");
+    assert_custom_error(res, 6085, "double-use nullifier rejected");
 }
 
 // D2: Right lifecycle — grant right, verify it exists, revoke, verify
@@ -32400,6 +32465,148 @@ async fn zk_generate_rejects_invalid_root_attestation() {
     .expect("valid root attestation must be accepted");
     let zone: ZoneSet = read_account(&ctx, zone_set).await;
     assert_eq!(zone.current_root_version, 1);
+}
+
+// D1: Full identity lifecycle — bind identity, grant OWNERSHIP right, transfer
+// parcel to a new owner, verify the original identity owner can still authorize
+// via identity path, then verify the new legacy owner can also authorize.
+#[tokio::test]
+async fn cross_module_d1_identity_lifecycle_bind_grant_transfer() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_id: [u8; 32] = [0xD1; 32];
+    let identity_hash: [u8; 32] = [0xD1; 32];
+    let (parcel_pk, _) = parcel_pda(&parcel_id);
+
+    // 1. Register parcel — payer is legacy owner.
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(ownership_pda(&parcel_pk), false),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "register_parcel").to_vec();
+                d.extend_from_slice(&parcel_id);
+                d.extend_from_slice(&borsh_ser(&"D1 Parcel".to_string()));
+                d.extend_from_slice(&[1u8; 32]);
+                d
+            },
+        },
+    )
+    .await
+    .expect("register_parcel");
+
+    // 2. Bind identity to payer.
+    let (identity_pk, _) = identity_pda(&identity_hash);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: IDENTITY_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(identity_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "bind_identity").to_vec();
+                d.extend_from_slice(&identity_hash);
+                d.extend_from_slice(&borsh_ser(&payer.pubkey()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("bind_identity");
+
+    // 3. Grant OWNERSHIP IdentityRights on the parcel.
+    let (ir_pk, _) = identity_rights_pda(&identity_pk, &parcel_pk, right_kind::OWNERSHIP);
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new_readonly(identity_pk, false),
+                AccountMeta::new(ir_pk, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data: {
+                let mut d = discriminator("global", "grant_identity_right").to_vec();
+                d.push(right_kind::OWNERSHIP);
+                d.extend_from_slice(&borsh_ser(&0i64));
+                d.extend_from_slice(&borsh_ser(&"ownership".to_string()));
+                d
+            },
+        },
+    )
+    .await
+    .expect("grant identity right");
+
+    // 4. Transfer parcel to bob.
+    let bob = Keypair::new();
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &bob.pubkey(), 10_000_000),
+    )
+    .await
+    .unwrap();
+    process(
+        &mut ctx,
+        &payer,
+        transfer_ix(&parcel_pk, &payer.pubkey(), &bob.pubkey()),
+    )
+    .await
+    .expect("transfer to bob");
+
+    // 5. Verify bob now holds the ownership right.
+    assert_eq!(holder_of(&ctx, &parcel_pk).await, bob.pubkey());
+
+    // 6. Payer tries the stale identity path — under RRR only the ownership
+    // right authorizes, so this must now be rejected.
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(ir_pk, false),
+                AccountMeta::new_readonly(identity_pk, false),
+            ],
+            data: {
+                let mut d = discriminator("global", "update_status").to_vec();
+                d.push(parcel_status::FOR_SALE);
+                d
+            },
+        },
+    )
+    .await;
+    assert_custom_error(
+        res,
+        6003,
+        "D1: stale identity no longer authorizes after transfer",
+    );
+
+    // 7. Bob (new legacy owner) can also authorize.
+    let res = process(
+        &mut ctx,
+        &bob,
+        update_status_ix(&parcel_pk, &bob.pubkey(), parcel_status::REGISTERED),
+    )
+    .await;
+    assert!(res.is_ok(), "D1: new legacy owner can authorize");
 }
 
 // ===========================================================================

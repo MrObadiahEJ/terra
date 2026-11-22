@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 ark-bn254 = "0.5"
+ark-circom = "0.5"
 ark-crypto-primitives = { version = "0.5", features = ["crh", "r1cs"] }
 ark-ff = "0.5"
 ark-groth16 = "0.5"
