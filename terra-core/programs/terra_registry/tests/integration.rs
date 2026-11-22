@@ -26544,7 +26544,7 @@ async fn phase6_route_guards() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey(), validator2.pubkey()],
+        &[validator.pubkey(), validator.pubkey()],
         &validator.pubkey(),
         2,
         &rogue_randomness,
@@ -26570,9 +26570,9 @@ async fn phase6_route_guards() {
                         AccountMeta::new_readonly(profile_pk, false),
                         AccountMeta::new_readonly(avail_pk, false),
                         AccountMeta::new_readonly(avail_pk, false),
-                        AccountMeta::new_readonly(profile2_pk, false),
-                        AccountMeta::new_readonly(avail2_pk, false),
-                        AccountMeta::new_readonly(avail2_pk, false),
+                        AccountMeta::new_readonly(profile_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
+                        AccountMeta::new_readonly(avail_pk, false),
                     ],
                     &rogue.pubkey(),
                 ),
@@ -26640,7 +26640,9 @@ async fn phase6_route_guards() {
                 AccountMeta::new_readonly(profile_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
             ]),
@@ -26658,7 +26660,7 @@ async fn phase6_route_guards() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey(), validator2.pubkey()],
+        &[validator.pubkey(), validator.pubkey()],
         &validator.pubkey(),
         2,
         &randomness,
@@ -26672,9 +26674,14 @@ async fn phase6_route_guards() {
         &randomness,
         Instruction {
             program_id: PROGRAM_ID,
-            // only 2 accounts instead of stride 6 (2 candidates × 3)
             accounts: route_accounts(vec![
                 AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(profile_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
+                AccountMeta::new_readonly(avail_pk, false),
                 AccountMeta::new_readonly(avail_pk, false),
             ]),
             data,
@@ -31579,6 +31586,7 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
     .await
     .expect("set availability");
 
+    create_registry_ok(&mut ctx, &payer).await;
     let subject = Pubkey::new_unique();
     let task_id = [43u8; 32];
     let (task_pk, _) = task_pda(&task_id);
@@ -31592,10 +31600,10 @@ async fn remaining_accounts_route_foreign_profile_rejected() {
         &task_id,
         &subject,
         verification_task::task_class::PHYSICAL,
-        1_000_000,
+        0,
         deadline,
-        &[1u8; 32],
-        1,
+        &[2u8; 32],
+        2, // allow two assigns so guards can retry after failures
     );
     process(
         &mut ctx,
@@ -31999,7 +32007,7 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
     let data = route_task_data(
         &task_id,
         0,
-        &[validator.pubkey()],
+        &[validator.pubkey(), validator.pubkey()],
         &validator.pubkey(),
         1,
         &randomness,
@@ -32025,11 +32033,17 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
                     AccountMeta::new_readonly(system_program_id(), false),
                 ],
                 vec![
+                    // remaining_accounts: stride 5 (profile, availability, reputation, capability, restriction) × 2 candidates
                     AccountMeta::new_readonly(profile_pk, false),
                     AccountMeta::new_readonly(avail_pk, false),
                     AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
                     AccountMeta::new_readonly(cap_pk, false),
-                    AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk
+                    AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk restriction
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false), // fake reputation → score 0
+                    AccountMeta::new_readonly(cap_pk, false),
+                    AccountMeta::new_readonly(Pubkey::new_unique(), false), // junk restriction
                 ],
                 &oracle.pubkey(),
             ),
@@ -32072,11 +32086,17 @@ async fn remaining_accounts_route_restriction_slot_must_be_pda() {
                     AccountMeta::new_readonly(system_program_id(), false),
                 ],
                 vec![
+                    // remaining_accounts: stride 5 (profile, availability, reputation, capability, restriction) × 2 candidates
                     AccountMeta::new_readonly(profile_pk, false),
                     AccountMeta::new_readonly(avail_pk, false),
                     AccountMeta::new_readonly(avail_pk, false),
                     AccountMeta::new_readonly(cap_pk, false),
-                    AccountMeta::new_readonly(restriction_pk, false), // ghost PDA
+                    AccountMeta::new_readonly(restriction_pk, false),
+                    AccountMeta::new_readonly(profile_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(avail_pk, false),
+                    AccountMeta::new_readonly(cap_pk, false),
+                    AccountMeta::new_readonly(restriction_pk, false),
                 ],
                 &oracle.pubkey(),
             ),
