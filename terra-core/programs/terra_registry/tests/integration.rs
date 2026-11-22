@@ -26290,7 +26290,7 @@ async fn phase6_route_single_candidate_assigns() {
         0,
         &[validator.pubkey(), validator.pubkey()],
         &validator.pubkey(),
-        2,
+        1,
         &randomness,
         &oracle,
     );
