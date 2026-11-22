@@ -97,9 +97,11 @@ testing, authority/pause key mapping, and known gaps.
 
 | Component | Status | Risk |
 |-----------|--------|------|
-| `terra-zk-membership` | Implemented | Low — zone sets, ownership roots, nullifier records implemented per RFC-011 |
-| RFC-011 ZK ownership proofs | Implemented | Zone sets, ownership roots, nullifier records, Groth16 verification |
-| `Groth16` verifier | Implemented | ark_groth16 ProvingKey verification in `api/src/zk.rs` |
+| `terra-zk-membership` | Implemented | Poseidon Merkle membership circuit, nullifier derivation, TG16 framing; real Groth16 prover/verifier E2E (`zk_membership_prover_verifier_e2e`) |
+| RFC-011 ZK ownership proofs | Implemented | Zone sets, ownership roots, nullifier records, on-chain `alt_bn128` Groth16 verification (`programs/terra_registry/src/zk/{mod,groth16}.rs`) |
+| `Groth16` verifier | Implemented | On-chain pairing check over BN254 with hash-pinned VK; API loads dev keys (`api/src/zk.rs`) and exposes loopback-only dev proving |
+| Production trusted setup | **Missing** | Dev setup (`scripts/zk-dev-setup.sh`) is single-party and forgeable; production needs an arkworks Groth16 MPC ceremony + external circuit audit (Q-009) |
+| G2 subgroup checks | Deferred | The agave `alt_bn128` pairing syscall does not reject non-prime-order G2 points; accepted as a documented protocol risk for devnet (see RFC-011 §6.3) |
 
 ---
 
@@ -180,8 +182,18 @@ Additional API coverage added in this pass:
 - Emergency protection can be lifted (requires `emergency_lift` instruction)
 - The routing VRF oracle is an on-chain admin-allowlisted key, not a caller-supplied
   argument; rotating it requires the registry admin
-- The storage-PoP oracle key is configurable via env var and falls back to the
-  legacy SHA-256 proof only when unset (documented deployment gap, see §5)
+- The storage-PoP oracle key is configurable via env var and the API **fails
+  closed** when it is unset: `challenge_replica`/`schedule_pop_challenges` do
+  not issue unanswerable challenges and `prove_replica` returns 503. The old
+  SHA-256(challenge || content_address) fallback was removed because it did not
+  prove continued possession of the bytes.
+- Admin centralization (R-022): `transfer_admin`/`accept_admin` provide a
+  two-step on-chain handoff. In peer-consensus mode the admin can no longer
+  remove a validator unilaterally or deactivate one via
+  `set_validator_active`; both require the peer quorum or liveness expiry.
+  `check_quorum_reachable` now counts live `ValidatorActivityTracker` accounts
+  instead of `validators.len()`. The emergency pause remains admin-only and is
+  still an open centralization item (no expiry yet); see R-022.
 
 ---
 
@@ -193,7 +205,12 @@ Additional API coverage added in this pass:
 | No live-cluster verification | High | Gated on Q-001 devnet funding | Founder |
 | No managed PostGIS / free hosting yet | High | Render + Supabase/Neon config documented; credentials not provisioned | Founder |
 | Durable evidence backend not provisioned | Medium | S3-compatible backend implemented and env-selectable (`S3_BUCKET`/`S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_REGION`); bucket credentials outstanding | Founder |
-| Storage-PoP oracle key not pinned in production | Medium | Set `VRF_ORACLE_PUBKEY`; otherwise the legacy SHA-256 fallback is used | Dev work |
+| Storage-PoP oracle key not pinned in production | Medium | The API now fails closed when `VRF_ORACLE_PUBKEY` is unset (no challenges issued, `prove_replica` 503). Set the key before claiming any evidence is "verified". | Dev work |
+| ZK trusted setup is dev-only | **High** | `scripts/zk-dev-setup.sh` keys are single-party; a holder can forge proofs. Production requires an arkworks MPC ceremony, published transcript, and VK pin (Q-009). | Founder + external |
+| ZK circuit not externally audited | **High** | Underconstraint is the classic ZK bug class. The real-circuit E2E proves the happy path, not soundness under adversarial witnesses. Commission an external audit before mainnet. | Founder + external |
+| G2 subgroup checks not performed | Medium | The agave pairing syscall accepts non-prime-order G2 points; Foom/Veil (Feb 2026) is the cautionary case. Mitigated by hash-pinned VKs and ceremony discipline today; a curve check requires syscall/toolchain support. | Protocol research |
+| Emergency pause has no expiry | High | Admin pause is indefinite; `transfer_admin` now exists but pause remains unilateral. Add a bounded pause window / multisig upgrade authority before real value (R-022, REQ-031). | Dev work |
+| PoP/VRF reviewer randomization still missing | Medium | REQ-032 known gap: reviewer assignment lacks VRF randomization; R-023/R-024 are spec-only. | Dev work |
 | No R2/CDN hot tier | Low | S3-compatible backend covers durability; CDN is an optimization | Dev work |
 | Audit is internal | Medium | External review not yet commissioned | Founder |
 | H3 hexagonal analytics deferred | Low | Quadtree covering retained (deterministic floor arithmetic, published conservative semantics); H3 deferred to Phase 2+ only if hexagonal analytics demand it | Founder |

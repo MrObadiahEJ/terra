@@ -108,6 +108,11 @@ pub struct CredentialRequest {
     pub region_registry: Pubkey,
     #[max_len(32)]
     pub signers: Vec<Pubkey>,
+    /// Concatenated 64-byte Ed25519 signatures over
+    /// [`credential_endorsement_message`], in the same order as `signers`.
+    /// These are the offline-verifiable authorization transcript.
+    #[max_len(2048)]
+    pub signatures: Vec<u8>,
     pub finalized: bool,
     pub credential: Option<Pubkey>,
     pub created_at: i64,
@@ -123,6 +128,10 @@ pub struct ThresholdCredential {
     pub purpose: String,
     pub disclosure_type: u8,
     pub region_registry: Pubkey,
+    /// Concatenated 64-byte Ed25519 signatures over the canonical
+    /// [`credential_endorsement_message`], in the same order as `signers`.
+    /// Anyone can verify these offline against `signers[i]`, so the credential
+    /// is a real multi-signature attestation rather than a bare hash list.
     #[max_len(2048)]
     pub aggregate_signature: Vec<u8>,
     #[max_len(32)]
@@ -175,6 +184,7 @@ pub struct CredentialNullifier {
 
 const OWNERSHIP_PROOF_DOMAIN: &[u8] = b"TERRA_ZK_OWNERSHIP_PROOF_V1";
 const CREDENTIAL_PROOF_DOMAIN: &[u8] = b"TERRA_ZK_CREDENTIAL_PROOF_V1";
+const CREDENTIAL_ENDORSEMENT_DOMAIN: &[u8] = b"TERRA_ZK_CREDENTIAL_ENDORSEMENT_V1";
 
 /// RFC-011 §6.2: `sign(new_merkle_root || zone_set.current_root_version)`.
 /// Version is little-endian (Solana convention); the signer must know the
@@ -243,6 +253,32 @@ pub fn credential_proof_statement(
     m.extend_from_slice(prover.as_ref());
     push_str(&mut m, purpose);
     m.push(disclosure_type);
+    m
+}
+
+/// Canonical message each validator signs to endorse a credential request.
+///
+/// This is the message covered by `CredentialRequest.signatures` and copied
+/// into `ThresholdCredential.aggregate_signature`. It binds the endorsement to
+/// the exact request (hash, purpose, disclosure type, region registry, and
+/// prover), so a signature collected for one credential cannot be replayed
+/// onto another.
+pub fn credential_endorsement_message(
+    request_hash: &[u8; 32],
+    purpose: &str,
+    disclosure_type: u8,
+    region_registry: &Pubkey,
+    prover: &Pubkey,
+) -> Vec<u8> {
+    let mut m = Vec::with_capacity(
+        CREDENTIAL_ENDORSEMENT_DOMAIN.len() + 32 + 1 + purpose.len() + 1 + 32 + 32,
+    );
+    m.extend_from_slice(CREDENTIAL_ENDORSEMENT_DOMAIN);
+    m.extend_from_slice(request_hash);
+    push_str(&mut m, purpose);
+    m.push(disclosure_type);
+    m.extend_from_slice(region_registry.as_ref());
+    m.extend_from_slice(prover.as_ref());
     m
 }
 
@@ -467,7 +503,7 @@ pub fn verify_ownership_proof(
         TerraError::InvalidProofPurpose
     );
     require!(
-        disclosure_type <= disclosure_type::MAX,
+        disclosure_type == disclosure_type::MEMBERSHIP,
         TerraError::InvalidDisclosureType
     );
 
@@ -634,6 +670,7 @@ pub fn request_credential(
     request.disclosure_type = disclosure_type;
     request.region_registry = ctx.accounts.region_registry.key();
     request.signers = Vec::new();
+    request.signatures = Vec::new();
     request.finalized = false;
     request.credential = None;
     request.created_at = now;
@@ -649,7 +686,10 @@ pub fn request_credential(
     Ok(())
 }
 
-pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
+pub fn sign_credential(
+    ctx: &mut Context<super::SignCredential>,
+    signature: [u8; 64],
+) -> Result<()> {
     let request = &mut ctx.accounts.credential_request;
     require!(!request.finalized, TerraError::AlreadyEndorsedRotation);
 
@@ -665,7 +705,25 @@ pub fn sign_credential(ctx: &mut Context<super::SignCredential>) -> Result<()> {
         TerraError::AlreadyEndorsedRotation
     );
 
+    // The signature is the offline-verifiable artifact; the transaction signer
+    // alone is not portable. Verify it through the runtime Ed25519 precompile
+    // over the canonical endorsement message.
+    let message = credential_endorsement_message(
+        &request.request_hash,
+        &request.purpose,
+        request.disclosure_type,
+        &request.region_registry,
+        &request.prover,
+    );
+    verify_precompiled_ed25519(
+        &ctx.accounts.instructions,
+        &signer_key,
+        &message,
+        &signature,
+    )?;
+
     request.signers.push(signer_key);
+    request.signatures.extend_from_slice(&signature);
     request.updated_at = Clock::get()?.unix_timestamp;
 
     emit!(super::CredentialSigned {
@@ -686,6 +744,11 @@ pub fn finalize_credential(ctx: &mut Context<super::FinalizeCredential>) -> Resu
     require!(
         request.signers.len() as u8 >= required,
         TerraError::InsufficientEndorsements
+    );
+    // Every signer must have contributed exactly one signature, in order.
+    require!(
+        request.signatures.len() == request.signers.len() * 64,
+        TerraError::InvalidProofData
     );
 
     for signer in request.signers.iter() {
@@ -711,11 +774,8 @@ pub fn finalize_credential(ctx: &mut Context<super::FinalizeCredential>) -> Resu
     nullifier_input.extend_from_slice(&request.prover.to_bytes());
     let nullifier_hash = solana_program::hash::hash(&nullifier_input).to_bytes();
 
-    let mut aggregate_signature = Vec::new();
-    for signer in request.signers.iter() {
-        aggregate_signature.extend_from_slice(&signer.to_bytes());
-        aggregate_signature.extend_from_slice(&request.request_hash);
-    }
+    let mut aggregate_signature = Vec::with_capacity(request.signers.len() * 64);
+    aggregate_signature.extend_from_slice(&request.signatures);
 
     let credential = &mut ctx.accounts.threshold_credential;
     credential.credential_hash = credential_hash;
@@ -933,6 +993,60 @@ mod tests {
         assert_eq!(
             a,
             ownership_proof_statement(&zone, &[1u8; 32], 3, &[2u8; 32], &prover, "a", 1)
+        );
+    }
+
+    #[test]
+    fn credential_endorsement_message_binds_every_field() {
+        let reg = Pubkey::new_unique();
+        let prover = Pubkey::new_unique();
+        let base = credential_endorsement_message(&[1u8; 32], "membership", 0, &reg, &prover);
+
+        assert_eq!(
+            base,
+            credential_endorsement_message(&[1u8; 32], "membership", 0, &reg, &prover),
+            "deterministic"
+        );
+        assert_eq!(
+            &base[..CREDENTIAL_ENDORSEMENT_DOMAIN.len()],
+            CREDENTIAL_ENDORSEMENT_DOMAIN
+        );
+        assert_ne!(
+            base,
+            credential_endorsement_message(&[2u8; 32], "membership", 0, &reg, &prover),
+            "request hash is bound"
+        );
+        assert_ne!(
+            base,
+            credential_endorsement_message(&[1u8; 32], "other", 0, &reg, &prover),
+            "purpose is bound"
+        );
+        assert_ne!(
+            base,
+            credential_endorsement_message(&[1u8; 32], "membership", 1, &reg, &prover),
+            "disclosure type is bound"
+        );
+        assert_ne!(
+            base,
+            credential_endorsement_message(
+                &[1u8; 32],
+                "membership",
+                0,
+                &Pubkey::new_unique(),
+                &prover
+            ),
+            "region registry is bound"
+        );
+        assert_ne!(
+            base,
+            credential_endorsement_message(
+                &[1u8; 32],
+                "membership",
+                0,
+                &reg,
+                &Pubkey::new_unique()
+            ),
+            "prover is bound"
         );
     }
 

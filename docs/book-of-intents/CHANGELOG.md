@@ -2,6 +2,42 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-23 — Book-of-intents audit reconciliation (claims 1–7 verified against code)
+
+- **Verified closed in code (working tree, uncommitted):** `transfer_admin`/`accept_admin` two-step admin handoff (`validator_registry.rs:177-222`); `remove_validator` admin-only in bootstrap, peer-consensus requires endorsement quorum (`validator_registry.rs:424-494`); `set_validator_active` deactivation blocked in peer-consensus (`recovery.rs:83-87`); `check_quorum_reachable` counts live `ValidatorActivityTracker` accounts with `ACTIVITY_WINDOW_SECS` liveness (`recovery.rs:117-158`); `aggregate_signature` stores detached Ed25519 validator signatures over `credential_endorsement_message`, and `verify_credential` requires the prover's signature over `credential_proof_statement` — both offline-verifiable (`zk/mod.rs:711-790, 809-883`); `prove_replica` fails closed (503) without `VRF_ORACLE_PUBKEY`, SHA-256 fallback removed (`api/src/routes/providers.rs:661-729`); `verify_ownership_proof` requires `disclosure_type == MEMBERSHIP (0)`, matching circuit and API (`zk/mod.rs:505-508`; `zk-membership/src/circuit.rs:95`; `api/src/routes/zk_proofs.rs:428`).
+- **Fixed (non-breaking docs):** `config.rs` `vrf_oracle_pubkey` comment no longer describes a removed SHA-256 fallback; `IMPLEMENTATION_STATUS.md` B4 row corrected (PoP requires the pinned oracle key, fail-closed).
+- **Still open (security-consequence decisions → founder authorization; not implemented here):** `pause_program` indefinite, no expiry (R-022); ZK production ceremony + external circuit audit + G2 subgroup checks (Q-009/Q-006); reviewer VRF randomization for security/privacy assignments (REQ-032/Q-014); off-chain privacy enforcement middleware not started (R-023/R-024, Q-016); `security.rs` RFC-016 core has 9 native tests only — not in the 308-test BPF/CI suite (Q-006 mainnet gate); 7-day unbonding / 90-day guardianship grace / 48h injection timelock guard-tested but never time-executed against real clock (Q-001 devnet); slashing economics never adversarially simulated (R-003); audit is internal.
+- No commits made (AGENT_GUIDE §7: commit only when the founder asks).
+
+## 2026-11-23 — Audit hardening: PoP fail-closed, real credential signatures, admin handoff
+
+- **Storage PoP fails closed** (`api/src/routes/providers.rs`) — removed the
+  SHA-256(challenge || content_address) fallback. Without `VRF_ORACLE_PUBKEY`,
+  `challenge_replica`/`schedule_pop_challenges` issue nothing and
+  `prove_replica` returns 503; a digest did not prove continued possession.
+- **Threshold credentials carry real signatures** (`zk/mod.rs`, `lib.rs`) —
+  `sign_credential` now takes a detached Ed25519 signature over a canonical
+  `credential_endorsement_message` (domain + request hash + purpose +
+  disclosure + region + prover), verified through the runtime precompile.
+  `ThresholdCredential.aggregate_signature` stores the concatenated 64-byte
+  signatures in signer order, so third parties can verify them offline. The
+  old pubkey||request_hash concatenation was not a signature.
+- **Admin handoff + peer guards** (`validator_registry.rs`, `recovery.rs`) —
+  two-step `transfer_admin`/`accept_admin`; in peer-consensus mode the admin
+  can no longer remove a validator unilaterally or deactivate one via
+  `set_validator_active`; `check_quorum_reachable` counts live
+  `ValidatorActivityTracker` accounts instead of `validators.len()`.
+  Bounded pause + multisig upgrade authority remain open (R-022).
+- **Disclosure drift closed** — on-chain `verify_ownership_proof` accepts only
+  `MEMBERSHIP` (0), matching the circuit/API; the lab panel now reflects this.
+- **ZK tooling/docs** — `make zk-dev-setup` / `make zk-info` / `make test-zk`;
+  `scripts/zk-ceremony.sh` now refuses to run until a constraint-equivalent
+  circom port exists (the production circuit is arkworks-native); Q-009,
+  A14, R-006/R-022, README, runbook, and the deep audit report updated.
+- **Removed** the non-compiling `zk_prover_verifier_e2e_zkey` block: it used a
+  nonexistent zkey, an empty Merkle path, and a placeholder circuit, and
+  duplicated the real-circuit E2E.
+
 ## 2026-11-21 — Full end-to-end Groth16 ZK membership proof pipeline
 
 - **ZK prover→verifier E2E** (`programs/terra_registry/tests/integration.rs`:

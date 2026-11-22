@@ -13,7 +13,6 @@ use axum::{Json, Router};
 use ed25519_dalek::Verifier;
 use hex;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::auth::SignedRequest;
@@ -583,6 +582,14 @@ pub async fn challenge_replica(
         .map_err(|e| AppError::internal(format!("query failed: {e}")))?
         .ok_or_else(|| AppError::not_found(format!("replica {replica_id} not found")))?;
 
+    // A challenge is only useful if the provider can answer it with an oracle
+    // signature. Refuse to issue one when no oracle key is pinned.
+    if state.vrf_oracle_pubkey.is_none() {
+        return Err(AppError::Unavailable(
+            "proof-of-possession is not configured: set VRF_ORACLE_PUBKEY".into(),
+        ));
+    }
+
     // Generate a random challenge.
     let challenge = Uuid::new_v4().to_string();
 
@@ -606,6 +613,12 @@ pub async fn challenge_replica(
 /// challenges issued. Called from the API's maintenance loop; the manual
 /// `POST /providers/{id}/replicas/{id}/challenge` endpoint remains available.
 pub async fn schedule_pop_challenges(state: &AppState, batch: i64) -> Result<u64, AppError> {
+    // Fail closed: without an oracle key, issuing challenges would only create
+    // unanswerable work and inflate the "challenged" metric.
+    if state.vrf_oracle_pubkey.is_none() {
+        return Ok(0);
+    }
+
     let due: Vec<(Uuid,)> = sqlx::query_as(
         "SELECT pr.id FROM provider_replicas pr \
          JOIN storage_providers sp ON sp.id = pr.provider_id \
@@ -683,27 +696,25 @@ pub async fn prove_replica(
     let payload = format!("{challenge}{addr}");
 
     // Verify the proof as an Ed25519 signature from the VRF oracle authority
-    // over the payload bytes. When no oracle key is configured, fall back to
-    // the legacy SHA-256(challenge + content_address) comparison.
-    if let Some(oracle_key) = &state.vrf_oracle_pubkey {
-        let sig_bytes =
-            hex::decode(&req.proof).map_err(|_| AppError::bad_request("proof is not valid hex"))?;
-        let sig: ed25519_dalek::Signature = sig_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| AppError::bad_request("proof is not a valid Ed25519 signature"))?;
-        oracle_key.verify(payload.as_bytes(), &sig).map_err(|_| {
-            AppError::bad_request("proof signature does not verify against oracle key")
-        })?;
-    } else {
-        // Legacy fallback: SHA-256(challenge + content_address) comparison.
-        let expected_proof = format!("{:x}", Sha256::digest(payload.as_bytes()));
-        if req.proof != expected_proof {
-            return Err(AppError::bad_request(
-                "proof does not match expected digest",
-            ));
-        }
-    }
+    // over the payload bytes.
+    //
+    // Fail closed: the old SHA-256(challenge || content_address) fallback is
+    // gone. A digest only proves the responder can hash the challenge; it says
+    // nothing about whether the provider still holds the bytes, so a provider
+    // that deleted the content but kept the hash would still pass. Without a
+    // pinned oracle key there is no proof of possession at all.
+    let oracle_key = state.vrf_oracle_pubkey.as_ref().ok_or_else(|| {
+        AppError::Unavailable("proof-of-possession is not configured: set VRF_ORACLE_PUBKEY".into())
+    })?;
+    let sig_bytes =
+        hex::decode(&req.proof).map_err(|_| AppError::bad_request("proof is not valid hex"))?;
+    let sig: ed25519_dalek::Signature = sig_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| AppError::bad_request("proof is not a valid Ed25519 signature"))?;
+    oracle_key
+        .verify(payload.as_bytes(), &sig)
+        .map_err(|_| AppError::bad_request("proof signature does not verify against oracle key"))?;
 
     // Update last_proof_at and clear the challenge, then derive the
     // provider's reliability_score from challenge results (Q-008).
@@ -917,6 +928,7 @@ mod tests {
     use crate::storage::StorageBackend;
     use chrono::{Duration, Utc};
     use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+    use sha2::{Digest, Sha256};
     use std::sync::Arc;
 
     #[test]
@@ -1186,9 +1198,14 @@ mod tests {
         .await
         .expect("insert replica");
 
-        let expected_proof = format!(
-            "{:x}",
-            Sha256::digest("challenge-123sha256:expected".as_bytes())
+        // The oracle signs `challenge || content_address`; that signature is
+        // the only accepted proof of possession.
+        let oracle_signing_key = SigningKey::from_bytes(&[42u8; 32]);
+        let oracle_verifying_key = VerifyingKey::from(&oracle_signing_key);
+        let expected_proof = hex::encode(
+            oracle_signing_key
+                .sign(b"challenge-123sha256:expected")
+                .to_bytes(),
         );
 
         let dir = tempfile::tempdir().expect("temp storage dir");
@@ -1198,7 +1215,7 @@ mod tests {
             api_authority: ApiAuthority(Some(VerifyingKey::from(&SigningKey::from_bytes(
                 &[13u8; 32],
             )))),
-            vrf_oracle_pubkey: None,
+            vrf_oracle_pubkey: Some(oracle_verifying_key),
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -1292,7 +1309,7 @@ mod tests {
             pool: pool.clone(),
             geo: None,
             api_authority: ApiAuthority(None),
-            vrf_oracle_pubkey: None,
+            vrf_oracle_pubkey: Some(VerifyingKey::from(&SigningKey::from_bytes(&[42u8; 32]))),
             storage: Arc::new(StorageBackend::Local {
                 root: dir.path().to_path_buf(),
             }),
@@ -1366,6 +1383,32 @@ mod tests {
             .execute(&pool)
             .await
             .expect("clean up provider");
+    }
+
+    #[tokio::test]
+    async fn scheduled_pop_challenges_fail_closed_without_oracle_key() {
+        // No oracle key means no proof of possession is possible. The scheduler
+        // must not issue unanswerable challenges (and must not touch the DB,
+        // so a lazy, unused pool is sufficient).
+        let dir = tempfile::tempdir().expect("temp storage dir");
+        let pool = sqlx::PgPool::connect_lazy("postgres://unused/unused").expect("lazy pool");
+        let state = AppState {
+            pool,
+            geo: None,
+            api_authority: ApiAuthority(None),
+            vrf_oracle_pubkey: None,
+            storage: Arc::new(StorageBackend::Local {
+                root: dir.path().to_path_buf(),
+            }),
+            zk: None,
+        };
+        assert_eq!(
+            schedule_pop_challenges(&state, 10)
+                .await
+                .expect("scheduler"),
+            0,
+            "no oracle key must yield zero challenges"
+        );
     }
 
     #[tokio::test]

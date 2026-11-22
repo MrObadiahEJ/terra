@@ -17,12 +17,13 @@ pub struct Config {
     /// Ed25519 public key (base58) that may sign privileged requests.
     /// When absent, privileged endpoints reject all callers (fail-closed).
     pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
-    /// Ed25519 public key (base58) of the Switchboard/Pyth VRF oracle authority.
-    /// When set, `GET /providers/{id}/replicas/{replica_id}/prove` verifies that
-    /// the submitted proof is a valid Ed25519 signature from this authority over
-    /// the challenge + content_address bytes. When absent, proof verification
-    /// falls back to the legacy SHA-256(challenge + content_address) comparison
-    /// for backward compatibility during migration.
+    /// Ed25519 public key (base58) of the VRF oracle authority for storage
+    /// proof-of-possession. When set, `prove_replica` verifies that the
+    /// submitted proof is a valid Ed25519 signature from this authority over
+    /// the challenge + content_address bytes. When absent, the API fails
+    /// closed: no challenges are issued and `prove_replica` returns 503. The
+    /// legacy SHA-256(challenge + content_address) fallback was removed — a
+    /// digest never proved continued possession of the bytes.
     pub vrf_oracle_pubkey: Option<ed25519_dalek::VerifyingKey>,
     /// Maximum accepted request body size in bytes (tower-http limit).
     /// Default 64 MiB: covers multipart OSM ingest (PBF extracts) and photo

@@ -8,7 +8,7 @@ import { err, pushGate, type Gate, type Verdict } from './helpers'
 
 const MAX_PROOF = 1024 // zk/mod.rs MAX_ZK_PROOF_SIZE
 const MAX_PURPOSE = 128
-const MAX_DISCLOSURE = 2 // disclosure_type::MAX = COUNT
+const MAX_DISCLOSURE = 0 // the deployed circuit/verifier accept MEMBERSHIP (0) only
 const HEX_32 = /^[0-9a-f]{64}$/i
 
 type ZAction = 'register_zone_set' | 'generate_ownership_root' | 'verify_ownership_proof' | 'invalidate_proof' | 'update_verification_key_hash'
@@ -218,8 +218,8 @@ export default function ZkPanel() {
         if (purpose === '') fail('InvalidProofPurpose', 'proof_purpose empty')
         else if (purpose.length > MAX_PURPOSE) fail('InvalidProofPurpose', `len ${purpose.length} > ${MAX_PURPOSE}`)
         else pass(`proof_purpose ≤ ${MAX_PURPOSE} chars`, purpose)
-        if (disclosure > MAX_DISCLOSURE) fail('InvalidDisclosureType', `disclosure_type = ${disclosure} > MAX = ${MAX_DISCLOSURE} (MEMBERSHIP/RANGE/COUNT)`)
-        else pass('disclosure_type ≤ MAX', `${disclosure} ∈ 0..${MAX_DISCLOSURE}`)
+        if (disclosure !== MAX_DISCLOSURE) fail('InvalidDisclosureType', `disclosure_type = ${disclosure}; only ${MAX_DISCLOSURE} (MEMBERSHIP) is implemented by the deployed circuit and verifier`)
+        else pass('disclosure_type == MEMBERSHIP', '0 (the only implemented disclosure type)')
         if (zone === null || zone.rootVersion === 0) fail('RootVersionMismatch', 'no ownership root published yet (root_version = 0)')
         else if (presentedVersion !== zone.rootVersion) fail('RootVersionMismatch', `presented root_version ${presentedVersion} ≠ current ${zone.rootVersion}`)
         else pass('root_version == zone.current_root_version', `version ${zone.rootVersion}`)
@@ -463,8 +463,8 @@ export default function ZkPanel() {
             <Field label="disclosure_type">
               <select className="select-input" value={disclosure} onChange={(e) => setDisclosure(Number(e.target.value))}>
                 <option value={0}>0 — MEMBERSHIP</option>
-                <option value={1}>1 — RANGE</option>
-                <option value={2}>2 — COUNT</option>
+                <option value={1}>1 — RANGE (not implemented — rejected)</option>
+                <option value={2}>2 — COUNT (not implemented — rejected)</option>
                 <option value={3}>3 — invalid (&gt; MAX)</option>
               </select>
             </Field>

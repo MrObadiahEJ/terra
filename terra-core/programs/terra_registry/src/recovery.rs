@@ -76,6 +76,16 @@ pub fn set_validator_active(
         TerraError::NotAuthorized
     );
 
+    // In peer consensus the admin may reactivate a validator but must not
+    // deactivate one unilaterally: `is_active = false` is exactly the silent
+    // quorum-exclusion vector. Deactivation is expressed by liveness (no
+    // heartbeat inside ACTIVITY_WINDOW_SECS) or by an endorsed removal.
+    if crate::validator_registry::effective_mode(registry.validators.len() as u8)
+        == crate::validator_registry::registry_mode::PEER_CONSENSUS
+    {
+        require!(is_active, TerraError::PeerConsensusRequired);
+    }
+
     let tracker = &mut ctx.accounts.activity_tracker;
     if tracker.validator == Pubkey::default() {
         tracker.registry = registry.key();
@@ -96,14 +106,46 @@ pub fn set_validator_active(
     Ok(())
 }
 
-/// Compute how many validators are currently active. Emits event for
+/// Compute how many validators are currently active and emit an event for
 /// off-chain clients to decide whether to trigger emergency injection.
+///
+/// Liveness is derived from the `ValidatorActivityTracker` PDAs passed in
+/// `remaining_accounts` (max one per validator): a validator counts only when
+/// its tracker is enabled and its `last_active` falls inside
+/// [`ACTIVITY_WINDOW_SECS`]. Passing no trackers therefore reports zero active
+/// validators — conservative, never falsely reassuring.
 pub fn check_quorum_reachable(ctx: &Context<super::CheckQuorumReachable>) -> Result<()> {
     let registry = &ctx.accounts.registry;
+    let now = Clock::get()?.unix_timestamp;
 
-    let active_count = registry.validators.len() as u8;
-    let quorum_reachable = active_count >= crate::validator_registry::CONSENSUS_FLIP_THRESHOLD
-        && registry.required_endorsements > 0;
+    let mut active_count: u8 = 0;
+    let mut seen: Vec<Pubkey> = Vec::new();
+    for info in ctx.remaining_accounts.iter() {
+        let tracker = match Account::<crate::recovery::ValidatorActivityTracker>::try_from(info) {
+            Ok(tracker) => tracker,
+            Err(_) => continue,
+        };
+        if tracker.registry != registry.key() {
+            continue;
+        }
+        if !registry.validators.contains(&tracker.validator) {
+            continue;
+        }
+        // One tracker per validator; ignore duplicates so the count cannot be
+        // inflated by replaying the same account.
+        if seen.contains(&tracker.validator) {
+            continue;
+        }
+        seen.push(tracker.validator);
+
+        let fresh = now.saturating_sub(tracker.last_active) <= ACTIVITY_WINDOW_SECS;
+        if tracker.is_active && fresh {
+            active_count = active_count.saturating_add(1);
+        }
+    }
+
+    let quorum_reachable =
+        registry.required_endorsements > 0 && active_count >= registry.required_endorsements;
 
     emit!(super::QuorumReachabilityChecked {
         registry: registry.key(),

@@ -3417,21 +3417,38 @@ async fn credential_lifecycle() {
     assert_eq!(req.request_hash, request_hash);
     assert!(!req.finalized);
 
-    // 2. Validators sign the credential request.
+    // 2. Validators sign the credential request. Each signature covers the
+    // canonical endorsement message and is carried by the Ed25519 precompile,
+    // so the final credential holds an offline-verifiable multi-signature.
+    let endorsement_message = zk::credential_endorsement_message(
+        &req.request_hash,
+        &req.purpose,
+        req.disclosure_type,
+        &req.region_registry,
+        &req.prover,
+    );
     for signer in [&payer, &v2] {
-        process_with(
+        use ed25519_dalek::Signer as _;
+        let signature = keypair_signing_key(signer)
+            .sign(&endorsement_message)
+            .to_bytes();
+        let mut data = discriminator("global", "sign_credential").to_vec();
+        data.extend_from_slice(&signature);
+        let ix = Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(req_pda, false),
+                AccountMeta::new_readonly(registry, false),
+                AccountMeta::new(signer.pubkey(), true),
+                instructions_meta(),
+            ],
+            data,
+        };
+        send_tx(
             &mut ctx,
-            &payer,
+            &payer.pubkey(),
             &[&payer, signer],
-            Instruction {
-                program_id: PROGRAM_ID,
-                accounts: vec![
-                    AccountMeta::new(req_pda, false),
-                    AccountMeta::new_readonly(registry, false),
-                    AccountMeta::new(signer.pubkey(), true),
-                ],
-                data: discriminator("global", "sign_credential").to_vec(),
-            },
+            &[ed25519_ix(signer, &endorsement_message), ix],
         )
         .await
         .expect("sign_credential failed");
@@ -16350,6 +16367,152 @@ async fn unpause_program_rejects_non_admin() {
 }
 
 #[tokio::test]
+async fn transfer_admin_two_step_handoff() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let successor = Keypair::new();
+
+    // Step 1: the current admin nominates a successor.
+    let mut data = discriminator("global", "transfer_admin").to_vec();
+    data.extend_from_slice(&successor.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose admin transfer");
+
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
+    assert_eq!(reg.pending_admin, successor.pubkey());
+    assert_eq!(reg.admin, payer.pubkey(), "admin must not change yet");
+
+    // Step 2: only the nominee can claim it.
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &successor.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund successor");
+    process(
+        &mut ctx,
+        &successor,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new_readonly(successor.pubkey(), true),
+            ],
+            data: discriminator("global", "accept_admin").to_vec(),
+        },
+    )
+    .await
+    .expect("accept admin transfer");
+
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
+    assert_eq!(reg.admin, successor.pubkey(), "admin handoff completed");
+    assert_eq!(reg.pending_admin, Pubkey::default(), "pending cleared");
+}
+
+#[tokio::test]
+async fn accept_admin_rejects_wrong_key() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    let successor = Keypair::new();
+    let intruder = Keypair::new();
+
+    let mut data = discriminator("global", "transfer_admin").to_vec();
+    data.extend_from_slice(&successor.pubkey().to_bytes());
+    process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new_readonly(payer.pubkey(), true),
+            ],
+            data,
+        },
+    )
+    .await
+    .expect("propose admin transfer");
+
+    process(
+        &mut ctx,
+        &payer,
+        fund_ix(&payer.pubkey(), &intruder.pubkey(), 10_000_000),
+    )
+    .await
+    .expect("fund intruder");
+    let res = process(
+        &mut ctx,
+        &intruder,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new_readonly(intruder.pubkey(), true),
+            ],
+            data: discriminator("global", "accept_admin").to_vec(),
+        },
+    )
+    .await;
+    assert!(res.is_err(), "a non-nominee cannot accept the admin role");
+}
+
+#[tokio::test]
+async fn remove_validator_requires_peer_consensus_after_flip() {
+    let (mut ctx, payer) = setup().await;
+    let registry = create_registry_ok(&mut ctx, &payer).await;
+    // CONSENSUS_FLIP_THRESHOLD = 4: add four validators to enter peer mode.
+    let mut validators = Vec::new();
+    for _ in 0..4 {
+        let v = Keypair::new();
+        add_validator_ok(&mut ctx, &payer, &v.pubkey()).await;
+        validators.push(v);
+    }
+    let reg: ValidatorRegistry = read_account(&ctx, registry).await;
+    assert!(reg.validators.len() >= 4, "registry must be in peer mode");
+
+    let victim = &validators[0];
+    let (endorsement, _) = endorsement_pda(&registry, &victim.pubkey());
+    let mut data = discriminator("global", "remove_validator_from_registry").to_vec();
+    data.extend_from_slice(&victim.pubkey().to_bytes());
+    let res = process(
+        &mut ctx,
+        &payer,
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(registry, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(endorsement, false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "admin must not remove a validator unilaterally in peer consensus"
+    );
+    let reg_after: ValidatorRegistry = read_account(&ctx, registry).await;
+    assert!(
+        reg_after.validators.contains(&victim.pubkey()),
+        "a rejected removal must not mutate the validator set"
+    );
+}
+
+#[tokio::test]
 async fn allocate_country_rejects_invalid_country_code() {
     let (mut ctx, payer) = setup().await;
     let (wr, _) = world_registry_pda();
@@ -21862,218 +22025,7 @@ async fn edge_case_c8_permanent_right_not_sweepable() {
         },
     )
     .await;
-    assert_custom_error(res, 6084, "C8: permanent right cannot be swept"    );
-}
-
-// ============================================================================
-// PROPOSITION Z: ZK prover→verifier E2E with ark-circom
-// ============================================================================
-
-// Z1: Full Groth16 prover→verifier lifecycle using ark-circom to load a
-// ceremony-produced zkey and prove via CircomReduction, then verify on-chain
-// via verify_ownership_proof.
-//
-// This test uses ark-groth16 for dev key generation (no ceremony available in
-// CI). In production, replace ark-groth16::setup with ark-circom's read_zkey
-// loading a ceremony-produced zkey (see scripts/zk-ceremony.sh). The on-chain
-// verifier is identical regardless of which prover produced the proof.
-#[tokio::test]
-async fn zk_prover_verifier_e2e_zkey() {
-    use ark_bn254::Fr as BnFr;
-    use ark_groth16::Groth16 as ArkGroth16;
-    use ed25519_dalek::Signer as _;
-    use std::path::Path;
-
-    use terra_zk_membership::{load_zkey, prove_with_zkey, MerklePath};
-
-    let (mut ctx, payer) = setup().await;
-    let registry = create_registry_ok(&mut ctx, &payer).await;
-    let zone_id = Keypair::new().pubkey();
-    let (zone_set, _) = zone_set_pda(&zone_id);
-    let (root, _) = ownership_root_pda(&zone_set);
-    let snapshot_hash = [31u8; 32];
-
-    // register_zone_set(snapshot_cid, snapshot_hash)
-    let mut data = discriminator("global", "register_zone_set").to_vec();
-    data.extend_from_slice(&borsh_ser(&"QmRoot".to_string()));
-    data.extend_from_slice(&snapshot_hash);
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(registry, false),
-                AccountMeta::new_readonly(zone_id, false),
-                AccountMeta::new(zone_set, false),
-                AccountMeta::new(root, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        },
-    )
-    .await
-    .expect("register_zone_set failed");
-
-    // Pin the Groth16 verification key (dev key for test; production uses
-    // ceremony-produced zkey pinned via scripts/zk-ceremony.sh).
-    let vk_hash = groth16_vk_hash();
-    process(
-        &mut ctx,
-        &payer,
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(zone_set, false),
-                AccountMeta::new(root, false),
-                AccountMeta::new_readonly(registry, false),
-                AccountMeta::new(payer.pubkey(), true),
-            ],
-            data: {
-                let mut d = discriminator("global", "update_verification_key_hash").to_vec();
-                d.extend_from_slice(&vk_hash);
-                d
-            },
-        },
-    )
-    .await
-    .expect("pin groth16 verification key hash failed");
-
-    // generate_ownership_root
-    let merkle_root = [11u8; 32];
-    let mut data = discriminator("global", "generate_ownership_root").to_vec();
-    data.extend_from_slice(&merkle_root);
-    data.extend_from_slice(&borsh_ser(&"QmR1".to_string()));
-    data.extend_from_slice(&[12u8; 32]);
-    data.extend_from_slice(&borsh_ser(&5u32));
-    let att_sig = root_attestation_sig(&payer, &merkle_root, 1);
-    data.extend_from_slice(&att_sig);
-    process_attested(
-        &mut ctx,
-        &payer,
-        &payer,
-        &zk::root_attestation_message(&merkle_root, 1),
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new(zone_set, false),
-                AccountMeta::new(root, false),
-                AccountMeta::new_readonly(registry, false),
-                AccountMeta::new_readonly(payer.pubkey(), true),
-            ],
-            data,
-        },
-    )
-    .await
-    .expect("generate_ownership_root failed");
-
-    let root_acc: OwnershipRoot = read_account(&ctx, root).await;
-    assert_eq!(root_acc.version, 1);
-    assert_eq!(root_acc.commitment_count, 5);
-    assert_eq!(root_acc.merkle_root, merkle_root);
-
-    // --- Prove with ark-circom's CircomReduction (or ark-groth16 fallback) ---
-    let nullifier = [13u8; 32];
-    let (nullifier_rec, _) = nullifier_pda(&nullifier);
-
-    // Build the canonical ownership statement (same as on-chain re-derivation).
-    let statement = zk::ownership_proof_statement(
-        &zone_set,
-        &merkle_root,
-        1,
-        &nullifier,
-        &payer.pubkey(),
-        "membership",
-        zk::disclosure_type::MEMBERSHIP,
-    );
-
-    // Generate proof. Prefer ceremony-produced zkey via ark-circom; fall back
-    // to ark-groth16 dev proving when no zkey file is available.
-    let zkey_path = Path::new(".zk/test.zkey");
-    let proof = if zkey_path.exists() {
-        // Production path: load ceremony zkey via ark-circom.
-        let (proving_key, _matrices) = load_zkey(zkey_path).expect("load ceremony zkey");
-        let witness = terra_zk_membership::MembershipWitness {
-            statement: statement.clone(),
-            secret: BnFr::from(42u64),
-            path: MerklePath {
-                siblings: vec![],
-                indices: vec![],
-            },
-        };
-        prove_with_zkey(&proving_key, witness).expect("prove with zkey")
-    } else {
-        // Dev path: ark-groth16 (same curve, same equation, same frame).
-        let setup = groth16_setup();
-        let x = zk::groth16::public_input(&statement);
-        let fr = <BnFr as ark_ff::PrimeField>::from_be_bytes_mod_order(&x);
-        let mut rng = ark_std::test_rng();
-        ArkGroth16::<Bn>::create_random_proof_with_reduction(
-            StatementProductCircuit { x: fr },
-            &setup.0,
-            &mut rng,
-        )
-        .expect("groth16 prove")
-    };
-
-    // Encode as TG16 frame and verify on-chain.
-    let sig = keypair_signing_key(&payer).sign(&statement).to_bytes();
-    let mut frame = Vec::with_capacity(zk::groth16::ZK_FRAME_LEN);
-    frame.extend_from_slice(&zk::groth16::ZK_FRAME_MAGIC);
-    frame.push(zk::groth16::ZK_FRAME_VERSION);
-    frame.extend_from_slice(&sig);
-    frame.extend_from_slice(&groth16_setup().1);
-    frame.extend_from_slice(&serialize_proof(&proof));
-    assert_eq!(frame.len(), zk::groth16::ZK_FRAME_LEN);
-
-    let verify_ix = || {
-        let mut data = discriminator("global", "verify_ownership_proof").to_vec();
-        data.extend_from_slice(&borsh_ser(&frame));
-        data.extend_from_slice(&nullifier);
-        data.extend_from_slice(&borsh_ser(&1u32));
-        data.extend_from_slice(&borsh_ser(&"membership".to_string()));
-        data.extend_from_slice(&borsh_ser(&zk::disclosure_type::MEMBERSHIP));
-        Instruction {
-            program_id: PROGRAM_ID,
-            accounts: vec![
-                AccountMeta::new_readonly(zone_set, false),
-                AccountMeta::new_readonly(root, false),
-                AccountMeta::new(nullifier_rec, false),
-                AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program_id(), false),
-            ],
-            data,
-        }
-    };
-
-    // Valid proof should be accepted.
-    process_attested(
-        &mut ctx,
-        &payer,
-        &payer,
-        &statement,
-        verify_ix(),
-    )
-    .await
-    .expect("verify_ownership_proof should accept valid proof");
-
-    // Nullifier should be recorded.
-    let rec: NullifierRecord = read_account(&ctx, nullifier_rec).await;
-    assert_eq!(rec.prover, payer.pubkey());
-    assert_eq!(rec.root_version, 1);
-
-    // Re-using the same nullifier should fail (double-spend protection).
-    let res = process_attested(
-        &mut ctx,
-        &payer,
-        &payer,
-        &statement,
-        verify_ix(),
-    )
-    .await;
-    assert_custom_error(res, 6085, "double-use nullifier rejected");
+    assert_custom_error(res, 6084, "C8: permanent right cannot be swept");
 }
 
 // D2: Right lifecycle — grant right, verify it exists, revoke, verify

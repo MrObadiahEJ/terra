@@ -411,7 +411,12 @@ BN254 pairing equation `e(A,B)·e(-α,β)·e(-L,γ)·e(-C,δ) == 1` through
 `alt_bn128` syscalls. Trusted-setup ceremony tooling is dev-only
 (`scripts/zk-dev-setup.sh`, `.zk/` gitignored); production ceremony
 (Groth16 MPC / PLONK universal SRS / transparent proofs) deferred to Q-006
-gate.
+gate. The circuit is arkworks-native, so `scripts/zk-ceremony.sh` (snarkjs)
+refuses to run until a constraint-equivalent circom port exists; production
+must be an arkworks MPC ceremony over the exported R1CS. Only
+`disclosure_type = MEMBERSHIP (0)` is implemented by both the circuit and the
+on-chain verifier; the instruction rejects 1–2 rather than advertising
+unimplemented disclosure modes.
 **Alternatives:** `Fr::from_bytes` strict (rejected: fails on arbitrary zone
 bytes); raw zone bytes as circuit input without framing (rejected: no VK
 binding / signature attestation); Halo2/PLONK now (rejected: higher on-chain

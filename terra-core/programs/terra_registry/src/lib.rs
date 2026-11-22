@@ -784,6 +784,20 @@ pub struct UnpauseProgram<'info> {
     pub admin: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct TransferAdmin<'info> {
+    #[account(mut, seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    pub admin: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct AcceptAdmin<'info> {
+    #[account(mut, seeds = [b"validator_registry"], bump)]
+    pub registry: Account<'info, validator_registry::ValidatorRegistry>,
+    pub new_admin: Signer<'info>,
+}
+
 #[program]
 pub mod terra_registry {
     use super::*;
@@ -1551,6 +1565,14 @@ pub mod terra_registry {
         validator_registry::unpause_program(ctx)
     }
 
+    pub fn transfer_admin(ctx: Context<TransferAdmin>, new_admin: Pubkey) -> Result<()> {
+        validator_registry::transfer_admin(ctx, new_admin)
+    }
+
+    pub fn accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
+        validator_registry::accept_admin(ctx)
+    }
+
     // -----------------------------------------------------------------------
     // Dispute / freeze protocol (RFC-007)
     // -----------------------------------------------------------------------
@@ -1800,8 +1822,8 @@ pub mod terra_registry {
         zk::request_credential(&mut ctx, request_hash, purpose, disclosure_type)
     }
 
-    pub fn sign_credential(mut ctx: Context<SignCredential>) -> Result<()> {
-        zk::sign_credential(&mut ctx)
+    pub fn sign_credential(mut ctx: Context<SignCredential>, signature: [u8; 64]) -> Result<()> {
+        zk::sign_credential(&mut ctx, signature)
     }
 
     pub fn finalize_credential(mut ctx: Context<FinalizeCredential>) -> Result<()> {
@@ -4691,6 +4713,10 @@ pub struct SignCredential<'info> {
     #[account(seeds = [b"validator_registry"], bump)]
     pub registry: Account<'info, validator_registry::ValidatorRegistry>,
     pub validator_signer: Signer<'info>,
+    /// CHECK: Address validated in `zk::verify_precompiled_ed25519`
+    /// (must be the Instructions sysvar holding this transaction's Ed25519
+    /// precompile attestation of the validator's endorsement signature).
+    pub instructions: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -6780,6 +6806,20 @@ pub struct ProgramUnpaused {
     pub unpaused_at: i64,
 }
 
+#[event]
+pub struct AdminTransferProposed {
+    pub registry: Pubkey,
+    pub current_admin: Pubkey,
+    pub pending_admin: Pubkey,
+}
+
+#[event]
+pub struct AdminTransferred {
+    pub registry: Pubkey,
+    pub old_admin: Pubkey,
+    pub new_admin: Pubkey,
+}
+
 // ---------------------------------------------------------------------------
 // Verification pipeline events
 // ---------------------------------------------------------------------------
@@ -8142,6 +8182,10 @@ pub enum TerraError {
     VrfAuthorityMismatch,
     #[msg("Dispute bond must be greater than zero")]
     InvalidBond,
+    #[msg("This action requires peer-consensus endorsement")]
+    PeerConsensusRequired,
+    #[msg("Invalid admin transfer (zero key, same key, or no pending transfer)")]
+    InvalidAdminTransfer,
 }
 
 #[cfg(test)]
@@ -8230,6 +8274,7 @@ mod prep_hook_tests {
         let stranger = Pubkey::new_unique();
         let registry = validator_registry::ValidatorRegistry {
             admin,
+            pending_admin: Pubkey::default(),
             validators: vec![validator],
             required_endorsements: 0,
             paused: false,

@@ -117,7 +117,10 @@ Set these in the Render dashboard (see
 | `TERRA_RPC_URL` | yes | Helius/QuickNode devnet endpoint (public RPC is rate-limited) |
 | `API_AUTHORITY_PUBKEY` | yes for privileged routes | Base58 Ed25519 key; absent = fail-closed |
 | `CORS_ALLOWED_ORIGINS` | yes | `https://<user>.github.io` (comma-separated, no trailing slash) |
-| `VRF_ORACLE_PUBKEY` | recommended | Base58 storage-PoP oracle key; absent = legacy SHA-256 proof |
+| `VRF_ORACLE_PUBKEY` | yes for storage PoP | Base58 storage-PoP oracle key; absent = fail-closed (no challenges, `prove_replica` 503) |
+| `TERRA_ZK_MODE` | optional | `disabled` (default), `development`, or `production`; dev proving is loopback-only |
+| `TERRA_ZK_VERIFYING_KEY_PATH` | with ZK | Path to the Groth16 verifying key loaded at startup |
+| `TERRA_ZK_PROVING_KEY_PATH` | development only | Path to the dev proving key; never deploy this |
 | `S3_BUCKET` | recommended | Private bucket |
 | `S3_ENDPOINT` | recommended | e.g. `https://s3.filebase.com` |
 | `S3_ACCESS_KEY` | recommended | Bucket credential |
@@ -131,6 +134,27 @@ Render's disk is ephemeral. Without `S3_*`, uploaded evidence disappears on
 restart and is not shared across replicas. Set all four S3 values before
 publishing the demo; the backend is selected at startup and logs
 `evidence storage: s3`.
+
+### Zero-knowledge membership proofs
+
+The on-chain verifier is always enabled; it accepts only a `proof_data` frame
+whose 576-byte VK hash equals the value pinned per ownership root via
+`update_verification_key_hash`.
+
+- **Development / devnet demo:** run `make zk-dev-setup` in `terra-core/`. It
+  writes `.zk/membership.{pk,vk}` and `.zk/env.sh` (gitignored), then prints the
+  VK hash. `source .zk/env.sh`, restart the API, and pin the same hash on the
+  zone root (`update_verification_key_hash`). `prepare`/`generate` are
+  loopback-only; production mode never loads a proving key.
+- **Production:** the dev setup is a single-party setup, so it is forgeable.
+  Do not use it with real value. Production requires an arkworks Groth16 MPC
+  ceremony over `MembershipCircuit` (or a constraint-equivalent circom port
+  with an R1CS equivalence test), a published transcript, an external circuit
+  audit, and the resulting VK hash pinned on-chain. `scripts/zk-ceremony.sh`
+  refuses to run until the circom-port precondition exists. See Q-009.
+- Verify key identity with `make zk-info` (prints the frame and its SHA-256).
+- The agave `alt_bn128` pairing syscall does not perform G2 subgroup checks;
+  treat this as a protocol-level risk until the toolchain enforces it.
 
 ### Maintenance loop
 

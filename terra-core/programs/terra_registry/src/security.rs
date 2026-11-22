@@ -1157,3 +1157,98 @@ pub struct SecurityAuditRecorded {
     pub actor: Pubkey,
     pub timestamp: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_status_constants() {
+        assert_eq!(request_status::OPEN, 0);
+        assert_eq!(request_status::UNDER_REVIEW, 1);
+        assert_eq!(request_status::APPROVED, 2);
+        assert_eq!(request_status::REJECTED, 3);
+        assert_eq!(request_status::APPEALED, 4);
+        assert_eq!(request_status::MAX, request_status::APPEALED);
+    }
+
+    #[test]
+    fn privacy_state_constants() {
+        assert_eq!(privacy_state::PUBLIC, 0);
+        assert_eq!(privacy_state::RESTRICTED, 1);
+        assert_eq!(privacy_state::PRIVATE, 2);
+        assert_eq!(privacy_state::REDACTED, 3);
+        assert_eq!(privacy_state::TEMPORARILY_PROTECTED, 4);
+        assert_eq!(privacy_state::UNDER_REVIEW, 5);
+        assert_eq!(privacy_state::WITHDRAWN_FROM_PUBLIC_ACCESS, 6);
+        assert_eq!(privacy_state::TOMBSTONED, 7);
+        assert_eq!(privacy_state::RESTORED, 8);
+        assert_eq!(privacy_state::MAX, privacy_state::RESTORED);
+    }
+
+    #[test]
+    fn review_decision_constants() {
+        assert_eq!(review_decision::PENDING, 0);
+        assert_eq!(review_decision::UPHELD, 1);
+        assert_eq!(review_decision::DISMISSED, 2);
+        assert_eq!(review_decision::MAX, review_decision::DISMISSED);
+    }
+
+    #[test]
+    fn restriction_type_constants() {
+        assert_eq!(restriction_type::PERSONAL_PRIVACY, 0);
+        assert_eq!(restriction_type::SENSITIVE_EVIDENCE, 1);
+        assert_eq!(restriction_type::SECURITY_THREAT, 2);
+        assert_eq!(restriction_type::IDENTITY_EXPOSURE, 3);
+        assert_eq!(restriction_type::JURISDICTIONAL, 4);
+        assert_eq!(restriction_type::EMERGENCY_PROTECTION, 5);
+        assert_eq!(restriction_type::CORRECTION_RECLASSIFICATION, 6);
+        assert_eq!(
+            restriction_type::MAX,
+            restriction_type::CORRECTION_RECLASSIFICATION
+        );
+    }
+
+    #[test]
+    fn remedy_type_constants() {
+        assert_eq!(remedy_type::RESTRICT_ACCESS, 0);
+        assert_eq!(remedy_type::REMOVE_PUBLIC_INDEXING, 1);
+        assert_eq!(remedy_type::REDACT, 2);
+        assert_eq!(remedy_type::REPLACE_PUBLIC_REPRESENTATION, 3);
+        assert_eq!(remedy_type::ENCRYPT, 4);
+        assert_eq!(remedy_type::REVOKE_ACCESS, 5);
+        assert_eq!(remedy_type::STOP_REPLICATION, 6);
+        assert_eq!(remedy_type::CRYPTO_ERASE, 7);
+        assert_eq!(remedy_type::TOMBSTONE, 8);
+        assert_eq!(remedy_type::CORRECT_CLASSIFICATION, 9);
+        assert_eq!(remedy_type::REJECT_REQUEST, 10);
+        assert_eq!(remedy_type::MAX, remedy_type::REJECT_REQUEST);
+    }
+
+    #[test]
+    fn appeal_status_constants() {
+        assert_eq!(appeal_status::PENDING, 0);
+        assert_eq!(appeal_status::GRANTED, 1);
+        assert_eq!(appeal_status::DENIED, 2);
+        assert_eq!(appeal_status::MAX, appeal_status::DENIED);
+    }
+
+    #[test]
+    fn time_constants() {
+        assert_eq!(EMERGENCY_PROTECTION_SECS, 7 * 24 * 3600);
+        assert_eq!(STANDARD_REVIEW_SECS, 14 * 24 * 3600);
+        assert_eq!(APPEAL_WINDOW_SECS, 7 * 24 * 3600);
+    }
+
+    #[test]
+    fn max_request_note_len() {
+        assert_eq!(MAX_REQUEST_NOTE_LEN, 256);
+        assert_eq!(MAX_REASON_LEN, 128);
+    }
+
+    #[test]
+    fn security_committee_size() {
+        assert_eq!(SECURITY_COMMITTEE_SIZE, 5);
+        assert_eq!(MIN_SECURITY_REPUTATION, 5_000);
+    }
+}

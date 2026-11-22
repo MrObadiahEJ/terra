@@ -1,4 +1,4 @@
-.PHONY: build test test-ts test-localnet-e2e test-fast lint ci prune deploy deploy-devnet deploy-mainnet clean idl
+.PHONY: build test test-ts test-localnet-e2e test-fast lint ci prune deploy deploy-devnet deploy-mainnet clean idl zk-dev-setup zk-info test-zk
 
 # Build all programs
 build:
@@ -86,6 +86,27 @@ idl:
 	cp target/idl/terra_registry.json idl/terra_registry.json
 	cp target/idl/terra_identity.json idl/terra_identity.json
 	@ls -lh idl/*.json
+
+# --- Zero-knowledge membership proofs (RFC-011) -----------------------------
+
+# Generate a DEVELOPMENT-ONLY Groth16 setup for the arkworks MembershipCircuit.
+# Writes .zk/{membership.pk,membership.vk,env.sh} (gitignored) and prints the
+# verification-key hash to pin with `update_verification_key_hash`.
+# These keys are NOT ceremony artifacts: anyone holding the proving key can
+# forge proofs. Never use them with real value (Q-009).
+zk-dev-setup:
+	./scripts/zk-dev-setup.sh
+
+# Print the on-chain-visible identity (frame + SHA-256 hash) of a VK.
+zk-info:
+	cargo run --release -p terra-zk-membership --bin zk-info -- \
+		--vk "$${TERRA_ZK_VERIFYING_KEY_PATH:?set TERRA_ZK_VERIFYING_KEY_PATH}" --json
+
+# Authoritative real-circuit proof test: arkworks setup + prove for
+# MembershipCircuit, verified on-chain through the alt_bn128 pairing syscalls.
+# Slow (~5 min in debug) because it runs a real Groth16 setup and proof.
+test-zk:
+	cargo test -p terra-registry --test integration zk_membership_prover_verifier_e2e -- --test-threads=1
 
 # Deploy to devnet
 deploy-devnet:

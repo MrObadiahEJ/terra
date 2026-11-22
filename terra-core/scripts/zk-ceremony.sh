@@ -1,41 +1,55 @@
 #!/usr/bin/env bash
-# scripts/zk-ceremony.sh — Groth16 Phase 2 ceremony for terra-zk-membership
+# scripts/zk-ceremony.sh — Groth16 ceremony TEMPLATE for a future circom port
 #
-# Orchestrates the snarkjs-based multi-party ceremony that produces the
-# production Groth16 proving/verifying key pair for the MembershipCircuit.
+# IMPORTANT — read before running:
 #
-# Design decisions (from the phase-1 spec):
-#   • Phase 1: Reuse the Perpetual Powers of Tau (bn128, 2^20). Do NOT run
-#     a fresh phase 1 — dozens of independent contributors already exist;
-#     running our own adds risk, not security.
-#   • Phase 2 tool: snarkjs zkey contribute, run interactively via zkpick.com
-#     (production-used, actively maintained, browser-capable). p0tion is in
-#     maintenance mode; icicle is a prover accelerator, not ceremony tooling;
-#     gnark-mpc-ceremony is BLS12-381-only and research-grade.
-#   • Bridge: ark-circom 0.5 (CircomReduction) parses snarkjs zkeys into
-#     arkworks ProvingKey<Bn254>. Export R1CS from MembershipCircuit, run
-#     snarkjs groth16 setup, contribute, then load the final zkey via
-#     ark-circom in terra-zk-membership. The on-chain verifier does NOT
-#     change — same curve, same equation, same frame.
-#   • Participants: minimum 5, target 8–10, from distinct org classes.
-#     1-of-N honesty suffices mathematically; the Q-003 council roster
-#     (notary chamber, surveyor body, academic GIS lab, land-rights NGO,
-#     independent auditor) maps onto ceremony seats.
-#   • Entropy: interactive snarkjs prompts (keyboard/mouse + /dev/urandom).
-#     NEVER -e="literal string" in scripts — a CI string produces no secret.
-#   • Finalize: snarkjs zkey beacon with a future public beacon (drand round
-#     announced before contributions close), then zkey verify r1cs + export VK.
-#   • Artifacts: proving key is public (provers need it); store zkey + VK +
-#     transcript on IPFS (N-of-M provider layer, Q-008) + git-LFS for the
-#     576-byte VK frame and its SHA-256. Pin via update_verification_key_hash.
-#   • Guardrails: γ≠δ≠generator; VK frame hash == pinned hash;
-#     parse_verification_key curve-point validity (already in frame.rs);
-#     reproducible R1CS fingerprint recorded in the Book.
+# The production circuit in this repository is `terra-zk-membership::MembershipCircuit`,
+# an **arkworks R1CS circuit**. There is no `.circom` source for it, and this
+# script's snarkjs path therefore cannot produce keys for the circuit the
+# on-chain verifier actually checks. Running snarkjs on a hand-written circom
+# file would only be valid after:
+#   1. a circom port exists whose R1CS is proven constraint-equivalent to
+#      `MembershipCircuit` (same public input `SHA-256(statement)` layout, same
+#      Poseidon parameters, same nullifier derivation), and
+#   2. an equivalence test proves both circuits accept the same witnesses.
+#
+# Until then, this script refuses to run. The working, supported path is:
+#
+#   • Development / devnet:  ./scripts/zk-dev-setup.sh   (arkworks setup)
+#   • Production:            an arkworks Groth16 MPC ceremony over the exported
+#                            `MembershipCircuit` R1CS, with independent
+#                            contributors and an external audit (Q-009).
+#
+# The mechanics below are retained as a template for the circom-port branch;
+# set ZK_CIRCOM_PORT_READY=1 only after (1) and (2) above are true.
+#
+# Design notes for that future branch:
+#   • Phase 1: reuse Perpetual Powers of Tau (bn128, 2^20).
+#   • Phase 2: snarkjs zkey contribute via zkpick.com; minimum 5 contributors.
+#   • Entropy: interactive prompts; never -e="literal string".
+#   • Finalize: drand beacon, then zkey verify + export VK, then convert the
+#     VK to the 576-byte frame and pin SHA-256(VK frame) on-chain.
+#   • The on-chain verifier is unchanged (same BN254 pairing equation).
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+if [[ "${ZK_CIRCOM_PORT_READY:-0}" != "1" ]]; then
+    cat >&2 <<'EOF'
+ERROR: the production circuit is arkworks-native; there is no .circom source.
+
+  * This snarkjs ceremony template is intentionally disabled.
+  * Use ./scripts/zk-dev-setup.sh for development/devnet keys.
+  * Production needs an arkworks Groth16 MPC ceremony + external audit
+    (see docs/book-of-intents/OPEN_QUESTIONS.md Q-009).
+
+Set ZK_CIRCOM_PORT_READY=1 only after a constraint-equivalent circom port and
+its R1CS equivalence test exist.
+EOF
+    exit 1
+fi
 
 # ----- configuration (overridable via env) ---------------------------------
 ZKPTAU_URL="${ZKPTAU_URL:-https://hermes.sigmaproject.io/powersOfTau20_hez_final_20.ptau}"

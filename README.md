@@ -95,9 +95,11 @@ mtimes and fail with the rebuild command (`anchor build --skip-lint`).
 Known limits before `main`: devnet deployment pending (see
 [Devnet checklist](#devnet-checklist)); ZK proof verification is
 framed `proof_data` v1 with on-chain Groth16/BN254 (RFC-011 §6.3.1,
-hash-pinned VK — end-to-end prover→verifier E2E tested via
-`zk_membership_prover_verifier_e2e`; the production membership circuit +
-trusted setup still need external audit); time-locked paths (7-day unbonding
+hash-pinned VK) and the real `MembershipCircuit` is proven end-to-end
+via `zk_membership_prover_verifier_e2e`; the only setup tooling is
+`make zk-dev-setup` (single-party, forgeable), so production still needs an
+arkworks MPC ceremony + external circuit audit, and the agave pairing syscall
+does not perform G2 subgroup checks; time-locked paths (7-day unbonding
 withdraw) are guard-verified, not time-executed, in the harness; checked-in IDL
 (`terra-web/src/idl/terra_registry.json`) is synced to source at
 **177/82/165/271** — re-run `make idl` / `./build.sh`
@@ -351,7 +353,7 @@ pnpm dev
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
 - [ ] Frontend wallet signing wired to deployed program ID
 - [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged); RFC-013 Phase B (2026-10-01): **162/67/149/241** synced to `terra-web/src/idl/`
-- [ ] ZK membership circuit design + trusted setup + external audit (RFC-006/011) — Groth16/BN254 verifier now live on-chain (P0-ZK-01), circuit choice made; placeholder test circuit is not production
+- [ ] ZK trusted-setup ceremony + external circuit audit (RFC-006/011) — `MembershipCircuit` is implemented and proven end-to-end on-chain (`make test-zk`); `make zk-dev-setup` produces **dev-only** keys. Production still needs an arkworks MPC ceremony + audit (Q-009); the dev keys are not a production setup.
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
 ---

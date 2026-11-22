@@ -16,7 +16,7 @@ pub mod statement;
 pub use ark_bn254::Fr;
 pub use ark_groth16::{ProvingKey, VerifyingKey};
 pub use circuit::MembershipCircuit;
-pub use frame::{decode_frame, encode_frame, Frame, TG16_FRAME_LEN, TG16_VK_LEN, TG16_PROOF_LEN};
+pub use frame::{decode_frame, encode_frame, Frame, TG16_FRAME_LEN, TG16_PROOF_LEN, TG16_VK_LEN};
 pub use merkle::TREE_DEPTH;
 pub use merkle::{
     compute_root, derive_nullifier, field_from_be, field_to_be, poseidon_hash_pair, MerklePath,
@@ -45,13 +45,7 @@ use std::path::Path;
 /// pairing equation, same 576-byte VK frame.
 pub fn load_zkey(
     path: &Path,
-) -> Result<
-    (
-        ProvingKey<Bn254>,
-        ConstraintMatrices<Fr>,
-    ),
-    Box<dyn std::error::Error + Send + Sync>,
-> {
+) -> Result<(ProvingKey<Bn254>, ConstraintMatrices<Fr>), Box<dyn std::error::Error + Send + Sync>> {
     let mut file = File::open(path)?;
     Ok(read_zkey(&mut file)?)
 }

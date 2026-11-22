@@ -63,6 +63,9 @@ pub fn consensus_required(n: u8) -> u8 {
 pub struct ValidatorRegistry {
     /// Bootstrap admin who can add validators unilaterally in bootstrap mode.
     pub admin: Pubkey,
+    /// Two-step admin handoff: proposed successor, set by `transfer_admin` and
+    /// claimed by `accept_admin`. Zero means no transfer is pending.
+    pub pending_admin: Pubkey,
     /// Current list of registered validators.
     #[max_len(32)]
     pub validators: Vec<Pubkey>,
@@ -107,6 +110,7 @@ pub fn create_registry(ctx: Context<super::CreateRegistry>) -> Result<()> {
     let clock = Clock::get()?;
     let registry = &mut ctx.accounts.registry;
     registry.admin = ctx.accounts.admin.key();
+    registry.pending_admin = Pubkey::default();
     registry.validators = Vec::new();
     registry.required_endorsements = 0;
     registry.paused = false;
@@ -163,6 +167,56 @@ pub fn unpause_program(ctx: Context<super::UnpauseProgram>) -> Result<()> {
         registry: registry.key(),
         admin: ctx.accounts.admin.key(),
         unpaused_at: registry.updated_at,
+    });
+    Ok(())
+}
+
+/// Step 1 of a two-step admin handoff. The current admin nominates a
+/// successor; the nominee must claim the role with `accept_admin`. Two steps
+/// prevent a typo from permanently stranding the protocol's admin key.
+pub fn transfer_admin(ctx: Context<super::TransferAdmin>, new_admin: Pubkey) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        ctx.accounts.admin.key() == registry.admin,
+        super::TerraError::NotAuthorized
+    );
+    require!(
+        new_admin != Pubkey::default() && new_admin != registry.admin,
+        super::TerraError::InvalidAdminTransfer
+    );
+
+    registry.pending_admin = new_admin;
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::AdminTransferProposed {
+        registry: registry.key(),
+        current_admin: registry.admin,
+        pending_admin: new_admin,
+    });
+    Ok(())
+}
+
+/// Step 2 of a two-step admin handoff. Only the nominated key may accept.
+pub fn accept_admin(ctx: Context<super::AcceptAdmin>) -> Result<()> {
+    let registry = &mut ctx.accounts.registry;
+    require!(
+        registry.pending_admin != Pubkey::default(),
+        super::TerraError::InvalidAdminTransfer
+    );
+    require!(
+        ctx.accounts.new_admin.key() == registry.pending_admin,
+        super::TerraError::NotAuthorized
+    );
+
+    let old_admin = registry.admin;
+    registry.admin = registry.pending_admin;
+    registry.pending_admin = Pubkey::default();
+    registry.updated_at = Clock::get()?.unix_timestamp;
+
+    emit!(super::AdminTransferred {
+        registry: registry.key(),
+        old_admin,
+        new_admin: registry.admin,
     });
     Ok(())
 }
@@ -378,7 +432,15 @@ pub fn remove_validator(ctx: Context<super::RemoveValidator>, validator: Pubkey)
     let clock = Clock::get()?;
 
     if ctx.accounts.admin_signer.key() == registry.admin {
-        // Admin removal — no endorsement needed.
+        // Admin removal is only available during bootstrap. Once the registry
+        // has flipped to peer consensus, removing a validator requires the
+        // same endorsement quorum as adding one — the admin cannot silently
+        // shrink the validator set out from under quorum.
+        let mode = effective_mode(registry.validators.len() as u8);
+        require!(
+            mode == registry_mode::BOOTSTRAP,
+            super::TerraError::PeerConsensusRequired
+        );
         registry.validators.remove(pos);
     } else {
         // Peer removal — endorsement quorum required. The required > 0
