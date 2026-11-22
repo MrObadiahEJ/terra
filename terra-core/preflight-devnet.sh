@@ -83,9 +83,8 @@ if [[ -f "$DEPLOY_KEYPAIR" ]] && command -v solana >/dev/null 2>&1; then
         if [[ -n "${lamports:-}" ]]; then
             sol=$(awk -v l="$lamports" 'BEGIN { printf "%.6f", l }')
         else
-            # Fallback: 6.96 lamports/byte-year * 2 years = 13.92 lamports/byte,
-            # plus ~128 bytes of account overhead.
-            sol=$(awk -v b="$bytes" 'BEGIN { printf "%.6f", (b + 128) * 13.92 / 1000000000 }')
+            bad "solana rent query failed for $so ($bytes bytes) — cannot estimate rent without live query"
+            sol=0
         fi
         note "$name rent: ~$sol SOL"
         rent_lamports=$(awk -v a="$rent_lamports" -v s="$sol" 'BEGIN { printf "%.0f", a + s * 1000000000 }')

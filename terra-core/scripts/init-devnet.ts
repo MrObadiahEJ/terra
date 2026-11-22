@@ -154,12 +154,12 @@ async function main() {
   // Devnet rate-limits requestAirdrop to ~2 SOL per request per IP. Rotate
   // through multiple faucet URLs to accumulate enough SOL for rent + tx fees.
   async function fund(kp: Keypair, targetSol: number): Promise<void> {
-    let accumulated = 0n;
+    let accumulated = BigInt(0);
     let attempt = 0;
     let faucetIdx = 0;
 
     while (
-      accumulated < targetSol * LAMPORTS_PER_SOLn &&
+      accumulated < BigInt(targetSol) * LAMPORTS_PER_SOLn &&
       attempt < MAX_FAUCET_RETRIES
     ) {
       attempt++;
@@ -169,11 +169,9 @@ async function main() {
       // Most devnet faucets double as RPC endpoints for requestAirdrop.
       const conn = new Connection(url, "confirmed");
       try {
-        const sig = await conn.requestAirdrop(kp.publicKey, 2 * LAMPORTS_PER_SOL, {
-          commitment: "confirmed",
-        });
+        const sig = await conn.requestAirdrop(kp.publicKey, 2 * LAMPORTS_PER_SOL);
         await conn.confirmTransaction(sig, "confirmed");
-        accumulated += 2n * LAMPORTS_PER_SOL;
+        accumulated += BigInt(2) * LAMPORTS_PER_SOLn;
         console.log(
           `  funded ${kp.publicKey.toBase58().slice(0, 8)}... +2 SOL via ${url} (attempt ${attempt})`
         );
@@ -182,7 +180,7 @@ async function main() {
       }
     }
 
-    if (accumulated < targetSol * LAMPORTS_PER_SOLn) {
+    if (accumulated < BigInt(targetSol) * LAMPORTS_PER_SOLn) {
       throw new Error(
         `Failed to fund ${kp.publicKey.toBase58()}: accumulated ${accumulated / LAMPORTS_PER_SOLn} SOL, need ${targetSol}`
       );
