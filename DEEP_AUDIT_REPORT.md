@@ -201,7 +201,7 @@ Additional API coverage added in this pass:
 
 | Gap | Severity | Mitigation | Owner |
 |-----|----------|------------|-------|
-| No devnet deployment | High | Q-001 blocked (deployer wallet unfunded, ~15.7 SOL rent + fees) | Founder |
+| No devnet deployment | High | Q-001 blocked (deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` unfunded, ~15.7 SOL rent + fees) | Founder |
 | No live-cluster verification | High | Gated on Q-001 devnet funding | Founder |
 | No managed PostGIS / free hosting yet | High | Render + Supabase/Neon config documented; credentials not provisioned | Founder |
 | Durable evidence backend not provisioned | Medium | S3-compatible backend implemented and env-selectable (`S3_BUCKET`/`S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_REGION`); bucket credentials outstanding | Founder |
@@ -232,14 +232,15 @@ Additional API coverage added in this pass:
 | Q-008 (Storage independence) | Implemented | N-of-M audit + provider economy + S3/IPFS backend options |
 | Q-007 (Server-side routing) | Implemented | `GET /geo/route` with allowlisted VRF |
 | Q-005 (No security/token) | Enforced | Settlement is `settlement_kind='service_fee'`; payout assets are registry rows (default SOL, optional USDC/EURC), never a token or yield instrument |
-| Q-001 (Devnet funding) | Blocked | Deployer wallet unfunded |
+| Q-001 (Devnet funding) | Blocked | Deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` unfunded |
 
 ---
 
 ## 7. Recommendations
 
 ### Immediate (0-30 days)
-1. **Q-001**: Fund the deployer wallet and run the registry devnet deploy
+1. **Q-001**: Fund deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` at
+   https://faucet.solana.com and run the registry devnet deploy
 2. **Free hosting**: Provision Supabase/Neon PostGIS + Render API, set
    `DATABASE_URL`, `TERRA_RPC_URL`, `API_AUTHORITY_PUBKEY`,
    `CORS_ALLOWED_ORIGINS`, and point Pages at the API

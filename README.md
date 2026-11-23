@@ -296,6 +296,28 @@ DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
   cargo run -p terra-api                 # serves /api/v1 (migrations auto-applied)
 ```
 
+#### Render free web service (production deploy)
+
+| Setting | Value |
+|---------|-------|
+| Root directory | `terra-core` |
+| Build command | `cargo build --release -p terra-api` |
+| Start command | `./target/release/terra-api` |
+| Health check path | `/health` |
+
+**Do not** use `cargo run --release` as the start command — build once, then run the binary.
+
+Set these in the Render dashboard (see `terra-core/api/.env.example`):
+
+| Variable | Example value |
+|----------|---------------|
+| `DATABASE_URL` | `<your Supabase pooled URI>?sslmode=require` |
+| `TERRA_RPC_URL` | `https://devnet.helius-rpc.com/?api-key=<KEY>&rebate-address=AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` |
+| `API_AUTHORITY_PUBKEY` | `<base58 from solana-keygen new --no-outfile>` |
+| `CORS_ALLOWED_ORIGINS` | `https://mrobadiahej.github.io` |
+| `PORT` | `8080` |
+| `TERRA_ZK_MODE` | `disabled` |
+
 ### 3. On-chain program (BPF) + integration tests
 
 Build the BPF program (manifest parsing issue in Anchor requires direct

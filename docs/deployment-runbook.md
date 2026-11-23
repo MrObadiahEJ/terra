@@ -25,8 +25,14 @@ committed secrets.
 1. Create/choose the deployer keypair (`DEPLOY_KEYPAIR`, default
    `~/.config/solana/id.json`).
 2. Back it up somewhere durable. Losing it loses the program upgrade authority.
-3. Fund it from https://faucet.solana.com. The registry program is the large
-   artifact (~3.4 MB); the preflight prints the exact shortfall:
+3. Fund it from https://faucet.solana.com using this devnet address:
+
+   ```
+   AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3
+   ```
+
+   The registry program is the large artifact (~3.4 MB); the preflight prints the
+   exact shortfall:
 
    ```bash
    cd terra-core
@@ -69,27 +75,32 @@ from the public site (Sprint D acceptance).
 
 ---
 
-## 2. Managed PostGIS (Supabase or Neon)
+## 2. Managed PostGIS (Supabase)
 
-1. Create a free project on Supabase (Postgres + PostGIS) or Neon.
-2. Enable extensions:
+1. Create a free project on Supabase at https://supabase.com/dashboard/organizations
+   (your project: `qgtstweelyankeqftepx`).
+2. Open the SQL Editor at your project's SQL page and run:
 
    ```sql
    CREATE EXTENSION IF NOT EXISTS postgis;
    CREATE EXTENSION IF NOT EXISTS pgcrypto;
    ```
 
-3. Copy the pooled connection string into `DATABASE_URL` and append
+3. **Settings → Database** → copy the **Connection string (URI, pooled)** → append
    `?sslmode=require` if the provider does not already include it.
+
+   That URI is your `DATABASE_URL`. Example format:
+
+   ```
+   postgres://postgres:<password>@db.<project>.supabase.co:5432/postgres?sslmode=require
+   ```
+
 4. Apply migrations from a trusted machine (or as Render's pre-deploy step):
 
    ```bash
    cd terra-core
    DATABASE_URL='postgres://...' sqlx migrate run --source api/migrations
    ```
-
-Migrations are plain SQL (no compile-time `query!` macros), so no
-`SQLX_OFFLINE` cache is needed.
 
 ---
 
@@ -113,10 +124,10 @@ Set these in the Render dashboard (see
 
 | Variable | Required | Notes |
 |---|---|---|
-| `DATABASE_URL` | yes | Managed PostGIS URL |
-| `TERRA_RPC_URL` | yes | Helius/QuickNode devnet endpoint (public RPC is rate-limited) |
-| `API_AUTHORITY_PUBKEY` | yes for privileged routes | Base58 Ed25519 key; absent = fail-closed |
-| `CORS_ALLOWED_ORIGINS` | yes | `https://<user>.github.io` (comma-separated, no trailing slash) |
+| `DATABASE_URL` | yes | Managed PostGIS URL from Supabase + `?sslmode=require` |
+| `TERRA_RPC_URL` | yes | Devnet Helius endpoint: `https://devnet.helius-rpc.com/?api-key=<KEY>&rebate-address=AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` (use your own regenerated key — revoke the old one) |
+| `API_AUTHORITY_PUBKEY` | yes for privileged routes | Base58 Ed25519 key; generate with `solana-keygen new --no-outfile`; absent = fail-closed |
+| `CORS_ALLOWED_ORIGINS` | yes | `https://mrobadiahej.github.io` (comma-separated, no trailing slash) |
 | `VRF_ORACLE_PUBKEY` | yes for storage PoP | Base58 storage-PoP oracle key; absent = fail-closed (no challenges, `prove_replica` 503) |
 | `TERRA_ZK_MODE` | optional | `disabled` (default), `development`, or `production`; dev proving is loopback-only |
 | `TERRA_ZK_VERIFYING_KEY_PATH` | with ZK | Path to the Groth16 verifying key loaded at startup |

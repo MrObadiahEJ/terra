@@ -40,9 +40,14 @@ with no “SIMULATION” chips on any step of that path.
 
 ## Known blockers
 
-- **Q-001 devnet funding** — deployer `CCng7wFc…Drsy4m` holds 0 SOL. Blocks
-  Sprint D's real devnet deploy and every “stranger on devnet” exit criterion.
-  Sprint A (local), B, C, E (partial), and F are zero-SOL and not blocked.
+- **Q-001 devnet funding** — deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`
+  holds 0 SOL. Blocks Sprint D's real devnet deploy and every "stranger on
+  devnet" exit criterion. Fund it at https://faucet.solana.com. Sprint A
+  (local), B, C, E (partial), and F are zero-SOL and not blocked.
+- **Supabase project** — `qgtstweelyankeqftepx`; enable `postgis` + `pgcrypto`
+  extensions, copy pooled `DATABASE_URL` + `?sslmode=require` into Render.
+- **Helius devnet RPC** — use `https://devnet.helius-rpc.com/?api-key=<KEY>&rebate-address=AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` (generate your own key; revoke any previously published key).
+- **Render free web service** — root `terra-core`, build `cargo build --release -p terra-api`, start `./target/release/terra-api`, health `/health`.
 - **Q-003 / Q-004 founder ratification** — blocks Sprint G implementation
   (institutional identity, residency attestation).
 - **Q-005 securities hard gate** — no token, fee-yield, or profit-sharing work;
@@ -56,7 +61,12 @@ with no “SIMULATION” chips on any step of that path.
 ## Next up
 
 1. Confirm CI is green including the `localnet-e2e` job; if red, fix before any new work.
-2. Sprint D (founder-gated: Q-001 devnet funding): real devnet deploy, hosted API + managed PostGIS + private RPC, env-driven `TERRA_RPC_URL`/`API_BASE`, Pages on hosted API, neutral globe focus.
+2. Sprint D (founder-gated: Q-001 devnet funding): real devnet deploy on
+   `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`, hosted API + managed
+   PostGIS (Supabase `qgtstweelyankeqftepx`) + private RPC (Helius devnet),
+   env-driven `TERRA_RPC_URL`/`API_BASE`, Pages on hosted API, neutral globe
+   focus. Render settings: root `terra-core`, build `cargo build --release -p
+   terra-api`, start `./target/release/terra-api`, health `/health`.
 3. Sprint E remainder (founder-gated partially): protocol-side candidate discovery (not requester-supplied), premium-category guarantee (≥1 requested-category validator + random reputable fill), worker re-registration regression test.
 4. Continue Sprint F remainder if Q-001 unblocks: ≥2 replicas for “verified” evidence status, scheduled PoP challenges.
 5. Docs/book-of-intents fully synced to code reality (edition 2024, test baselines, MVP demo).
