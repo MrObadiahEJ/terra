@@ -2,7 +2,7 @@
 name = "terra-identity"
 version = "0.1.0"
 description = "Terra Identity program — PEOPLE domain (identity, succession, guardianship)"
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib", "lib"]
