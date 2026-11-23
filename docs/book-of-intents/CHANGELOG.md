@@ -2,6 +2,25 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-23 — Full doc sync: edition 2024 migration + MVP demo release + test baselines
+
+- **Edition 2024 migration** (`1d495d5`): all 5 workspace crates migrated from
+  Rust edition 2021 to 2024 — `terra-core/Cargo.toml` (workspace.package),
+  `programs/terra_registry/Cargo.toml`, `programs/terra_identity/Cargo.toml`,
+  `api/Cargo.toml`, `geo-engine/Cargo.toml`, `zk-membership/Cargo.toml`.
+  `cargo check --workspace` clean; all tests green (registry lib 164/164,
+  API 166/166, identity 23/23, geo 45/45+1, zk-membership 6/6).
+- **MVP demo release** (`15af9fc`): terra-web v0.1.0 — `/demo` scenario
+  player, `/mvp` Intent 5 flow, `/verify`, `/atlas`, `/lab` all functional;
+  `tsc` clean, vitest 138/138, build:check PASS (entry 303 KB gz, Cesium
+  1098 KB gz, total 1908 KB gz). Built for GitHub Pages at `TERRA_BASE_PATH=/terra/`
+  (dist/ ready for gh-pages deploy to mrobadiahej.github.io/terra).
+- **Test baselines updated**: registry lib 164 (was 154), API 166 (was 151),
+  geo 45/45+1 (was 42/42+1), identity 23/23, zk-membership 6/6 (new),
+  frontend vitest 138/138 (was 134/134).
+- **AGENT_GUIDE.md gates** updated: edition 2024, added zk-membership test
+  target, updated geo baseline.
+
 ## 2026-11-23 — Book-of-intents audit reconciliation (claims 1–7 verified against code)
 
 - **Verified closed in code (working tree, uncommitted):** `transfer_admin`/`accept_admin` two-step admin handoff (`validator_registry.rs:177-222`); `remove_validator` admin-only in bootstrap, peer-consensus requires endorsement quorum (`validator_registry.rs:424-494`); `set_validator_active` deactivation blocked in peer-consensus (`recovery.rs:83-87`); `check_quorum_reachable` counts live `ValidatorActivityTracker` accounts with `ACTIVITY_WINDOW_SECS` liveness (`recovery.rs:117-158`); `aggregate_signature` stores detached Ed25519 validator signatures over `credential_endorsement_message`, and `verify_credential` requires the prover's signature over `credential_proof_statement` — both offline-verifiable (`zk/mod.rs:711-790, 809-883`); `prove_replica` fails closed (503) without `VRF_ORACLE_PUBKEY`, SHA-256 fallback removed (`api/src/routes/providers.rs:661-729`); `verify_ownership_proof` requires `disclosure_type == MEMBERSHIP (0)`, matching circuit and API (`zk/mod.rs:505-508`; `zk-membership/src/circuit.rs:95`; `api/src/routes/zk_proofs.rs:428`).

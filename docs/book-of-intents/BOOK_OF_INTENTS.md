@@ -6,9 +6,9 @@ maintained continuously and must stay sufficient context for a competent AI
 agent or human to continue the project without the founder repeating
 instructions.
 
-**Audit basis:** repository state at commit `9f1ad9e` (dev = main),
-re-verified 2026-11-21 (API 151/151, geo-engine 42 passed +1 ignored, vitest
-134/134, tsc clean, build + bundle PASS; BPF count re-confirmed in source:
+**Audit basis:** repository state at commit `1d495d5` (dev = main),
+re-verified 2026-11-23 (API 166/166, geo-engine 45 passed +1 ignored, vitest
+138/138, tsc clean, build + bundle PASS; BPF count re-confirmed in source:
 308 — CI run `41474466105` green; ZK E2E prover→verifier added).
 
 ## Canonical trust principle

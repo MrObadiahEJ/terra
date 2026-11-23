@@ -1,12 +1,12 @@
 # Terra Deep-Audit Report
 
-**Date:** 2026-11-19
+**Date:** 2026-11-23
 
 **Repository:** github.com/MrObadiahEJ/terra
 
 **Branch:** dev
 
-**Commit:** `4eb9ed6` + Sprint E/F working tree
+**Commit:** `1d495d5` (edition 2024 migration) + `15af9fc` (MVP demo release)
 
 **Auditor:** Internal (Kilo agent)
 
@@ -274,10 +274,11 @@ anchors parcel, claim, observation, and verification-attestation PDAs on-chain v
 the real `terra_registry` program, then verifies real Ed25519 residency signatures,
 the VC issuer, and the on-chain digest against that anchor.
 
-Gates pass: `cargo fmt --check`, `cargo clippy -D warnings`, registry BPF 307/307,
-identity BPF 23/23, registry lib 154, identity lib 7, security 9, RFC-012 21,
-API 164 (PostGIS), frontend `tsc` clean, vitest 134/134, and `build:check`
-(1901.5 kB gz total, budget 1950).
+Gates pass: `cargo fmt --check`, `cargo clippy -D warnings`, registry BPF 308/308,
+identity BPF 23/23, registry lib 164, identity lib 6, security 9, RFC-012 21,
+API 166 (PostGIS), zk-membership 6/6, geo 45/45+1, frontend `tsc` clean,
+vitest 138/138, and `build:check` PASS (entry 303 kB gz, Cesium 1098 kB gz lazy,
+total 1908 kB gz, budget 1950). All Rust workspace crates on edition 2024.
 
 The primary blocker to public deployment is operational, not code: Q-001 devnet
 funding plus free-hosting and bucket credentials, which require founder action.

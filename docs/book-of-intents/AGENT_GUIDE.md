@@ -98,7 +98,8 @@ anchor build --skip-lint            # BPF suites load target/deploy/*.so and
                                     # fail loudly on a stale/missing build
 cargo test -p terra-registry --test integration -- --test-threads=1   # 307 baseline
 cargo test -p terra-identity --test integration                       # 23 baseline
-cargo test -p terra-geo             # 12 + 1 ignored (2026-11-02)
+cargo test -p terra-geo             # 45 + 1 ignored (2026-11-23)
+cargo test -p terra-zk-membership   # 6 baseline
 ```
 
 Local machine constraints (this dev box): ~1.6 GB free disk, 8 GB RAM, load

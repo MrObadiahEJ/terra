@@ -44,7 +44,7 @@ green on `dev` and `main` (fmt, `clippy -D warnings`, registry/identity lib
 unit tests, RFC-012 structural, geo, API unit tests incl. live-PostGIS
 migration run, frontend `tsc -b` + vitest).
 
-**Complete on `dev` (verified 2026-11-21):** RFC-012 **Phases 0–10** (architecture
+**Complete on `dev` (verified 2026-11-23):** RFC-012 **Phases 0–10** (architecture
 contract, security hardening, generalized validator PDAs, verification tasks,
 multi-source observations, evidence provenance, dynamic routing, reputation
 governance, economic/resource layer, **device identities**, **cross-border bindings**, **Vision Stage 3 Phase A — spatial assets & versioned geometry**), **Tier A1–A3** (security residuals, IDL
@@ -56,7 +56,8 @@ verification — unique validator sets, endorsement
 action binding, account-ownership checks on `remaining_accounts` loaders,
 admin/authority constraints, M-2/C-4/L-1 session-audit guards, checked-in IDL
 synced to source (177/82/165/271), and CI covers registry/identity lib + rfc012 +
-geo + API. See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
+geo + API. All Rust workspace crates migrated to **edition 2024**.
+See [`terra-core/SECURITY.md`](terra-core/SECURITY.md).
 
 **Frontend:** interactive `/lab` experiments
 (geometry vault with on-disk byte inspector + WebGL-free SVG 3D land skeleton,
@@ -66,19 +67,19 @@ devnet), 3D Cesium globe with automatic 2D Leaflet fallback
 when WebGL is unavailable, bundled demo-data fallback so the globe works on any
 device without a wallet or running API, typed API client, wallet adapter.
 
-Verified tests on `dev` (2026-11-21):
+Verified tests on `dev` (2026-11-23):
 
 | Suite | Count |
 |-------|------:|
-| `terra-registry` lib unit tests | 154 |
+| `terra-registry` lib unit tests | 164 |
 | `terra-registry` RFC-012 structural tests | 21 |
 | `terra-registry` BPF integration (incl. ZK E2E) | 308 |
 | `terra-identity` lib unit tests | 6 |
 | `terra-identity` integration (BPF) | 23 |
-| `terra-api` unit tests | 165 |
-| `terra-geo` unit tests | 12 (+1 ignored vector-regen) |
+| `terra-api` unit tests | 166 |
+| `terra-geo` unit tests | 45 (+1 ignored) |
 | `terra-zk-membership` unit tests | 6 |
-| `terra-web` vitest | 134 |
+| `terra-web` vitest | 138 |
 
 CI runs: fmt, clippy `-D warnings`, registry/identity lib, rfc012, geo, API
 (+PostGIS migrations), and frontend `tsc -b` + vitest — mirrored locally by
@@ -288,9 +289,9 @@ createdb -h localhost -p 5433 -U terra terra_dev
 ```bash
 cd terra-core
 cargo check -p terra-registry            # on-chain program (native)
-cargo test -p terra-registry --lib       # 153 unit tests
+cargo test -p terra-registry --lib       # 164 unit tests
 cargo test -p terra-identity --lib       # 6 unit tests
-cargo test -p terra-api                  # 111 API unit tests
+cargo test -p terra-api                  # 166 API unit tests
 DATABASE_URL=postgres://terra@127.0.0.1:5433/terra_dev PORT=18080 \
   cargo run -p terra-api                 # serves /api/v1 (migrations auto-applied)
 ```
@@ -319,7 +320,8 @@ setup needed.
 cd terra-web
 pnpm install --frozen-lockfile
 pnpm exec tsc -b        # type check
-pnpm test               # story-engine unit tests (vitest)
+pnpm test               # story-engine unit tests (vitest, 138 pass)
+pnpm build:check        # bundle budget + SPA fallback (v0.1.0)
 pnpm dev
 ```
 
@@ -329,16 +331,16 @@ pnpm dev
 
 | Layer | How | Status |
 |-------|-----|--------|
-| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 154/154 |
+| Unit (on-chain guards/constants) | `cargo test -p terra-registry --lib` | 164/164 |
 | Unit (identity helpers) | `cargo test -p terra-identity --lib` | 6/6 |
 | RFC-012 structural | `rustc --test programs/terra_registry/tests/rfc012_structure.rs` | 21/21 |
 | Identity BPF | `cargo test -p terra-identity --test integration` | 23/23 |
 | Registry BPF (long-form) | `cargo test -p terra-registry --test integration` | 308/308 (~7 min; run locally) |
-| Unit (API validation logic) | `cargo test -p terra-api` | 165/165 |
-| Geo engine pure logic | `cargo test -p terra-geo` | 12/12 (+1 ignored) |
+| Unit (API validation logic) | `cargo test -p terra-api` | 166/166 |
+| Geo engine pure logic | `cargo test -p terra-geo` | 45/45 (+1 ignored) |
 | ZK membership crate | `cargo test -p terra-zk-membership` | 6/6 |
 | Migrations on real PostGIS 16 | CI service + local scratch instance | 55/55 apply |
-| Frontend types + tests | `pnpm exec tsc -b` + `pnpm test` | clean / 134 pass |
+| Frontend types + tests | `pnpm exec tsc -b` + `pnpm test` | clean / 138 pass |
 | Lints | `cargo fmt --check`, `cargo clippy -- -D warnings` | clean |
 
 ### Devnet checklist

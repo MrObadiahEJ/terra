@@ -1,8 +1,8 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-16. Previous ledger archived at
-`work/archive/CURRENT-2026-11-15.md` (sprints 001–055).
+Last reconciled: 2026-11-23. Previous ledger archived at
+`work/archive/CURRENT-2026-11-16.md` (sprints 001–062).
 
 ## Objective
 
@@ -28,13 +28,15 @@ with no “SIMULATION” chips on any step of that path.
 
 - **Sprint B** — Real write path: deleted `tx_prep.rs` placeholder builders and route registration; every write now uses client-side IDL `program.methods` with real PDAs, discriminators and signers; fixed `identityPda`/`successionPda` to derive on `terra_identity` program ID; generated and checked in IDLs (`idl/terra_registry.json` 176 instructions, `idl/terra_identity.json` 8 instructions); wired `/console` and parcel panels to the real loop; commit `76d85df`.
 - **Sprint C** — Chain indexer: `api/src/indexer.rs` polls `terra_registry` program accounts, decodes Anchor `Parcel` and `VerificationAttestation` accounts by discriminator, upserts mirror rows with `chain_verified=true`, `chain_slot`, `chain_signature`; `GET /mirror/audit` compares DB to chain across 7 tables including `verification_attestations_onchain`; migration `0051_chain_verified_columns.sql` adds `chain_verified`/`chain_slot`/`chain_signature` to all mirror tables; commit `ac754f6`.
-- **Sprint E (partial)** — Routing/economics hardening: server-side `GET /geo/route` with `route_between` Dijkstra using `from_node_id`/`to_node_id` node-id topology (migration 0049 adds `content_address` to `provider_replicas` fixing the `prove_replica` column bug); `prove_replica` verifies `SHA-256(challenge + content_address)` via Ed25519 precompile; oracle independence enforced (`oracle ≠ winner/candidate/requester`); `storage_providers.stake_bond` + `wallet_address` (migration 0053) for anti-spam; `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes; `reliability_score` derived from `last_proof_at` challenge results (not self-declared); commits `8cd7aa9`, `0f0a052`.
+- **Sprint E (partial)** — Routing/economics hardening: server-side `GET /geo/route` with `route_between` Dijkstra using `from_node_id`/`to_node_id` node-id topology (migration 0049 adds `content_address` to `provider_replicas` fixing the `prove_replica` column bug); `prove_replica` **fails closed** (503) without `VRF_ORACLE_PUBKEY` — verifies Ed25519 oracle signature over `challenge + content_address`; legacy SHA-256 fallback removed; oracle independence enforced (`oracle ≠ winner/candidate/requester`); `storage_providers.stake_bond` + `wallet_address` (migration 0053) for anti-spam; `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes; `reliability_score` derived from `last_proof_at` challenge results (not self-declared); commits `8cd7aa9`, `0f0a052`.
 - **Sprint F** — Evidence durability: `StorageBackend` enum (`Local`/`Ipfs`); IPFS pinning via `IPFS_API_URL`/`IPFS_GATEWAY_URL` env vars; quarantine + TTL columns on `evidence_uploads` (`quarantined`, `quarantine_reason`, `ttl_seconds`, `expires_at`); honest labeling in `storage.rs` until paid IPFS/S3 backend exists; migration `0053_evidence_durability_and_provider_economy.sql`; commit `0f0a052`.
 - **ZK (out-of-sprint)** — Full Groth16 prover→verifier E2E: `zk_membership_prover_verifier_e2e` registers a zone set, pins VK hash, generates an ownership root, arkworks produces a real Groth16 proof over `terra-zk-membership::MembershipCircuit`, and on-chain `verify_ownership_proof` accepts via `alt_bn128` pairing; tampered proofs rejected. `IMPLEMENTATION_STATUS.md` A14 → `1 – IMPLEMENTED AND VERIFIED`; BPF suite now **308/308**; `ARCHITECTURAL_DECISIONS.md` ADR-025.
+- **Edition 2024 migration** (`1d495d5`): all 5 workspace crates migrated from Rust edition 2021 to 2024 — `terra-core/Cargo.toml` (workspace.package), `programs/terra_registry/Cargo.toml`, `programs/terra_identity/Cargo.toml`, `api/Cargo.toml`, `geo-engine/Cargo.toml`, `zk-membership/Cargo.toml`. `cargo check --workspace` clean; all tests green (registry lib 164/164, API 166/166, identity 23/23, geo 45/45+1, zk-membership 6/6).
+- **MVP demo release** (`15af9fc`): terra-web v0.1.0 — `/demo` scenario player, `/mvp` Intent 5 flow, `/verify`, `/atlas`, `/lab` all functional; `tsc` clean, vitest 138/138, build:check PASS (entry 303 KB gz, Cesium 1098 KB gz, total 1908 KB gz). Built for GitHub Pages at `TERRA_BASE_PATH=/terra/`.
 
 ## Deep-audit report
 
-- **`DEEP_AUDIT_REPORT.md`** (new): security architecture, dependency analysis, BPF adversarial test results (307/307 passing, 0 failed — CI run `41474466105` green), authority/pause key map, known gaps, recommendations.
+- **`DEEP_AUDIT_REPORT.md`** (updated): security architecture, dependency analysis, BPF adversarial test results (308/308 passing, 0 failed — CI run `41474466105` green), authority/pause key map, known gaps, recommendations.
 
 ## Known blockers
 
@@ -57,3 +59,4 @@ with no “SIMULATION” chips on any step of that path.
 2. Sprint D (founder-gated: Q-001 devnet funding): real devnet deploy, hosted API + managed PostGIS + private RPC, env-driven `TERRA_RPC_URL`/`API_BASE`, Pages on hosted API, neutral globe focus.
 3. Sprint E remainder (founder-gated partially): protocol-side candidate discovery (not requester-supplied), premium-category guarantee (≥1 requested-category validator + random reputable fill), worker re-registration regression test.
 4. Continue Sprint F remainder if Q-001 unblocks: ≥2 replicas for “verified” evidence status, scheduled PoP challenges.
+5. Docs/book-of-intents fully synced to code reality (edition 2024, test baselines, MVP demo).
