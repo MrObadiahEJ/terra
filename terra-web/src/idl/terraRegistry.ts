@@ -1,7 +1,7 @@
 // Auto-generated from terra_registry.json — DO NOT EDIT
 import type { Idl } from "@coral-xyz/anchor";
 
-export const terraRegistry: Idl = {
+export const terraRegistry = {
   "address": "GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage",
   "metadata": {
     "name": "terra_registry",
@@ -11,7 +11,7 @@ export const terraRegistry: Idl = {
   },
   "instructions": [
     {
-      "name": "accept_admin",
+      "name": "acceptAdmin",
       "discriminator": [
         112,
         42,
@@ -62,7 +62,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "accept_escrow",
+      "name": "acceptEscrow",
       "discriminator": [
         193,
         2,
@@ -153,7 +153,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "add_evidence",
+      "name": "addEvidence",
       "discriminator": [
         205,
         19,
@@ -232,7 +232,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "add_evidence_artifact",
+      "name": "addEvidenceArtifact",
       "discriminator": [
         168,
         32,
@@ -391,7 +391,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "add_second_validator",
+      "name": "addSecondValidator",
       "discriminator": [
         117,
         163,
@@ -425,7 +425,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "add_task_requirement",
+      "name": "addTaskRequirement",
       "discriminator": [
         181,
         37,
@@ -522,7 +522,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "add_third_validator",
+      "name": "addThirdValidator",
       "discriminator": [
         106,
         119,
@@ -559,7 +559,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "add_validator_to_registry",
+      "name": "addValidatorToRegistry",
       "discriminator": [
         117,
         200,
@@ -642,7 +642,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "adjudicate_dispute",
+      "name": "adjudicateDispute",
       "discriminator": [
         0,
         67,
@@ -761,7 +761,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "admin_verify_validator_capability",
+      "name": "adminVerifyValidatorCapability",
       "discriminator": [
         136,
         212,
@@ -867,7 +867,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "allocate_country",
+      "name": "allocateCountry",
       "discriminator": [
         110,
         200,
@@ -905,7 +905,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "amalgamate_parcels",
+      "name": "amalgamateParcels",
       "discriminator": [
         169,
         18,
@@ -1077,7 +1077,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "appeal_decision",
+      "name": "appealDecision",
       "discriminator": [
         221,
         132,
@@ -1146,7 +1146,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "append_geometry_version",
+      "name": "appendGeometryVersion",
       "discriminator": [
         130,
         154,
@@ -1274,7 +1274,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "append_geometry_version_from_evidence",
+      "name": "appendGeometryVersionFromEvidence",
       "docs": [
         "Anchor a geometry version from an evidence manifest (RFC-013 Phase B)."
       ],
@@ -1470,7 +1470,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "assign_reviewer",
+      "name": "assignReviewer",
       "discriminator": [
         50,
         160,
@@ -1576,7 +1576,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "assign_task_validator",
+      "name": "assignTaskValidator",
       "discriminator": [
         217,
         224,
@@ -1673,7 +1673,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "attach_parcel",
+      "name": "attachParcel",
       "docs": [
         "Attach a parcel to an identity (the person behind its holder wallet).",
         "Only the current ownership holder may do this, and only for an identity",
@@ -1751,7 +1751,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "authorize_vault_access",
+      "name": "authorizeVaultAccess",
       "discriminator": [
         241,
         177,
@@ -1826,7 +1826,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "bind_cross_border_identity",
+      "name": "bindCrossBorderIdentity",
       "discriminator": [
         221,
         72,
@@ -1936,7 +1936,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "bootstrap_self_proclaim",
+      "name": "bootstrapSelfProclaim",
       "discriminator": [
         150,
         57,
@@ -1975,7 +1975,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "cancel_dispute",
+      "name": "cancelDispute",
       "discriminator": [
         23,
         155,
@@ -2073,7 +2073,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "cancel_escrow",
+      "name": "cancelEscrow",
       "discriminator": [
         156,
         203,
@@ -2178,7 +2178,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "cancel_shard_rotation",
+      "name": "cancelShardRotation",
       "discriminator": [
         41,
         160,
@@ -2210,7 +2210,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "cancel_task",
+      "name": "cancelTask",
       "discriminator": [
         69,
         228,
@@ -2262,7 +2262,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "cast_appeal_vote",
+      "name": "castAppealVote",
       "discriminator": [
         76,
         236,
@@ -2319,7 +2319,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "cast_fraud_vote",
+      "name": "castFraudVote",
       "discriminator": [
         55,
         195,
@@ -2376,7 +2376,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "cast_quorum_vote",
+      "name": "castQuorumVote",
       "discriminator": [
         27,
         98,
@@ -2494,7 +2494,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "cast_review_vote",
+      "name": "castReviewVote",
       "discriminator": [
         254,
         48,
@@ -2562,7 +2562,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "check_quorum_reachable",
+      "name": "checkQuorumReachable",
       "discriminator": [
         236,
         95,
@@ -2608,7 +2608,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "claim_rewards",
+      "name": "claimRewards",
       "discriminator": [
         4,
         144,
@@ -2726,7 +2726,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "claim_succession_with_parcels",
+      "name": "claimSuccessionWithParcels",
       "docs": [
         "Claim a succession AND transfer every ownership right it covers in one",
         "atomic step (B6 boundary rule: identity state is only ever *composed*",
@@ -2785,7 +2785,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "claim_task",
+      "name": "claimTask",
       "discriminator": [
         49,
         222,
@@ -2879,7 +2879,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "claim_task_reward",
+      "name": "claimTaskReward",
       "discriminator": [
         105,
         212,
@@ -3103,7 +3103,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "close_verification_session",
+      "name": "closeVerificationSession",
       "discriminator": [
         188,
         203,
@@ -3213,7 +3213,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "confirm_genesis",
+      "name": "confirmGenesis",
       "discriminator": [
         116,
         83,
@@ -3273,7 +3273,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "confirm_nomination",
+      "name": "confirmNomination",
       "discriminator": [
         216,
         43,
@@ -3301,7 +3301,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "create_claim",
+      "name": "createClaim",
       "discriminator": [
         71,
         122,
@@ -3411,7 +3411,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_cross_border_binding",
+      "name": "createCrossBorderBinding",
       "discriminator": [
         165,
         96,
@@ -3510,7 +3510,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_escrow",
+      "name": "createEscrow",
       "discriminator": [
         253,
         215,
@@ -3645,7 +3645,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_guardian_claim",
+      "name": "createGuardianClaim",
       "discriminator": [
         220,
         101,
@@ -3775,7 +3775,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_registry",
+      "name": "createRegistry",
       "discriminator": [
         210,
         219,
@@ -3831,7 +3831,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "create_review_case",
+      "name": "createReviewCase",
       "discriminator": [
         121,
         220,
@@ -3930,7 +3930,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_spatial_snapshot",
+      "name": "createSpatialSnapshot",
       "docs": [
         "Freeze a point-in-time copy of the asset's spatial indexes",
         "(RFC-012 \u00a75 `SpatialSnapshot`, RFC-013 \u00a78.5 \u2014 snapshots copy the",
@@ -4075,7 +4075,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_stake_pool",
+      "name": "createStakePool",
       "discriminator": [
         198,
         175,
@@ -4162,7 +4162,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_validator_relationship_edge",
+      "name": "createValidatorRelationshipEdge",
       "discriminator": [
         174,
         195,
@@ -4267,7 +4267,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_vault",
+      "name": "createVault",
       "discriminator": [
         29,
         237,
@@ -4358,7 +4358,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_verification_task",
+      "name": "createVerificationTask",
       "discriminator": [
         117,
         19,
@@ -4443,7 +4443,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "create_world_registry",
+      "name": "createWorldRegistry",
       "discriminator": [
         124,
         83,
@@ -4495,7 +4495,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "declare_validator_capability",
+      "name": "declareValidatorCapability",
       "discriminator": [
         13,
         57,
@@ -4575,7 +4575,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "deposit_escrow",
+      "name": "depositEscrow",
       "discriminator": [
         226,
         112,
@@ -4680,7 +4680,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "deposit_stake",
+      "name": "depositStake",
       "discriminator": [
         160,
         167,
@@ -4803,7 +4803,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "dismiss_report",
+      "name": "dismissReport",
       "discriminator": [
         17,
         115,
@@ -4925,7 +4925,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "dispute_escrow",
+      "name": "disputeEscrow",
       "discriminator": [
         198,
         174,
@@ -5048,7 +5048,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "dispute_guardian_claim",
+      "name": "disputeGuardianClaim",
       "discriminator": [
         156,
         186,
@@ -5133,7 +5133,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "dispute_slashing",
+      "name": "disputeSlashing",
       "discriminator": [
         119,
         42,
@@ -5256,7 +5256,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "distribute_rewards",
+      "name": "distributeRewards",
       "discriminator": [
         97,
         6,
@@ -5343,7 +5343,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "emergency_protect",
+      "name": "emergencyProtect",
       "discriminator": [
         79,
         181,
@@ -5414,7 +5414,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "endorse_shard_rotation",
+      "name": "endorseShardRotation",
       "discriminator": [
         132,
         217,
@@ -5448,7 +5448,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "endorse_validator_add",
+      "name": "endorseValidatorAdd",
       "discriminator": [
         42,
         252,
@@ -5514,7 +5514,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "endorse_validator_removal",
+      "name": "endorseValidatorRemoval",
       "discriminator": [
         88,
         47,
@@ -5580,7 +5580,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "execute_emergency_injection",
+      "name": "executeEmergencyInjection",
       "discriminator": [
         170,
         146,
@@ -5680,7 +5680,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "execute_judgment",
+      "name": "executeJudgment",
       "discriminator": [
         78,
         95,
@@ -5809,7 +5809,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "execute_shard_rotation",
+      "name": "executeShardRotation",
       "discriminator": [
         241,
         227,
@@ -5842,7 +5842,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "expire_escrow",
+      "name": "expireEscrow",
       "discriminator": [
         49,
         150,
@@ -5914,7 +5914,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "file_challenge",
+      "name": "fileChallenge",
       "discriminator": [
         200,
         165,
@@ -6011,7 +6011,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "file_dispute",
+      "name": "fileDispute",
       "discriminator": [
         210,
         63,
@@ -6170,7 +6170,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "file_fraud_appeal",
+      "name": "fileFraudAppeal",
       "discriminator": [
         223,
         21,
@@ -6252,7 +6252,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "finalize_appeal",
+      "name": "finalizeAppeal",
       "discriminator": [
         104,
         61,
@@ -6326,7 +6326,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "finalize_appeal_review",
+      "name": "finalizeAppealReview",
       "discriminator": [
         175,
         147,
@@ -6461,7 +6461,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "finalize_credential",
+      "name": "finalizeCredential",
       "discriminator": [
         159,
         151,
@@ -6590,7 +6590,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "finalize_decision",
+      "name": "finalizeDecision",
       "discriminator": [
         205,
         130,
@@ -6730,7 +6730,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "finalize_fraud_review",
+      "name": "finalizeFraudReview",
       "discriminator": [
         83,
         178,
@@ -6866,7 +6866,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "finalize_quorum",
+      "name": "finalizeQuorum",
       "discriminator": [
         150,
         75,
@@ -6939,7 +6939,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "freeze_parcel",
+      "name": "freezeParcel",
       "discriminator": [
         245,
         48,
@@ -7012,7 +7012,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "fund_task_escrow",
+      "name": "fundTaskEscrow",
       "discriminator": [
         129,
         231,
@@ -7182,7 +7182,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "generate_ownership_root",
+      "name": "generateOwnershipRoot",
       "discriminator": [
         111,
         202,
@@ -7332,7 +7332,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "grant_conditional_right",
+      "name": "grantConditionalRight",
       "discriminator": [
         203,
         9,
@@ -7443,7 +7443,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "grant_identity_right",
+      "name": "grantIdentityRight",
       "docs": [
         "Grant an identity-based right on a parcel. Only the current holder",
         "of the canonical ownership right may sign. The `identity` must be a",
@@ -7548,7 +7548,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "grant_right",
+      "name": "grantRight",
       "docs": [
         "Grant a non-ownership right on a parcel to `holder`. Holder-only.",
         "",
@@ -7709,7 +7709,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "init_spatial_asset",
+      "name": "initSpatialAsset",
       "discriminator": [
         202,
         140,
@@ -7803,7 +7803,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "init_validator_profile",
+      "name": "initValidatorProfile",
       "discriminator": [
         135,
         94,
@@ -7876,7 +7876,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "init_vrf_authority",
+      "name": "initVrfAuthority",
       "docs": [
         "Set or rotate the allowlisted VRF oracle authority. Registry admin only."
       ],
@@ -7965,7 +7965,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "initialize_validator_reputation",
+      "name": "initializeValidatorReputation",
       "discriminator": [
         199,
         93,
@@ -8060,7 +8060,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "initiate_shard_rotation",
+      "name": "initiateShardRotation",
       "discriminator": [
         48,
         48,
@@ -8150,7 +8150,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "initiate_unbonding",
+      "name": "initiateUnbonding",
       "discriminator": [
         75,
         33,
@@ -8262,7 +8262,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "invalidate_proof",
+      "name": "invalidateProof",
       "discriminator": [
         122,
         166,
@@ -8343,7 +8343,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "judicial_forfeiture",
+      "name": "judicialForfeiture",
       "docs": [
         "Force-transfer a parcel's ownership away from a non-compliant owner, per",
         "a court order. This is deliberately heavier than a normal transfer:",
@@ -8494,7 +8494,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "link_cross_border_to_session",
+      "name": "linkCrossBorderToSession",
       "discriminator": [
         237,
         10,
@@ -8636,7 +8636,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "migrate_rights",
+      "name": "migrateRights",
       "discriminator": [
         81,
         152,
@@ -8734,7 +8734,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "mutual_cancel_escrow",
+      "name": "mutualCancelEscrow",
       "discriminator": [
         241,
         12,
@@ -8838,7 +8838,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "nominate_validator",
+      "name": "nominateValidator",
       "discriminator": [
         54,
         117,
@@ -8949,7 +8949,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "open_appeal_review",
+      "name": "openAppealReview",
       "discriminator": [
         84,
         185,
@@ -9073,7 +9073,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "open_fraud_review",
+      "name": "openFraudReview",
       "discriminator": [
         111,
         26,
@@ -9200,7 +9200,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "open_verification_session",
+      "name": "openVerificationSession",
       "discriminator": [
         233,
         132,
@@ -9357,7 +9357,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "pause_program",
+      "name": "pauseProgram",
       "discriminator": [
         91,
         86,
@@ -9381,7 +9381,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "ping_shard",
+      "name": "pingShard",
       "discriminator": [
         148,
         232,
@@ -9409,7 +9409,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "propose_validator",
+      "name": "proposeValidator",
       "discriminator": [
         177,
         134,
@@ -9488,7 +9488,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "propose_validator_removal",
+      "name": "proposeValidatorRemoval",
       "discriminator": [
         217,
         106,
@@ -9567,7 +9567,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "queue_emergency_injection",
+      "name": "queueEmergencyInjection",
       "discriminator": [
         153,
         11,
@@ -9667,7 +9667,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "quote_task_resources",
+      "name": "quoteTaskResources",
       "discriminator": [
         185,
         225,
@@ -9732,7 +9732,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "reactivate_observer",
+      "name": "reactivateObserver",
       "discriminator": [
         31,
         227,
@@ -9807,7 +9807,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "rebind_cross_border_identity",
+      "name": "rebindCrossBorderIdentity",
       "discriminator": [
         144,
         28,
@@ -9913,7 +9913,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_attestation_outcome",
+      "name": "recordAttestationOutcome",
       "discriminator": [
         61,
         154,
@@ -10006,7 +10006,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_audit_entry",
+      "name": "recordAuditEntry",
       "discriminator": [
         187,
         75,
@@ -10096,7 +10096,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_audit_event",
+      "name": "recordAuditEvent",
       "discriminator": [
         123,
         52,
@@ -10169,7 +10169,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_cross_border_verification",
+      "name": "recordCrossBorderVerification",
       "discriminator": [
         243,
         167,
@@ -10352,7 +10352,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_session_attestation",
+      "name": "recordSessionAttestation",
       "discriminator": [
         210,
         151,
@@ -10495,7 +10495,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "record_session_evidence",
+      "name": "recordSessionEvidence",
       "discriminator": [
         251,
         34,
@@ -10591,7 +10591,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "record_session_observation",
+      "name": "recordSessionObservation",
       "discriminator": [
         90,
         81,
@@ -10687,7 +10687,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "refund_task_escrow",
+      "name": "refundTaskEscrow",
       "discriminator": [
         67,
         95,
@@ -10778,7 +10778,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "register_3d_model",
+      "name": "register3dModel",
       "docs": [
         "Register an off-chain 3D model claim against an anchored geometry",
         "version (RFC-012 \u00a75 `ThreeDModel`, Design Rule 10 \u2014 never on-chain",
@@ -10934,7 +10934,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "register_device",
+      "name": "registerDevice",
       "discriminator": [
         210,
         151,
@@ -11016,7 +11016,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "register_jurisdiction",
+      "name": "registerJurisdiction",
       "discriminator": [
         6,
         255,
@@ -11135,7 +11135,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "register_observer",
+      "name": "registerObserver",
       "discriminator": [
         95,
         238,
@@ -11190,7 +11190,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "register_parcel",
+      "name": "registerParcel",
       "docs": [
         "Register a new parcel on-chain. The signer receives the canonical",
         "ownership right (`Rights` PDA at `[\"ownership\", parcel]`), which is",
@@ -11299,7 +11299,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "register_zone_set",
+      "name": "registerZoneSet",
       "discriminator": [
         161,
         121,
@@ -11427,7 +11427,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "rehabilitate_restriction",
+      "name": "rehabilitateRestriction",
       "discriminator": [
         161,
         98,
@@ -11534,7 +11534,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "remove_validator_from_registry",
+      "name": "removeValidatorFromRegistry",
       "discriminator": [
         62,
         197,
@@ -11608,7 +11608,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "renew_right",
+      "name": "renewRight",
       "discriminator": [
         244,
         248,
@@ -11707,7 +11707,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "report_equivocation",
+      "name": "reportEquivocation",
       "discriminator": [
         140,
         250,
@@ -11883,7 +11883,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "report_validator_offense",
+      "name": "reportValidatorOffense",
       "discriminator": [
         26,
         28,
@@ -12064,7 +12064,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "request_credential",
+      "name": "requestCredential",
       "discriminator": [
         250,
         55,
@@ -12175,7 +12175,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "request_genesis",
+      "name": "requestGenesis",
       "discriminator": [
         21,
         184,
@@ -12268,7 +12268,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "resolve_guardian_claim",
+      "name": "resolveGuardianClaim",
       "discriminator": [
         125,
         182,
@@ -12353,7 +12353,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "revoke_cross_border",
+      "name": "revokeCrossBorder",
       "discriminator": [
         32,
         235,
@@ -12445,7 +12445,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "revoke_identity_right",
+      "name": "revokeIdentityRight",
       "docs": [
         "Revoke an identity-based right. The original granter may revoke."
       ],
@@ -12509,7 +12509,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "revoke_jurisdictional_identity",
+      "name": "revokeJurisdictionalIdentity",
       "discriminator": [
         196,
         187,
@@ -12548,7 +12548,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "revoke_right",
+      "name": "revokeRight",
       "docs": [
         "Revoke a previously granted (non-ownership) right. The current parcel",
         "holder or the original granter may revoke. The account is closed and",
@@ -12639,7 +12639,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "rotate_device_key",
+      "name": "rotateDeviceKey",
       "discriminator": [
         96,
         133,
@@ -12702,7 +12702,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "route_task",
+      "name": "routeTask",
       "discriminator": [
         10,
         69,
@@ -12878,7 +12878,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_coverage_incentive",
+      "name": "setCoverageIncentive",
       "discriminator": [
         240,
         111,
@@ -12985,7 +12985,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_cross_border_binding_status",
+      "name": "setCrossBorderBindingStatus",
       "discriminator": [
         192,
         154,
@@ -13020,7 +13020,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_device_calibration",
+      "name": "setDeviceCalibration",
       "discriminator": [
         117,
         26,
@@ -13092,7 +13092,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_device_status",
+      "name": "setDeviceStatus",
       "discriminator": [
         151,
         78,
@@ -13155,7 +13155,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_fee_policy",
+      "name": "setFeePolicy",
       "discriminator": [
         91,
         32,
@@ -13238,7 +13238,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_quorum_config",
+      "name": "setQuorumConfig",
       "discriminator": [
         10,
         126,
@@ -13319,7 +13319,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_validator_active",
+      "name": "setValidatorActive",
       "discriminator": [
         211,
         189,
@@ -13396,7 +13396,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_validator_availability",
+      "name": "setValidatorAvailability",
       "discriminator": [
         136,
         107,
@@ -13499,7 +13499,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_validator_jurisdiction",
+      "name": "setValidatorJurisdiction",
       "docs": [
         "Declare / update the validator's operating jurisdiction (RFC-012 Phase 10)."
       ],
@@ -13566,7 +13566,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_validator_presence",
+      "name": "setValidatorPresence",
       "discriminator": [
         201,
         97,
@@ -13681,7 +13681,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "set_validator_profile_tier",
+      "name": "setValidatorProfileTier",
       "discriminator": [
         95,
         3,
@@ -13771,7 +13771,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "settle_escrow",
+      "name": "settleEscrow",
       "discriminator": [
         22,
         135,
@@ -13907,7 +13907,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "sign_credential",
+      "name": "signCredential",
       "discriminator": [
         43,
         172,
@@ -14010,7 +14010,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "slash_validator",
+      "name": "slashValidator",
       "discriminator": [
         238,
         57,
@@ -14103,7 +14103,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "subdivide_parcel",
+      "name": "subdivideParcel",
       "discriminator": [
         179,
         231,
@@ -14327,7 +14327,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_evidence_manifest",
+      "name": "submitEvidenceManifest",
       "discriminator": [
         232,
         67,
@@ -14441,7 +14441,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_fraud_report",
+      "name": "submitFraudReport",
       "discriminator": [
         31,
         239,
@@ -14532,7 +14532,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_jurisdictional_restriction",
+      "name": "submitJurisdictionalRestriction",
       "discriminator": [
         171,
         42,
@@ -14632,7 +14632,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_observation",
+      "name": "submitObservation",
       "discriminator": [
         109,
         4,
@@ -14753,7 +14753,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_observation_v2",
+      "name": "submitObservationV2",
       "discriminator": [
         255,
         214,
@@ -14914,7 +14914,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_privacy_request",
+      "name": "submitPrivacyRequest",
       "discriminator": [
         73,
         68,
@@ -15015,7 +15015,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_security_request",
+      "name": "submitSecurityRequest",
       "discriminator": [
         151,
         173,
@@ -15107,7 +15107,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_task_result",
+      "name": "submitTaskResult",
       "discriminator": [
         39,
         108,
@@ -15210,7 +15210,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "submit_verification_attestation",
+      "name": "submitVerificationAttestation",
       "discriminator": [
         104,
         215,
@@ -15369,7 +15369,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "suspend_observer",
+      "name": "suspendObserver",
       "discriminator": [
         187,
         179,
@@ -15444,7 +15444,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "suspend_validator_availability",
+      "name": "suspendValidatorAvailability",
       "discriminator": [
         202,
         137,
@@ -15573,7 +15573,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "sweep_expired_rights",
+      "name": "sweepExpiredRights",
       "discriminator": [
         174,
         5,
@@ -15654,7 +15654,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "transfer_admin",
+      "name": "transferAdmin",
       "discriminator": [
         42,
         242,
@@ -15710,7 +15710,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "transfer_parcel",
+      "name": "transferParcel",
       "docs": [
         "Transfer the ownership right of a parcel to `new_owner`. Only the",
         "current holder can sign (wallet holder or, via the identity overlay,",
@@ -15788,7 +15788,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "unpause_program",
+      "name": "unpauseProgram",
       "discriminator": [
         43,
         162,
@@ -15812,7 +15812,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "update_device",
+      "name": "updateDevice",
       "discriminator": [
         30,
         154,
@@ -15879,7 +15879,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "update_infrastructure",
+      "name": "updateInfrastructure",
       "docs": [
         "Set the parcel's infrastructure flag bitmask together with the canonical",
         "access digest produced by the off-chain validation engine. Holder-only.",
@@ -15969,7 +15969,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "update_jurisdiction",
+      "name": "updateJurisdiction",
       "discriminator": [
         172,
         83,
@@ -16021,7 +16021,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "update_status",
+      "name": "updateStatus",
       "docs": [
         "Update a parcel's status (e.g. for-sale). Holder-only."
       ],
@@ -16098,7 +16098,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "update_validator_profile",
+      "name": "updateValidatorProfile",
       "discriminator": [
         31,
         20,
@@ -16166,7 +16166,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "update_verification_key_hash",
+      "name": "updateVerificationKeyHash",
       "discriminator": [
         139,
         196,
@@ -16282,7 +16282,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "verify_3d_model",
+      "name": "verify3dModel",
       "docs": [
         "A registered validator attests a registered model's hash",
         "(claim \u2192 fact, same split as geometry verification)."
@@ -16375,7 +16375,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_and_slash",
+      "name": "verifyAndSlash",
       "discriminator": [
         247,
         117,
@@ -16566,7 +16566,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_claim",
+      "name": "verifyClaim",
       "discriminator": [
         35,
         121,
@@ -16610,7 +16610,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_credential",
+      "name": "verifyCredential",
       "discriminator": [
         139,
         189,
@@ -16719,7 +16719,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "verify_cross_border",
+      "name": "verifyCrossBorder",
       "discriminator": [
         84,
         43,
@@ -16815,7 +16815,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_device",
+      "name": "verifyDevice",
       "discriminator": [
         103,
         113,
@@ -16872,7 +16872,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_geometry_version",
+      "name": "verifyGeometryVersion",
       "docs": [
         "A registered validator attests the version; `verified` flips when",
         "the append-time quorum threshold is reached (RFC-013 Phase B)."
@@ -16999,7 +16999,7 @@ export const terraRegistry: Idl = {
       "args": []
     },
     {
-      "name": "verify_jurisdiction_membership",
+      "name": "verifyJurisdictionMembership",
       "discriminator": [
         130,
         50,
@@ -17073,7 +17073,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "verify_ownership_proof",
+      "name": "verifyOwnershipProof",
       "discriminator": [
         114,
         247,
@@ -17224,7 +17224,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "vote_challenge",
+      "name": "voteChallenge",
       "discriminator": [
         198,
         76,
@@ -17339,7 +17339,7 @@ export const terraRegistry: Idl = {
       ]
     },
     {
-      "name": "withdraw_stake",
+      "name": "withdrawStake",
       "discriminator": [
         153,
         8,
@@ -32528,4 +32528,6 @@ export const terraRegistry: Idl = {
       }
     }
   ]
-};
+} as const satisfies Idl;
+
+export type TerraRegistry = typeof terraRegistry;

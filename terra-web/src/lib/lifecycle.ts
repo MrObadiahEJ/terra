@@ -844,7 +844,7 @@ async function disputeStep(state: StepState): Promise<void> {
 
   if (!(await disputes.fetchNullable(state.pdas.dispute))) {
     const ix = await state.program.methods
-      .fileDispute(Array.from(state.ids.caseHash), 2, validators)
+      .fileDispute(Array.from(state.ids.caseHash), 2, validators, new BN(1_000_000))
       .accounts({
         dispute: state.pdas.dispute,
         parcel: state.pdas.disputeParcel,
