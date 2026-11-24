@@ -5,7 +5,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use geo::{Coord, Distance, Haversine, Intersects, Point, Polygon, Rect};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use terra_geo::route_between;
 
 use crate::error::AppError;
@@ -126,7 +126,7 @@ async fn buildings(
         _ => {
             return Err(AppError::bad_request(
                 "provide a complete, ordered building bbox",
-            ))
+            ));
         }
     };
     let limit = params.limit.clamp(1, 2000);

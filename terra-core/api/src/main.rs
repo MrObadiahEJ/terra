@@ -14,12 +14,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use axum::Router;
 use axum::extract::Request;
 use axum::http::{HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::routing::get;
-use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
@@ -228,10 +228,10 @@ fn building_bounds(building: &terra_geo::BuildingFootprint) -> Option<geo::Rect<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::StatusCode;
     use axum::routing::get;
-    use axum::Router;
     use tower::ServiceExt;
 
     use crate::auth::ApiAuthority;

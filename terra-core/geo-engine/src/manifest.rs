@@ -22,7 +22,7 @@
 
 use crate::spatial_index::{GeoBounds, QuadCell, SpatialIndexError};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;

@@ -40,29 +40,29 @@ pub mod poi;
 pub mod reach;
 pub mod spatial_index;
 
-pub use access::{nearest_road_access, road_access_along_boundary, AccessPoint};
+pub use access::{AccessPoint, nearest_road_access, road_access_along_boundary};
 pub use canonical3d::{
-    canonicalize_v2 as canonicalize_geometry_v2, geometry_digest_hex_v2, geometry_digest_v2,
-    GEOMETRY_DIGEST_VERSION_V2,
+    GEOMETRY_DIGEST_VERSION_V2, canonicalize_v2 as canonicalize_geometry_v2,
+    geometry_digest_hex_v2, geometry_digest_v2,
 };
-pub use component_package::{validate, validate_with_geometry, ComponentPackage, ConformanceError};
-pub use graph::{build_graph, RoadGraph, RoadSegment};
+pub use component_package::{ComponentPackage, ConformanceError, validate, validate_with_geometry};
+pub use graph::{RoadGraph, RoadSegment, build_graph};
 pub use manifest::{
-    ContentAddress, ManifestError, ManifestObject, ManifestPayload, SignedManifest,
-    ValidationState, CONTENT_ADDRESS_PREFIX, MANIFEST_SCHEMA, MANIFEST_SIGNATURE_DOMAIN, MAX_LOD,
+    CONTENT_ADDRESS_PREFIX, ContentAddress, MANIFEST_SCHEMA, MANIFEST_SIGNATURE_DOMAIN, MAX_LOD,
+    ManifestError, ManifestObject, ManifestPayload, SignedManifest, ValidationState,
 };
-pub use osm::{read_osm_pbf, BuildingFootprint, OsmData, Poi, RoadWay};
+pub use osm::{BuildingFootprint, OsmData, Poi, RoadWay, read_osm_pbf};
 pub use poi::{pois_near, pois_within};
 pub use reach::{
-    access_digest, analyze, encode_metrics, is_sealed_highway, route_between, NetworkGraph,
-    ReachabilityReport, Route, FLAG_ROAD_ACCESS, ROAD_ACCESS_THRESHOLD_M,
+    FLAG_ROAD_ACCESS, NetworkGraph, ROAD_ACCESS_THRESHOLD_M, ReachabilityReport, Route,
+    access_digest, analyze, encode_metrics, is_sealed_highway, route_between,
 };
 pub use sdk_meta::{
     sdk_capabilities, sdk_name, sdk_schema_versions, sdk_security_assumptions,
     sdk_upgrade_migration, sdk_version,
 };
 pub use spatial_index::{
-    covering_cells, GeoBounds, QuadCell, SpatialIndexError, MAX_COVERAGE_CELLS, MAX_LEVEL,
+    GeoBounds, MAX_COVERAGE_CELLS, MAX_LEVEL, QuadCell, SpatialIndexError, covering_cells,
 };
 
 // ---------------------------------------------------------------------------
@@ -152,13 +152,17 @@ pub mod sdk_meta {
                 assert!(!version.is_empty());
             }
             // The component-package conformance capability is present (RFC-015).
-            assert!(sdk_capabilities()
-                .iter()
-                .any(|c| c.contains("component-package-conformance")));
+            assert!(
+                sdk_capabilities()
+                    .iter()
+                    .any(|c| c.contains("component-package-conformance"))
+            );
             // terra-geom-v2 geometry digest is declared.
-            assert!(sdk_schema_versions()
-                .iter()
-                .any(|(n, _)| *n == "terra-geom-v2 geometry digest"));
+            assert!(
+                sdk_schema_versions()
+                    .iter()
+                    .any(|(n, _)| *n == "terra-geom-v2 geometry digest")
+            );
         }
     }
 }

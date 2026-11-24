@@ -86,14 +86,16 @@ mod tests {
             indices: vec![false; TREE_DEPTH],
         };
         assert!(compute_root(Fr::from(9u64), &empty).is_ok());
-        assert!(compute_root(
-            Fr::from(9u64),
-            &MerklePath {
-                siblings: vec![],
-                indices: vec![],
-            }
-        )
-        .is_err());
+        assert!(
+            compute_root(
+                Fr::from(9u64),
+                &MerklePath {
+                    siblings: vec![],
+                    indices: vec![],
+                }
+            )
+            .is_err()
+        );
 
         let value = field_to_be(&Fr::from(42u64));
         assert_eq!(field_from_be(&value), Ok(Fr::from(42u64)));

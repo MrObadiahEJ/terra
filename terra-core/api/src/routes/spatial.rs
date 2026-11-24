@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
-use terra_geo::{covering_cells as geo_covering_cells, GeoBounds, QuadCell};
+use terra_geo::{GeoBounds, QuadCell, covering_cells as geo_covering_cells};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -363,10 +363,12 @@ mod tests {
         .unwrap();
         assert!(cover.count > 0);
         assert_eq!(cover.count, cover.cells.len());
-        assert!(cover
-            .cells
-            .windows(2)
-            .all(|pair| (pair[0].y, pair[0].x) <= (pair[1].y, pair[1].x)));
+        assert!(
+            cover
+                .cells
+                .windows(2)
+                .all(|pair| (pair[0].y, pair[0].x) <= (pair[1].y, pair[1].x))
+        );
     }
 
     #[tokio::test]

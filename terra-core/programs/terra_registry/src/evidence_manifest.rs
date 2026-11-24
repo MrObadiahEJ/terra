@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::observation_v2::{is_valid_observation_provenance, is_valid_observation_source};
-use crate::verification_task::{task_is_terminal, VerificationTask};
 use crate::TerraError;
+use crate::observation_v2::{is_valid_observation_provenance, is_valid_observation_source};
+use crate::verification_task::{VerificationTask, task_is_terminal};
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 5 — evidence provenance (EvidenceManifest / EvidenceArtifact)

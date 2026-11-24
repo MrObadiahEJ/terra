@@ -1,11 +1,11 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use ark_bn254::Bn254;
 use ark_groth16::ProvingKey;
 use sha2::{Digest, Sha256};
-use terra_zk_membership::{frame::serialize_verification_key, VerifyingKey, TG16_VK_LEN};
+use terra_zk_membership::{TG16_VK_LEN, VerifyingKey, frame::serialize_verification_key};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ZkMode {

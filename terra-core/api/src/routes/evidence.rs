@@ -1,6 +1,6 @@
 use axum::body::Body;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -65,8 +65,7 @@ pub struct EvidenceListParams {
     pub content_hash: Option<String>,
 }
 
-const SELECT_UPLOAD: &str =
-    "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
+const SELECT_UPLOAD: &str = "SELECT id, content_hash, storage_ref, storage_backend, filename, content_type, size_bytes, \
      uploaded_by, parcel_id, created_at, quarantined, quarantine_reason";
 
 /// Apply the intake quarantine policy to one upload.
@@ -247,43 +246,42 @@ pub async fn list_evidence_uploads(
     State(state): State<AppState>,
     Query(params): Query<EvidenceListParams>,
 ) -> Result<Json<Vec<EvidenceUploadRow>>, AppError> {
-    let rows = match (params.parcel_id, params.content_hash) {
-        (Some(parcel), Some(hash)) => {
-            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+    let rows =
+        match (params.parcel_id, params.content_hash) {
+            (Some(parcel), Some(hash)) => sqlx::query_as::<_, EvidenceUploadRow>(&format!(
                 "{SELECT_UPLOAD} FROM evidence_uploads WHERE parcel_id = $1 AND content_hash = $2 \
                  ORDER BY created_at DESC LIMIT 200"
             ))
             .bind(parcel)
             .bind(hash)
             .fetch_all(&state.pool)
-            .await?
-        }
-        (Some(parcel), None) => {
-            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
-                "{SELECT_UPLOAD} FROM evidence_uploads WHERE parcel_id = $1 \
+            .await?,
+            (Some(parcel), None) => {
+                sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                    "{SELECT_UPLOAD} FROM evidence_uploads WHERE parcel_id = $1 \
                  ORDER BY created_at DESC LIMIT 200"
-            ))
-            .bind(parcel)
-            .fetch_all(&state.pool)
-            .await?
-        }
-        (None, Some(hash)) => {
-            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
-                "{SELECT_UPLOAD} FROM evidence_uploads WHERE content_hash = $1 \
+                ))
+                .bind(parcel)
+                .fetch_all(&state.pool)
+                .await?
+            }
+            (None, Some(hash)) => {
+                sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                    "{SELECT_UPLOAD} FROM evidence_uploads WHERE content_hash = $1 \
                  ORDER BY created_at DESC LIMIT 200"
-            ))
-            .bind(hash)
-            .fetch_all(&state.pool)
-            .await?
-        }
-        (None, None) => {
-            sqlx::query_as::<_, EvidenceUploadRow>(&format!(
-                "{SELECT_UPLOAD} FROM evidence_uploads ORDER BY created_at DESC LIMIT 100"
-            ))
-            .fetch_all(&state.pool)
-            .await?
-        }
-    };
+                ))
+                .bind(hash)
+                .fetch_all(&state.pool)
+                .await?
+            }
+            (None, None) => {
+                sqlx::query_as::<_, EvidenceUploadRow>(&format!(
+                    "{SELECT_UPLOAD} FROM evidence_uploads ORDER BY created_at DESC LIMIT 100"
+                ))
+                .fetch_all(&state.pool)
+                .await?
+            }
+        };
     Ok(Json(rows))
 }
 
@@ -736,11 +734,13 @@ mod tests {
         // Crafted traversal ref must not escape the root.
         assert!(backend.load("../../etc/passwd").await.is_err());
         // A benign missing ref is simply None.
-        assert!(backend
-            .load("2099/01/01/ghost.bin")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            backend
+                .load("2099/01/01/ghost.bin")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]

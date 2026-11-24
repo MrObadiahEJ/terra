@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::verification::reputation::ValidatorReputation;
 use crate::TerraError;
+use crate::verification::reputation::ValidatorReputation;
 
 // ---------------------------------------------------------------------------
 // RFC-016 — Protocol Security, Decentralization, Privacy and Censorship

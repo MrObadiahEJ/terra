@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 
-use crate::verification::reputation::{validator_status, ValidatorReputation, MAX_REPUTATION};
 use crate::TerraError;
+use crate::verification::reputation::{MAX_REPUTATION, ValidatorReputation, validator_status};
 
 // ---------------------------------------------------------------------------
 // Quorum vote choice

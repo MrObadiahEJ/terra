@@ -17,8 +17,8 @@
 
 use anchor_lang::prelude::*;
 
-use crate::evidence_manifest::{is_nonzero_hash, is_valid_storage_reference};
 use crate::TerraError;
+use crate::evidence_manifest::{is_nonzero_hash, is_valid_storage_reference};
 
 // ---------------------------------------------------------------------------
 // Enums

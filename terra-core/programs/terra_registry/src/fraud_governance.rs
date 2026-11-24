@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use solana_program::hash::hashv;
 
-use crate::validator_profile::{capability_level, profile_tier, ValidatorProfile};
-use crate::verification::reputation::ValidatorReputation;
 use crate::TerraError;
+use crate::validator_profile::{ValidatorProfile, capability_level, profile_tier};
+use crate::verification::reputation::ValidatorReputation;
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 7 — reputation governance (self-regulating, no jail)

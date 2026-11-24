@@ -8,7 +8,7 @@
 //! geometry bytes. `validate_with_geometry()` additionally checks rule 1
 //! (digest integrity) given the geometry document as a GeoJSON string.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -65,7 +65,9 @@ pub struct BoundingVolume {
 /// Validation error details.
 #[derive(Debug, thiserror::Error)]
 pub enum ConformanceError {
-    #[error("rule 1: digest integrity — geometry_digest does not match canonical digest of geometry_artifact")]
+    #[error(
+        "rule 1: digest integrity — geometry_digest does not match canonical digest of geometry_artifact"
+    )]
     DigestIntegrity,
     #[error("rule 2: CRS validity — crs must normalize to EPSG:4326, got '{0}'")]
     CrsInvalid(String),
@@ -75,7 +77,9 @@ pub enum ConformanceError {
     VerticalUnitsInvalid(String),
     #[error("rule 6: bounding_volume must enclose spatial_extent")]
     BoundingVolumeInconsistent,
-    #[error("rule 7: AI-kind provenance requires reconstruction_engine_id/version and confidence in [0,1]")]
+    #[error(
+        "rule 7: AI-kind provenance requires reconstruction_engine_id/version and confidence in [0,1]"
+    )]
     ProvenanceIncomplete,
     #[error("rule 8: privacy_classification/access_policy must be present and consistent")]
     PrivacyInvalid,

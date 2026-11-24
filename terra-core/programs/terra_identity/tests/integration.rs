@@ -1,5 +1,5 @@
 use anchor_lang::AccountDeserialize;
-use solana_program_test::{tokio, ProgramTest, ProgramTestContext};
+use solana_program_test::{ProgramTest, ProgramTestContext, tokio};
 use solana_sdk::{
     hash::hash,
     instruction::{AccountMeta, Instruction},
@@ -8,10 +8,10 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use terra_identity::{
+    ID as PROGRAM_ID,
     constants::*,
     helpers::*,
     state::{Identity, Succession},
-    ID as PROGRAM_ID,
 };
 
 // ---------------------------------------------------------------------------

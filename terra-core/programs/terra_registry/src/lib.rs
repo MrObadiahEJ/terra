@@ -3,8 +3,8 @@
 // know about. Silence it at the crate root; our own cfgs are unaffected.
 #![allow(unexpected_cfgs)]
 
-use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
+use anchor_lang::prelude::*;
 
 declare_id!("GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage");
 
@@ -7928,7 +7928,9 @@ pub enum TerraError {
     MissingReputation,
 
     // P0-6: canonical attestation digest
-    #[msg("Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence")]
+    #[msg(
+        "Attestation signature_hash does not match the canonical digest over claim, validator, observation, result, and confidence"
+    )]
     AttestationDigestMismatch,
 
     // Intent 2: W3C VC + SD-JWT
@@ -8369,12 +8371,16 @@ pub mod sdk_meta {
                 assert!(!name.is_empty());
                 assert!(!version.is_empty());
             }
-            assert!(sdk_capabilities()
-                .iter()
-                .any(|c| c.contains("parcel registry")));
-            assert!(sdk_schema_versions()
-                .iter()
-                .any(|(n, _)| *n == "RFC-007 Dispute Resolution & Parcel Freeze"));
+            assert!(
+                sdk_capabilities()
+                    .iter()
+                    .any(|c| c.contains("parcel registry"))
+            );
+            assert!(
+                sdk_schema_versions()
+                    .iter()
+                    .any(|(n, _)| *n == "RFC-007 Dispute Resolution & Parcel Freeze")
+            );
         }
     }
 }

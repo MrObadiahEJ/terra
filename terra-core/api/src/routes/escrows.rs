@@ -411,7 +411,7 @@ async fn cancel_escrow(
         _ => {
             return Err(AppError::bad_request(
                 "cannot cancel escrow in current status",
-            ))
+            ));
         }
     }
 

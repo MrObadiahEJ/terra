@@ -475,9 +475,11 @@ mod tests {
     #[test]
     fn expires_at_parser() {
         assert!(parse_expires_at(None).unwrap().is_none());
-        assert!(parse_expires_at(Some("2030-01-01T00:00:00Z"))
-            .unwrap()
-            .is_some());
+        assert!(
+            parse_expires_at(Some("2030-01-01T00:00:00Z"))
+                .unwrap()
+                .is_some()
+        );
         assert!(parse_expires_at(Some("not-a-date")).is_err());
     }
 

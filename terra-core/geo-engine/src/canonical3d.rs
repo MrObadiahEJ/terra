@@ -60,7 +60,7 @@
 //! `cargo test -p terra-geo -- --ignored regenerate_vectors_v2 --nocapture`
 //! to refresh them after a v-prefixed change.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
@@ -832,14 +832,18 @@ mod tests {
 
     #[test]
     fn rejects_out_of_range_and_bad_ordinate_count() {
-        assert!(geometry_digest_hex_v2(&format!(
-            "{{{META}\"type\":\"Point\",\"coordinates\":[8.5,47.4,150000]}}"
-        ))
-        .is_err()); // z beyond ±100000
-        assert!(geometry_digest_hex_v2(&format!(
-            "{{{META}\"type\":\"Point\",\"coordinates\":[8.5,47.4,400,1]}}"
-        ))
-        .is_err()); // 4 ordinates
+        assert!(
+            geometry_digest_hex_v2(&format!(
+                "{{{META}\"type\":\"Point\",\"coordinates\":[8.5,47.4,150000]}}"
+            ))
+            .is_err()
+        ); // z beyond ±100000
+        assert!(
+            geometry_digest_hex_v2(&format!(
+                "{{{META}\"type\":\"Point\",\"coordinates\":[8.5,47.4,400,1]}}"
+            ))
+            .is_err()
+        ); // 4 ordinates
     }
 
     #[test]
@@ -849,9 +853,11 @@ mod tests {
         let c = canonicalize_v2(&d).unwrap();
         assert!(c.contains("[0.0000000,0.0000000,0.00000]"), "{c}");
         let e = format!("{{{META}\"type\":\"Point\",\"coordinates\":[0.00000005,0.0,0]}}");
-        assert!(canonicalize_v2(&e)
-            .unwrap()
-            .contains("[0.0000001,0.0000000,0.00000]"));
+        assert!(
+            canonicalize_v2(&e)
+                .unwrap()
+                .contains("[0.0000001,0.0000000,0.00000]")
+        );
     }
 
     /// Regeneration helper: prints the digest for every vector so the file can

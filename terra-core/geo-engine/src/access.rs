@@ -1,4 +1,4 @@
-use geo::algorithm::line_intersection::{line_intersection, LineIntersection};
+use geo::algorithm::line_intersection::{LineIntersection, line_intersection};
 use geo::{Closest, ClosestPoint, Coord, Distance, Haversine, Line, LineString, Point, Polygon};
 
 use crate::graph::RoadGraph;

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::observation_v2;
 use crate::TerraError;
+use crate::observation_v2;
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 9 — physical infrastructure (device identities)

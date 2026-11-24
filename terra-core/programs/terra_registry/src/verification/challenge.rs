@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 
-use crate::verification::session::{session_status, VerificationSession};
 use crate::TerraError;
+use crate::verification::session::{VerificationSession, session_status};
 
 // ---------------------------------------------------------------------------
 // Challenge status

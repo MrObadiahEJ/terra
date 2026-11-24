@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{parcel_status, TerraError, MAX_VALIDATORS};
+use crate::{MAX_VALIDATORS, TerraError, parcel_status};
 
 pub mod dispute_status {
     pub const FILED: u8 = 0;

@@ -1,11 +1,11 @@
-use axum::extract::{Query, State};
-use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
+use axum::extract::{Query, State};
+use axum::routing::{get, post};
 use chrono::{DateTime, Utc};
 use geo::LineString;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::{Postgres, QueryBuilder};
 
 use crate::error::AppError;
@@ -313,7 +313,7 @@ fn point_wkt(lon: f64, lat: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use geo::{line_string, Coord};
+    use geo::{Coord, line_string};
     use sqlx::Execute as _;
     use std::collections::HashMap;
 

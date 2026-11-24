@@ -1,7 +1,7 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::get,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
@@ -55,10 +55,8 @@ pub struct QueueEmergencyInjectionRequest {
 // SQL constants
 // ---------------------------------------------------------------------------
 
-const ACTIVITY_SELECT: &str =
-    "SELECT id, registry_pubkey, validator_pubkey, last_active, created_at, updated_at FROM validator_activities";
-const EMERGENCY_INJECTION_SELECT: &str =
-    "SELECT id, registry_pubkey, validator_pubkey, injected_by, queued_at, execute_after, executed, created_at FROM emergency_injections";
+const ACTIVITY_SELECT: &str = "SELECT id, registry_pubkey, validator_pubkey, last_active, created_at, updated_at FROM validator_activities";
+const EMERGENCY_INJECTION_SELECT: &str = "SELECT id, registry_pubkey, validator_pubkey, injected_by, queued_at, execute_after, executed, created_at FROM emergency_injections";
 
 // ---------------------------------------------------------------------------
 // Handlers

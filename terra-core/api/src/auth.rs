@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use axum::extract::FromRequestParts;
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use std::convert::Infallible;
 

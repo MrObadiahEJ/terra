@@ -24,7 +24,7 @@
 //! `GeoBounds`; callers split them into two boxes. This keeps containment and
 //! covering rules unambiguous.
 
-use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use std::fmt;
 use std::str::FromStr;
 

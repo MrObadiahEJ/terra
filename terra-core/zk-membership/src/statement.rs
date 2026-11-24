@@ -58,9 +58,11 @@ mod tests {
         );
         assert_eq!(statement[PURPOSE_LENGTH_OFFSET], 4);
         assert_eq!(&statement[PURPOSE_OFFSET..PURPOSE_OFFSET + 4], b"land");
-        assert!(statement[PURPOSE_OFFSET + 4..DISCLOSURE_OFFSET]
-            .iter()
-            .all(|byte| *byte == 0));
+        assert!(
+            statement[PURPOSE_OFFSET + 4..DISCLOSURE_OFFSET]
+                .iter()
+                .all(|byte| *byte == 0)
+        );
         assert_eq!(statement[DISCLOSURE_OFFSET], 0);
     }
 }

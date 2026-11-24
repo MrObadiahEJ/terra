@@ -1,7 +1,7 @@
 use ark_bn254::Fr;
 use ark_crypto_primitives::crh::sha256::Sha256;
 use ark_crypto_primitives::{
-    crh::{sha256::constraints::Sha256Gadget, CRHScheme},
+    crh::{CRHScheme, sha256::constraints::Sha256Gadget},
     sponge::poseidon::PoseidonConfig,
 };
 use ark_ff::PrimeField;
@@ -10,7 +10,7 @@ use ark_r1cs_std::{
     alloc::AllocVar,
     boolean::Boolean,
     eq::EqGadget,
-    fields::{fp::FpVar, FieldVar},
+    fields::{FieldVar, fp::FpVar},
     select::CondSelectGadget,
     uint8::UInt8,
 };
@@ -276,7 +276,7 @@ fn enforce_canonical_field_encoding(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{canonical_ownership_statement, derive_nullifier, field_to_be, Fr, MerklePath};
+    use crate::{Fr, MerklePath, canonical_ownership_statement, derive_nullifier, field_to_be};
     use ark_r1cs_std::R1CSVar;
     use ark_relations::r1cs::ConstraintSystem;
 

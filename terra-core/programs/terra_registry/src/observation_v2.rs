@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::verification_task::{task_is_terminal, VerificationTask};
 use crate::TerraError;
+use crate::verification_task::{VerificationTask, task_is_terminal};
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 4 — multi-source observations (ObservationV2)

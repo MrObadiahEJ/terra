@@ -326,7 +326,7 @@ pub fn verify_precompiled_ed25519(
     expected_signature: &[u8],
 ) -> Result<()> {
     use solana_program::sysvar::instructions::{
-        load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID,
+        ID as INSTRUCTIONS_SYSVAR_ID, load_instruction_at_checked,
     };
     require_keys_eq!(
         *instructions.key,

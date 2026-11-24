@@ -196,8 +196,7 @@ fn verify_root_attestation(
         .map_err(|_| AppError::bad_request("invalid zone-authority root signature"))
 }
 
-const MEMBERSHIP_PROOFS_DISABLED: &str =
-    "ownership membership proofs are disabled until a sound membership circuit, trusted verification key, and audited setup artifacts are installed";
+const MEMBERSHIP_PROOFS_DISABLED: &str = "ownership membership proofs are disabled until a sound membership circuit, trusted verification key, and audited setup artifacts are installed";
 
 // ---------------------------------------------------------------------------
 // Handlers

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::AccountInfo;
 use anchor_lang::prelude::*;
 
-use crate::{TerraError, MAX_VALIDATORS};
+use crate::{MAX_VALIDATORS, TerraError};
 
 /// Count unique non-default pubkeys in a declared validator set.
 ///

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{parcel_status, TerraError, MAX_VALIDATORS};
+use crate::{MAX_VALIDATORS, TerraError, parcel_status};
 
 pub mod escrow_status {
     pub const CREATED: u8 = 0;

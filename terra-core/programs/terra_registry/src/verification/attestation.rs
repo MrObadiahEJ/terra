@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 use solana_program::hash::hashv;
 
-use crate::verification::reputation::{validator_status, ValidatorReputation};
 use crate::TerraError;
+use crate::verification::reputation::{ValidatorReputation, validator_status};
 
 // ---------------------------------------------------------------------------
 // W3C Verifiable Credential + SD-JWT attestation (Intent 2)

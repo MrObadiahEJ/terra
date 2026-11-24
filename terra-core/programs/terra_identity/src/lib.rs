@@ -310,12 +310,16 @@ pub mod sdk_meta {
                 assert!(!name.is_empty());
                 assert!(!version.is_empty());
             }
-            assert!(sdk_capabilities()
-                .iter()
-                .any(|c| c.contains("identity-binding")));
-            assert!(sdk_schema_versions()
-                .iter()
-                .any(|(n, _)| *n == "RFC-006 Cross-Border Identity Bridge"));
+            assert!(
+                sdk_capabilities()
+                    .iter()
+                    .any(|c| c.contains("identity-binding"))
+            );
+            assert!(
+                sdk_schema_versions()
+                    .iter()
+                    .any(|(n, _)| *n == "RFC-006 Cross-Border Identity Bridge")
+            );
         }
     }
 }

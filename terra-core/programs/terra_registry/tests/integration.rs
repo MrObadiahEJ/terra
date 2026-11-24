@@ -1,5 +1,5 @@
 use anchor_lang::AccountDeserialize;
-use solana_program_test::{tokio, ProgramTest, ProgramTestContext};
+use solana_program_test::{ProgramTest, ProgramTestContext, tokio};
 use solana_sdk::{
     hash::hash,
     instruction::{AccountMeta, Instruction},
@@ -7,9 +7,10 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use terra_identity::state::{Identity, Succession};
 use terra_identity::ID as IDENTITY_PROGRAM_ID;
+use terra_identity::state::{Identity, Succession};
 use terra_registry::{
+    ID as PROGRAM_ID, IdentityRights, Parcel, Rights, TerraError,
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
     infra_flag, parcel_status, recovery, right_kind, staking,
@@ -17,17 +18,16 @@ use terra_registry::{
     validator_registry::{self, ValidatorRegistry},
     verification,
     verification::{
+        AuditEntry, Challenge, Claim, Evidence, GuardianClaim, Observation, Observer, QuorumConfig,
+        QuorumTally, ValidatorReputation, VerificationAttestation, VerificationSession,
         attestation::attestation_result, audit_trail::audit_action, challenge_status,
         claim::claim_status, claim::claim_type, evidence::evidence_type,
         guardian_claim::guardian_claim_status, guardian_claim::guardian_type,
         observer::observer_status, quorum_voting::quorum_vote_choice, session::session_status,
-        validator_status, vc_type, AuditEntry, Challenge, Claim, Evidence, GuardianClaim,
-        Observation, Observer, QuorumConfig, QuorumTally, ValidatorReputation,
-        VerificationAttestation, VerificationSession,
+        validator_status, vc_type,
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
-    IdentityRights, Parcel, Rights, TerraError, ID as PROGRAM_ID,
 };
 
 fn parcel_pda(id: &[u8; 32]) -> (Pubkey, u8) {
@@ -1711,12 +1711,12 @@ async fn zk_membership_prover_verifier_e2e() {
     use ark_bn254::Bn254;
     use ark_groth16::Groth16;
     use ark_snark::{CircuitSpecificSetupSNARK, SNARK};
-    use ark_std::rand::{rngs::StdRng, SeedableRng};
+    use ark_std::rand::{SeedableRng, rngs::StdRng};
     use ed25519_dalek::Signer as _;
     use terra_zk_membership::frame::encode_frame;
     use terra_zk_membership::{
-        canonical_ownership_statement, compute_root, derive_nullifier, field_to_be, Fr,
-        MembershipCircuit, MembershipWitness, MerklePath, TREE_DEPTH,
+        Fr, MembershipCircuit, MembershipWitness, MerklePath, TREE_DEPTH,
+        canonical_ownership_statement, compute_root, derive_nullifier, field_to_be,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -4451,7 +4451,7 @@ async fn dispute_cancel_by_filer() {
 
 #[tokio::test]
 async fn escrow_lifecycle_create_deposit_accept() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
 
     let (mut ctx, payer) = setup().await;
 
@@ -4587,7 +4587,7 @@ async fn escrow_lifecycle_create_deposit_accept() {
 
 #[tokio::test]
 async fn escrow_seller_cancel_before_deposit() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
 
     let (mut ctx, payer) = setup().await;
 
@@ -6033,7 +6033,7 @@ async fn expire_escrow_rejects_before_deadline() {
 
 #[tokio::test]
 async fn dispute_escrow_creates_dispute_record() {
-    use terra_registry::escrow::{escrow_status, EscrowRecord};
+    use terra_registry::escrow::{EscrowRecord, escrow_status};
 
     let (mut ctx, payer) = setup().await;
 
@@ -6139,7 +6139,7 @@ async fn dispute_escrow_creates_dispute_record() {
     let mut disp_data = discriminator("global", "dispute_escrow").to_vec();
     disp_data.extend_from_slice(&case_hash);
     disp_data.push(2u8); // required (MIN_DISPUTE_VALIDATORS = 2)
-                         // validators array: [validator1, validator2, 0x00...]
+    // validators array: [validator1, validator2, 0x00...]
     disp_data.extend_from_slice(&validator1.pubkey().to_bytes());
     disp_data.extend_from_slice(&validator2.pubkey().to_bytes());
     for _ in 2..8 {
@@ -23844,12 +23844,13 @@ async fn p0_2_remove_endorsement_cannot_authorize_add() {
     // Create a REMOVE proposal for validator v3.
     propose_removal_ok(&mut ctx, &payer, &registry, &v3.pubkey()).await;
     let (endorsement, _) = endorsement_pda(&registry, &v3.pubkey());
-    assert!(ctx
-        .banks_client
-        .get_account(endorsement)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(
+        ctx.banks_client
+            .get_account(endorsement)
+            .await
+            .unwrap()
+            .is_some()
+    );
 
     // Try to use the REMOVE endorsement to ADD the same validator's key —
     // the add path requires action == ADD.
@@ -27280,7 +27281,7 @@ async fn phase7_vote_double_and_not_member() {
 #[tokio::test]
 async fn phase7_upheld_demotes_not_jails() {
     use terra_registry::fraud_governance::{
-        restriction_status, CapabilityRestriction, FraudReport, ReviewCase,
+        CapabilityRestriction, FraudReport, ReviewCase, restriction_status,
     };
     use terra_registry::validator_profile::{ValidatorCapability, ValidatorProfile};
 
@@ -29015,12 +29016,13 @@ async fn b6_composite_claim_moves_identity_and_parcel_atomically() {
     assert_eq!(id_after.owner, successor.pubkey());
     assert_eq!(id_after.recovery, Pubkey::default());
     // Succession PDA closed by the callee (rent paid to the successor).
-    assert!(ctx
-        .banks_client
-        .get_account(succ_pda)
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        ctx.banks_client
+            .get_account(succ_pda)
+            .await
+            .unwrap()
+            .is_none()
+    );
     // Ownership re-pointed (registry's own write).
     assert_eq!(holder_of(&ctx, &parcel_pk).await, successor.pubkey());
 }
@@ -29190,12 +29192,13 @@ async fn b6_composite_claim_rejects_not_yet_effective_without_side_effects() {
     assert_custom_error(res, 6011, "claim before grace must fail");
     let id_after: Identity = read_account(&ctx, id_pda).await;
     assert_eq!(id_after.owner, payer.pubkey());
-    assert!(ctx
-        .banks_client
-        .get_account(succ_pda)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(
+        ctx.banks_client
+            .get_account(succ_pda)
+            .await
+            .unwrap()
+            .is_some()
+    );
     assert_eq!(holder_of(&ctx, &parcel_pk).await, payer.pubkey());
 }
 
@@ -29277,12 +29280,13 @@ async fn b6_composite_claim_rejects_non_ownership_right() {
     // Rolled back: identity untouched, succession still open.
     let id_after: Identity = read_account(&ctx, id_pda).await;
     assert_eq!(id_after.owner, payer.pubkey());
-    assert!(ctx
-        .banks_client
-        .get_account(succ_pda)
-        .await
-        .unwrap()
-        .is_some());
+    assert!(
+        ctx.banks_client
+            .get_account(succ_pda)
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -30125,7 +30129,7 @@ fn stage3_verify_ix(asset_pk: &Pubkey, entry_pk: &Pubkey, validator: &Pubkey) ->
 #[tokio::test]
 async fn stage3_spatial_asset_lifecycle() {
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+        GeometryVersion, SpatialAsset, elevation_source, geometry_source, spatial_dimension,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -30543,7 +30547,7 @@ async fn stage3_spatial_asset_lifecycle() {
 #[tokio::test]
 async fn stage3_geometry_version_verification() {
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+        GeometryVersion, SpatialAsset, elevation_source, geometry_source, spatial_dimension,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -30730,7 +30734,7 @@ fn stage3_append_from_evidence_ix(
 async fn stage3_evidence_linked_geometry() {
     use terra_registry::evidence_manifest::{self, EvidenceManifest};
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, GeometryVersion, SpatialAsset,
+        GeometryVersion, SpatialAsset, elevation_source, geometry_source, spatial_dimension,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -30957,7 +30961,7 @@ async fn stage3_evidence_linked_geometry() {
 #[tokio::test]
 async fn stage3_geometry_quorum_config() {
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, GeometryVersion,
+        GeometryVersion, elevation_source, geometry_source, spatial_dimension,
     };
 
     let (mut ctx, payer) = setup().await;
@@ -31159,9 +31163,9 @@ fn stage3_snapshot_ix(
 #[tokio::test]
 async fn stage3_3d_model_lifecycle() {
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, GeometryVersion,
+        GeometryVersion, elevation_source, geometry_source, spatial_dimension,
     };
-    use terra_registry::three_d_model::{model_format, ThreeDModel, ThreeDModelMeta};
+    use terra_registry::three_d_model::{ThreeDModel, ThreeDModelMeta, model_format};
 
     let (mut ctx, payer) = setup().await;
     create_registry_ok(&mut ctx, &payer).await;
@@ -31398,7 +31402,7 @@ async fn stage3_3d_model_lifecycle() {
 #[tokio::test]
 async fn stage3_spatial_snapshot_lifecycle() {
     use terra_registry::spatial_asset::{
-        elevation_source, geometry_source, spatial_dimension, SpatialAsset,
+        SpatialAsset, elevation_source, geometry_source, spatial_dimension,
     };
     use terra_registry::spatial_snapshot::{SpatialSnapshot, SpatialSnapshotMeta};
 

@@ -421,11 +421,7 @@ pub mod binding_status {
 /// Canonical ordering of a country pair: lexicographic (min, max).
 /// Keeps the PDA `["cross_border_binding", min, max]` unique per unordered pair.
 pub fn order_country_pair(a: [u8; 2], b: [u8; 2]) -> ([u8; 2], [u8; 2]) {
-    if a <= b {
-        (a, b)
-    } else {
-        (b, a)
-    }
+    if a <= b { (a, b) } else { (b, a) }
 }
 
 pub fn is_valid_binding_status(status: u8) -> bool {

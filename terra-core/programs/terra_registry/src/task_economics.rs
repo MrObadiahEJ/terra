@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::verification_task;
 use crate::TerraError;
+use crate::verification_task;
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 8 — economic / resource layer
@@ -193,11 +193,7 @@ pub fn subsidy_bps_for(policy: &CoverageIncentive, task_class: u8, required_vali
         bps += policy.strategic_bps as u32;
     }
     let cap = policy.max_subsidy_bps as u32;
-    if bps > cap {
-        cap as u16
-    } else {
-        bps as u16
-    }
+    if bps > cap { cap as u16 } else { bps as u16 }
 }
 
 /// Coverage subsidy in lamports for a base share.

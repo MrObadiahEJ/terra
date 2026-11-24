@@ -1,14 +1,14 @@
 use anchor_lang::prelude::*;
 use solana_program::hash::hashv;
 
+use crate::TerraError;
 use crate::validator_profile::{
-    availability_status, capability_level, presence_is_stale, ValidatorAvailability,
-    ValidatorCapability, ValidatorPresence, ValidatorProfile,
+    ValidatorAvailability, ValidatorCapability, ValidatorPresence, ValidatorProfile,
+    availability_status, capability_level, presence_is_stale,
 };
 use crate::verification::reputation::ValidatorReputation;
-use crate::verification_task::{can_assign, task_is_past_deadline, TaskRequirement};
-use crate::verification_task::{task_is_terminal, CAPABILITY_ANY};
-use crate::TerraError;
+use crate::verification_task::{CAPABILITY_ANY, task_is_terminal};
+use crate::verification_task::{TaskRequirement, can_assign, task_is_past_deadline};
 
 // ---------------------------------------------------------------------------
 // RFC-012 Phase 6 — dynamic routing
@@ -728,7 +728,7 @@ pub fn route_task(
 mod tests {
     use super::*;
     use crate::validator_profile::{
-        availability_status, capability_level, profile_tier, PRESENCE_TTL_SECS,
+        PRESENCE_TTL_SECS, availability_status, capability_level, profile_tier,
     };
 
     fn dummy_presence(lat: i32, lon: i32, now: i64) -> ValidatorPresence {

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{right_status, Rights, TerraError};
+use crate::{Rights, TerraError, right_status};
 
 /// 30-day warning window before expiry.
 pub const EXPIRING_WARNING_SECS: i64 = 30 * 24 * 3600;

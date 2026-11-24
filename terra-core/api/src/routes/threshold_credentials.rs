@@ -1,7 +1,7 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
@@ -76,12 +76,9 @@ pub struct NullifyCredentialRequest {
 // SQL constants
 // ---------------------------------------------------------------------------
 
-const CREDENTIAL_REQUEST_SELECT: &str =
-    "SELECT id, request_pubkey, holder_pubkey, zone_id, request_hash, status, created_at FROM credential_requests";
-const THRESHOLD_CREDENTIAL_SELECT: &str =
-    "SELECT id, credential_pubkey, holder_pubkey, zone_id, issued_at, expires_at, revoked, created_at FROM threshold_credentials";
-const CREDENTIAL_NULLIFIER_SELECT: &str =
-    "SELECT id, nullifier_pubkey, credential_pubkey, nullified_at, created_at FROM credential_nullifiers";
+const CREDENTIAL_REQUEST_SELECT: &str = "SELECT id, request_pubkey, holder_pubkey, zone_id, request_hash, status, created_at FROM credential_requests";
+const THRESHOLD_CREDENTIAL_SELECT: &str = "SELECT id, credential_pubkey, holder_pubkey, zone_id, issued_at, expires_at, revoked, created_at FROM threshold_credentials";
+const CREDENTIAL_NULLIFIER_SELECT: &str = "SELECT id, nullifier_pubkey, credential_pubkey, nullified_at, created_at FROM credential_nullifiers";
 
 // ---------------------------------------------------------------------------
 // Handlers

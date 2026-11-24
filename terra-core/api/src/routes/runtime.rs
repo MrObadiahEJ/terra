@@ -69,15 +69,13 @@ const LOD_LEVELS: [LodLevel; 5] = [
     LodLevel {
         level: 0,
         name: "global_overview",
-        description:
-            "Globe representation, major boundaries, low-resolution terrain, region manifests",
+        description: "Globe representation, major boundaries, low-resolution terrain, region manifests",
         max_distance_m: 1_000_000.0,
     },
     LodLevel {
         level: 1,
         name: "regional",
-        description:
-            "Regional manifests, terrain tiles, administrative boundaries, major infrastructure",
+        description: "Regional manifests, terrain tiles, administrative boundaries, major infrastructure",
         max_distance_m: 100_000.0,
     },
     LodLevel {

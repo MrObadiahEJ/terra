@@ -11,8 +11,8 @@
 //! receipt ledger, not a server renderer.
 
 use axum::extract::{Path, Query, State};
-use axum::http::header;
 use axum::http::StatusCode;
+use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, put};
 use axum::{Json, Router};
@@ -1518,10 +1518,12 @@ mod tests {
         assert_eq!(doc["properties"]["read_only"]["const"], true);
         let links = doc["links"].as_array().unwrap();
         assert!(links.iter().any(|l| l["rel"] == "geojson"));
-        assert!(doc["$defs"]["stop"]["required"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r == "position"));
+        assert!(
+            doc["$defs"]["stop"]["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r == "position")
+        );
     }
 }

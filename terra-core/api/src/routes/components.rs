@@ -9,7 +9,7 @@
 
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::Response;
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
@@ -22,8 +22,8 @@ use crate::auth::{OptionalSignedRequest, SignedRequest};
 use crate::error::AppError;
 use crate::state::AppState;
 
-use terra_geo::component_package::{validate_with_geometry, ComponentPackage};
 use terra_geo::ContentAddress;
+use terra_geo::component_package::{ComponentPackage, validate_with_geometry};
 
 pub fn router() -> Router<AppState> {
     Router::new()

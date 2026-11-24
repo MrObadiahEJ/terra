@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
 
-use crate::verification::quorum_config::QuorumConfig;
 use crate::TerraError;
+use crate::verification::quorum_config::QuorumConfig;
 
 // ---------------------------------------------------------------------------
 // Session status

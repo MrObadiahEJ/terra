@@ -665,13 +665,17 @@ mod tests {
             body_hash_hex: digest,
         };
 
-        assert!(signed
-            .verify_wallet(&owner_wallet, "POST", "/api/v1/identities")
-            .is_ok());
+        assert!(
+            signed
+                .verify_wallet(&owner_wallet, "POST", "/api/v1/identities")
+                .is_ok()
+        );
         let other_wallet = bs58::encode([8u8; 32]).into_string();
-        assert!(signed
-            .verify_wallet(&other_wallet, "POST", "/api/v1/identities")
-            .is_err());
+        assert!(
+            signed
+                .verify_wallet(&other_wallet, "POST", "/api/v1/identities")
+                .is_err()
+        );
     }
 
     /// A passation is only valid if the required threshold does not exceed the
@@ -722,7 +726,7 @@ mod tests {
         reconstituted.push(bs58::encode([99u8; 32]).into_string());
         reconstituted.push(bs58::encode([100u8; 32]).into_string());
         let reconstituted = reconstituted; // now 4 known validators
-                                           // Quorum reachable again with threshold 3 of 4.
+        // Quorum reachable again with threshold 3 of 4.
         assert!(threshold_ok(3, &reconstituted));
     }
 

@@ -1,7 +1,7 @@
 use axum::{
+    Json, Router,
     extract::{Path, State},
     routing::get,
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 
@@ -65,10 +65,8 @@ pub struct AllocateCountryRequest {
 
 const WORLD_REGISTRY_SELECT: &str =
     "SELECT id, pubkey, admin, created_at, updated_at FROM world_registries";
-const COUNTRY_ALLOCATION_SELECT: &str =
-    "SELECT id, world_registry_pubkey, country_code, approved_admin, created_at FROM country_allocations";
-const GENESIS_REQUEST_SELECT: &str =
-    "SELECT id, world_registry_pubkey, genesis_request_pubkey, country_code, requested_by, confirmations_count, distinct_countries, finalized, created_at FROM genesis_requests";
+const COUNTRY_ALLOCATION_SELECT: &str = "SELECT id, world_registry_pubkey, country_code, approved_admin, created_at FROM country_allocations";
+const GENESIS_REQUEST_SELECT: &str = "SELECT id, world_registry_pubkey, genesis_request_pubkey, country_code, requested_by, confirmations_count, distinct_countries, finalized, created_at FROM genesis_requests";
 
 // ---------------------------------------------------------------------------
 // Handlers
