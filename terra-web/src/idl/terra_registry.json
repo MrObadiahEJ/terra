@@ -8,6 +8,57 @@
   },
   "instructions": [
     {
+      "name": "accept_admin",
+      "discriminator": [
+        112,
+        42,
+        45,
+        90,
+        116,
+        181,
+        13,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "accept_escrow",
       "discriminator": [
         193,
@@ -699,6 +750,10 @@
         {
           "name": "new_owner",
           "type": "pubkey"
+        },
+        {
+          "name": "remedy_geometry_version",
+          "type": "pubkey"
         }
       ]
     },
@@ -1203,11 +1258,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i32"
+          "type": "i64"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i32"
+          "type": "i64"
         },
         {
           "name": "elevation_source",
@@ -1399,11 +1454,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i32"
+          "type": "i64"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i32"
+          "type": "i64"
         },
         {
           "name": "elevation_source",
@@ -6104,6 +6159,10 @@
               8
             ]
           }
+        },
+        {
+          "name": "bond_lamports",
+          "type": "u64"
         }
       ]
     },
@@ -7732,11 +7791,11 @@
         },
         {
           "name": "elevation_min_mm",
-          "type": "i32"
+          "type": "i64"
         },
         {
           "name": "elevation_max_mm",
-          "type": "i32"
+          "type": "i64"
         }
       ]
     },
@@ -13926,9 +13985,26 @@
         {
           "name": "validator_signer",
           "signer": true
+        },
+        {
+          "name": "instructions",
+          "docs": [
+            "(must be the Instructions sysvar holding this transaction's Ed25519",
+            "precompile attestation of the validator's endorsement signature)."
+          ]
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "slash_validator",
@@ -15571,6 +15647,62 @@
         {
           "name": "nonce",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [
+        42,
+        242,
+        66,
+        106,
+        228,
+        10,
+        111,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "registry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  108,
+                  105,
+                  100,
+                  97,
+                  116,
+                  111,
+                  114,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
         }
       ]
     },
@@ -18391,6 +18523,32 @@
     }
   ],
   "events": [
+    {
+      "name": "AdminTransferProposed",
+      "discriminator": [
+        203,
+        168,
+        175,
+        51,
+        239,
+        104,
+        20,
+        85
+      ]
+    },
+    {
+      "name": "AdminTransferred",
+      "discriminator": [
+        255,
+        147,
+        182,
+        5,
+        199,
+        217,
+        38,
+        179
+      ]
+    },
     {
       "name": "AppealDecided",
       "discriminator": [
@@ -21505,391 +21663,451 @@
     },
     {
       "code": 6193,
+      "name": "InsufficientCategoryCoverage",
+      "msg": "Fewer than 2 eligible validators carry the required capability category"
+    },
+    {
+      "code": 6194,
       "name": "RouteAccountMismatch",
       "msg": "Route remaining_accounts do not match candidate list"
     },
     {
-      "code": 6194,
+      "code": 6195,
       "name": "InvalidFraudReason",
       "msg": "Invalid fraud reason code"
     },
     {
-      "code": 6195,
+      "code": 6196,
       "name": "InvalidFraudStatus",
       "msg": "Fraud status does not allow this transition"
     },
     {
-      "code": 6196,
+      "code": 6197,
       "name": "SelfFraudReport",
       "msg": "Reporters cannot file fraud against themselves"
     },
     {
-      "code": 6197,
+      "code": 6198,
       "name": "CommitteeTooSmall",
       "msg": "Too few eligible well-reputed validators for a committee"
     },
     {
-      "code": 6198,
+      "code": 6199,
       "name": "ReviewAlreadyDecided",
       "msg": "Review already has a final decision"
     },
     {
-      "code": 6199,
+      "code": 6200,
       "name": "NotCommitteeMember",
       "msg": "Signer is not a member of this review committee"
     },
     {
-      "code": 6200,
+      "code": 6201,
       "name": "DuplicateCommitteeVote",
       "msg": "This committee member has already voted"
     },
     {
-      "code": 6201,
+      "code": 6202,
       "name": "ReviewNotFinalizable",
       "msg": "Not every committee member has voted yet"
     },
     {
-      "code": 6202,
+      "code": 6203,
       "name": "InvalidRestrictionStatus",
       "msg": "Invalid capability restriction status"
     },
     {
-      "code": 6203,
+      "code": 6204,
       "name": "RestrictionNotActive",
       "msg": "Restriction is not active"
     },
     {
-      "code": 6204,
+      "code": 6205,
       "name": "AppealWindowClosed",
       "msg": "Appeal window for this restriction has not opened"
     },
     {
-      "code": 6205,
+      "code": 6206,
       "name": "NotRestrictedWallet",
       "msg": "Signer is not the restricted wallet"
     },
     {
-      "code": 6206,
+      "code": 6207,
       "name": "InvalidAppealStatus",
       "msg": "Invalid fraud appeal status"
     },
     {
-      "code": 6207,
+      "code": 6208,
       "name": "RehabTooEarly",
       "msg": "Rehabilitation period for this restriction has not elapsed"
     },
     {
-      "code": 6208,
+      "code": 6209,
       "name": "CapabilityRestricted",
       "msg": "Active capability restriction blocks this route"
     },
     {
-      "code": 6209,
+      "code": 6210,
       "name": "InvalidFeeBps",
       "msg": "Protocol fee exceeds the maximum allowed bps"
     },
     {
-      "code": 6210,
+      "code": 6211,
       "name": "FeePolicyNotInitialized",
       "msg": "Fee policy has not been initialized"
     },
     {
-      "code": 6211,
+      "code": 6212,
       "name": "InvalidCoverageParams",
       "msg": "Invalid coverage incentive parameters"
     },
     {
-      "code": 6212,
+      "code": 6213,
       "name": "CoverageIncentiveNotInitialized",
       "msg": "Coverage incentive has not been initialized"
     },
     {
-      "code": 6213,
+      "code": 6214,
       "name": "QuoteAlreadyExists",
       "msg": "A resource quote already exists for this task"
     },
     {
-      "code": 6214,
+      "code": 6215,
       "name": "ResourceQuoteMissing",
       "msg": "Resource quote is missing for this task"
     },
     {
-      "code": 6215,
+      "code": 6216,
       "name": "EscrowAlreadyFunded",
       "msg": "Task escrow is already funded"
     },
     {
-      "code": 6216,
+      "code": 6217,
       "name": "TaskNotCompleted",
       "msg": "Task is not completed"
     },
     {
-      "code": 6217,
+      "code": 6218,
       "name": "AssignmentNotSubmitted",
       "msg": "Validator has not submitted a result for this task"
     },
     {
-      "code": 6218,
+      "code": 6219,
       "name": "EscrowNotFunded",
       "msg": "Task escrow is not funded or already fully released"
     },
     {
-      "code": 6219,
+      "code": 6220,
       "name": "RewardAlreadyClaimed",
       "msg": "This validator already claimed the task reward"
     },
     {
-      "code": 6220,
+      "code": 6221,
       "name": "EscrowNotRefundable",
       "msg": "Task is still active — escrow is not refundable"
     },
     {
-      "code": 6221,
+      "code": 6222,
       "name": "ClaimWindowNotClosed",
       "msg": "Claim window for this completed task is still open"
     },
     {
-      "code": 6222,
+      "code": 6223,
       "name": "NothingToRefund",
       "msg": "No refundable lamports remain in the escrow vault"
     },
     {
-      "code": 6223,
+      "code": 6224,
       "name": "DeviceMetadataTooLong",
       "msg": "Device metadata reference exceeds the maximum length"
     },
     {
-      "code": 6224,
+      "code": 6225,
       "name": "InvalidDeviceKey",
       "msg": "Device key must not be the zero key"
     },
     {
-      "code": 6225,
+      "code": 6226,
       "name": "InvalidDeviceStatus",
       "msg": "Invalid device status value"
     },
     {
-      "code": 6226,
+      "code": 6227,
       "name": "DeviceRevoked",
       "msg": "Device is revoked — this operation is no longer allowed"
     },
     {
-      "code": 6227,
+      "code": 6228,
       "name": "NotDeviceOwner",
       "msg": "Signer is not the device owner"
     },
     {
-      "code": 6228,
+      "code": 6229,
       "name": "InvalidJurisdictionPair",
       "msg": "Country pair is invalid (equal, reversed, or mismatched)"
     },
     {
-      "code": 6229,
+      "code": 6230,
       "name": "InvalidBindingStatus",
       "msg": "Invalid cross-border binding status value"
     },
     {
-      "code": 6230,
+      "code": 6231,
       "name": "SameJurisdiction",
       "msg": "Verification must span two different jurisdictions"
     },
     {
-      "code": 6231,
+      "code": 6232,
       "name": "JurisdictionMismatch",
       "msg": "Jurisdiction accounts or binding do not match the required pair"
     },
     {
-      "code": 6232,
+      "code": 6233,
       "name": "InvalidBindingExpiry",
       "msg": "Cross-border binding expiry must be in the future (or 0)"
     },
     {
-      "code": 6233,
+      "code": 6234,
       "name": "UndeclaredJurisdiction",
       "msg": "Validator profile or requirement jurisdiction is undeclared"
     },
     {
-      "code": 6234,
+      "code": 6235,
       "name": "InvalidSpatialDimension",
       "msg": "Spatial dimension must be 0 (2D), 1 (2.5D) or 2 (3D)"
     },
     {
-      "code": 6235,
+      "code": 6236,
       "name": "InvalidGeometrySource",
       "msg": "Unknown geometry source"
     },
     {
-      "code": 6236,
+      "code": 6237,
       "name": "GeometryVersionMismatch",
       "msg": "Geometry version index or parent asset does not match"
     },
     {
-      "code": 6237,
+      "code": 6238,
       "name": "GeometryVersionsFull",
       "msg": "Spatial asset has reached the maximum number of geometry versions"
     },
     {
-      "code": 6238,
+      "code": 6239,
       "name": "InvalidElevationRange",
       "msg": "Elevation range is invalid (min > max)"
     },
     {
-      "code": 6239,
+      "code": 6240,
       "name": "GeometryAlreadyVerified",
       "msg": "Geometry version is already verified"
     },
     {
-      "code": 6240,
+      "code": 6241,
       "name": "InvalidElevationSource",
       "msg": "Unknown elevation source, or provenance does not match the layer dimension"
     },
     {
-      "code": 6241,
+      "code": 6242,
       "name": "GeometryAlreadyAttested",
       "msg": "Validator has already attested this geometry version"
     },
     {
-      "code": 6242,
+      "code": 6243,
       "name": "EmptyEvidenceManifest",
       "msg": "Evidence manifest has no artifacts to anchor a version from"
     },
     {
-      "code": 6243,
+      "code": 6244,
       "name": "GeometryQuorumFull",
       "msg": "Geometry version quorum list has no free attestation slot"
     },
     {
-      "code": 6244,
+      "code": 6245,
       "name": "InvalidModelFormat",
       "msg": "Unknown 3D model format, or format is the UNKNOWN placeholder"
     },
     {
-      "code": 6245,
+      "code": 6246,
       "name": "ThreeDModelsFull",
       "msg": "Spatial asset has reached the maximum number of 3D models"
     },
     {
-      "code": 6246,
+      "code": 6247,
       "name": "ModelGeometryVersionMismatch",
       "msg": "Model geometry version does not exist in the asset's version history"
     },
     {
-      "code": 6247,
+      "code": 6248,
       "name": "ThreeDModelAlreadyVerified",
       "msg": "3D model is already verified"
     },
     {
-      "code": 6248,
+      "code": 6249,
       "name": "SpatialSnapshotsFull",
       "msg": "Spatial asset has reached the maximum number of snapshots"
     },
     {
-      "code": 6249,
+      "code": 6250,
       "name": "InvalidSnapshotLabel",
       "msg": "Snapshot label is too long"
     },
     {
-      "code": 6250,
+      "code": 6251,
       "name": "InvalidRequestDescription",
       "msg": "Request description is too long"
     },
     {
-      "code": 6251,
+      "code": 6252,
       "name": "InvalidRemedyType",
       "msg": "Invalid remedy type"
     },
     {
-      "code": 6252,
+      "code": 6253,
       "name": "InvalidRestrictionType",
       "msg": "Invalid restriction type"
     },
     {
-      "code": 6253,
+      "code": 6254,
       "name": "RequestNotOpen",
       "msg": "Request is not open"
     },
     {
-      "code": 6254,
+      "code": 6255,
       "name": "RequestExpired",
       "msg": "Request has expired"
     },
     {
-      "code": 6255,
+      "code": 6256,
       "name": "InvalidReviewVote",
       "msg": "Invalid review vote"
     },
     {
-      "code": 6256,
+      "code": 6257,
       "name": "AlreadyVoted",
       "msg": "Already voted on this case"
     },
     {
-      "code": 6257,
+      "code": 6258,
       "name": "CaseAlreadyDecided",
       "msg": "Case is already decided"
     },
     {
-      "code": 6258,
+      "code": 6259,
       "name": "ReviewerInsufficientReputation",
       "msg": "Reviewer has insufficient reputation"
     },
     {
-      "code": 6259,
+      "code": 6260,
       "name": "SecurityQuorumNotReached",
       "msg": "Security quorum not reached"
     },
     {
-      "code": 6260,
+      "code": 6261,
       "name": "DecisionNotAppealable",
       "msg": "Decision is not appealable"
     },
     {
-      "code": 6261,
+      "code": 6262,
       "name": "ReasonTooLong",
       "msg": "Reason is too long"
     },
     {
-      "code": 6262,
+      "code": 6263,
       "name": "AppealAlreadyDecided",
       "msg": "Appeal is already decided"
     },
     {
-      "code": 6263,
+      "code": 6264,
       "name": "AppealDecisionMismatch",
       "msg": "Appeal decision account does not match appeal"
     },
     {
-      "code": 6264,
+      "code": 6265,
       "name": "ProtectionAlreadyActive",
       "msg": "Emergency protection is already active"
     },
     {
-      "code": 6265,
+      "code": 6266,
       "name": "ProtectionExpired",
       "msg": "Emergency protection has expired"
     },
     {
-      "code": 6266,
+      "code": 6267,
       "name": "CandidateCannotBeOracle",
       "msg": "Candidate validator cannot serve as VRF oracle"
     },
     {
-      "code": 6267,
+      "code": 6268,
       "name": "RequesterCannotBeOracle",
       "msg": "Requester cannot serve as VRF oracle"
     },
     {
-      "code": 6268,
+      "code": 6269,
       "name": "InvalidVrfRandomness",
       "msg": "Invalid VRF oracle signature or forged randomness"
     },
     {
-      "code": 6269,
+      "code": 6270,
       "name": "VrfAuthorityMismatch",
       "msg": "VRF oracle is not the allowlisted authority"
+    },
+    {
+      "code": 6271,
+      "name": "InvalidBond",
+      "msg": "Dispute bond must be greater than zero"
+    },
+    {
+      "code": 6272,
+      "name": "PeerConsensusRequired",
+      "msg": "This action requires peer-consensus endorsement"
+    },
+    {
+      "code": 6273,
+      "name": "InvalidAdminTransfer",
+      "msg": "Invalid admin transfer (zero key, same key, or no pending transfer)"
     }
   ],
   "types": [
+    {
+      "name": "AdminTransferProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AdminTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "registry",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_admin",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
     {
       "name": "AmalgamationRecord",
       "docs": [
@@ -22948,6 +23166,15 @@
             }
           },
           {
+            "name": "signatures",
+            "docs": [
+              "Concatenated 64-byte Ed25519 signatures over",
+              "[`credential_endorsement_message`], in the same order as `signers`.",
+              "These are the offline-verifiable authorization transcript."
+            ],
+            "type": "bytes"
+          },
+          {
             "name": "finalized",
             "type": "bool"
           },
@@ -23929,7 +24156,8 @@
           {
             "name": "outcome",
             "docs": [
-              "Outcome of adjudication (OWNER_WINS or OWNER_LOSES). Set at adjudication."
+              "Outcome of adjudication (OWNER_WINS / OWNER_LOSES / BOUNDARY_ADJUSTED /",
+              "OVERLAP_SPLIT / EASEMENT_RECOGNIZED / COEXISTENCE). Set at adjudication."
             ],
             "type": "u8"
           },
@@ -23937,6 +24165,36 @@
             "name": "new_owner",
             "docs": [
               "New owner if outcome is OWNER_LOSES. Set at adjudication."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bond_lamports",
+            "docs": [
+              "Bond lamports posted by the filer at filing (permissionless gate).",
+              "Refunded on filer win / partial remedy; slashed on filer loss."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bond_refund_to",
+            "docs": [
+              "Wallet to receive the bond refund (defaults to filer at filing)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bond_resolved",
+            "docs": [
+              "Whether the bond has been refunded or slashed (resolved)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "remedy_geometry_version",
+            "docs": [
+              "Geometry-version remedy reference for partial remedies",
+              "(BOUNDARY_ADJUSTED / OVERLAP_SPLIT / EASEMENT_RECOGNIZED)."
             ],
             "type": "pubkey"
           }
@@ -23967,6 +24225,10 @@
           {
             "name": "adjudicated_at",
             "type": "i64"
+          },
+          {
+            "name": "remedy_geometry_version",
+            "type": "pubkey"
           }
         ]
       }
@@ -24024,6 +24286,10 @@
           {
             "name": "declared_count",
             "type": "u8"
+          },
+          {
+            "name": "bond_lamports",
+            "type": "u64"
           }
         ]
       }
@@ -24573,7 +24839,8 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Storage reference (IPFS CID, URL, or content address)."
+              "Storage reference (IPFS CID, URL, or content address). Widened to 256",
+              "chars so signed URLs (S3 pre-signed, R2, gateway tokens) fit."
             ],
             "type": "string"
           },
@@ -25325,7 +25592,7 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 128 chars."
+              "Off-chain pointer (PostGIS row / IPFS CID / storage URL), <= 512 chars."
             ],
             "type": "string"
           },
@@ -25372,11 +25639,11 @@
               "This version's elevation envelope, millimetres (both 0 when",
               "`elevation_source == elevation_source::NONE`)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_source",
@@ -25464,11 +25731,11 @@
           },
           {
             "name": "elevation_min_mm",
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_source",
@@ -28969,14 +29236,14 @@
             "docs": [
               "Minimum elevation of the asset envelope, millimetres (may be < 0)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_max_mm",
             "docs": [
               "Maximum elevation of the asset envelope, millimetres (>= min)."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "geometry_version_count",
@@ -29096,11 +29363,11 @@
             "docs": [
               "Asset elevation envelope copied at creation, millimetres."
             ],
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "elevation_max_mm",
-            "type": "i32"
+            "type": "i64"
           },
           {
             "name": "label",
@@ -30049,7 +30316,8 @@
           {
             "name": "storage_reference",
             "docs": [
-              "Off-chain pointer (tileset URL / IPFS CID / storage key), <= 128 chars."
+              "Off-chain pointer (tileset URL / IPFS CID / storage key). Widened to",
+              "256 chars to accommodate signed URLs (CIDs alone fit in 128)."
             ],
             "type": "string"
           },
@@ -30226,6 +30494,12 @@
           },
           {
             "name": "aggregate_signature",
+            "docs": [
+              "Concatenated 64-byte Ed25519 signatures over the canonical",
+              "[`credential_endorsement_message`], in the same order as `signers`.",
+              "Anyone can verify these offline against `signers[i]`, so the credential",
+              "is a real multi-signature attestation rather than a bare hash list."
+            ],
             "type": "bytes"
           },
           {
@@ -31003,6 +31277,14 @@
             "name": "admin",
             "docs": [
               "Bootstrap admin who can add validators unilaterally in bootstrap mode."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "docs": [
+              "Two-step admin handoff: proposed successor, set by `transfer_admin` and",
+              "claimed by `accept_admin`. Zero means no transfer is pending."
             ],
             "type": "pubkey"
           },
