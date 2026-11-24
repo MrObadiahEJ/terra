@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-23. Previous ledger archived at
+Last reconciled: 2026-11-24. Previous ledger archived at
 `work/archive/CURRENT-2026-11-16.md` (sprints 001–062).
 
 ## Objective
@@ -19,7 +19,7 @@ with no “SIMULATION” chips on any step of that path.
 | **A** | Repeatable Surfpool localnet + full lifecycle smoke (parcel → rights → claim → evidence → observation → attestation → quorum → task → fund → route → reward → geometry → snapshot → escrow → dispute) | **delivered; CI green** | `terra-core/tests/localnet_e2e.ts` 9/9 local; `scripts/run-localnet-e2e.sh`; CI run `43855396029` green (all five jobs incl. Localnet Lifecycle E2E); commit `fd89d89`; note `sprints/056-sprint-a-localnet-lifecycle.md` |
 | **B** | Real write path: delete `tx_prep.rs`, IDL/client `program.methods`, fix identity PDAs, sync IDL/types, wire full UI loop | **delivered** | `tx_prep.rs` deleted; `program.methods` write path; identity PDA fix (`identityPda` → `terra_identity`); IDL sync (`idl/terra_registry.json` 176 instructions, `idl/terra_identity.json` 8); commit `76d85df`; note `sprints/057-sprint-b-real-write-path.md` |
 | **C** | Chain indexer: `api/src/indexer.rs`, RPC in `AppState`, `chain_verified` mirror upserts, DB-vs-chain audit | **delivered** | `api/src/indexer.rs`; migration `0051_chain_verified_columns.sql`; `GET /mirror/audit` covers 7 tables + `verification_attestations_onchain`; commit `ac754f6`; note `sprints/058-sprint-c-chain-indexer.md` |
-| **D** | Devnet hosting: real deploy, hosted API + managed PostGIS + private RPC, env-driven clients, Pages on hosted API, neutral globe focus | planned — **Q-001** | `sprints/059-sprint-d-devnet-hosting.md` |
+| **D** | Devnet hosting: real deploy, hosted API + managed PostGIS + private RPC, env-driven clients, Pages on hosted API, neutral globe focus | **in progress / partially delivered** | Render API `https://terra-gscx.onrender.com` healthy; Pages `https://mrobadiahej.github.io/terra/`; devnet programs deployed (registry `GaEDbk...bage`, identity `HyjpaH...Vo6p`); Supabase `qgtstweelyankeqftepx` migrated 0001–0056; browser-wallet E2E still pending; `sprints/059-sprint-d-devnet-hosting.md` |
 | **E** | Routing/economics hardening: VRF-verified routing (server-side `GET /geo/route` with `from_node_id`/`to_node_id` topology), anti-spam staging bond, premium-category routing, reliability derived from challenge results | **partially delivered** | `geo-engine/src/reach.rs` `route_between` Dijkstra; `api/migrations/0049_provider_content_address.sql`; `storage_providers.stake_bond` + `wallet_address` (migration 0053); `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes; commits `8cd7aa9`, `0f0a052`; note `sprints/060-sprint-e-routing-economics.md` |
 | **F** | Evidence durability: IPFS backend option (`IPFS_API_URL`), quarantine + TTL columns on `evidence_uploads`, `StorageBackend` enum (`Local`/`Ipfs`), honest labeling until paid | **delivered** | `api/src/storage.rs` (IPFS backend, quarantine/TTL); migration `0053_evidence_durability_and_provider_economy.sql`; commit `0f0a052`; note `sprints/061-sprint-f-evidence-durability.md` |
 | **G** | Ratified vision features: institutional credentials, residency attestation, lien/encumbrance, one real reconstruction job hashed on-chain | planned — **Q-003/Q-004 ratification; Q-005 hard gate** | `sprints/062-sprint-g-ratified-vision.md` |
@@ -40,10 +40,15 @@ with no “SIMULATION” chips on any step of that path.
 
 ## Known blockers
 
-- **Q-001 devnet funding** — deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`
-  holds 0 SOL. Blocks Sprint D's real devnet deploy and every "stranger on
-  devnet" exit criterion. Fund it at https://faucet.solana.com. Sprint A
-  (local), B, C, E (partial), and F are zero-SOL and not blocked.
+- **Q-001 devnet funding / Sprint D hosting** — deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`
+  is funded (~0.09 SOL on devnet at last check) and programs are deployed
+  (`terra_registry` `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage`,
+  `terra_identity` `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p`). Hosted API
+  is live on Render (`https://terra-gscx.onrender.com`, `/health` OK, DB up),
+  frontend on GitHub Pages (`https://mrobadiahej.github.io/terra/`), Supabase
+  project `qgtstweelyankeqftepx` migrated through 0056. Remaining Sprint D
+  work: full founder signoff on “stranger on devnet” exit criteria and
+  browser-wallet E2E validation. Keep faucet balance topped up for demo txs.
 - **Supabase project** — `qgtstweelyankeqftepx`; enable `postgis` + `pgcrypto`
   extensions, copy pooled `DATABASE_URL` + `?sslmode=require` into Render.
 - **Helius devnet RPC** — use `https://devnet.helius-rpc.com/?api-key=<KEY>&rebate-address=AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3` (generate your own key; revoke any previously published key).
