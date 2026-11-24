@@ -103,12 +103,12 @@ echo ""
 
 # Deploy terra_identity first (terra_registry depends on it)
 echo "==> Deploying terra_identity..."
-anchor deploy --provider.cluster "$CLUSTER" --program-name terra_identity 2>&1
+anchor deploy --provider.cluster "$CLUSTER" --provider.wallet "$DEPLOY_KEYPAIR" --program-name terra_identity 2>&1
 echo ""
 
 # Deploy terra_registry
 echo "==> Deploying terra_registry..."
-anchor deploy --provider.cluster "$CLUSTER" --program-name terra_registry 2>&1
+anchor deploy --provider.cluster "$CLUSTER" --provider.wallet "$DEPLOY_KEYPAIR" --program-name terra_registry 2>&1
 echo ""
 
 echo "==> Deployment complete!"
