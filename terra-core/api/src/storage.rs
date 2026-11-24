@@ -389,15 +389,15 @@ async fn load_ipfs(
     // Try gateway first for faster retrieval
     if let Some(gw) = gateway_url {
         let url = format!("{}/ipfs/{}", gw.trim_end_matches('/'), cid);
-        if let Ok(resp) = client.get(&url).send().await {
-            if resp.status().is_success() {
-                return Ok(Some(
-                    resp.bytes()
-                        .await
-                        .context("reading ipfs gateway bytes")?
-                        .to_vec(),
-                ));
-            }
+        if let Ok(resp) = client.get(&url).send().await
+            && resp.status().is_success()
+        {
+            return Ok(Some(
+                resp.bytes()
+                    .await
+                    .context("reading ipfs gateway bytes")?
+                    .to_vec(),
+            ));
         }
     }
 
@@ -761,15 +761,15 @@ async fn delete_s3(
 
 pub fn from_env() -> Result<StorageBackend> {
     // IPFS takes precedence when IPFS_API_URL is set.
-    if let Ok(api_url) = std::env::var("IPFS_API_URL") {
-        if !api_url.is_empty() {
-            let gateway_url = std::env::var("IPFS_GATEWAY_URL").ok();
-            tracing::info!(api_url = %api_url, "evidence storage: ipfs");
-            return Ok(StorageBackend::Ipfs {
-                api_url,
-                gateway_url,
-            });
-        }
+    if let Ok(api_url) = std::env::var("IPFS_API_URL")
+        && !api_url.is_empty()
+    {
+        let gateway_url = std::env::var("IPFS_GATEWAY_URL").ok();
+        tracing::info!(api_url = %api_url, "evidence storage: ipfs");
+        return Ok(StorageBackend::Ipfs {
+            api_url,
+            gateway_url,
+        });
     }
 
     // S3-compatible backend (Filebase, R2, MinIO, AWS) when configured.
@@ -780,18 +780,18 @@ pub fn from_env() -> Result<StorageBackend> {
         std::env::var("S3_ENDPOINT"),
         std::env::var("S3_ACCESS_KEY"),
         std::env::var("S3_SECRET_KEY"),
-    ) {
-        if !bucket.is_empty() && !endpoint.is_empty() {
-            let region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
-            tracing::info!(bucket = %bucket, endpoint = %endpoint, "evidence storage: s3");
-            return Ok(StorageBackend::S3 {
-                bucket,
-                region,
-                endpoint,
-                access_key,
-                secret_key,
-            });
-        }
+    ) && !bucket.is_empty()
+        && !endpoint.is_empty()
+    {
+        let region = std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string());
+        tracing::info!(bucket = %bucket, endpoint = %endpoint, "evidence storage: s3");
+        return Ok(StorageBackend::S3 {
+            bucket,
+            region,
+            endpoint,
+            access_key,
+            secret_key,
+        });
     }
 
     let root =

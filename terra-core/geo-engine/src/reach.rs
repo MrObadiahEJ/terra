@@ -459,10 +459,10 @@ pub fn route_between(network: &NetworkGraph, from: Coord<f64>, to: Coord<f64>) -
                     None
                 }
             });
-        if let Some(id) = found {
-            if segment_ids.last() != Some(&id) {
-                segment_ids.push(id);
-            }
+        if let Some(id) = found
+            && segment_ids.last() != Some(&id)
+        {
+            segment_ids.push(id);
         }
     }
 
@@ -630,7 +630,7 @@ mod tests {
         assert_eq!(route.geometry.first(), Some(&Coord { x: 10.0, y: 0.0 }));
         assert_eq!(route.geometry.last(), Some(&Coord { x: 12.0, y: 0.0 }));
         assert!(route.distance_m > 0.0);
-        assert!(route.segment_ids.len() >= 1);
+        assert!(!route.segment_ids.is_empty());
     }
 
     #[test]

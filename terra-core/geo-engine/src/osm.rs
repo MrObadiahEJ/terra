@@ -125,20 +125,20 @@ pub fn read_osm_pbf(path: &Path) -> Result<OsmData> {
                     refs.clone(),
                 ));
             }
-            if let Some(highway) = tags.get("highway") {
-                if is_road_highway(highway) {
-                    let oneway = matches!(
-                        tags.get("oneway").map(String::as_str),
-                        Some("yes") | Some("true") | Some("1")
-                    );
-                    data.roads.push(RoadWay {
-                        id: way.id(),
-                        name: tags.get("name").cloned(),
-                        highway: highway.clone(),
-                        oneway,
-                        nodes: refs,
-                    });
-                }
+            if let Some(highway) = tags.get("highway")
+                && is_road_highway(highway)
+            {
+                let oneway = matches!(
+                    tags.get("oneway").map(String::as_str),
+                    Some("yes") | Some("true") | Some("1")
+                );
+                data.roads.push(RoadWay {
+                    id: way.id(),
+                    name: tags.get("name").cloned(),
+                    highway: highway.clone(),
+                    oneway,
+                    nodes: refs,
+                });
             }
         }
         _ => {}

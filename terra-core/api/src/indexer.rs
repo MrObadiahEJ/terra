@@ -1174,10 +1174,10 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
     let mut parcel_holder: std::collections::HashMap<[u8; 32], [u8; 32]> =
         std::collections::HashMap::new();
     for (_pubkey, account) in &accounts {
-        if let Some(rights) = parse_rights(&account.data) {
-            if rights.rights_kind == RIGHTS_KIND_OWNERSHIP {
-                parcel_holder.insert(rights.parcel, rights.holder);
-            }
+        if let Some(rights) = parse_rights(&account.data)
+            && rights.rights_kind == RIGHTS_KIND_OWNERSHIP
+        {
+            parcel_holder.insert(rights.parcel, rights.holder);
         }
     }
 

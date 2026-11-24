@@ -395,7 +395,7 @@ async fn assign_reviewer_ok() {
 
     // Create registry (required by initialize_validator_reputation)
     let (registry_pda, _) = registry_pda();
-    let mut data = discriminator("global", "create_registry").to_vec();
+    let data = discriminator("global", "create_registry").to_vec();
     let ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
@@ -448,7 +448,7 @@ async fn assign_reviewer_ok() {
     // Initialize validator reputation for reviewer
     let reviewer_reputation_pda =
         Pubkey::find_program_address(&[b"validator_reputation", reviewer.as_ref()], &PROGRAM_ID).0;
-    let mut data = discriminator("global", "initialize_validator_reputation").to_vec();
+    let data = discriminator("global", "initialize_validator_reputation").to_vec();
     let ix = Instruction {
         program_id: PROGRAM_ID,
         accounts: vec![
@@ -463,7 +463,7 @@ async fn assign_reviewer_ok() {
     process_with(&mut ctx, &payer, &[&payer], ix).await.unwrap();
 
     // Assign reviewer
-    let mut data = discriminator("global", "assign_reviewer").to_vec();
+    let data = discriminator("global", "assign_reviewer").to_vec();
 
     let ix = Instruction {
         program_id: PROGRAM_ID,

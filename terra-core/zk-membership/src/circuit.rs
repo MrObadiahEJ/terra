@@ -81,10 +81,10 @@ impl ConstraintSynthesizer<Fr> for MembershipCircuit {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        if let Some(statement) = &self.statement {
-            if statement.len() != OWNERSHIP_STATEMENT_LEN {
-                return Err(SynthesisError::Unsatisfiable);
-            }
+        if let Some(statement) = &self.statement
+            && statement.len() != OWNERSHIP_STATEMENT_LEN
+        {
+            return Err(SynthesisError::Unsatisfiable);
         }
         for (byte, expected) in statement_bytes
             .iter()

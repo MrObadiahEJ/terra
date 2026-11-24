@@ -121,19 +121,18 @@ pub fn file_challenge(
     // Close/transition any active VerificationSession for this claim.
     if let Ok(Some((session_key, mut session_account))) =
         try_load_session(ctx.remaining_accounts, &claim.key())
+        && !VerificationSession::is_terminal(session_account.status)
     {
-        if !VerificationSession::is_terminal(session_account.status) {
-            session_account.status = session_status::CHALLENGED;
-            session_account.closed_at = now;
-            session_account.updated_at = now;
+        session_account.status = session_status::CHALLENGED;
+        session_account.closed_at = now;
+        session_account.updated_at = now;
 
-            emit!(crate::VerificationSessionClosed {
-                session: session_key,
-                claim: session_account.claim,
-                status: session_status::CHALLENGED,
-                closed_at: now,
-            });
-        }
+        emit!(crate::VerificationSessionClosed {
+            session: session_key,
+            claim: session_account.claim,
+            status: session_status::CHALLENGED,
+            closed_at: now,
+        });
     }
 
     emit!(crate::ChallengeFiled {
@@ -226,31 +225,29 @@ pub fn vote_challenge(ctx: Context<crate::VoteChallenge>, vote_uphold: bool) -> 
     }
 
     // On resolution, transition any active VerificationSession.
-    if resolved {
-        if let Ok(Some((session_key, mut session_account))) =
+    if resolved
+        && let Ok(Some((session_key, mut session_account))) =
             try_load_session(ctx.remaining_accounts, &claim_key)
-        {
-            if !VerificationSession::is_terminal(session_account.status) {
-                // UPHELD → CHALLENGED (session was for a verified claim that
-                // is now rejected). OVERTURNED → QUORUM_REACHED (claim stays
-                // verified).
-                let session_final = if final_outcome == challenge_status::UPHELD {
-                    session_status::CHALLENGED
-                } else {
-                    session_status::QUORUM_REACHED
-                };
-                session_account.status = session_final;
-                session_account.closed_at = now;
-                session_account.updated_at = now;
+        && !VerificationSession::is_terminal(session_account.status)
+    {
+        // UPHELD → CHALLENGED (session was for a verified claim that
+        // is now rejected). OVERTURNED → QUORUM_REACHED (claim stays
+        // verified).
+        let session_final = if final_outcome == challenge_status::UPHELD {
+            session_status::CHALLENGED
+        } else {
+            session_status::QUORUM_REACHED
+        };
+        session_account.status = session_final;
+        session_account.closed_at = now;
+        session_account.updated_at = now;
 
-                emit!(crate::VerificationSessionClosed {
-                    session: session_key,
-                    claim: session_account.claim,
-                    status: session_final,
-                    closed_at: now,
-                });
-            }
-        }
+        emit!(crate::VerificationSessionClosed {
+            session: session_key,
+            claim: session_account.claim,
+            status: session_final,
+            closed_at: now,
+        });
     }
 
     emit!(crate::ChallengeVoteRecorded {

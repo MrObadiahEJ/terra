@@ -413,19 +413,19 @@ fn registry_program_id() -> solana_sdk::pubkey::Pubkey {
 /// on-chain id (the UUID simple form is never stored — `gen_random_uuid()`
 /// text output always carries dashes).
 fn parse_parcel_lookup(parcel_id: &str) -> (Option<uuid::Uuid>, Option<String>) {
-    if parcel_id.contains('-') {
-        if let Ok(u) = uuid::Uuid::parse_str(parcel_id) {
-            return (Some(u), None);
-        }
+    if parcel_id.contains('-')
+        && let Ok(u) = uuid::Uuid::parse_str(parcel_id)
+    {
+        return (Some(u), None);
     }
     if parcel_id.len() == 64 && parcel_id.chars().all(|c| c.is_ascii_hexdigit()) {
         return (None, Some(parcel_id.to_lowercase()));
     }
-    if let Ok(bytes) = bs58::decode(parcel_id).into_vec() {
-        if bytes.len() == 32 {
-            let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-            return (None, Some(hex));
-        }
+    if let Ok(bytes) = bs58::decode(parcel_id).into_vec()
+        && bytes.len() == 32
+    {
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        return (None, Some(hex));
     }
     (None, Some(parcel_id.to_string()))
 }
@@ -717,12 +717,12 @@ fn validate_provenance(input: &CompleteInput) -> Result<(), AppError> {
         ("model_name", input.model_name.as_deref()),
         ("model_version", input.model_version.as_deref()),
     ] {
-        if let Some(v) = value {
-            if v.trim().is_empty() || v.trim().len() > MAX_PROVENANCE_LEN {
-                return Err(AppError::bad_request(format!(
-                    "{label} must be 1..={MAX_PROVENANCE_LEN} characters when present"
-                )));
-            }
+        if let Some(v) = value
+            && (v.trim().is_empty() || v.trim().len() > MAX_PROVENANCE_LEN)
+        {
+            return Err(AppError::bad_request(format!(
+                "{label} must be 1..={MAX_PROVENANCE_LEN} characters when present"
+            )));
         }
     }
     let has_model_fields = input.model_provider.is_some()
@@ -742,12 +742,12 @@ fn validate_provenance(input: &CompleteInput) -> Result<(), AppError> {
             "AI provenance requires model_name and model_version",
         ));
     }
-    if let Some(c) = input.model_confidence {
-        if !c.is_finite() || !(0.0..=1.0).contains(&c) {
-            return Err(AppError::bad_request(
-                "model_confidence must be within 0.0..=1.0",
-            ));
-        }
+    if let Some(c) = input.model_confidence
+        && (!c.is_finite() || !(0.0..=1.0).contains(&c))
+    {
+        return Err(AppError::bad_request(
+            "model_confidence must be within 0.0..=1.0",
+        ));
     }
     Ok(())
 }

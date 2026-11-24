@@ -344,13 +344,12 @@ pub fn verify_precompiled_ed25519(
         if ix.program_id != solana_program::ed25519_program::ID {
             continue;
         }
-        if let Some((pk, sig, msg)) = parse_ed25519_self_attestation(&ix.data, i) {
-            if pk == expected_signer.as_ref()
-                && msg == expected_message
-                && sig.as_slice() == expected_signature
-            {
-                return Ok(());
-            }
+        if let Some((pk, sig, msg)) = parse_ed25519_self_attestation(&ix.data, i)
+            && pk == expected_signer.as_ref()
+            && msg == expected_message
+            && sig.as_slice() == expected_signature
+        {
+            return Ok(());
         }
     }
     err!(TerraError::InvalidProofData)

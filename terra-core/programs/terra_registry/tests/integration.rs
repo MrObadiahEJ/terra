@@ -20,11 +20,10 @@ use terra_registry::{
     verification::{
         AuditEntry, Challenge, Claim, Evidence, GuardianClaim, Observation, Observer, QuorumConfig,
         QuorumTally, ValidatorReputation, VerificationAttestation, VerificationSession,
-        attestation::attestation_result, audit_trail::audit_action, challenge_status,
-        claim::claim_status, claim::claim_type, evidence::evidence_type,
-        guardian_claim::guardian_claim_status, guardian_claim::guardian_type,
-        observer::observer_status, quorum_voting::quorum_vote_choice, session::session_status,
-        validator_status, vc_type,
+        audit_trail::audit_action, challenge_status, claim::claim_status, claim::claim_type,
+        evidence::evidence_type, guardian_claim::guardian_claim_status,
+        guardian_claim::guardian_type, observer::observer_status,
+        quorum_voting::quorum_vote_choice, session::session_status, validator_status,
     },
     world_registry,
     zk::{self, NullifierRecord, OwnershipRoot, ZoneSet},
@@ -439,12 +438,11 @@ fn assert_program_so_fresh() {
                     let p = e.path();
                     if p.is_dir() {
                         stack.push(p);
-                    } else if p.extension().is_some_and(|x| x == "rs") {
-                        if let Ok(m) = e.metadata().and_then(|m| m.modified()) {
-                            if m > newest {
-                                newest = m;
-                            }
-                        }
+                    } else if p.extension().is_some_and(|x| x == "rs")
+                        && let Ok(m) = e.metadata().and_then(|m| m.modified())
+                        && m > newest
+                    {
+                        newest = m;
                     }
                 }
             }
@@ -2549,7 +2547,7 @@ async fn slash_and_dismiss_require_admin() {
     // Reporter (payer) files against the offender; bond is really moved.
     let evidence = [61u8; 32];
     let (report, _) = {
-        let r = Pubkey::find_program_address(
+        Pubkey::find_program_address(
             &[
                 b"slashing_report".as_ref(),
                 pool.as_ref(),
@@ -2557,8 +2555,7 @@ async fn slash_and_dismiss_require_admin() {
                 evidence.as_ref(),
             ],
             &PROGRAM_ID,
-        );
-        r
+        )
     };
     let reporter_before = ctx.banks_client.get_balance(payer.pubkey()).await.unwrap();
     let mut data = discriminator("global", "report_equivocation").to_vec();
@@ -7302,7 +7299,7 @@ async fn verification_full_e2e() {
                 AccountMeta::new_readonly(rep_a, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -7317,8 +7314,7 @@ async fn verification_full_e2e() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -7346,7 +7342,7 @@ async fn verification_full_e2e() {
                 AccountMeta::new_readonly(rep_b, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -7361,8 +7357,7 @@ async fn verification_full_e2e() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -7526,7 +7521,7 @@ async fn verify_claim_quorum_not_reached() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -7541,8 +7536,7 @@ async fn verify_claim_quorum_not_reached() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -7975,7 +7969,7 @@ async fn verified_claim_ok(
                     AccountMeta::new_readonly(rep_pk, false),
                 ],
                 data: {
-                    let d = attestation_instruction_data(
+                    attestation_instruction_data(
                         verification::vc_type::VERIFICATION_ATTESTATION,
                         &claim_pk,
                         1_700_000_000,
@@ -7990,8 +7984,7 @@ async fn verified_claim_ok(
                             1_800_000_000,
                         ),
                         false,
-                    );
-                    d
+                    )
                 },
             },
         )
@@ -8208,7 +8201,7 @@ async fn challenge_file_and_vote() {
                 AccountMeta::new_readonly(rep_v1, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -8223,8 +8216,7 @@ async fn challenge_file_and_vote() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -8729,7 +8721,7 @@ async fn jailed_validator_cannot_attest() {
                 AccountMeta::new_readonly(rep_pk, false), // remaining: reputation
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -8744,8 +8736,7 @@ async fn jailed_validator_cannot_attest() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -8844,7 +8835,7 @@ async fn p0_5_attestation_requires_reputation_account() {
                 AccountMeta::new_readonly(system_program_id(), false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -8859,8 +8850,7 @@ async fn p0_5_attestation_requires_reputation_account() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -8952,7 +8942,7 @@ async fn p0_5_attestation_with_active_reputation_succeeds() {
                 AccountMeta::new_readonly(rep_pk, false), // remaining: reputation
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -8967,8 +8957,7 @@ async fn p0_5_attestation_with_active_reputation_succeeds() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -9089,7 +9078,7 @@ async fn p0_5_attestation_rejects_jailed_validator() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -9104,8 +9093,7 @@ async fn p0_5_attestation_rejects_jailed_validator() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -9204,15 +9192,14 @@ async fn p0_6_attestation_rejects_non_canonical_digest() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
                     1_800_000_000,
                     &[42u8; 32], // arbitrary junk, not the canonical SD-JWT digest
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -10318,7 +10305,7 @@ async fn duplicate_attestation_same_validator_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -10333,8 +10320,7 @@ async fn duplicate_attestation_same_validator_fails() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -10359,7 +10345,7 @@ async fn duplicate_attestation_same_validator_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -10374,8 +10360,7 @@ async fn duplicate_attestation_same_validator_fails() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -10530,7 +10515,7 @@ async fn observation_after_closed_session_fails() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -10545,8 +10530,7 @@ async fn observation_after_closed_session_fails() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -10892,7 +10876,7 @@ async fn evidence_immutable_after_claim_verification() {
                 AccountMeta::new_readonly(rep_pk, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -10907,8 +10891,7 @@ async fn evidence_immutable_after_claim_verification() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -10934,7 +10917,7 @@ async fn evidence_immutable_after_claim_verification() {
         att_record.vc_type,
         verification::vc_type::VERIFICATION_ATTESTATION
     );
-    assert_eq!(att_record.selective_disclosure, false);
+    assert!(!att_record.selective_disclosure);
 
     // All records remain immutable — no status field on Evidence/Observation to change.
     let ev_after: Evidence = read_account(&ctx, ev_pk).await;
@@ -11730,7 +11713,7 @@ async fn challenge_filing_and_vote_outcome() {
                 AccountMeta::new_readonly(rep_v1, false),
             ],
             data: {
-                let d = attestation_instruction_data(
+                attestation_instruction_data(
                     verification::vc_type::VERIFICATION_ATTESTATION,
                     &claim_pk,
                     1_700_000_000,
@@ -11745,8 +11728,7 @@ async fn challenge_filing_and_vote_outcome() {
                         1_800_000_000,
                     ),
                     false,
-                );
-                d
+                )
             },
         },
     )
@@ -26121,7 +26103,7 @@ async fn process_route(
     payer: &Keypair,
     oracle: &Keypair,
     task_id: &[u8; 32],
-    vrf_randomness: &[u8; 32],
+    _vrf_randomness: &[u8; 32],
     ix: Instruction,
 ) -> Result<(), solana_program_test::BanksClientError> {
     set_vrf_authority(ctx, payer, &oracle.pubkey()).await;
@@ -29480,7 +29462,7 @@ async fn phase10_route(
     let (avail_pk, _) = validator_availability_pda(validator);
 
     let oracle = Keypair::new();
-    let randomness = vrf_randomness(&oracle, &task_id);
+    let randomness = vrf_randomness(&oracle, task_id);
     // Use validator twice in candidates so the random winner is always validator
     // (both entries are the same pubkey, select_winner picks validator).
     let data = route_task_data(

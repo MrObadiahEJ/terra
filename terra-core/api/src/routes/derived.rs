@@ -334,10 +334,10 @@ pub async fn complete_job(
         AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
     })?;
     auth.verify(&key, "POST", &format!("/api/v1/derived/jobs/{id}/complete"))?;
-    if let Some(h) = &input.result_hash {
-        if !is_hex64(h) {
-            return Err(AppError::bad_request("result_hash must be 64 hex chars"));
-        }
+    if let Some(h) = &input.result_hash
+        && !is_hex64(h)
+    {
+        return Err(AppError::bad_request("result_hash must be 64 hex chars"));
     }
     // Single UPDATE with a status guard: racing completers cannot clobber a
     // terminal row (one wins, the other gets 409).

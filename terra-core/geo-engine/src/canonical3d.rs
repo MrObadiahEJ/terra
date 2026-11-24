@@ -302,12 +302,12 @@ fn canonicalize_value_v2(geom: &Value, meta: &Meta) -> Result<String> {
 
 /// A GeometryCollection child may not re-declare or contradict the parent CRS.
 fn check_no_crs_override(geom: &Value) -> Result<()> {
-    if let Some(crs) = geom.get("crs") {
-        if !crs.is_null() {
-            let name = crs_name_of(crs);
-            if !is_supported_crs(name) {
-                bail!("collection child declares an unsupported crs: {name:?}");
-            }
+    if let Some(crs) = geom.get("crs")
+        && !crs.is_null()
+    {
+        let name = crs_name_of(crs);
+        if !is_supported_crs(name) {
+            bail!("collection child declares an unsupported crs: {name:?}");
         }
     }
     Ok(())

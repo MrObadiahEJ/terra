@@ -66,17 +66,17 @@ pub fn submit_observation(
         if data.len() < 8 {
             continue;
         }
-        if let Ok(obs) = Observer::try_deserialize(&mut &data[..]) {
-            if obs.wallet == observer_key {
-                require!(
-                    obs.status == observer_status::ACTIVE,
-                    TerraError::ObserverNotActive
-                );
-                // Note: we cannot mutate remaining_accounts directly in a clean
-                // way, but we record the observation. The caller should pass the
-                // observer account as mutable in the context for bumping.
-                break;
-            }
+        if let Ok(obs) = Observer::try_deserialize(&mut &data[..])
+            && obs.wallet == observer_key
+        {
+            require!(
+                obs.status == observer_status::ACTIVE,
+                TerraError::ObserverNotActive
+            );
+            // Note: we cannot mutate remaining_accounts directly in a clean
+            // way, but we record the observation. The caller should pass the
+            // observer account as mutable in the context for bumping.
+            break;
         }
     }
 

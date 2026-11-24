@@ -9,7 +9,7 @@
             "options": {
                 "cwd": "${workspaceFolder}/terra-core",
                 "env": {
-                    "CARGO_TARGET_DIR": "${workspaceFolder}/terra-core/target/rust-analyzer"
+                    "CARGO_TARGET_DIR": "${workspaceFolder}/terra-core/target/vscode-cargo"
                 }
             },
             "group": {

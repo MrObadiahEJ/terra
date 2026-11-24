@@ -247,18 +247,15 @@ where
     match coords {
         Value::Array(arr) => {
             // A position: [lon, lat, z?]
-            if arr.len() >= 2 {
-                if let (Some(Value::Number(lon)), Some(Value::Number(lat))) =
+            if arr.len() >= 2
+                && let (Some(Value::Number(lon)), Some(Value::Number(lat))) =
                     (arr.first(), arr.get(1))
-                {
-                    if let Some(ln) = lon.as_f64() {
-                        if let Some(la) = lat.as_f64() {
-                            let z = arr.get(2).and_then(Value::as_f64).unwrap_or(0.0);
-                            f(ln, la, z);
-                            return;
-                        }
-                    }
-                }
+                && let Some(ln) = lon.as_f64()
+                && let Some(la) = lat.as_f64()
+            {
+                let z = arr.get(2).and_then(Value::as_f64).unwrap_or(0.0);
+                f(ln, la, z);
+                return;
             }
             // Otherwise recurse into elements (nested arrays / geometries).
             for el in arr {

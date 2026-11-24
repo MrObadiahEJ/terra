@@ -322,10 +322,10 @@ async fn verify_membership(
     if row.revoked {
         return Err(AppError::bad_request("binding has been revoked"));
     }
-    if let Some(exp) = row.expires_at {
-        if exp < Utc::now() {
-            return Err(AppError::bad_request("binding has expired"));
-        }
+    if let Some(exp) = row.expires_at
+        && exp < Utc::now()
+    {
+        return Err(AppError::bad_request("binding has expired"));
     }
 
     // Single-statement UPDATE...RETURNING (with join) so the returned row

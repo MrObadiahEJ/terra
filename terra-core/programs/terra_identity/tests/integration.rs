@@ -69,12 +69,11 @@ fn assert_program_so_fresh() {
                 let p = e.path();
                 if p.is_dir() {
                     stack.push(p);
-                } else if p.extension().is_some_and(|x| x == "rs") {
-                    if let Ok(m) = e.metadata().and_then(|m| m.modified()) {
-                        if m > newest_src {
-                            newest_src = m;
-                        }
-                    }
+                } else if p.extension().is_some_and(|x| x == "rs")
+                    && let Ok(m) = e.metadata().and_then(|m| m.modified())
+                    && m > newest_src
+                {
+                    newest_src = m;
                 }
             }
         }

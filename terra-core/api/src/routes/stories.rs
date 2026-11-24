@@ -262,26 +262,26 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
                     "stops[{i}].provenance.attestors exceeds 64"
                 )));
             }
-            if let Some(v) = &p.verified_by {
-                if v.trim().is_empty() || v.len() > 128 {
-                    return Err(AppError::bad_request(format!(
-                        "stops[{i}].provenance.verified_by must be 1..=128 characters"
-                    )));
-                }
+            if let Some(v) = &p.verified_by
+                && (v.trim().is_empty() || v.len() > 128)
+            {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.verified_by must be 1..=128 characters"
+                )));
             }
-            if let Some(m) = &p.evidence_manifest {
-                if m.trim().is_empty() || m.len() > 512 {
-                    return Err(AppError::bad_request(format!(
-                        "stops[{i}].provenance.evidence_manifest must be 1..=512 characters"
-                    )));
-                }
+            if let Some(m) = &p.evidence_manifest
+                && (m.trim().is_empty() || m.len() > 512)
+            {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.evidence_manifest must be 1..=512 characters"
+                )));
             }
-            if let Some(h) = &p.geometry_hash {
-                if h.trim().is_empty() || h.len() > 128 {
-                    return Err(AppError::bad_request(format!(
-                        "stops[{i}].provenance.geometry_hash must be 1..=128 characters"
-                    )));
-                }
+            if let Some(h) = &p.geometry_hash
+                && (h.trim().is_empty() || h.len() > 128)
+            {
+                return Err(AppError::bad_request(format!(
+                    "stops[{i}].provenance.geometry_hash must be 1..=128 characters"
+                )));
             }
         }
     }
@@ -399,15 +399,15 @@ pub fn validate_definition(def: &StoryDefinition) -> Result<(), AppError> {
 fn entity_refs(def: &StoryDefinition) -> Vec<String> {
     let mut refs: Vec<String> = Vec::new();
     for stop in &def.stops {
-        if let Some(p) = &stop.parcel_id {
-            if !refs.contains(p) {
-                refs.push(p.clone());
-            }
+        if let Some(p) = &stop.parcel_id
+            && !refs.contains(p)
+        {
+            refs.push(p.clone());
         }
-        if let Some(a) = &stop.asset_pubkey {
-            if !refs.contains(a) {
-                refs.push(a.clone());
-            }
+        if let Some(a) = &stop.asset_pubkey
+            && !refs.contains(a)
+        {
+            refs.push(a.clone());
         }
     }
     refs

@@ -760,10 +760,10 @@ async fn verify_proof(
     .fetch_one(&mut *tx)
     .await
     .map_err(|error| {
-        if let sqlx::Error::Database(db) = &error {
-            if db.code().as_deref() == Some("23505") {
-                return AppError::conflict("proof has already been used (nullifier recorded)");
-            }
+        if let sqlx::Error::Database(db) = &error
+            && db.code().as_deref() == Some("23505")
+        {
+            return AppError::conflict("proof has already been used (nullifier recorded)");
         }
         AppError::from(error)
     })?;
