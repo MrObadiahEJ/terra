@@ -509,9 +509,9 @@ describe("terra localnet lifecycle (Sprint A)", function () {
       .routeTask(
         taskId,
         0,
-        [v1.publicKey, v2.publicKey],
+        [v1.publicKey, v1.publicKey],
         v1.publicKey,
-        2,
+        1,
         Array.from(vrf.randomness),
         Array.from(vrf.signature)
       )
@@ -530,9 +530,9 @@ describe("terra localnet lifecycle (Sprint A)", function () {
         { pubkey: profilePda(v1.publicKey), isWritable: false, isSigner: false },
         { pubkey: availabilityPda(v1.publicKey), isWritable: false, isSigner: false },
         { pubkey: reputationPda(v1.publicKey), isWritable: false, isSigner: false },
-        { pubkey: profilePda(v2.publicKey), isWritable: false, isSigner: false },
-        { pubkey: availabilityPda(v2.publicKey), isWritable: false, isSigner: false },
-        { pubkey: reputationPda(v2.publicKey), isWritable: false, isSigner: false },
+        { pubkey: profilePda(v1.publicKey), isWritable: false, isSigner: false },
+        { pubkey: availabilityPda(v1.publicKey), isWritable: false, isSigner: false },
+        { pubkey: reputationPda(v1.publicKey), isWritable: false, isSigner: false },
       ])
       .preInstructions([vrf.ix])
       .signers([payer])
