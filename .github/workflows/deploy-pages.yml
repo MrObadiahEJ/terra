@@ -52,6 +52,8 @@ jobs:
       - name: Build (project-site base path)
         env:
           TERRA_BASE_PATH: /terra/
+          VITE_API_BASE: https://terra-gscx.onrender.com/api/v1
+          VITE_TERRA_RPC_URL: ${{ secrets.VITE_TERRA_RPC_URL }}
         run: pnpm build
 
       - uses: actions/configure-pages@v5
