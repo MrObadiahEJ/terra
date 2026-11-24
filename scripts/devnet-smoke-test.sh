@@ -15,7 +15,7 @@ RPC_URL="${TERRA_RPC_URL:-https://api.devnet.solana.com}"
 pass=0; fail=0; skip=0
 green(){ printf '\033[32mPASS\033[0m %s\n' "$1"; }
 red(){ printf '\033[31mFAIL\033[0m %s\n' "$1"; }
-yellow(){ printf '\033[33mSKIP\033[0m %s\n' "$1"; }
+yellow(){ printf '\033[33mWARN\033[0m %s\n' "$1"; }
 
 check_http() {
   local name="$1" url="$2" expect="${3:-200}"
@@ -68,6 +68,11 @@ if command -v curl >/dev/null 2>&1; then
       if grep -q "$needle" "$bundle"; then green "Bundle contains $needle"; pass=$((pass+1))
       else red "Bundle missing $needle"; fail=$((fail+1)); fi
     done
+    if grep -qE 'http://localhost|https://localhost|localhost:[0-9]+' "$bundle"; then
+      yellow "Bundle contains localhost URL literals; inspect context before demo (may be benign library defaults)"
+    else
+      green "No localhost URL literals in bundle"
+    fi
     rm -f "$bundle"
   else
     yellow "Could not locate Pages JS bundle"; skip=$((skip+1))
