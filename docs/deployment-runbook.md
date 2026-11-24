@@ -279,13 +279,15 @@ the debt: it can be honoured over another rail without changing the proof.
 
 ## 6. Go-live checklist
 
-- [ ] `./preflight-devnet.sh` reports `Preflight PASSED`
-- [ ] Both programs deployed; Explorer links recorded
-- [ ] Migrations applied to managed PostGIS
-- [ ] Render `/health` returns `{"status":"ok","database":"up"}`
-- [ ] `CORS_ALLOWED_ORIGINS` matches the Pages origin
-- [ ] S3 bucket configured; evidence survives a Render restart
-- [ ] UptimeRobot monitor green
-- [ ] Pages bundle contains no `localhost`
-- [ ] Wallet-signed devnet transaction visible from the public site
-- [ ] CI green on `dev`; then merge `dev` → `main` with branch protection
+Status as of 2026-11-24 (devnet demo environment):
+
+- [x] `./preflight-devnet.sh` reports `Preflight PASSED` (used during deploy; deployer `AK3Lm...3`)
+- [x] Both programs deployed; Explorer links recorded in sprint/deploy notes — registry `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage`, identity `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p`
+- [x] Migrations applied to managed PostGIS (Supabase `qgtstweelyankeqftepx`, through 0056)
+- [x] Render `/health` returns `{"status":"ok","database":"up"}`
+- [x] `CORS_ALLOWED_ORIGINS` matches the Pages origin (`https://mrobadiahej.github.io`)
+- [ ] S3 bucket configured; evidence survives a Render restart (verify in Render env before demo)
+- [ ] UptimeRobot monitor green (verify monitor configured)
+- [ ] Pages bundle contains no `localhost` — **2026-11-24 smoke found `localhost` strings in JS bundle; inspect whether runtime fallback or benign literal before publishing as clean**
+- [ ] Wallet-signed devnet transaction visible from the public site (needs browser-wallet MVP pass)
+- [x] CI green on `dev` and `main` for latest code commit `1be63e8`; docs synced on `c087339`+

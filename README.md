@@ -371,12 +371,13 @@ pnpm dev
 - [x] Build pipeline pinned to `cargo build-sbf` (Anchor manifest issue documented)
 - [x] Phase 0 — RFC-012 architecture contract + structural tests
 - [x] Phase 1 — security hardening (unique validator sets, endorsement action binding, ownership checks, admin constraints)
-- [ ] `solana-test-validator` run with program deployed (requires AVX-capable CPU — not available on current dev machine)
-- [ ] Fund the deploy wallet (`CCng7…`): ~17.1 devnet SOL of rent — registry 15.70 + identity 1.38 (refundable)
+- [x] Localnet lifecycle E2E (Surfpool) — `./scripts/run-localnet-e2e.sh`, CI green (see Sprint A / `terra-core/tests/localnet_e2e.ts`)
+- [x] Devnet deployer funded and programs deployed (2026-11-24): deployer `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`; registry `GaEDbktvpZ3qiqp4PmFgHwDSa6JsFfVjXFqNb2nTbage`, identity `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p`. Keep wallet topped up for demo txs.
 - [x] `terra_identity` deploy keypair — original `68urV9nG…` keypair lost before first deploy; program ID rotated to `HyjpaHY9…` (2026-10-01, `declare_id!` + `Anchor.toml` synced, keypair backed up in `terra-core/deploy-backup/`); `deploy.sh` verifies each `target/deploy/*-keypair.json` against `declare_id!` and aborts on mismatch
+- [x] Hosted API on Render — `https://terra-gscx.onrender.com/health` returns OK/DB up
+- [x] Frontend on GitHub Pages — `https://mrobadiahej.github.io/terra/` configured with hosted API + devnet RPC + deployed program IDs
+- [ ] Browser-wallet "stranger on devnet" MVP E2E verified (connect Phantom Devnet, register parcel, upload evidence, pay verification, quorum/proof export, dispute)
 - [ ] Withdraw-after-7d-unbonding executed against real clock time
-- [ ] Frontend wallet signing wired to deployed program ID
-- [x] Regenerate checked-in IDL from current source (`make idl`) — A2 (2026-09-24): 119/44/108/160; Phase 2 (2026-09-24): 128/49/115/169; Phase 3 (2026-09-24): 134/52/120/182; Phase 4 (2026-09-24): 135/53/121/184; Phase 5 (2026-09-24): 137/55/123/187; Phase 6 (2026-09-24): 138/55/124/191; Phase 7 (2026-09-24): 147/59/133/206; Phase 8 (2026-09-24): 153/64/139/220; legacy sweep → 146/62/134/220; B6 → 147/62/135/220; P0-2 (2026-09-25): 148/62/135/220; Phase 9 (2026-09-26): 154/63/141/225; Phase 10 (2026-09-28): **158/65/145/231** synced to `terra-web/src/idl/`; Stage 3A spatial (2026-09-28): **161/67/148/237** synced to `terra-web/src/idl/`; P0-ZK-01 (2026-10-01): 161/67/148/237 (doc-comment only, counts unchanged); RFC-013 Phase B (2026-10-01): **162/67/149/241** synced to `terra-web/src/idl/`
 - [ ] ZK trusted-setup ceremony + external circuit audit (RFC-006/011) — `MembershipCircuit` is implemented and proven end-to-end on-chain (`make test-zk`); `make zk-dev-setup` produces **dev-only** keys. Production still needs an arkworks MPC ceremony + audit (Q-009); the dev keys are not a production setup.
 - [ ] Governance decision on RFC-005 staking (RFC says do-not-implement without one; code path exists — reconfirm before mainnet)
 
