@@ -482,3 +482,144 @@ tests `claim_discriminator_matches_sha256_account_claim`,
 `upsert_claim_writes_real_transaction_provenance`,
 `spatial_mirrors_set_chain_verified_from_transaction_provenance`;
 RISK R-039–R-041; `REQUIREMENTS_TRACEABILITY.md` REQ-055.
+
+## ADR-027 — IDL-derived indexer decoders and honest read-model confirmation
+
+**Date:** 2026-11-27 · **Status:** Accepted
+**Context:** A second source audit of the read path found five defects that
+survived ADR-026: (1) hand-written Borsh parsers read string/vec lengths as
+`u8` and `GeometryVersion.storage_reference` as `u16`, while Anchor/Borsh
+uses `u32` LE — any longer value silently misparses or is skipped; (2) only
+five of the eight accounts with mirror tables were decoded (`Rights`,
+`ThreeDModel`, `SpatialSnapshot` were never mirrored); (3) `Rights.parcel`
+is the Parcel PDA but the old code looked up `parcel.id` (a caller-derived
+hash) and then fell back to writing the PDA itself as a fake wallet holder;
+(4) on-chain `geometry_hash` was never compared with the stored polygon, so a
+mismatched client polygon could be marked `chain_verified`; (5) a hard-coded
+15 s poll fetched every full account — unacceptable on a metered hosted RPC —
+with no backoff, and `/mirror/audit` omitted `claims_onchain` while
+`verification_attestations_onchain` defaulted to `TRUE`/`0`/`''`.
+**Decision:** (1) Generate decoders from `idl/terra_registry.json` with
+`scripts/generate-indexer-decoders.py`; `api/src/indexer_decoders.rs` is a
+generated artifact pinned by CI (`--check`). The indexer contains no
+hand-written Borsh offsets. (2) Mirror all eight accounts that have tables;
+standalone rows are written first and FK-dependent rows (rights, geometry
+versions, 3D models, snapshots) second, independent of RPC order. (3) Read
+the real wallet holder from `Rights.holder` keyed by the Parcel PDA; never
+substitute the PDA. (4) Keep the exact submitted GeoJSON in
+`parcels.source_geometry` (migration 0059) and require
+`sha256(JSON.stringify(coordinates[0])) == onchain geometry_hash` **plus** a
+real transaction signature before setting `chain_verified`. PostGIS
+normalizes numbers, so `ST_AsGeoJSON` cannot reproduce the client's digest.
+Rows with no source bytes stay unverified. (5) Make cadence, timeout, backoff
+ceiling and batch size env-driven (`TERRA_INDEXER_*`, default 60 s poll), use
+a header-only discriminator scan followed by batched `getMultipleAccounts`,
+and back off exponentially on poll failure. (6) Fix the attestation defaults
+with forward migration 0058 and add `claims_onchain` to `/mirror/audit`.
+**Alternatives:** keep hand-written parsers (rejected: IDL drift and u8/u16
+bugs are invisible until a long string appears); fabricate chain-only parcels
+(rejected: `geometry` is `NOT NULL` and the chain carries only a hash — that
+would invent geometry); claim `chain_verified` from a real signature alone
+(rejected: the signature proves the hash, not the polygon); paginate
+`getProgramAccounts` (rejected: Solana RPC 3.1.12 has no cursor/offset —
+Q-034). **Consequences:** eight mirrored account types are now IDL-pinned;
+holder, geometry and provenance claims are independently checkable; hosted
+RPC load is bounded and tunable. All 82 IDL account types (83 after Q-035) are
+now decoded and generically mirrored with provenance (ADR-028), but typed projections still
+cover only the original eight; clients without source geometry or a verified
+artifact cannot be confirmed (ADR-029).
+**Evidence:** `api/src/indexer.rs` (`IndexerOptions`,
+`fetch_mirrored_accounts`, two-phase `poll_once`, `submitted_ring_hash`,
+`upsert_rights`, `upsert_three_d_model`, `upsert_spatial_snapshot`),
+`api/src/indexer_decoders.rs`, `scripts/generate-indexer-decoders.py`,
+migrations `0058`/`0059`, `routes/mirror.rs` (claims audit + updated hash
+SQL), `.github/workflows/ci.yml` generator pin, tests
+`idl_decoders_round_trip_all_mirrored_accounts`,
+`header_filter_accepts_only_mirrored_discriminators`,
+`rights_mirror_uses_parcel_pda_and_real_wallet_holder`,
+`parcel_verification_requires_matching_geometry_digest`,
+`three_d_and_snapshot_mirrors_set_provenance`,
+`mirror_audit_claims_hash_matches_trigger`,
+`verification_attestation_defaults_are_honest`; full API suite **182/182**.
+RISK R-042–R-046; REQ-055, REQ-060; OPEN_QUESTIONS Q-033–Q-035.
+
+---
+
+## ADR-028 — Q-033(b): staged read-model rollout — generic mirror for every IDL account
+
+**Date:** 2026-11-27 · **Status:** Accepted
+**Context:** Q-033 asked whether to mirror all 82 `terra_registry` account
+types or keep only the eight business-critical typed tables. The founder
+funded option (b): a staged rollout with per-type acceptance tests. Adding 74
+typed tables, routers and audit SQL in one change would be an unauditable
+schema/RPC cost spike, and the original decoders covered only eight types.
+**Decision:** Stage 0 keeps the eight typed projections unchanged. Stage 1
+generates decoders for **every** account in `idl/terra_registry.json` (82 types
+at the time of the decision; the Q-035 artifact adds the 83rd), adds a single
+generic `chain_accounts` mirror table keyed by pubkey with `account_type`,
+`fields` JSONB, trigger-maintained `mirror_hash` and ADR-026 provenance
+columns, and calls `decode_any()` before typed dispatch for every fetched
+account. Later stages may promote a type to a typed table/API only when it has
+a decoder, a mirror, a hash and an audit rule. No account is advertised as
+chain-verified without all four. **Alternatives:** 74 hand-written typed
+migrations at once (rejected: cost and review surface); leave the remaining
+types client-trust only (rejected by the founder). **Consequences:** every IDL
+account is now chain-derived and provenance-tagged, while typed read APIs and
+audits for the remaining types remain explicitly out of scope — the generic
+mirror is labelled as such, never as typed parity. `GET /mirror/audit` includes
+`chain_accounts`. **Evidence:** `scripts/generate-indexer-decoders.py`
+(`ALL_ACCOUNT_NAMES`, `RICH_ACCOUNT_NAMES`, `decode_any`, generated
+discriminators and 82 per-type acceptance tests), `api/src/indexer.rs`
+(`upsert_chain_account`, two-phase `mirror_account`), migration
+`0060_chain_accounts_generic_mirror.sql` (applied to Supabase), CI generator
+`--check` pin, tests `generic_chain_mirror_covers_every_idl_account_type`,
+`generic_chain_mirror_rejects_provenance_without_signature`,
+`empty_signature_never_becomes_verified_provenance`. Full API suite **268/268**
+at stage 1; **272/272** after ADR-029 (83 decoder acceptance tests, including
+the new artifact account). RISK R-047; REQ-060; Q-033 closed.
+
+---
+
+## ADR-029 — Q-035(a): content-addressed geometry artifacts for chain-only parcels
+
+**Date:** 2026-11-27 · **Status:** Accepted
+**Context:** `parcels.geometry` is `NOT NULL` and guarded by
+`guard_parcel_geometry()`, while an on-chain `Parcel` carries only a 32-byte
+`geometry_hash` (the client's `sha256(JSON.stringify(coordinates[0]))`). The
+indexer therefore could not display a parcel created by CLI/chain-only flows
+without inventing a polygon. The founder selected option (a): store geometry
+as a content-addressed artifact referenced by a new on-chain instruction.
+**Decision:** Add a separate PDA
+`["parcel_geometry_artifact", parcel, content_hash]` with
+`register_parcel_geometry_artifact(content_hash, storage_uri)`. The `Parcel`
+Borsh layout is unchanged. Only the current rights holder may register;
+re-registering the same digest and URI is idempotent, and substituting a
+different URI for a digest is rejected. `PUT /api/v1/parcels/{parcel_pda}/geometry-artifact`
+stores raw GeoJSON bytes under `sha256(bytes)` and returns the exact
+`content_hash`/`storage_uri`/`geometry_hash` to anchor. Chain-only
+materialization is allowed **only** when: the artifact PDA is chain-verified
+with a real signature (ADR-026); the on-chain URI equals the stored ref;
+`sha256(bytes) == content_hash`; and the re-derived ring digest equals the
+parcel's on-chain `geometry_hash`. Any failure leaves the parcel invisible —
+never a fabricated polygon. **Alternatives:** nullable-geometry staging table
+with an explicit hash-only representation (option b, rejected by founder);
+keep chain-only parcels invisible forever (option c, rejected by founder);
+trust client POSTs without digest checks (rejected: would mark invented
+geometry as chain-verified). **Consequences:** chain-only parcels can now be
+displayed honestly, with two independent digests; a compromised API cannot
+substitute bytes under a registered digest, and a tampered mirror cannot
+supply geometry. Storage durability still depends on the backend (R-035);
+signed uploads use the existing authority key. **Evidence:**
+`programs/terra_registry/src/parcel_geometry_artifact.rs`, instruction/event/
+error wiring in `programs/terra_registry/src/lib.rs`, BPF integration test
+`register_parcel_geometry_artifact_is_content_addressed_and_holder_only`,
+`api/src/routes/parcels.rs` (`upload_geometry_artifact`),
+`api/src/indexer.rs` (`verified_geometry_artifact`, `upsert_parcel_geometry_artifact`,
+chain-only branch of `upsert_parcel`), migrations `0061_parcel_geometry_artifacts.sql`
+(applied to Supabase), DB tests `parcel_geometry_artifact_mirror_writes_transaction_provenance`
+and `chain_only_parcel_materializes_from_verified_artifact`. Gates: full API suite
+**272/272**, registry lib tests **167/167**, `cargo fmt --check`,
+`cargo clippy -- -D warnings`, frontend `tsc -b` + vitest **143/143** +
+`build:check` PASS. RISK R-044/R-048; REQ-061; Q-035 closed. The checked-in IDL
+now has 180 instructions / 83 accounts; BPF integration and localnet execution
+are CI-authoritative (no AVX locally).

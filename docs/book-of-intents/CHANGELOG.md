@@ -2,7 +2,80 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
-## 2026-11-27 — Chain indexer P0 hardening (uncommitted; founder authorization pending)
+## 2026-11-27 — Q-033(b) staged rollout + Q-035(a) content-addressed geometry (founder authorized)
+
+- **Q-033(b) stage 1 (ADR-028; REQ-060; R-047):** the founder funded a staged
+  rollout with per-type acceptance tests. `scripts/generate-indexer-decoders.py`
+  now decodes **every** account in `idl/terra_registry.json` (`ALL_ACCOUNT_NAMES`,
+  `decode_any`, full discriminator map, 82 per-type acceptance tests); CI pins
+  the generated `api/src/indexer_decoders.rs` with `--check`. New forward
+  migration `0060_chain_accounts_generic_mirror.sql` (applied to Supabase) adds
+  a `chain_accounts` mirror with ADR-026 provenance and a trigger-maintained
+  hash. `mirror_account()` calls `decode_any()` before the eight typed
+  projections, so every IDL account type is chain-derived and auditable while
+  only the original eight have typed tables/routers. `AccountProvenance::verified()`
+  now normalizes empty/whitespace signatures to `unverified()` — no code path
+  can store `Some("")` as a real transaction.
+- **Q-035(a) (ADR-029; REQ-061; R-048):** new on-chain account
+  `ParcelGeometryArtifact` at PDA `["parcel_geometry_artifact", parcel,
+  content_hash]` and instruction `register_parcel_geometry_artifact(content_hash,
+  storage_uri)`; holder-only, idempotent for the same digest/URI, and rejects
+  URI substitution. `Parcel`'s Borsh layout is unchanged. Forward migration
+  `0061_parcel_geometry_artifacts.sql` (applied) adds the typed artifact mirror
+  and `parcel_geometry_uploads`. Signed `PUT
+  /api/v1/parcels/{parcel_pda}/geometry-artifact` stores raw GeoJSON under
+  `sha256(bytes)` with a required `X-Content-SHA256`. Chain-only parcels are
+  materialized only when the artifact has a real tx signature, the on-chain URI
+  matches the stored ref, `sha256(bytes) == content_hash`, and the re-derived
+  `sha256(JSON.stringify(coordinates[0])) == Parcel.geometry_hash`; otherwise
+  no row is invented. `/mirror/audit` covers both new tables.
+- **Gates:** `cargo check -p terra-registry` and `cargo check -p terra-api`
+  clean; IDL regenerated (180 instructions / 83 accounts) after the program
+  change and synced to `terra-web/src/idl`; decoder generator `--check` PASS;
+  `cargo fmt --check` and `cargo clippy -- -D warnings` clean; full API suite
+  **272/272** with `DATABASE_URL` against Supabase (migrations 0058–0061
+  applied), registry lib tests **167/167**, frontend `tsc -b` + vitest
+  **143/143** + `pnpm build:check` PASS. BPF integration test
+  `register_parcel_geometry_artifact_is_content_addressed_and_holder_only`
+  added (CI-authoritative locally: no AVX). Commit/merge to `main` authorized
+  by the founder.
+
+## 2026-11-27 — Indexer 1d/1e: IDL decoders + honest confirmation (committed; dev → main checkpoint)
+
+- **Source-audit defects fixed (ADR-027; R-042–R-046):** hand-written Borsh
+  offsets (u8/u16 instead of u32 LE) replaced by generated IDL decoders
+  (`terra-core/scripts/generate-indexer-decoders.py` →
+  `api/src/indexer_decoders.rs`), pinned in CI with `--check`; the read model
+  now mirrors eight account types (added `Rights`, `ThreeDModel`,
+  `SpatialSnapshot`) in two phases so FK-dependent rows follow their parents.
+  `Rights.parcel` is resolved as the Parcel PDA and the holder is the real
+  base58 wallet from `Rights.holder`, never the PDA. Parcel `chain_verified`
+  now requires both a real transaction and a match between the on-chain
+  `geometry_hash` and `sha256(JSON.stringify(coordinates[0]))` recomputed from
+  the submitted GeoJSON stored by forward migration `0059_parcel_source_geometry.sql`
+  (applied to Supabase). Rows without source bytes or with a mismatched hash
+  stay `FALSE`/`NULL`/`NULL`; chain-only parcels are never fabricated because
+  `parcels.geometry` is `NOT NULL` and guarded.
+- **Forward migration `0058_indexer_mirror_honesty.sql` (applied to Supabase):**
+  adds `rights.onchain_id` + partial unique index and includes it in the
+  rights mirror hash; corrects `verification_attestations_onchain` defaults
+  to `FALSE`/NULL/NULL and downgrades pre-existing bogus provenance.
+  `/mirror/audit` now covers `claims_onchain` with the 0057 trigger hash; its
+  parcels and rights recomputation SQL was updated for 0059/0058. No applied
+  migration was rewritten (ADR-011).
+- **Metered-RPC hardening:** the 15 s hard-coded full-account poll became
+  env-driven (`TERRA_INDEXER_ENABLED`, `TERRA_INDEXER_POLL_SECS`,
+  `TERRA_INDEXER_RPC_TIMEOUT_SECS`, `TERRA_INDEXER_MAX_BACKOFF_SECS`,
+  `TERRA_INDEXER_BATCH_SIZE`; defaults 60 s/30 s/300 s/100), with a header-only
+  discriminator scan, batched `getMultipleAccounts`, and exponential backoff.
+- **Gates:** `python3 scripts/generate-indexer-decoders.py --check` PASS;
+  `CARGO_INCREMENTAL=0 cargo check -p terra-api` clean;
+  `CARGO_INCREMENTAL=0 cargo test -p terra-api` **182/182** with `DATABASE_URL`
+  against Supabase; `git diff --check` clean. Frontend unchanged, so frontend
+  gates were not re-run. Founder later authorized the commit/merge; this work
+  is included in the 2026-11-27 `dev → main` checkpoint.
+
+## 2026-11-27 — Chain indexer P0 hardening (committed; dev → main checkpoint)
 
 - **Source-audit defects fixed in `api/src/indexer.rs`:** (1) the indexer
   queried `claims_onchain` although no migration created it — the first Claim
@@ -28,8 +101,8 @@ Format: date · version · what changed · evidence/why. Append-only.
   `CARGO_INCREMENTAL=0 cargo test -p terra-api` **173/173** with `DATABASE_URL`
   against Supabase (7 new indexer tests, including 3 DB-backed). Only 3
   pre-existing `runtime.rs` `unused_must_use` warnings. Frontend files
-  unchanged, so frontend gates not re-run. Work remains uncommitted on `dev`
-  per AGENT_GUIDE §7; `main` untouched.
+  unchanged, so frontend gates not re-run. Founder later authorized the
+  commit/merge; this work is included in the 2026-11-27 `dev → main` checkpoint.
 
 ## 2026-11-27 — Branch sync + public-demo bundle hygiene; audit findings registered (no backend changes)
 
@@ -87,7 +160,7 @@ Format: date · version · what changed · evidence/why. Append-only.
 
 ## 2026-11-23 — Book-of-intents audit reconciliation (claims 1–7 verified against code)
 
-- **Verified closed in code (working tree, uncommitted):** `transfer_admin`/`accept_admin` two-step admin handoff (`validator_registry.rs:177-222`); `remove_validator` admin-only in bootstrap, peer-consensus requires endorsement quorum (`validator_registry.rs:424-494`); `set_validator_active` deactivation blocked in peer-consensus (`recovery.rs:83-87`); `check_quorum_reachable` counts live `ValidatorActivityTracker` accounts with `ACTIVITY_WINDOW_SECS` liveness (`recovery.rs:117-158`); `aggregate_signature` stores detached Ed25519 validator signatures over `credential_endorsement_message`, and `verify_credential` requires the prover's signature over `credential_proof_statement` — both offline-verifiable (`zk/mod.rs:711-790, 809-883`); `prove_replica` fails closed (503) without `VRF_ORACLE_PUBKEY`, SHA-256 fallback removed (`api/src/routes/providers.rs:661-729`); `verify_ownership_proof` requires `disclosure_type == MEMBERSHIP (0)`, matching circuit and API (`zk/mod.rs:505-508`; `zk-membership/src/circuit.rs:95`; `api/src/routes/zk_proofs.rs:428`).
+- **Verified closed in code (committed in the 2026-11-27 checkpoint):** `transfer_admin`/`accept_admin` two-step admin handoff (`validator_registry.rs:177-222`); `remove_validator` admin-only in bootstrap, peer-consensus requires endorsement quorum (`validator_registry.rs:424-494`); `set_validator_active` deactivation blocked in peer-consensus (`recovery.rs:83-87`); `check_quorum_reachable` counts live `ValidatorActivityTracker` accounts with `ACTIVITY_WINDOW_SECS` liveness (`recovery.rs:117-158`); `aggregate_signature` stores detached Ed25519 validator signatures over `credential_endorsement_message`, and `verify_credential` requires the prover's signature over `credential_proof_statement` — both offline-verifiable (`zk/mod.rs:711-790, 809-883`); `prove_replica` fails closed (503) without `VRF_ORACLE_PUBKEY`, SHA-256 fallback removed (`api/src/routes/providers.rs:661-729`); `verify_ownership_proof` requires `disclosure_type == MEMBERSHIP (0)`, matching circuit and API (`zk/mod.rs:505-508`; `zk-membership/src/circuit.rs:95`; `api/src/routes/zk_proofs.rs:428`).
 - **Fixed (non-breaking docs):** `config.rs` `vrf_oracle_pubkey` comment no longer describes a removed SHA-256 fallback; `IMPLEMENTATION_STATUS.md` B4 row corrected (PoP requires the pinned oracle key, fail-closed).
 - **Still open (security-consequence decisions → founder authorization; not implemented here):** `pause_program` indefinite, no expiry (R-022); ZK production ceremony + external circuit audit + G2 subgroup checks (Q-009/Q-006); reviewer VRF randomization for security/privacy assignments (REQ-032/Q-014); off-chain privacy enforcement middleware not started (R-023/R-024, Q-016); `security.rs` RFC-016 core has 9 native tests only — not in the 308-test BPF/CI suite (Q-006 mainnet gate); 7-day unbonding / 90-day guardianship grace / 48h injection timelock guard-tested but never time-executed against real clock (Q-001 devnet); slashing economics never adversarially simulated (R-003); audit is internal.
 - No commits made (AGENT_GUIDE §7: commit only when the founder asks).

@@ -18,7 +18,7 @@ with no “SIMULATION” chips on any step of that path.
 |---|---|---|---|
 | **A** | Repeatable Surfpool localnet + full lifecycle smoke (parcel → rights → claim → evidence → observation → attestation → quorum → task → fund → route → reward → geometry → snapshot → escrow → dispute) | **delivered; CI green** | `terra-core/tests/localnet_e2e.ts` 9/9 local; `scripts/run-localnet-e2e.sh`; CI run `43855396029` green (all five jobs incl. Localnet Lifecycle E2E); commit `fd89d89`; note `sprints/056-sprint-a-localnet-lifecycle.md` |
 | **B** | Real write path: delete `tx_prep.rs`, IDL/client `program.methods`, fix identity PDAs, sync IDL/types, wire full UI loop | **delivered** | `tx_prep.rs` deleted; `program.methods` write path; identity PDA fix (`identityPda` → `terra_identity`); IDL sync (`idl/terra_registry.json` 176 instructions, `idl/terra_identity.json` 8); commit `76d85df`; note `sprints/057-sprint-b-real-write-path.md` |
-| **C** | Chain indexer: `api/src/indexer.rs`, RPC in `AppState`, `chain_verified` mirror upserts, DB-vs-chain audit | **delivered; P0 hardening in progress (uncommitted)** | `api/src/indexer.rs`; migrations `0051_chain_verified_columns.sql` + `0057_claims_onchain_mirror.sql` (applied); `GET /mirror/audit` covers 7 tables + `verification_attestations_onchain`; commits `ac754f6`/`62875fd`; P0 fixes ADR-026, R-039–R-041; note `sprints/058-sprint-c-chain-indexer.md` |
+| **C** | Chain indexer: `api/src/indexer.rs`, RPC in `AppState`, `chain_verified` mirror upserts, DB-vs-chain audit | **delivered; Q-033/Q-035 follow-ups complete locally** | `api/src/indexer.rs`; migrations `0051`/`0057`–`0061` applied; `GET /mirror/audit` covers typed mirrors + `chain_accounts` + `parcel_geometry_artifacts`; commits `ac754f6`/`62875fd`; ADR-026–029; notes `sprints/058-sprint-c-chain-indexer.md`, `sprints/063-sprint-q033-q035.md` |
 | **D** | Devnet hosting: real deploy, hosted API + managed PostGIS + private RPC, env-driven clients, Pages on hosted API, neutral globe focus | **in progress / partially delivered** | Render API `https://terra-gscx.onrender.com` healthy; Pages `https://mrobadiahej.github.io/terra/`; devnet programs deployed (registry `GaEDbk...bage`, identity `HyjpaH...Vo6p`); Supabase `qgtstweelyankeqftepx` migrated 0001–0056; browser-wallet E2E still pending; `sprints/059-sprint-d-devnet-hosting.md` |
 | **E** | Routing/economics hardening: VRF-verified routing (server-side `GET /geo/route` with `from_node_id`/`to_node_id` topology), anti-spam staging bond, premium-category routing, reliability derived from challenge results | **partially delivered** | `geo-engine/src/reach.rs` `route_between` Dijkstra; `api/migrations/0049_provider_content_address.sql`; `storage_providers.stake_bond` + `wallet_address` (migration 0053); `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes; commits `8cd7aa9`, `0f0a052`; note `sprints/060-sprint-e-routing-economics.md` |
 | **F** | Evidence durability: IPFS backend option (`IPFS_API_URL`), quarantine + TTL columns on `evidence_uploads`, `StorageBackend` enum (`Local`/`Ipfs`), honest labeling until paid | **delivered** | `api/src/storage.rs` (IPFS backend, quarantine/TTL); migration `0053_evidence_durability_and_provider_economy.sql`; commit `0f0a052`; note `sprints/061-sprint-f-evidence-durability.md` |
@@ -28,7 +28,8 @@ with no “SIMULATION” chips on any step of that path.
 
 - **Sprint B** — Real write path: deleted `tx_prep.rs` placeholder builders and route registration; every write now uses client-side IDL `program.methods` with real PDAs, discriminators and signers; fixed `identityPda`/`successionPda` to derive on `terra_identity` program ID; generated and checked in IDLs (`idl/terra_registry.json` 176 instructions, `idl/terra_identity.json` 8 instructions); wired `/console` and parcel panels to the real loop; commit `76d85df`.
 - **Sprint C** — Chain indexer: `api/src/indexer.rs` polls `terra_registry` program accounts, decodes Anchor `Parcel` and `VerificationAttestation` accounts by discriminator, upserts mirror rows with `chain_verified=true`, `chain_slot`, `chain_signature`; `GET /mirror/audit` compares DB to chain across 7 tables including `verification_attestations_onchain`; migration `0051_chain_verified_columns.sql` adds `chain_verified`/`chain_slot`/`chain_signature` to all mirror tables; commit `ac754f6`.
-- **Sprint C P0 hardening (2026-11-27, uncommitted)** — source audit found three P0 defects in the read path: a missing `claims_onchain` table could abort the whole 15 s poll on the first Claim PDA; spatial/geometry upserts never wrote chain provenance; and `chain_signature`/`chain_slot` were decorative (empty string + poll slot). Fixed with forward migration `0057_claims_onchain_mirror.sql` (applied to Supabase; columns verified), per-account error isolation, and real `getSignaturesForAddress` provenance for all five decoded account types (ADR-026; R-039–R-041). The new DB-backed test also caught a missing INSERT expression and a base58/hex FK mismatch in the geometry upsert, both fixed. Gates: `cargo check -p terra-api` clean; `cargo test -p terra-api` **173/173** (7 new indexer tests; 3 pre-existing `runtime.rs` warnings). Not committed — founder authorization required (AGENT_GUIDE §7).
+- **Sprint C P0 hardening (2026-11-27, committed)** — source audit found three P0 defects in the read path: a missing `claims_onchain` table could abort the whole 15 s poll on the first Claim PDA; spatial/geometry upserts never wrote chain provenance; and `chain_signature`/`chain_slot` were decorative (empty string + poll slot). Fixed with forward migration `0057_claims_onchain_mirror.sql` (applied to Supabase; columns verified), per-account error isolation, and real `getSignaturesForAddress` provenance for all five decoded account types (ADR-026; R-039–R-041). The new DB-backed test also caught a missing INSERT expression and a base58/hex FK mismatch in the geometry upsert, both fixed. Gates: `cargo check -p terra-api` clean; `cargo test -p terra-api` **173/173** (7 new indexer tests; 3 pre-existing `runtime.rs` warnings).
+- **Sprint 063 — Q-033(b) staged rollout + Q-035(a) content-addressed geometry (2026-11-27):** founder authorized both options and commit/merge. All IDL account types now have generated decoders and a provenance-tagged generic `chain_accounts` mirror (migration 0060, applied; 82 per-type acceptance tests at that stage, 83 after the artifact account; CI `--check`), while the eight typed projections stay unchanged. New `ParcelGeometryArtifact` PDA/instruction registers `sha256(raw GeoJSON)` + storage URI without changing the `Parcel` layout; signed upload route and chain-only materialization require tx provenance + content-hash + ring-hash agreement (migration 0061, applied). `/mirror/audit` covers both new tables. ADR-028/029; detail in `sprints/063-sprint-q033-q035.md`.
 - **Sprint E (partial)** — Routing/economics hardening: server-side `GET /geo/route` with `route_between` Dijkstra using `from_node_id`/`to_node_id` node-id topology (migration 0049 adds `content_address` to `provider_replicas` fixing the `prove_replica` column bug); `prove_replica` **fails closed** (503) without `VRF_ORACLE_PUBKEY` — verifies Ed25519 oracle signature over `challenge + content_address`; legacy SHA-256 fallback removed; oracle independence enforced (`oracle ≠ winner/candidate/requester`); `storage_providers.stake_bond` + `wallet_address` (migration 0053) for anti-spam; `GET /providers/replication-audit` enforces N-of-M ≥2 provider classes; `reliability_score` derived from `last_proof_at` challenge results (not self-declared); commits `8cd7aa9`, `0f0a052`.
 - **Sprint F** — Evidence durability: `StorageBackend` enum (`Local`/`Ipfs`); IPFS pinning via `IPFS_API_URL`/`IPFS_GATEWAY_URL` env vars; quarantine + TTL columns on `evidence_uploads` (`quarantined`, `quarantine_reason`, `ttl_seconds`, `expires_at`); honest labeling in `storage.rs` until paid IPFS/S3 backend exists; migration `0053_evidence_durability_and_provider_economy.sql`; commit `0f0a052`.
 - **ZK (out-of-sprint)** — Full Groth16 prover→verifier E2E: `zk_membership_prover_verifier_e2e` registers a zone set, pins VK hash, generates an ownership root, arkworks produces a real Groth16 proof over `terra-zk-membership::MembershipCircuit`, and on-chain `verify_ownership_proof` accepts via `alt_bn128` pairing; tampered proofs rejected. `IMPLEMENTATION_STATUS.md` A14 → `1 – IMPLEMENTED AND VERIFIED`; BPF suite now **308/308**; `ARCHITECTURAL_DECISIONS.md` ADR-025.
@@ -48,7 +49,8 @@ with no “SIMULATION” chips on any step of that path.
   `terra_identity` `HyjpaHY9yQg1KneLZGjpLDQfP9WV4LUEbNZcb7C4Vo6p`). Hosted API
   is live on Render (`https://terra-gscx.onrender.com`, `/health` OK, DB up),
   frontend on GitHub Pages (`https://mrobadiahej.github.io/terra/`), Supabase
-  project `qgtstweelyankeqftepx` migrated through 0057 (`claims_onchain` now present). Remaining Sprint D
+  project `qgtstweelyankeqftepx` migrated through 0061 (`claims_onchain`, `chain_accounts` and
+   `parcel_geometry_artifacts` present). Remaining Sprint D
   work: full founder signoff on “stranger on devnet” exit criteria and
   browser-wallet E2E validation. Keep faucet balance topped up for demo txs.
 - **Supabase project** — `qgtstweelyankeqftepx`; enable `postgis` + `pgcrypto`
@@ -75,10 +77,20 @@ with no “SIMULATION” chips on any step of that path.
   behaviour for the demo. The ZK ceremony/external audit, bounded pause +
   multisig, reviewer randomization, RFC-005 governance decision, external
   audit/fuzzing and time-warp CI remain open (R-006/R-022–R-024/R-029/R-038).
-- **Indexer RPC load (R-041)** — hardened provenance adds one
-   `getSignaturesForAddress` call per mirrored account per 15 s poll; hosted
+- **Indexer RPC load (R-041/R-045)** — 2026-11-27 update: the hard-coded
+   15 s full-account poll was replaced by a 60 s default, env-driven cadence
+   (`TERRA_INDEXER_*`), an 8-byte header-only discriminator scan, batched
+   `getMultipleAccounts` and exponential backoff. ADR-026 still adds one
+   `getSignaturesForAddress` call per mirrored account per poll; hosted
    rate-limit impact is unverified. Failed lookups downgrade rows honestly
    (`FALSE`/`NULL`/`NULL`), so throttling cannot fabricate chain verification.
+- **Indexer coverage + chain-only parcels (REQ-060/Q-033/Q-035)** — Q-033(b)
+   and Q-035(a) resolved (ADR-028/029): every IDL account type is decoded and
+   generically mirrored with provenance; typed tables/APIs still cover only the
+   original eight (stage 2 not funded). Chain-only parcels are now materialized
+   only from a chain-verified content-addressed artifact whose bytes and ring
+   digest both match the chain; no polygon is fabricated. Q-034 pagination and
+   Q-032 hosting remain founder/vendor-gated.
 - **Rotating the exposed Helius RPC key (R-034)** — old published Pages bundles
   contain `api-key=…`; new builds no longer embed it, but the founder must
   revoke/rotate the old key in the Helius dashboard.
@@ -104,8 +116,11 @@ with no “SIMULATION” chips on any step of that path.
    the exposed Helius key (R-034).
 7. Investor demo walkthrough: `/welcome` → `/atlas` → `/demo` → `/mvp` →
    `/verify` → `/stories`, with demo labels visible and no live-chain claim.
-8. Verify the P0 indexer fix on hosted devnet: create a real Claim PDA, confirm
-   `claims_onchain` receives a non-empty `chain_signature` and matching
-   `chain_slot`, check geometry mirrors are `chain_verified`, and watch RPC
-   error logs for rate limiting. Commit/push only after founder authorization
-   (AGENT_GUIDE §7); all P0 work is currently uncommitted.
+8. Verify the P0 + 1d/1e indexer fixes on hosted devnet: create a real Claim
+   PDA, confirm `claims_onchain` receives a non-empty `chain_signature` and
+   matching `chain_slot`, check geometry/rights/3D/snapshot mirrors are
+   `chain_verified`, register a parcel through the panel and confirm the
+   geometry-hash gate, and watch RPC error logs for rate limiting at the new
+   60 s cadence. Also exercise the Q-035 upload→register→materialize flow with
+   a real tx. Founder authorization for commit + `dev`→`main` merge is granted;
+   verify local gates and CI BPF/localnet results before publishing.
