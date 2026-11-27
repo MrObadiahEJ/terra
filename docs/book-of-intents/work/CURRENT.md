@@ -1,7 +1,7 @@
 # Current Work Ledger
 
 Authoritative record of active execution. Phase derives from evidence here.
-Last reconciled: 2026-11-24. Previous ledger archived at
+Last reconciled: 2026-11-27. Previous ledger archived at
 `work/archive/CURRENT-2026-11-16.md` (sprints 001–062).
 
 ## Objective
@@ -33,6 +33,7 @@ with no “SIMULATION” chips on any step of that path.
 - **ZK (out-of-sprint)** — Full Groth16 prover→verifier E2E: `zk_membership_prover_verifier_e2e` registers a zone set, pins VK hash, generates an ownership root, arkworks produces a real Groth16 proof over `terra-zk-membership::MembershipCircuit`, and on-chain `verify_ownership_proof` accepts via `alt_bn128` pairing; tampered proofs rejected. `IMPLEMENTATION_STATUS.md` A14 → `1 – IMPLEMENTED AND VERIFIED`; BPF suite now **308/308**; `ARCHITECTURAL_DECISIONS.md` ADR-025.
 - **Edition 2024 migration** (`1d495d5`): all 5 workspace crates migrated from Rust edition 2021 to 2024 — `terra-core/Cargo.toml` (workspace.package), `programs/terra_registry/Cargo.toml`, `programs/terra_identity/Cargo.toml`, `api/Cargo.toml`, `geo-engine/Cargo.toml`, `zk-membership/Cargo.toml`. `cargo check --workspace` clean; all tests green (registry lib 164/164, API 166/166, identity 23/23, geo 45/45+1, zk-membership 6/6).
 - **MVP demo release** (`15af9fc`): terra-web v0.1.0 — `/demo` scenario player, `/mvp` Intent 5 flow, `/verify`, `/atlas`, `/lab` all functional; `tsc` clean, vitest 138/138, build:check PASS (entry 303 KB gz, Cesium 1098 KB gz, total 1908 KB gz). Built for GitHub Pages at `TERRA_BASE_PATH=/terra/`.
+- **Branch sync + public-demo bundle hygiene** (2026-11-27): `dev` upstream corrected to `origin/dev` and `2cbfb55..dfc65de` pushed; `main` untouched. Frontend now strips loopback API bases and keyed RPC URLs from production (`lib/constants.ts` + 5 tests), `check-bundle.mjs` §5 fails leaking bundles, and the Pages workflow uses public devnet RPC with `pnpm build:check`. Gates: `tsc -b` clean, vitest 143/143, `build:check` PASS. Site: <https://mrobadiahej.github.io/terra/>. Old bundles contain a Helius key — founder must rotate it (R-034). ESLint: 27 pre-existing errors, not a CI gate.
 
 ## Deep-audit report
 
@@ -62,16 +63,39 @@ with no “SIMULATION” chips on any step of that path.
   SBF builds.
 - **Disk headroom** — keep `target/debug` pruned (`make prune`); CI artifacts
   are the source of `.so` files for local E2E.
+- **Hosted production provisioning (Q-032 / R-035–R-038)** — live `/health`
+  reports `osm_loaded:false` (`OSM_PBF_PATH` unset → road access and
+  `GET /geo/route` disabled), no durable object-store creds on ephemeral
+  Render disk (bytes can vanish on redeploy), `VRF_ORACLE_PUBKEY` unset
+  (fail-closed: no challenges, `prove_replica` 503), `TERRA_ZK_MODE=disabled`,
+  and free-tier sleep stops the API-owned TTL/PoP loop and indexer. No uptime
+  monitor or epoch-close scheduler confirmed; single ~0.09 SOL deployer key is
+  also the deploy authority. Founder-gated — do **not** weaken fail-closed
+  behaviour for the demo. The ZK ceremony/external audit, bounded pause +
+  multisig, reviewer randomization, RFC-005 governance decision, external
+  audit/fuzzing and time-warp CI remain open (R-006/R-022–R-024/R-029/R-038).
+- **Rotating the exposed Helius RPC key (R-034)** — old published Pages bundles
+  contain `api-key=…`; new builds no longer embed it, but the founder must
+  revoke/rotate the old key in the Helius dashboard.
+- **Frontend lint debt** — `pnpm exec eslint .` reports 27 pre-existing errors
+  (10 warnings) in 8 files; ESLint is not currently a CI gate. Build, typecheck
+  and 143 vitest cases are green.
 
 ## Next up
 
 1. Confirm CI is green including the `localnet-e2e` job; if red, fix before any new work.
 2. Sprint D (founder-gated: Q-001 devnet funding): real devnet deploy on
    `AK3LmJmQijTJbsqj1PGt1hfXtdHirhNZybhPrYeRPvs3`, hosted API + managed
-   PostGIS (Supabase `qgtstweelyankeqftepx`) + private RPC (Helius devnet),
+   PostGIS (Supabase `qgtstweelyankeqftepx`) + private RPC for the **backend**
+   (Helius devnet; never embed its key in the public Pages bundle),
    env-driven `TERRA_RPC_URL`/`API_BASE`, Pages on hosted API, neutral globe
    focus. Render settings: root `terra-core`, build `cargo build --release -p
    terra-api`, start `./target/release/terra-api`, health `/health`.
-3. Sprint E remainder (founder-gated partially): protocol-side candidate discovery (not requester-supplied), premium-category guarantee (≥1 requested-category validator + random reputable fill), worker re-registration regression test.
+3. Sprint E remainder (founder-gated partially): **on-chain** protocol-side candidate discovery (not requester-supplied) and the on-chain requested-category validator guarantee. The off-chain runtime premium-category guarantee is already implemented and CI-tested (`runtime.rs:462-491`, `premium_category_guarantees_one_reputable_replica` runs with `DATABASE_URL`); do not re-implement it in the API. Worker re-regression test still pending.
 4. Continue Sprint F remainder if Q-001 unblocks: ≥2 replicas for “verified” evidence status, scheduled PoP challenges.
 5. Docs/book-of-intents fully synced to code reality (edition 2024, test baselines, MVP demo).
+6. Confirm the Pages deployment triggered by the frontend commit serves the
+   config-clean bundle at <https://mrobadiahej.github.io/terra/>, then rotate
+   the exposed Helius key (R-034).
+7. Investor demo walkthrough: `/welcome` → `/atlas` → `/demo` → `/mvp` →
+   `/verify` → `/stories`, with demo labels visible and no live-chain claim.

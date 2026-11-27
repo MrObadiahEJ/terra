@@ -2,6 +2,41 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-27 — Branch sync + public-demo bundle hygiene; audit findings registered (no backend changes)
+
+- **Branch sync (founder request):** local `dev` tracked `origin/main` by mistake.
+  Reset upstream to `origin/dev` and pushed the one pending commit
+  (`2cbfb55..dfc65de`, `ci/test: run push CI on main only; improve smoke bundle
+  warning`). `dev = origin/dev = origin/main = dfc65de`; local `main` remains
+  `7b930ef` (untouched). GitHub Pages publishes from `dev`.
+- **Frontend-only production config guard:** `src/lib/constants.ts` now resolves
+  endpoints through `resolvePublicEndpoint` — loopback API bases and keyed RPC
+  URLs are stripped from production builds (dev/E2E keeps them; explicit
+  `VITE_ALLOW_EMBEDDED_RPC_KEY=1` opt-in exists). New `constants.test.ts` (5
+  cases), and `scripts/check-bundle.mjs` §5 fails `dist/` containing a loopback
+  API base or embedded key. `deploy-pages.yml` no longer passes the Helius
+  secret; it uses public devnet RPC and `pnpm build:check`. Verified:
+  `tsc -b` clean, vitest **143/143**, `build:check` PASS (entry 327.8 kB gz,
+  Cesium 1072 kB gz lazy, total 1907.8 kB gz); built `dist/` contains
+  `https://api.devnet.solana.com` + the hosted API base and no dev
+  endpoints/keys. The previously published key must be **rotated** by the
+  founder (it is public in old bundles) — R-034.
+- **Book reconciliation (documentation only):** the premium-category
+  discrepancy is a scope confusion, not a contradiction — the off-chain
+  artifact-retrieval guarantee exists (`api/src/routes/runtime.rs:462-491`,
+  CI-tested with `DATABASE_URL`); the on-chain validator-selection guarantee /
+  protocol-side candidate discovery remains pending (A11 note, CURRENT §Next
+  up). Registered the pasted audit findings not already covered by R-003,
+  R-006, R-011, R-022–R-024, R-029 and Q-009 as R-034–R-038 + Q-032: OSM not
+  loaded, evidence durability unprovisioned, VRF oracle unset, free-tier
+  spin-down of maintenance/indexer, and deployer-key concentration. ZK
+  ceremony/audit, bounded pause/multisig, reviewer randomization, RFC-005
+  governance, external audit/fuzzing and time-warp CI remain founder-gated
+  and were **not** implemented in this frontend-only change.
+- **Honest gate note:** `pnpm exec eslint .` reports 27 pre-existing errors
+  (10 warnings) in 8 files; ESLint is not a CI gate. Not fixed here — recorded
+  as frontend debt, does not affect build/tests.
+
 ## 2026-11-23 — Full doc sync: edition 2024 migration + MVP demo release + test baselines
 
 - **Edition 2024 migration** (`1d495d5`): all 5 workspace crates migrated from

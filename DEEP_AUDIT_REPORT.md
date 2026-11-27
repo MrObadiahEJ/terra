@@ -144,7 +144,12 @@ All registry and identity BPF integration tests pass, covering:
 Additional API coverage added in this pass:
 - Premium-category discovery guarantees ≥1 replica from the requested provider
   type and randomly fills remaining slots; a low-reliability colluder in the
-  requested category is not selected.
+  requested category is not selected. **Scope (reconciled 2026-11-27):** this
+  is the *off-chain artifact-retrieval* path (`api/src/routes/runtime.rs:462-491`;
+  CI test `premium_category_guarantees_one_reputable_replica` with
+  `DATABASE_URL`). The *on-chain* requested-category validator guarantee and
+  protocol-side candidate discovery remain unimplemented (A11, REQ-032) — the
+  `CURRENT.md` "pending" note refers to that layer, not to a contradiction.
 - Retrieval increments `access_count`; downloads add `bytes_served`.
 - Epoch close commits a Merkle root and a claim settles exactly once.
 - Scheduled PoP maintenance challenges due replicas and does not replace a
