@@ -2,6 +2,35 @@
 
 Format: date · version · what changed · evidence/why. Append-only.
 
+## 2026-11-27 — Chain indexer P0 hardening (uncommitted; founder authorization pending)
+
+- **Source-audit defects fixed in `api/src/indexer.rs`:** (1) the indexer
+  queried `claims_onchain` although no migration created it — the first Claim
+  PDA would fail `SELECT id FROM claims_onchain`, `?` would abort the entire
+  15 s poll, and every later account (including parcels) would stop mirroring;
+  (2) spatial-asset and geometry-version upserts never wrote
+  `chain_verified`/`chain_slot`/`chain_signature`; (3) all upserts bound an
+  empty-string signature and the poll-time slot, so `chain_verified` meant
+  "seen during a scan". Fixed by forward migration
+  `0057_claims_onchain_mirror.sql` (applied to Supabase; 20 columns verified
+  including provenance + `mirror_hash` trigger), per-account error isolation,
+  and `AccountProvenance` resolved from `getSignaturesForAddress` (newest
+  non-failing transaction) and bound on INSERT/UPDATE for all five decoded
+  account types. Failed lookups write `FALSE`/`NULL`/`NULL`, never fabricated
+  confidence. ADR-026; R-039–R-041; REQ-055 updated. No applied migration was
+  rewritten (ADR-011) and no founder-gated backend control was changed.
+- **Two latent bugs exposed by the new DB-backed test:** geometry INSERT had
+  24 target columns but only 23 value expressions (missing `chain_signature`),
+  and `asset_pubkey` was hex while its FK requires base58
+  `spatial_assets_onchain.pubkey` — geometry-version mirroring had never
+  succeeded against PostgreSQL. Both fixed in the same forward change.
+- **Gates:** `CARGO_INCREMENTAL=0 cargo check -p terra-api` clean;
+  `CARGO_INCREMENTAL=0 cargo test -p terra-api` **173/173** with `DATABASE_URL`
+  against Supabase (7 new indexer tests, including 3 DB-backed). Only 3
+  pre-existing `runtime.rs` `unused_must_use` warnings. Frontend files
+  unchanged, so frontend gates not re-run. Work remains uncommitted on `dev`
+  per AGENT_GUIDE §7; `main` untouched.
+
 ## 2026-11-27 — Branch sync + public-demo bundle hygiene; audit findings registered (no backend changes)
 
 - **Branch sync (founder request):** local `dev` tracked `origin/main` by mistake.

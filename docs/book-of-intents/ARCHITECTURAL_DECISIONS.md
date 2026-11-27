@@ -427,3 +427,58 @@ and disclosure type; proofs are valid only for the exact pinned VK. No
 live-cluster run yet (B6/Q-001). **Evidence:** `zk-membership/src/circuit.rs`;
 `terra_registry/src/zk/mod.rs` L381–613; integration test
 `zk_membership_prover_verifier_e2e`; OPEN_QUESTIONS Q-009.
+
+## ADR-026 — Indexer provenance: `chain_verified` requires a real transaction
+
+**Date:** 2026-11-27 · **Status:** Accepted
+**Context:** A source audit of `api/src/indexer.rs` found three P0 defects in
+the read path of "Solana is source of truth": (1) `upsert_claim()` queried
+`claims_onchain`, which no migration created, so the first Claim PDA would
+abort the whole 15 s poll and starve later accounts; (2) spatial-asset and
+geometry-version upserts never wrote `chain_verified`/`chain_slot`/
+`chain_signature`, making chain-derived geometry appear unverified; (3) every
+upsert bound `chain_signature = ""` and `chain_slot` to the poll-time slot —
+`chain_verified` meant "seen during a scan", not "verified against a specific
+transaction". The claimed Claim discriminator `9b4616b07bd7f666` matches
+`sha256("account:Claim")[..8]`, so the missing-table failure was reachable in
+the first MVP flow.
+**Decision:** (1) Add forward migration `0057_claims_onchain_mirror.sql`
+(ADR-011: never rewrite applied migrations) with `chain_verified`/`chain_slot`/
+`chain_signature`/`mirror_hash` and a mirror-hash trigger; apply it to the
+hosted database before enabling claim indexing. (2) Isolate mirror failures
+per account: `poll_once()` logs and continues on account-level errors; only
+poll-level RPC failures (`get_slot`, `get_program_accounts`) abort a poll.
+(3) Introduce `AccountProvenance`, resolved via `getSignaturesForAddress`
+(newest **non-failing** entry) for each mirrored account. `chain_verified =
+TRUE`, `chain_slot` and `chain_signature` are bound from that transaction on
+both INSERT and UPDATE for parcels, rights-attestations, claims, spatial
+assets and geometry versions. An RPC failure or an empty/failed-signature list
+yields `FALSE`/`NULL`/`NULL` — never an empty signature or the scan slot. The new
+DB-backed geometry test also exposed two latent upsert defects in the same
+function, both fixed here: the INSERT had 24 target columns but only 23 values
+(`chain_signature` had no expression), and `asset_pubkey` was hex-encoded even
+though it is an FK to the base58 `spatial_assets_onchain.pubkey`, so every
+geometry-version mirror insert failed. These were invisible before because no
+test exercised the upsert against PostgreSQL.
+**Alternatives:** keep scan-slot provenance and rename the columns honestly
+(rejected: loses the transaction anchor required by "verifiable history");
+fetch account-level `getTransaction` for full confirmation (deferred: higher
+RPC cost; successful signature from `getSignaturesForAddress` suffices for a
+read-model anchor); make the whole poll transactional and abort on one bad
+account (rejected: exactly the starvation defect being fixed).
+**Consequences:** all mirrored rows now carry an honest transaction anchor and
+a failed lookup visibly downgrades the row instead of fabricating confidence.
+Per-account signature lookups add RPC load per poll and need hosted rate-limit
+monitoring (R-036/R-041). `/mirror/audit` can extend to claims using the new
+`mirror_hash` without another migration. No founder-gated backend/security
+control was changed. **Evidence:** `api/src/indexer.rs`
+(`AccountProvenance`, `resolve_provenance`, `classify_account`,
+`mirror_account`, per-account isolation in `poll_once`), migration `0057`,
+tests `claim_discriminator_matches_sha256_account_claim`,
+`provenance_skips_failed_transactions_and_uses_their_slot`,
+`provenance_without_signatures_is_unverified`,
+`classify_account_ignores_unknown_and_truncated_buffers`, and DB-backed
+`claims_mirror_has_provenance_columns`,
+`upsert_claim_writes_real_transaction_provenance`,
+`spatial_mirrors_set_chain_verified_from_transaction_provenance`;
+RISK R-039–R-041; `REQUIREMENTS_TRACEABILITY.md` REQ-055.

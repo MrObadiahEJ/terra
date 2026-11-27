@@ -1,16 +1,28 @@
-//! Chain indexer (Sprint C).
+//! Chain indexer (Sprint C; P0 hardening 2026-11-27).
 //!
 //! Polls the configured Solana RPC for `terra_registry` program accounts,
-//! decodes Anchor `Parcel` accounts by discriminator, and upserts them into the
-//! `parcels` mirror table with `chain_verified = true`, `chain_slot`, and
-//! `chain_signature`. Client-POSTed rows start with `chain_verified = false`
-//! and are confirmed by the indexer.
+//! decodes Anchor accounts by discriminator, and upserts them into their
+//! mirror tables. Client-POSTed rows start with `chain_verified = FALSE` and
+//! are confirmed by the indexer.
+//!
+//! Provenance semantics (R-041): `chain_verified = TRUE` means the row was
+//! decoded from an on-chain account **and** a real transaction signature was
+//! resolved for that account. `chain_slot` is the slot of that transaction,
+//! `chain_signature` is the signature itself. When no signature can be
+//! resolved, all three stay honest (`FALSE`/`NULL`/`NULL`) — never the
+//! poll-time slot and never an empty-string signature.
+//!
+//! Per-account isolation (R-039): one bad or undecodable account only skips
+//! that account. A failed mirror cannot abort the poll and starve later
+//! accounts (notably parcels) in RPC order.
 //!
 //! The indexer runs as a background tokio task spawned from `main.rs`.
 
 use anyhow::{Context, Result};
-use solana_client::rpc_client::RpcClient;
+use solana_client::rpc_client::{GetConfirmedSignaturesForAddress2Config, RpcClient};
+use solana_client::rpc_response::RpcConfirmedTransactionStatusWithSignature;
 use solana_sdk::pubkey::Pubkey;
+use sqlx::PgPool;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -52,6 +64,131 @@ const RIGHTS_KIND_OWNERSHIP: u8 = 0;
 
 /// Interval between indexer polls.
 const POLL_INTERVAL_SECS: u64 = 15;
+
+/// Transaction-level provenance for one mirrored account.
+///
+/// `signature` is None unless `getSignaturesForAddress` returned a real,
+/// non-failing transaction. `slot` is that transaction's slot — never the
+/// slot at which the poll happened.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AccountProvenance {
+    slot: Option<u64>,
+    signature: Option<String>,
+}
+
+impl AccountProvenance {
+    /// No confirming transaction resolved: the row is not chain-verified.
+    fn unverified() -> Self {
+        Self { slot: None, signature: None }
+    }
+
+    fn verified(slot: u64, signature: String) -> Self {
+        Self { slot: Some(slot), signature: Some(signature) }
+    }
+
+    fn is_verified(&self) -> bool {
+        self.signature.is_some()
+    }
+}
+
+/// Pick the newest successful transaction from `getSignaturesForAddress`.
+/// Entries are returned newest-first; failed transactions never prove state.
+fn provenance_from_signatures(
+    entries: &[RpcConfirmedTransactionStatusWithSignature],
+) -> AccountProvenance {
+    for entry in entries {
+        if entry.err.is_none() {
+            return AccountProvenance::verified(entry.slot, entry.signature.clone());
+        }
+    }
+    AccountProvenance::unverified()
+}
+
+/// Resolve transaction provenance for a single account.
+///
+/// RPC failures are non-fatal: they yield an unverified provenance so one
+/// rate-limited lookup cannot starve the rest of the poll.
+fn resolve_provenance(
+    client: &RpcClient,
+    pubkey: &Pubkey,
+) -> AccountProvenance {
+    // Bounded lookback: enough to skip a few recent failed transactions
+    // without pulling the account's entire history every poll.
+    let config = GetConfirmedSignaturesForAddress2Config {
+        limit: Some(5),
+        ..Default::default()
+    };
+    match client.get_signatures_for_address_with_config(pubkey, config) {
+        Ok(entries) => provenance_from_signatures(&entries),
+        Err(err) => {
+            warn!(%pubkey, "signature lookup failed; mirroring without chain verification: {err}");
+            AccountProvenance::unverified()
+        }
+    }
+}
+
+/// A decoded account that has a mirror table. Unknown/discriminator-mismatched
+/// accounts are ignored; classification never touches the database.
+enum MirroredAccount {
+    Parcel(ParsedParcel),
+    Attestation(ParsedVerificationAttestation),
+    Claim(ParsedClaim),
+    SpatialAsset(ParsedSpatialAsset),
+    GeometryVersion(ParsedGeometryVersion),
+}
+
+fn classify_account(data: &[u8]) -> Option<MirroredAccount> {
+    if let Some(parcel) = parse_parcel(data) {
+        Some(MirroredAccount::Parcel(parcel))
+    } else if let Some(attestation) = parse_verification_attestation(data) {
+        Some(MirroredAccount::Attestation(attestation))
+    } else if let Some(claim) = parse_claim(data) {
+        Some(MirroredAccount::Claim(claim))
+    } else if let Some(asset) = parse_spatial_asset(data) {
+        Some(MirroredAccount::SpatialAsset(asset))
+    } else if let Some(version) = parse_geometry_version(data) {
+        Some(MirroredAccount::GeometryVersion(version))
+    } else {
+        None
+    }
+}
+
+/// Mirror one account. Errors are returned to the caller, which isolates
+/// them per account instead of aborting the whole poll.
+async fn mirror_account(
+    pool: &PgPool,
+    client: &RpcClient,
+    pubkey: &Pubkey,
+    data: &[u8],
+    parcel_holder: &std::collections::HashMap<[u8; 32], [u8; 32]>,
+) -> Result<bool> {
+    let Some(decoded) = classify_account(data) else {
+        return Ok(false);
+    };
+    let provenance = resolve_provenance(client, pubkey);
+    match decoded {
+        MirroredAccount::Parcel(parcel) => {
+            let holder = parcel_holder
+                .get(&parcel.id)
+                .copied()
+                .unwrap_or_else(|| pubkey.to_bytes());
+            upsert_parcel(pool, pubkey, &parcel, &holder, &provenance).await?;
+        }
+        MirroredAccount::Attestation(attestation) => {
+            upsert_verification_attestation(pool, pubkey, &attestation, &provenance).await?;
+        }
+        MirroredAccount::Claim(claim) => {
+            upsert_claim(pool, pubkey, &claim, &provenance).await?;
+        }
+        MirroredAccount::SpatialAsset(asset) => {
+            upsert_spatial_asset(pool, pubkey, &asset, &provenance).await?;
+        }
+        MirroredAccount::GeometryVersion(version) => {
+            upsert_geometry_version(pool, pubkey, &version, &provenance).await?;
+        }
+    }
+    Ok(true)
+}
 
 /// Parsed Rights account from on-chain data.
 #[allow(dead_code)]
@@ -1159,10 +1296,16 @@ pub async fn run_indexer(rpc_url: String, state: Arc<AppState>) -> Result<()> {
     }
 }
 
-/// Single poll: fetch program accounts, decode parcels/rights/attestations,
-/// upsert mirror rows with real slot + holder from Rights PDA.
+/// Single poll: fetch program accounts, mirror each decoded account with
+/// transaction-level provenance.
+///
+/// Poll-level RPC failures still abort the poll (nothing can be mirrored).
+/// Per-account decode/DB failures are isolated: they are logged and skipped
+/// so later accounts — including parcels — keep mirroring.
 async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) -> Result<usize> {
-    let slot = client.get_slot().with_context(|| "get_slot failed")?;
+    // Keep the cheap slot probe as a poll-health check; provenance itself no
+    // longer uses this scan-time slot (R-041).
+    let _scan_slot = client.get_slot().with_context(|| "get_slot failed")?;
 
     let accounts = client
         .get_program_accounts(program_id)
@@ -1182,27 +1325,27 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
     }
 
     let mut upserted = 0usize;
+    let mut failed = 0usize;
     for (pubkey, account) in &accounts {
-        if let Some(parcel) = parse_parcel(&account.data) {
-            let holder = parcel_holder
-                .get(&parcel.id)
-                .copied()
-                .unwrap_or(pubkey.to_bytes());
-            upsert_parcel(state, pubkey, &parcel, &holder, slot, "").await?;
-            upserted += 1;
-        } else if let Some(attestation) = parse_verification_attestation(&account.data) {
-            upsert_verification_attestation(state, pubkey, &attestation, slot, "").await?;
-            upserted += 1;
-        } else if let Some(claim) = parse_claim(&account.data) {
-            upsert_claim(state, pubkey, &claim, slot, "").await?;
-            upserted += 1;
-        } else if let Some(spatial_asset) = parse_spatial_asset(&account.data) {
-            upsert_spatial_asset(state, pubkey, &spatial_asset, slot, "").await?;
-            upserted += 1;
-        } else if let Some(geometry_version) = parse_geometry_version(&account.data) {
-            upsert_geometry_version(state, pubkey, &geometry_version, slot, "").await?;
-            upserted += 1;
+        match mirror_account(
+            &state.pool,
+            client,
+            pubkey,
+            &account.data,
+            &parcel_holder,
+        )
+        .await
+        {
+            Ok(true) => upserted += 1,
+            Ok(false) => {}
+            Err(err) => {
+                warn!(%pubkey, error = %err, "indexer account mirror failed; continuing poll");
+                failed += 1;
+            }
         }
+    }
+    if failed > 0 {
+        info!("indexer poll: {upserted} accounts upserted, {failed} isolated failures");
     }
 
     Ok(upserted)
@@ -1220,12 +1363,11 @@ async fn poll_once(client: &RpcClient, program_id: &Pubkey, state: &AppState) ->
 /// account only carries a geometry hash, not the full GeoJSON, so overwriting
 /// the mirror's geometry with NULL would destroy client-supplied polygon data.
 async fn upsert_parcel(
-    state: &AppState,
+    pool: &PgPool,
     pubkey: &Pubkey,
     parcel: &ParsedParcel,
     holder: &[u8; 32],
-    slot: u64,
-    _signature: &str,
+    provenance: &AccountProvenance,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
     let holder_hex: String = holder.iter().map(|b| format!("{b:02x}")).collect();
@@ -1245,7 +1387,7 @@ async fn upsert_parcel(
     // Check whether the row already exists (onchain_id is the natural key).
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM parcels WHERE onchain_id = $1")
         .bind(&pubkey_str)
-        .fetch_optional(&state.pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| {
             warn!("check existing parcel {pubkey} failed: {e:?}");
@@ -1264,10 +1406,10 @@ async fn upsert_parcel(
                 rights_count = $5,
                 access_hash = $6,
                 updated_at = to_timestamp($7::double precision),
-                chain_verified = TRUE,
-                chain_slot = $8,
-                chain_signature = $9
-            WHERE id = $10
+                chain_verified = $8,
+                chain_slot = $9,
+                chain_signature = $10
+            WHERE id = $11
             "#,
         )
         .bind(&parcel.name)
@@ -1277,10 +1419,11 @@ async fn upsert_parcel(
         .bind(parcel.rights_count as i16)
         .bind(&access_hash_hex)
         .bind(parcel.updated_at as f64)
-        .bind(slot as i64)
-        .bind("")
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
         .bind(parcel_id)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("update parcel {pubkey} failed: {e:?}");
@@ -1291,7 +1434,7 @@ async fn upsert_parcel(
         sqlx::query("UPDATE parcel_ownership SET holder = $1 WHERE parcel_id = $2")
             .bind(&holder_hex)
             .bind(parcel_id)
-            .execute(&state.pool)
+            .execute(pool)
             .await
             .map_err(|e| {
                 warn!("update parcel_ownership {pubkey} failed: {e:?}");
@@ -1306,7 +1449,7 @@ async fn upsert_parcel(
                 created_at, updated_at, chain_verified, chain_slot, chain_signature
             ) VALUES (
                 $1, $2, NULL, $3, $4, $5, $6, $7,
-                to_timestamp($8::double precision), to_timestamp($9::double precision), TRUE, $10, $11
+                to_timestamp($8::double precision), to_timestamp($9::double precision), $10, $11, $12
             )
             RETURNING id
             "#,
@@ -1320,9 +1463,10 @@ async fn upsert_parcel(
         .bind(&access_hash_hex)
         .bind(parcel.created_at as f64)
         .bind(parcel.updated_at as f64)
-        .bind(slot as i64)
-        .bind("")
-        .fetch_one(&state.pool)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
+        .fetch_one(pool)
         .await
         .map_err(|e| {
             warn!("insert parcel {pubkey} failed: {e:?}");
@@ -1334,7 +1478,7 @@ async fn upsert_parcel(
         sqlx::query("INSERT INTO parcel_ownership (parcel_id, holder) VALUES ($1, $2)")
             .bind(parcel_id)
             .bind(&holder_hex)
-            .execute(&state.pool)
+            .execute(pool)
             .await
             .map_err(|e| {
                 warn!("insert parcel_ownership {pubkey} failed: {e:?}");
@@ -1347,11 +1491,10 @@ async fn upsert_parcel(
 
 /// Insert or update a verification_attestation row from on-chain data.
 async fn upsert_verification_attestation(
-    state: &AppState,
+    pool: &PgPool,
     pubkey: &Pubkey,
     attestation: &ParsedVerificationAttestation,
-    slot: u64,
-    _signature: &str,
+    provenance: &AccountProvenance,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
 
@@ -1386,7 +1529,7 @@ async fn upsert_verification_attestation(
     let exists: Option<i64> =
         sqlx::query_scalar("SELECT id FROM verification_attestations_onchain WHERE pubkey = $1")
             .bind(&pubkey_str)
-            .fetch_optional(&state.pool)
+            .fetch_optional(pool)
             .await
             .map_err(|e| {
                 warn!("check existing verification_attestation {pubkey} failed: {e:?}");
@@ -1407,10 +1550,10 @@ async fn upsert_verification_attestation(
                 sd_jwt_digest = $8,
                 selective_disclosure = $9,
                 protocol_version = $10,
-                chain_verified = TRUE,
-                chain_slot = $11,
-                chain_signature = $12
-            WHERE pubkey = $13
+                chain_verified = $11,
+                chain_slot = $12,
+                chain_signature = $13
+            WHERE pubkey = $14
             "#,
         )
         .bind(&claim_hex)
@@ -1423,10 +1566,11 @@ async fn upsert_verification_attestation(
         .bind(&sd_jwt_digest_hex)
         .bind(attestation.selective_disclosure)
         .bind(attestation.protocol_version as i16)
-        .bind(slot as i64) // chain_slot
-        .bind("") // chain_signature
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
         .bind(&pubkey_str)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("update verification_attestation {pubkey} failed: {e:?}");
@@ -1443,7 +1587,7 @@ async fn upsert_verification_attestation(
             ) VALUES (
                 $1, $2, $3, $4, $5, $6,
                 to_timestamp($7::double precision), to_timestamp($8::double precision),
-                $9, $10, $11, TRUE, $12, $13
+                $9, $10, $11, $12, $13, $14
             )
             "#,
         )
@@ -1458,9 +1602,10 @@ async fn upsert_verification_attestation(
         .bind(&sd_jwt_digest_hex)
         .bind(attestation.selective_disclosure)
         .bind(attestation.protocol_version as i16)
-        .bind(slot as i64) // chain_slot
-        .bind("") // chain_signature
-        .execute(&state.pool)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("insert verification_attestation {pubkey} failed: {e:?}");
@@ -1473,16 +1618,12 @@ async fn upsert_verification_attestation(
 
 /// Insert or update a claim row from on-chain data.
 ///
-/// NOTE: requires a `claims_onchain` mirror table migration (not yet present
-/// in api/migrations). The parsing logic is complete; the upsert SQL below
-/// assumes the table exists with columns matching the ParsedClaim fields.
-/// Create the migration before enabling claim indexing on a live database.
+/// The mirror table is created by migration `0057_claims_onchain_mirror.sql`.
 async fn upsert_claim(
-    state: &AppState,
+    pool: &PgPool,
     pubkey: &Pubkey,
     claim: &ParsedClaim,
-    _slot: u64,
-    _signature: &str,
+    provenance: &AccountProvenance,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
     let claim_id_hex: String = claim.claim_id.iter().map(|b| format!("{b:02x}")).collect();
@@ -1500,7 +1641,7 @@ async fn upsert_claim(
 
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM claims_onchain WHERE pubkey = $1")
         .bind(&pubkey_str)
-        .fetch_optional(&state.pool)
+        .fetch_optional(pool)
         .await
         .map_err(|e| {
             warn!("check existing claim {pubkey} failed: {e:?}");
@@ -1524,9 +1665,11 @@ async fn upsert_claim(
                 required_attestations = $11,
                 chain_created_at = to_timestamp($12::double precision),
                 chain_updated_at = to_timestamp($13::double precision),
-                chain_verified = TRUE,
+                chain_verified = $14,
+                chain_slot = $15,
+                chain_signature = $16,
                 mirrored_at = now()
-            WHERE pubkey = $14
+            WHERE pubkey = $17
             "#,
         )
         .bind(&claim_id_hex)
@@ -1542,8 +1685,11 @@ async fn upsert_claim(
         .bind(claim.required_attestations as i16)
         .bind(claim.created_at as f64)
         .bind(claim.updated_at as f64)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
         .bind(&pubkey_str)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("update claim {pubkey} failed: {e:?}");
@@ -1556,10 +1702,12 @@ async fn upsert_claim(
                 pubkey, claim_id, parcel_pubkey, claim_type, submitted_by,
                 status, statement_hash, version, evidence_count,
                 observation_count, attestation_count, required_attestations,
-                chain_created_at, chain_updated_at, chain_verified, mirrored_at
+                chain_created_at, chain_updated_at,
+                chain_verified, chain_slot, chain_signature, mirrored_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                to_timestamp($13::double precision), to_timestamp($14::double precision), TRUE, now()
+                to_timestamp($13::double precision), to_timestamp($14::double precision),
+                $15, $16, $17, now()
             )
             "#,
         )
@@ -1577,7 +1725,10 @@ async fn upsert_claim(
         .bind(claim.required_attestations as i16)
         .bind(claim.created_at as f64)
         .bind(claim.updated_at as f64)
-        .execute(&state.pool)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("insert claim {pubkey} failed: {e:?}");
@@ -1590,11 +1741,10 @@ async fn upsert_claim(
 
 /// Insert or update a spatial_asset row from on-chain data.
 async fn upsert_spatial_asset(
-    state: &AppState,
+    pool: &PgPool,
     pubkey: &Pubkey,
     asset: &ParsedSpatialAsset,
-    _slot: u64,
-    _signature: &str,
+    provenance: &AccountProvenance,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
     let parcel_hex: String = asset.parcel.iter().map(|b| format!("{b:02x}")).collect();
@@ -1608,7 +1758,7 @@ async fn upsert_spatial_asset(
     let exists: Option<i64> =
         sqlx::query_scalar("SELECT id FROM spatial_assets_onchain WHERE pubkey = $1")
             .bind(&pubkey_str)
-            .fetch_optional(&state.pool)
+            .fetch_optional(pool)
             .await
             .map_err(|e| {
                 warn!("check existing spatial_asset {pubkey} failed: {e:?}");
@@ -1628,8 +1778,11 @@ async fn upsert_spatial_asset(
                 latest_geometry_hash = $7,
                 chain_created_at = to_timestamp($8::double precision),
                 chain_updated_at = to_timestamp($9::double precision),
+                chain_verified = $10,
+                chain_slot = $11,
+                chain_signature = $12,
                 mirrored_at = now()
-            WHERE pubkey = $10
+            WHERE pubkey = $13
             "#,
         )
         .bind(&parcel_hex)
@@ -1641,8 +1794,11 @@ async fn upsert_spatial_asset(
         .bind(&latest_geometry_hex)
         .bind(asset.created_at as f64)
         .bind(asset.updated_at as f64)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
         .bind(&pubkey_str)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("update spatial_asset {pubkey} failed: {e:?}");
@@ -1654,10 +1810,12 @@ async fn upsert_spatial_asset(
             INSERT INTO spatial_assets_onchain (
                 pubkey, parcel_pubkey, authority, dimensionality,
                 elevation_min_mm, elevation_max_mm, geometry_version_count,
-                latest_geometry_hash, chain_created_at, chain_updated_at, mirrored_at
+                latest_geometry_hash, chain_created_at, chain_updated_at,
+                chain_verified, chain_slot, chain_signature, mirrored_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8,
-                to_timestamp($9::double precision), to_timestamp($10::double precision), now()
+                to_timestamp($9::double precision), to_timestamp($10::double precision),
+                $11, $12, $13, now()
             )
             "#,
         )
@@ -1671,7 +1829,10 @@ async fn upsert_spatial_asset(
         .bind(&latest_geometry_hex)
         .bind(asset.created_at as f64)
         .bind(asset.updated_at as f64)
-        .execute(&state.pool)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("insert spatial_asset {pubkey} failed: {e:?}");
@@ -1684,14 +1845,16 @@ async fn upsert_spatial_asset(
 
 /// Insert or update a geometry_version row from on-chain data.
 async fn upsert_geometry_version(
-    state: &AppState,
+    pool: &PgPool,
     pubkey: &Pubkey,
     version: &ParsedGeometryVersion,
-    _slot: u64,
-    _signature: &str,
+    provenance: &AccountProvenance,
 ) -> Result<()> {
     let pubkey_str = pubkey.to_string();
-    let asset_hex: String = version.asset.iter().map(|b| format!("{b:02x}")).collect();
+    // `geometry_versions_onchain.asset_pubkey` is an FK to
+    // `spatial_assets_onchain.pubkey`, which is base58. The on-chain field is
+    // raw bytes; hex encoding here silently broke every geometry insert.
+    let asset_pubkey = Pubkey::new_from_array(version.asset).to_string();
     let parcel_hex: String = version.parcel.iter().map(|b| format!("{b:02x}")).collect();
     let geometry_hash_hex: String = version
         .geometry_hash
@@ -1718,7 +1881,7 @@ async fn upsert_geometry_version(
     let exists: Option<i64> =
         sqlx::query_scalar("SELECT id FROM geometry_versions_onchain WHERE pubkey = $1")
             .bind(&pubkey_str)
-            .fetch_optional(&state.pool)
+            .fetch_optional(pool)
             .await
             .map_err(|e| {
                 warn!("check existing geometry_version {pubkey} failed: {e:?}");
@@ -1748,11 +1911,14 @@ async fn upsert_geometry_version(
                 required = $17,
                 attest_count = $18,
                 attestors = $19,
+                chain_verified = $20,
+                chain_slot = $21,
+                chain_signature = $22,
                 mirrored_at = now()
-            WHERE pubkey = $20
+            WHERE pubkey = $23
             "#,
         )
-        .bind(&asset_hex)
+        .bind(&asset_pubkey)
         .bind(&parcel_hex)
         .bind(version.version as i32)
         .bind(&geometry_hash_hex)
@@ -1771,8 +1937,11 @@ async fn upsert_geometry_version(
         .bind(version.required as i16)
         .bind(version.attest_count as i16)
         .bind(&attestors_hex)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
         .bind(&pubkey_str)
-        .execute(&state.pool)
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("update geometry_version {pubkey} failed: {e:?}");
@@ -1787,17 +1956,17 @@ async fn upsert_geometry_version(
                 chain_submitted_at, verified, verified_by,
                 chain_verified_at, evidence_manifest, elevation_min_mm,
                 elevation_max_mm, elevation_source, required, attest_count,
-                attestors, mirrored_at
+                attestors, chain_verified, chain_slot, chain_signature, mirrored_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9,
                 to_timestamp($10::double precision), $11, $12,
                 to_timestamp($13::double precision), $14, $15, $16, $17, $18, $19,
-                now()
+                $20, $21, $22, $23, now()
             )
             "#,
         )
         .bind(&pubkey_str)
-        .bind(&asset_hex)
+        .bind(&asset_pubkey)
         .bind(&parcel_hex)
         .bind(version.version as i32)
         .bind(&geometry_hash_hex)
@@ -1816,7 +1985,10 @@ async fn upsert_geometry_version(
         .bind(version.required as i16)
         .bind(version.attest_count as i16)
         .bind(&attestors_hex)
-        .execute(&state.pool)
+        .bind(provenance.is_verified())
+        .bind(provenance.slot.map(|s| s as i64))
+        .bind(provenance.signature.as_deref())
+        .execute(pool)
         .await
         .map_err(|e| {
             warn!("insert geometry_version {pubkey} failed: {e:?}");
@@ -1825,4 +1997,269 @@ async fn upsert_geometry_version(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+
+    fn signature_entry(
+        signature: &str,
+        slot: u64,
+        failed: bool,
+    ) -> RpcConfirmedTransactionStatusWithSignature {
+        RpcConfirmedTransactionStatusWithSignature {
+            signature: signature.to_string(),
+            slot,
+            err: if failed {
+                Some(
+                    serde_json::from_value(serde_json::json!("AccountNotFound"))
+                        .expect("UiTransactionError deserializes from variant name"),
+                )
+            } else {
+                None
+            },
+            memo: None,
+            block_time: None,
+            confirmation_status: None,
+        }
+    }
+
+    #[test]
+    fn claim_discriminator_matches_sha256_account_claim() {
+        let digest = Sha256::digest(b"account:Claim");
+        assert_eq!(
+            CLAIM_DISCRIMINATOR,
+            [
+                digest[0], digest[1], digest[2], digest[3],
+                digest[4], digest[5], digest[6], digest[7],
+            ],
+            "indexer must match the real Anchor Claim discriminator"
+        );
+    }
+
+    #[test]
+    fn provenance_skips_failed_transactions_and_uses_their_slot() {
+        // RPC returns newest-first; the newest entry failed, so it cannot
+        // prove the mirrored state. The next successful entry is the anchor.
+        let entries = vec![
+            signature_entry("failed-sig", 900, true),
+            signature_entry("real-sig", 842, false),
+        ];
+        let provenance = provenance_from_signatures(&entries);
+        assert!(provenance.is_verified());
+        assert_eq!(provenance.signature.as_deref(), Some("real-sig"));
+        assert_eq!(provenance.slot, Some(842));
+    }
+
+    #[test]
+    fn provenance_without_signatures_is_unverified() {
+        let provenance = provenance_from_signatures(&[]);
+        assert!(!provenance.is_verified());
+        assert_eq!(provenance.signature, None);
+        assert_eq!(provenance.slot, None);
+    }
+
+    #[test]
+    fn classify_account_ignores_unknown_and_truncated_buffers() {
+        assert!(classify_account(b"not an anchor account").is_none());
+        // A valid discriminator with a truncated body must return None rather
+        // than panicking: a malformed account must be isolated, not crash a poll.
+        let mut truncated = CLAIM_DISCRIMINATOR.to_vec();
+        truncated.extend_from_slice(&[0u8; 7]);
+        assert!(classify_account(&truncated).is_none());
+    }
+
+    async fn test_pool() -> Option<PgPool> {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping DB-backed indexer test: DATABASE_URL is not set");
+            return None;
+        };
+        Some(
+            sqlx::PgPool::connect(&database_url)
+                .await
+                .expect("connect test database"),
+        )
+    }
+
+    #[tokio::test]
+    async fn claims_mirror_has_provenance_columns() {
+        let Some(pool) = test_pool().await else { return };
+        let columns: Vec<String> = sqlx::query_scalar(
+            "SELECT column_name FROM information_schema.columns \
+             WHERE table_name = 'claims_onchain'",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("query claims_onchain columns");
+        for column in [
+            "pubkey",
+            "chain_verified",
+            "chain_slot",
+            "chain_signature",
+            "mirror_hash",
+        ] {
+            assert!(
+                columns.iter().any(|c| c == column),
+                "claims_onchain must have a {column} column (migration 0057)"
+            );
+        }
+        pool.close().await;
+    }
+
+    fn test_claim() -> ParsedClaim {
+        ParsedClaim {
+            claim_id: [1u8; 32],
+            parcel: [2u8; 32],
+            claim_type: 1,
+            submitted_by: [3u8; 32],
+            status: 1,
+            statement_hash: [4u8; 32],
+            version: 2,
+            evidence_count: 3,
+            observation_count: 4,
+            attestation_count: 5,
+            required_attestations: 6,
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_100,
+        }
+    }
+
+    #[tokio::test]
+    async fn upsert_claim_writes_real_transaction_provenance() {
+        let Some(pool) = test_pool().await else { return };
+        let pubkey = Pubkey::new_unique();
+        let key = pubkey.to_string();
+        let claim = test_claim();
+        let verified = AccountProvenance::verified(842, "test-claim-signature".to_string());
+
+        upsert_claim(&pool, &pubkey, &claim, &verified)
+            .await
+            .expect("upsert claim with provenance");
+
+        let (chain_verified, chain_slot, chain_signature): (bool, Option<i64>, Option<String>) =
+            sqlx::query_as(
+                "SELECT chain_verified, chain_slot, chain_signature \
+                 FROM claims_onchain WHERE pubkey = $1",
+            )
+            .bind(&key)
+            .fetch_one(&pool)
+            .await
+            .expect("read claim provenance");
+        assert!(chain_verified);
+        assert_eq!(chain_slot, Some(842));
+        assert_eq!(chain_signature.as_deref(), Some("test-claim-signature"));
+
+        // A failed signature lookup must downgrade, not fabricate provenance.
+        upsert_claim(&pool, &pubkey, &claim, &AccountProvenance::unverified())
+            .await
+            .expect("upsert claim without provenance");
+        let (chain_verified, chain_slot, chain_signature): (bool, Option<i64>, Option<String>) =
+            sqlx::query_as(
+                "SELECT chain_verified, chain_slot, chain_signature \
+                 FROM claims_onchain WHERE pubkey = $1",
+            )
+            .bind(&key)
+            .fetch_one(&pool)
+            .await
+            .expect("read downgraded claim provenance");
+        assert!(!chain_verified);
+        assert_eq!(chain_slot, None);
+        assert_eq!(chain_signature, None);
+
+        sqlx::query("DELETE FROM claims_onchain WHERE pubkey = $1")
+            .bind(&key)
+            .execute(&pool)
+            .await
+            .expect("delete test claim");
+        pool.close().await;
+    }
+
+    fn test_spatial_asset() -> ParsedSpatialAsset {
+        ParsedSpatialAsset {
+            parcel: [5u8; 32],
+            authority: [6u8; 32],
+            dimensionality: 2,
+            elevation_min_mm: 100,
+            elevation_max_mm: 900,
+            geometry_version_count: 1,
+            latest_geometry: [7u8; 32],
+            created_at: 1_700_000_000,
+            updated_at: 1_700_000_100,
+        }
+    }
+
+    fn test_geometry_version(asset: &Pubkey) -> ParsedGeometryVersion {
+        ParsedGeometryVersion {
+            asset: asset.to_bytes(),
+            parcel: [5u8; 32],
+            version: 1,
+            geometry_hash: [8u8; 32],
+            source: 1,
+            dimension: 2,
+            storage_reference: "test://geometry".to_string(),
+            submitted_by: [9u8; 32],
+            submitted_at: 1_700_000_000,
+            verified: true,
+            verified_by: [10u8; 32],
+            verified_at: 1_700_000_100,
+            evidence_manifest: [11u8; 32],
+            elevation_min_mm: 100,
+            elevation_max_mm: 900,
+            elevation_source: 1,
+            required: 1,
+            attestors: vec![],
+            attest_count: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn spatial_mirrors_set_chain_verified_from_transaction_provenance() {
+        let Some(pool) = test_pool().await else { return };
+        let asset_key = Pubkey::new_unique();
+        let version_key = Pubkey::new_unique();
+        let asset_str = asset_key.to_string();
+        let version_str = version_key.to_string();
+        let provenance = AccountProvenance::verified(1234, "test-spatial-signature".to_string());
+
+        let asset = test_spatial_asset();
+        upsert_spatial_asset(&pool, &asset_key, &asset, &provenance)
+            .await
+            .expect("upsert spatial asset");
+        let version = test_geometry_version(&asset_key);
+        upsert_geometry_version(&pool, &version_key, &version, &provenance)
+            .await
+            .expect("upsert geometry version");
+
+        for (table, key) in [
+            ("spatial_assets_onchain", &asset_str),
+            ("geometry_versions_onchain", &version_str),
+        ] {
+            let query = format!(
+                "SELECT chain_verified, chain_slot, chain_signature FROM {table} WHERE pubkey = $1"
+            );
+            let (verified, slot, signature): (bool, Option<i64>, Option<String>) =
+                sqlx::query_as(&query)
+                    .bind(key)
+                    .fetch_one(&pool)
+                    .await
+                    .expect("read spatial provenance");
+            assert!(verified, "{table} must be chain-verified when a tx is resolved");
+            assert_eq!(slot, Some(1234), "{table} must store the tx slot");
+            assert_eq!(signature.as_deref(), Some("test-spatial-signature"));
+        }
+
+        sqlx::query("DELETE FROM geometry_versions_onchain WHERE pubkey = $1")
+            .bind(&version_str)
+            .execute(&pool)
+            .await
+            .expect("delete test geometry version");
+        sqlx::query("DELETE FROM spatial_assets_onchain WHERE pubkey = $1")
+            .bind(&asset_str)
+            .execute(&pool)
+            .await
+            .expect("delete test spatial asset");
+        pool.close().await;
+    }
 }

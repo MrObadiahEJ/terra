@@ -38,3 +38,38 @@ chain agreement.
 
 Nothing; uses the Sprint A local cluster. Devnet slot/signature evidence waits
 for Sprint D.
+
+## Addendum — 2026-11-27 P0 source-audit hardening (uncommitted)
+
+**Status:** code + migration + tests complete on `dev`; **not committed** —
+founder authorization required (AGENT_GUIDE §7). `main` untouched.
+
+A source audit found three P0 defects not recorded in any ledger (R-039–R-041,
+ADR-026): `upsert_claim()` queried a `claims_onchain` table no migration
+created, so the first Claim PDA would abort the 15 s poll and starve later
+accounts; spatial/geometry upserts never wrote chain provenance columns; and
+all upserts bound `chain_signature = ""` plus the poll-time slot, making
+`chain_verified` mean "seen during a scan". Fixed by:
+
+1. Forward migration `0057_claims_onchain_mirror.sql` (applied to Supabase;
+   20 columns verified, includes `chain_verified`/`chain_slot`/
+   `chain_signature`/`mirror_hash` + trigger). No applied migration rewritten
+   (ADR-011).
+2. Per-account error isolation in `poll_once()`: only poll-level RPC failures
+   abort; one bad account logs and continues.
+3. `AccountProvenance` from `getSignaturesForAddress` (newest non-failing
+   transaction), bound on INSERT and UPDATE for parcels, attestations, claims,
+   spatial assets and geometry versions. RPC/empty-signature failures yield
+   `FALSE`/`NULL`/`NULL` — never an empty signature or scan slot.
+4. Two latent bugs exposed by the new DB-backed test: geometry INSERT had 24
+   target columns / 23 values (fixed `$23`), and `asset_pubkey` was hex despite
+   an FK to base58 `spatial_assets_onchain.pubkey` (now
+   `Pubkey::new_from_array(...).to_string()`).
+
+**Evidence / gates:** `cargo check -p terra-api` clean;
+`cargo test -p terra-api` **173/173** with `DATABASE_URL` against Supabase;
+7 new indexer tests (claim discriminator, provenance filtering,
+unknown/truncated buffers, claims columns, claim provenance, spatial/geometry
+provenance). Original exit checks (CLI parcel + hand-edited row via
+`/mirror/audit`) still require a live devnet run; hosted RPC rate-limit impact
+of per-account signature lookups remains under monitoring (R-041).
