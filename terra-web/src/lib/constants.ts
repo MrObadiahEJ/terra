@@ -11,8 +11,41 @@ export const TERRA_IDENTITY_PROGRAM_ID =
 
 // Solana cluster. Terra targets Devnet for the Phase 1 MVP; the Sprint B
 // Playwright loop overrides this with VITE_TERRA_RPC_URL on a local Surfnet.
-export const TERRA_RPC_URL =
-  import.meta.env.VITE_TERRA_RPC_URL?.trim() || 'https://api.devnet.solana.com'
+// Public GitHub Pages bundles are readable by anyone. Loopback endpoints and
+// embedded provider keys are dev/E2E-only: E2E uses the Vite dev server
+// (DEV=true), and a production build needs an explicit opt-in to embed a key.
+const allowDevEndpoints = import.meta.env.DEV
+const allowKeyedRpc =
+  allowDevEndpoints || import.meta.env.VITE_ALLOW_EMBEDDED_RPC_KEY === '1'
+
+const DEFAULT_RPC_URL = 'https://api.devnet.solana.com'
+const DEFAULT_API_BASE = '/api/v1'
+
+export function isLoopbackEndpoint(value: string): boolean {
+  return /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:[/?#]|$)/i.test(value.trim())
+}
+
+export function hasEmbeddedCredential(value: string): boolean {
+  return /[?&](?:api[-_]?key|token|access[_-]?token)=/i.test(value)
+}
+
+export function resolvePublicEndpoint(
+  configured: string | undefined,
+  fallback: string,
+  options: { allowLoopback: boolean; allowCredentials: boolean },
+): string {
+  const value = configured?.trim()
+  if (!value) return fallback
+  if (!options.allowLoopback && isLoopbackEndpoint(value)) return fallback
+  if (!options.allowCredentials && hasEmbeddedCredential(value)) return fallback
+  return value
+}
+
+export const TERRA_RPC_URL = resolvePublicEndpoint(
+  import.meta.env.VITE_TERRA_RPC_URL,
+  DEFAULT_RPC_URL,
+  { allowLoopback: allowDevEndpoints, allowCredentials: allowKeyedRpc },
+)
 
 function clusterName(url: string): string {
   if (/127\.0\.0\.1|localhost/.test(url)) return 'localnet'
@@ -26,8 +59,13 @@ export const TERRA_CLUSTER = clusterName(TERRA_RPC_URL)
 export const TERRA_IS_LOCALNET = TERRA_CLUSTER === 'localnet'
 
 // Off-chain Axum API. Served through the Vite dev proxy at /api, so use a
-// relative base here. Point this at the deployed host in production.
-export const API_BASE = import.meta.env.VITE_API_BASE?.trim() || '/api/v1'
+// relative base here. The Pages build points this at the hosted API; a stray
+// localhost override must never be compiled into a production bundle.
+export const API_BASE = resolvePublicEndpoint(
+  import.meta.env.VITE_API_BASE,
+  DEFAULT_API_BASE,
+  { allowLoopback: allowDevEndpoints, allowCredentials: false },
+)
 
 // Camera/journal default focus — neutral equatorial position. The globe
 // initializes here; users navigate to their region of interest. Deliberately

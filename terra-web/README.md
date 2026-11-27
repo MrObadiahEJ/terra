@@ -125,6 +125,30 @@ working for every page: the atlas uses bundled data and keyless tiles, the
 scenario player runs its deterministic local preview, and stories fall back to
 bundled demos.
 
+Production builds are public, so `lib/constants.ts` drops loopback API bases and
+keyed RPC URLs unless `DEV=true` (Vite dev server) or the explicit
+`VITE_ALLOW_EMBEDDED_RPC_KEY=1` opt-in is set. `scripts/check-bundle.mjs` fails
+the build if either survives into `dist/`. The Pages workflow therefore uses
+public devnet RPC and never passes a secret.
+
+### Presenting the public demo
+
+Live site: <https://mrobadiahej.github.io/terra/> (project site under `/terra/`).
+
+| Stop | URL | What it shows |
+| --- | --- | --- |
+| 1 | `/welcome` | Product framing, honest API status chip, activity feed (demo + live) |
+| 2 | `/atlas` | Globe with keyless basemaps, bundled parcels/roads, search and 2D↔3D |
+| 3 | `/demo` | Deterministic seeded scenario player; works with the API offline |
+| 4 | `/mvp` → `/verify` | Intent-5 flow and verifier surface |
+| 5 | `/stories` → `/story/:id` | Bundled spatial stories, no backend needed |
+
+The hosted API (`https://terra-gscx.onrender.com`) is optional for this walkthrough:
+Render's free tier can sleep and cold-start, and the API reports
+`osm_loaded:false` until OSM data is provisioned. Every page must stay usable
+with demo data and visible provenance labels — never present simulated output
+as verified on-chain evidence.
+
 ## Current Status & Next Steps
 
 **Done:** router shell and 13 pages, typed API clients, keyless Cesium atlas

@@ -159,6 +159,29 @@ if (kb(totalGzip) > BUDGET.totalGzipKb) {
   fail(`emitted JS is ${kb(totalGzip).toFixed(1)} KB gz (budget ${BUDGET.totalGzipKb} KB)`)
 }
 
+// 5. Production bundles are public. A dev API fallback or an embedded provider
+//    key cannot be fixed by "manual inspection" — fail the build instead.
+//    Loopback strings from third-party libraries (e.g. rpc-websockets' default
+//    ws://localhost:8080) are not our configured API base and are ignored.
+const PROD_CONFIG_LEAKS = [
+  {
+    label: 'loopback API base',
+    pattern: /(?:https?:\/\/)?(?:localhost|127\.0\.0\.1):8080\/api\/v1/i,
+  },
+  {
+    label: 'embedded RPC/API key',
+    pattern: /[?&](?:api[-_]?key|access[_-]?token)=[A-Za-z0-9_-]{8,}/i,
+  },
+]
+for (const asset of assets.values()) {
+  if (asset.text === null) asset.text = readFileSync(asset.path, 'utf8')
+  for (const { label, pattern } of PROD_CONFIG_LEAKS) {
+    if (pattern.test(asset.text)) {
+      fail(`${asset.name} ships a ${label} — dev-only endpoints/keys must not be bundled`)
+    }
+  }
+}
+
 if (process.exitCode) {
   console.error(
     '\nIf the growth is intentional, raise the matching budget in ' +

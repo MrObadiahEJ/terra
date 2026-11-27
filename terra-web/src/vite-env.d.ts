@@ -10,6 +10,11 @@ interface ImportMetaEnv {
    * wallet. It is ignored in production builds.
    */
   readonly VITE_TERRA_E2E_SECRET_KEY?: string
+  /**
+   * Explicit opt-in to embed a keyed RPC URL in a production build. Any key in
+   * a browser bundle is public; leave unset for the GitHub Pages demo.
+   */
+  readonly VITE_ALLOW_EMBEDDED_RPC_KEY?: string
 }
 
 interface ImportMeta {

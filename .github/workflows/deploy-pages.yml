@@ -49,12 +49,15 @@ jobs:
       - name: Type check
         run: pnpm exec tsc -b
 
-      - name: Build (project-site base path)
+      # Everything here is public. Never pass a keyed RPC URL: any key in a
+      # browser bundle is readable by every visitor. Wallet reads use public
+      # devnet; dev/E2E keeps its own keyed endpoint in gitignored `.env.local`.
+      - name: Build + bundle/config gate (project-site base path)
         env:
           TERRA_BASE_PATH: /terra/
           VITE_API_BASE: https://terra-gscx.onrender.com/api/v1
-          VITE_TERRA_RPC_URL: ${{ secrets.VITE_TERRA_RPC_URL }}
-        run: pnpm build
+          VITE_TERRA_RPC_URL: https://api.devnet.solana.com
+        run: pnpm build:check
 
       - uses: actions/configure-pages@v5
 
