@@ -64,10 +64,17 @@ if command -v curl >/dev/null 2>&1; then
       [ -n "$js_path" ] || continue
       curl -sS --max-time 30 "https://mrobadiahej.github.io${js_path}" >> "$bundle" || true
     done <<< "$js_paths"
-    for needle in "terra-gscx.onrender.com" "devnet.helius-rpc.com" "$REGISTRY"; do
+    # Production builds strip keyed RPC URLs and use public devnet (see
+    # terra-web/src/lib/constants.ts), so accept either devnet host here.
+    for needle in "terra-gscx.onrender.com" "$REGISTRY"; do
       if grep -q "$needle" "$bundle"; then green "Bundle contains $needle"; pass=$((pass+1))
       else red "Bundle missing $needle"; fail=$((fail+1)); fi
     done
+    if grep -qE 'api\.devnet\.solana\.com|devnet\.helius-rpc\.com' "$bundle"; then
+      green "Bundle contains a devnet RPC host"; pass=$((pass+1))
+    else
+      red "Bundle missing a devnet RPC host"; fail=$((fail+1))
+    fi
     if grep -qE 'http://localhost|https://localhost|localhost:[0-9]+' "$bundle"; then
       yellow "Bundle contains localhost URL literals; inspect context before demo (may be benign library defaults)"
     else
