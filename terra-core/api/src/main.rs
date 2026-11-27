@@ -4,6 +4,7 @@ mod db;
 mod error;
 mod geoutil;
 mod indexer;
+mod indexer_decoders;
 mod routes;
 mod state;
 mod storage;
@@ -104,14 +105,27 @@ async fn main() -> Result<()> {
         ))
         .with_state(state.clone());
 
-    // Sprint C: start the chain indexer as a background task.
-    let rpc_url = config.rpc_url.clone();
-    let indexer_state = state.clone();
-    tokio::spawn(async move {
-        if let Err(err) = indexer::run_indexer(rpc_url, Arc::new(indexer_state)).await {
-            tracing::error!("chain indexer stopped: {err}");
-        }
-    });
+    // Sprint C: start the chain indexer as a background task. The cadence,
+    // timeout, backoff ceiling and batch size are env-driven so a metered
+    // hosted RPC can be tuned without a redeploy (R-045).
+    if config.indexer_enabled {
+        let rpc_url = config.rpc_url.clone();
+        let indexer_state = state.clone();
+        let options = indexer::IndexerOptions {
+            poll_interval: std::time::Duration::from_secs(config.indexer_poll_interval_secs),
+            rpc_timeout: std::time::Duration::from_secs(config.indexer_rpc_timeout_secs),
+            max_backoff: std::time::Duration::from_secs(config.indexer_max_backoff_secs),
+            account_batch_size: config.indexer_account_batch_size,
+        };
+        tokio::spawn(async move {
+            if let Err(err) = indexer::run_indexer(rpc_url, Arc::new(indexer_state), options).await
+            {
+                tracing::error!("chain indexer stopped: {err}");
+            }
+        });
+    } else {
+        tracing::warn!("chain indexer disabled via TERRA_INDEXER_ENABLED");
+    }
 
     // Sprint F maintenance loop: TTL purge + scheduled PoP challenges.
     // Render has no cron, so the API owns this schedule: every 15 minutes it

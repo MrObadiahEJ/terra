@@ -1,12 +1,16 @@
+use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
-use axum::routing::{delete, get, post};
+use axum::http::{HeaderMap, StatusCode};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::auth::{self, RequestParts};
+use crate::auth::{self, RequestParts, SignedRequest};
 use crate::error::AppError;
 use crate::geoutil::geojson_polygon;
 use crate::routes::{disputes, identities, rights};
@@ -155,6 +159,10 @@ pub fn router() -> Router<AppState> {
             "/{id}/rights/{nonce}/sweep",
             post(rights::sweep_expired_right),
         )
+        .route(
+            "/{parcel_pda}/geometry-artifact",
+            put(upload_geometry_artifact),
+        )
 }
 
 async fn list(
@@ -234,8 +242,8 @@ async fn create_parcel(
 
     let parcel = sqlx::query_as::<_, ParcelRow>(
         "WITH p AS (
-            INSERT INTO parcels (name, status, geometry, onchain_id)
-            VALUES ($1, $3, ST_GeomFromGeoJSON($4), $5)
+            INSERT INTO parcels (name, status, geometry, source_geometry, onchain_id)
+            VALUES ($1, $3, ST_GeomFromGeoJSON($4), $4, $5)
             RETURNING id, name, status,
                       ST_AsGeoJSON(geometry)::text AS geometry,
                       ST_Area(geometry::geography)::float8 AS area_m2,
@@ -542,9 +550,169 @@ async fn judicial_forfeiture(
     ))
 }
 
+// ---------------------------------------------------------------------------
+// Q-035(a): content-addressed geometry artifact upload
+//
+// PUT /api/v1/parcels/{parcel_pda}/geometry-artifact
+//
+// Raw GeoJSON bytes are stored under sha256(bytes). The caller must declare
+// that digest in `X-Content-SHA256`; the signed body hash binds the bytes to
+// the request. The returned `storage_uri` and `content_hash` are the exact
+// values to pass to `register_parcel_geometry_artifact` on chain.
+// ---------------------------------------------------------------------------
+
+fn parse_pubkey_param(raw: &str) -> Result<Pubkey, AppError> {
+    if let Ok(pubkey) = Pubkey::from_str(raw) {
+        return Ok(pubkey);
+    }
+    Ok(Pubkey::new_from_array(decode_hex32(raw)?))
+}
+
+#[derive(Debug, Serialize)]
+pub struct GeometryArtifactUploadResponse {
+    pub parcel_pubkey: String,
+    /// sha256(raw GeoJSON bytes), hex — on-chain `content_hash`.
+    pub content_hash: String,
+    /// sha256(JSON.stringify(coordinates[0])), hex — on-chain `geometry_hash`.
+    pub geometry_hash: String,
+    /// Content-addressed storage reference — on-chain `storage_uri`.
+    pub storage_uri: String,
+    pub storage_backend: String,
+    pub size_bytes: i64,
+    pub created: bool,
+}
+
+pub async fn upload_geometry_artifact(
+    State(state): State<AppState>,
+    Path(parcel_pda): Path<String>,
+    auth: SignedRequest,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Json<GeometryArtifactUploadResponse>), AppError> {
+    let signed_path = format!("/api/v1/parcels/{parcel_pda}/geometry-artifact");
+    let key = state.api_authority.0.ok_or_else(|| {
+        AppError::unauthorized("privileged endpoint: API_AUTHORITY_PUBKEY not configured")
+    })?;
+    auth.verify(&key, "PUT", &signed_path)?;
+
+    let pubkey = parse_pubkey_param(&parcel_pda)?;
+    let parcel_pubkey = pubkey.to_string();
+
+    let mut hasher = Sha256::new();
+    hasher.update(&body);
+    let content_bytes: [u8; 32] = hasher.finalize().into();
+    if auth.body_hash_hex != hex::encode(content_bytes) {
+        return Err(AppError::bad_request(
+            "body hash does not match signed request",
+        ));
+    }
+    if body.is_empty() {
+        return Err(AppError::bad_request("empty geometry artifact"));
+    }
+
+    let declared = headers
+        .get("x-content-sha256")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| AppError::bad_request("X-Content-SHA256 is required"))?
+        .trim();
+    let declared = declared.strip_prefix("sha256:").unwrap_or(declared);
+    if decode_hex32(declared)? != content_bytes {
+        return Err(AppError::bad_request(
+            "X-Content-SHA256 does not match the uploaded bytes",
+        ));
+    }
+
+    let source = std::str::from_utf8(&body)
+        .map_err(|e| AppError::bad_request(format!("geometry must be UTF-8: {e}")))?;
+    let geometry: serde_json::Value = serde_json::from_str(source)
+        .map_err(|e| AppError::bad_request(format!("invalid GeoJSON: {e}")))?;
+    // Fail before storage when the bytes are not a usable parcel polygon.
+    let _ = geojson_polygon(&geometry)?;
+    let ring = crate::indexer::submitted_ring_hash(source)
+        .ok_or_else(|| AppError::bad_request("GeoJSON has no exterior ring"))?;
+
+    let content_hash = hex::encode(content_bytes);
+    let geometry_hash = hex::encode(ring);
+
+    let stored = state
+        .storage
+        .store_content_addressed("application/geo+json", &body)
+        .await
+        .map_err(|e| AppError::internal(format!("geometry artifact storage error: {e}")))?;
+    if stored.content_hash != content_bytes {
+        return Err(AppError::internal(
+            "storage returned a different content hash than the uploaded bytes",
+        ));
+    }
+
+    let existing: Option<(String, String)> = sqlx::query_as(
+        "SELECT storage_ref, geometry_hash FROM parcel_geometry_uploads \
+         WHERE parcel_pubkey = $1 AND content_hash = $2",
+    )
+    .bind(&parcel_pubkey)
+    .bind(&content_hash)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let created = match existing {
+        Some((storage_ref, stored_ring)) => {
+            if storage_ref != stored.storage_ref || stored_ring != geometry_hash {
+                return Err(AppError::conflict(
+                    "content hash already registered with different bytes",
+                ));
+            }
+            false
+        }
+        None => {
+            let result = sqlx::query(
+                "INSERT INTO parcel_geometry_uploads (
+                    parcel_pubkey, content_hash, geometry_hash, storage_ref,
+                    storage_backend, content_type, size_bytes
+                 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 ON CONFLICT (parcel_pubkey, content_hash) DO NOTHING",
+            )
+            .bind(&parcel_pubkey)
+            .bind(&content_hash)
+            .bind(&geometry_hash)
+            .bind(&stored.storage_ref)
+            .bind(&stored.backend_name)
+            .bind("application/geo+json")
+            .bind(body.len() as i64)
+            .execute(&state.pool)
+            .await?;
+            result.rows_affected() == 1
+        }
+    };
+
+    Ok((
+        if created {
+            StatusCode::CREATED
+        } else {
+            StatusCode::OK
+        },
+        Json(GeometryArtifactUploadResponse {
+            parcel_pubkey,
+            content_hash,
+            geometry_hash,
+            storage_uri: stored.storage_ref,
+            storage_backend: stored.backend_name,
+            size_bytes: body.len() as i64,
+            created,
+        }),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn geometry_artifact_pubkey_accepts_base58_and_hex() {
+        let key = Pubkey::new_from_array([7u8; 32]);
+        assert_eq!(parse_pubkey_param(&key.to_string()).unwrap(), key);
+        assert_eq!(parse_pubkey_param(&hex::encode([7u8; 32])).unwrap(), key);
+        assert!(parse_pubkey_param("not-a-pubkey").is_err());
+    }
 
     /// The core forfeiture guard: a collective seizure must meet a minimum
     /// threshold (>=2) of validator signers, and the threshold can never exceed

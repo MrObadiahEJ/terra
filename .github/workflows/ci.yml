@@ -187,6 +187,13 @@ jobs:
         with:
           tool: sqlx-cli@0.8.6
 
+      - name: Verify generated indexer decoders match the IDL
+        # R-042: hand-written Borsh offsets previously misread u32 string
+        # lengths as u8/u16. Fail CI when the generated file drifts from
+        # terra-core/idl/terra_registry.json.
+        run: python3 scripts/generate-indexer-decoders.py --check
+        working-directory: terra-core
+
       - name: Apply migrations
         run: sqlx migrate run --source api/migrations
         working-directory: terra-core

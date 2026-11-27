@@ -264,6 +264,7 @@ pub mod escrow;
 pub mod evidence_manifest;
 pub mod fraud_governance;
 pub mod observation_v2;
+pub mod parcel_geometry_artifact;
 pub mod quorum;
 pub mod recovery;
 pub mod routing;
@@ -845,6 +846,22 @@ pub mod terra_registry {
 
         emit!(ParcelRegistered { id, holder });
         Ok(())
+    }
+
+    /// Register a content-addressed geometry artifact for an existing parcel
+    /// (Q-035(a)). The `Parcel` Borsh layout is unchanged: this PDA carries
+    /// `sha256(raw GeoJSON bytes)` plus a storage URI. Off-chain readers must
+    /// verify both that digest and the parcel's exterior-ring `geometry_hash`
+    /// before treating the bytes as chain-derived geometry.
+    ///
+    /// PDA: `["parcel_geometry_artifact", parcel, content_hash]`. Only the
+    /// current rights holder may register (or idempotently re-confirm) it.
+    pub fn register_parcel_geometry_artifact(
+        ctx: Context<RegisterParcelGeometryArtifact>,
+        content_hash: [u8; 32],
+        storage_uri: String,
+    ) -> Result<()> {
+        parcel_geometry_artifact::register_parcel_geometry_artifact(ctx, content_hash, storage_uri)
     }
 
     /// Transfer the ownership right of a parcel to `new_owner`. Only the
@@ -2910,6 +2927,41 @@ pub struct RegisterParcel<'info> {
         bump
     )]
     pub ownership: Account<'info, Rights>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Q-035(a) content-addressed geometry artifact. The PDA is keyed by the
+/// parcel (not the caller's id) and the exact content digest, so one artifact
+/// digest can only ever point at one parcel.
+#[derive(Accounts)]
+#[instruction(content_hash: [u8; 32])]
+pub struct RegisterParcelGeometryArtifact<'info> {
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = 8 + parcel_geometry_artifact::ParcelGeometryArtifact::INIT_SPACE,
+        seeds = [
+            b"parcel_geometry_artifact",
+            parcel.key().as_ref(),
+            content_hash.as_ref(),
+        ],
+        bump,
+    )]
+    pub artifact: Account<'info, parcel_geometry_artifact::ParcelGeometryArtifact>,
+    #[account(
+        seeds = [b"parcel".as_ref(), parcel.id.as_ref()],
+        bump
+    )]
+    pub parcel: Account<'info, Parcel>,
+    /// The canonical ownership right; authorization is rechecked in the
+    /// handler so identity-PDA holders follow the transfer_parcel overlay.
+    #[account(
+        seeds = [b"ownership".as_ref(), parcel.key().as_ref()],
+        bump
+    )]
+    pub ownership: Account<'info, Rights>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -6471,6 +6523,19 @@ pub struct ParcelRegistered {
     pub holder: Pubkey,
 }
 
+/// Q-035(a): a content-addressed geometry artifact was registered for a
+/// parcel. `reused = true` means an idempotent re-confirmation of the same
+/// digest and URI, not a new artifact.
+#[event]
+pub struct ParcelGeometryArtifactRegistered {
+    pub artifact: Pubkey,
+    pub parcel: Pubkey,
+    pub content_hash: [u8; 32],
+    pub storage_uri: String,
+    pub registrant: Pubkey,
+    pub reused: bool,
+}
+
 #[event]
 pub struct ParcelTransferred {
     pub id: [u8; 32],
@@ -8188,6 +8253,10 @@ pub enum TerraError {
     PeerConsensusRequired,
     #[msg("Invalid admin transfer (zero key, same key, or no pending transfer)")]
     InvalidAdminTransfer,
+
+    // Q-035(a) — content-addressed parcel geometry artifacts
+    #[msg("Geometry artifact does not match the parcel, digest, or approved URI")]
+    GeometryArtifactMismatch,
 }
 
 #[cfg(test)]

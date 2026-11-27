@@ -14,6 +14,19 @@ pub struct Config {
     pub cors_allowed_origins: Vec<String>,
     /// Solana RPC URL for the chain indexer (Sprint C). Defaults to localnet.
     pub rpc_url: String,
+    /// Whether the background chain indexer task runs at all. Defaults on;
+    /// set `TERRA_INDEXER_ENABLED=false` to stop metered RPC traffic without
+    /// changing code (R-045).
+    pub indexer_enabled: bool,
+    /// Seconds between successful indexer polls. Default 60 (was a hard-coded
+    /// 15 s poll of every full program account).
+    pub indexer_poll_interval_secs: u64,
+    /// Per-RPC-call timeout for indexer requests. Default 30 s.
+    pub indexer_rpc_timeout_secs: u64,
+    /// Ceiling for exponential backoff after a failed poll. Default 300 s.
+    pub indexer_max_backoff_secs: u64,
+    /// Max pubkeys per `getMultipleAccounts` batch in phase 2 of a scan.
+    pub indexer_account_batch_size: usize,
     /// Ed25519 public key (base58) that may sign privileged requests.
     /// When absent, privileged endpoints reject all callers (fail-closed).
     pub api_authority_pubkey: Option<ed25519_dalek::VerifyingKey>,
@@ -101,6 +114,78 @@ impl Config {
             vrf_oracle_pubkey,
             rpc_url: std::env::var("TERRA_RPC_URL")
                 .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string()),
+            indexer_enabled: parse_bool_env("TERRA_INDEXER_ENABLED", true),
+            indexer_poll_interval_secs: parse_u64_env("TERRA_INDEXER_POLL_SECS", 60),
+            indexer_rpc_timeout_secs: parse_u64_env("TERRA_INDEXER_RPC_TIMEOUT_SECS", 30),
+            indexer_max_backoff_secs: parse_u64_env("TERRA_INDEXER_MAX_BACKOFF_SECS", 300),
+            indexer_account_batch_size: parse_usize_env("TERRA_INDEXER_BATCH_SIZE", 100),
         })
+    }
+}
+
+/// Parse an env bool. Invalid values fall back to the documented default
+/// rather than making the API fail to boot on a typo.
+fn parse_bool(value: Option<String>, default: bool) -> bool {
+    match value {
+        Some(value) => match value.trim().to_ascii_lowercase().as_str() {
+            "1" | "true" | "yes" | "on" => true,
+            "0" | "false" | "no" | "off" => false,
+            _ => default,
+        },
+        None => default,
+    }
+}
+
+fn parse_bool_env(name: &str, default: bool) -> bool {
+    parse_bool(std::env::var(name).ok(), default)
+}
+
+fn parse_u64(value: Option<String>, default: u64) -> u64 {
+    value
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(default)
+}
+
+fn parse_u64_env(name: &str, default: u64) -> u64 {
+    parse_u64(std::env::var(name).ok(), default)
+}
+
+fn parse_usize(value: Option<String>, default: usize) -> usize {
+    value
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(default)
+}
+
+fn parse_usize_env(name: &str, default: usize) -> usize {
+    parse_usize(std::env::var(name).ok(), default)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn indexer_env_defaults_are_conservative() {
+        // Parse helpers directly so a shared test process's env cannot change
+        // the assertion. Env lookups are a thin wrapper over these helpers.
+        assert!(parse_bool(None, true));
+        assert_eq!(parse_u64(None, 60), 60);
+        assert_eq!(parse_u64(None, 30), 30);
+        assert_eq!(parse_u64(None, 300), 300);
+        assert_eq!(parse_usize(None, 100), 100);
+    }
+
+    #[test]
+    fn indexer_env_rejects_invalid_and_zero_values() {
+        assert!(!parse_bool(Some("FALSE".into()), true));
+        assert!(parse_bool(Some("yes".into()), false));
+        assert!(parse_bool(Some("bogus".into()), true));
+        assert_eq!(parse_u64(Some("0".into()), 60), 60);
+        assert_eq!(parse_u64(Some("bogus".into()), 60), 60);
+        assert_eq!(parse_u64(Some(" 90 ".into()), 60), 90);
+        assert_eq!(parse_usize(Some("not-a-number".into()), 100), 100);
+        assert_eq!(parse_usize(Some("250".into()), 100), 250);
     }
 }

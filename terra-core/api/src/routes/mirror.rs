@@ -136,6 +136,39 @@ async fn audit(
     }
     tables.push(va_audit);
 
+    // --- claims_onchain (migration 0057) ---
+    let claims_audit = audit_claims(&state, limit).await?;
+    total_drifted += claims_audit.drifted_rows;
+    if claims_audit.drifted_rows > 0
+        || claims_audit.unhashed_rows > 0
+        || claims_audit.unverified_rows > 0
+    {
+        ok = false;
+    }
+    tables.push(claims_audit);
+
+    // --- chain_accounts (migration 0060, Q-033 stage 1) ---
+    let generic_audit = audit_chain_accounts(&state, limit).await?;
+    total_drifted += generic_audit.drifted_rows;
+    if generic_audit.drifted_rows > 0
+        || generic_audit.unhashed_rows > 0
+        || generic_audit.unverified_rows > 0
+    {
+        ok = false;
+    }
+    tables.push(generic_audit);
+
+    // --- parcel_geometry_artifacts (migration 0061, Q-035(a)) ---
+    let artifact_audit = audit_parcel_geometry_artifacts(&state, limit).await?;
+    total_drifted += artifact_audit.drifted_rows;
+    if artifact_audit.drifted_rows > 0
+        || artifact_audit.unhashed_rows > 0
+        || artifact_audit.unverified_rows > 0
+    {
+        ok = false;
+    }
+    tables.push(artifact_audit);
+
     Ok(Json(AuditReport {
         tables,
         total_drifted,
@@ -173,6 +206,7 @@ async fn audit_parcels(state: &AppState, limit: usize) -> Result<TableAudit, App
                  coalesce(name, '') || '|' || \
                  coalesce(status, '') || '|' || \
                  coalesce(ST_AsEWKB(geometry), '') || '|' || \
+                 coalesce(source_geometry, '') || '|' || \
                  coalesce(onchain_id, '') || '|' || \
                  coalesce(geometry_hash, '') || '|' || \
                  coalesce(access_hash, '') || '|' || \
@@ -240,6 +274,7 @@ async fn audit_rights(state: &AppState, limit: usize) -> Result<TableAudit, AppE
          FROM rights \
          WHERE mirror_hash IS NOT NULL \
            AND mirror_hash <> encode(digest( \
+                 coalesce(onchain_id, '') || '|' || \
                  coalesce(parcel_id::text, '') || '|' || \
                  rights_kind::text || '|' || \
                  coalesce(holder, '') || '|' || \
@@ -612,6 +647,192 @@ async fn audit_verification_attestations(
     })
 }
 
+/// Claims mirrored from on-chain `Claim` accounts (migration 0057).
+/// The hash expression below is intentionally identical to
+/// `compute_claims_onchain_mirror_hash()` in 0057; a mismatch here would
+/// report every honest row as drifted.
+async fn audit_claims(state: &AppState, limit: usize) -> Result<TableAudit, AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM claims_onchain")
+        .fetch_one(&state.pool)
+        .await?;
+    let hashed: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM claims_onchain WHERE mirror_hash IS NOT NULL")
+            .fetch_one(&state.pool)
+            .await?;
+    let unverified: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM claims_onchain WHERE chain_verified = FALSE")
+            .fetch_one(&state.pool)
+            .await?;
+
+    let drifted = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'hash-mismatch' AS kind, \
+                'stored mirror_hash does not match recomputed row hash' AS detail \
+         FROM claims_onchain \
+         WHERE mirror_hash IS NOT NULL \
+           AND mirror_hash <> encode(digest( \
+                 coalesce(pubkey, '') || '|' || \
+                 coalesce(claim_id, '') || '|' || \
+                 coalesce(parcel_pubkey, '') || '|' || \
+                 claim_type::text || '|' || \
+                 coalesce(submitted_by, '') || '|' || \
+                 status::text || '|' || \
+                 coalesce(statement_hash, '') || '|' || \
+                 version::text || '|' || \
+                 evidence_count::text || '|' || \
+                 observation_count::text || '|' || \
+                 attestation_count::text || '|' || \
+                 required_attestations::text || '|' || \
+                 coalesce(to_char(chain_created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), '') || '|' || \
+                 coalesce(to_char(chain_updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), ''), 'sha256'), 'hex') \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT id::text AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM claims_onchain \
+         WHERE chain_verified = FALSE \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let drifted_rows = drifted.len() + unverified_drift.len();
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
+    Ok(TableAudit {
+        table: "claims_onchain".into(),
+        total_rows: total,
+        hashed_rows: hashed,
+        unhashed_rows: total - hashed,
+        unverified_rows: unverified,
+        drifted_rows: drifted_rows as i64,
+        anchored_rows: 0,
+        unanchored_rows: 0,
+        drift: all_drift,
+    })
+}
+
+/// Generic all-IDL-account mirror (Q-033 stage 1). Every row must have a
+/// trigger-maintained hash and, per ADR-026, a real transaction provenance.
+async fn audit_chain_accounts(state: &AppState, limit: usize) -> Result<TableAudit, AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM chain_accounts")
+        .fetch_one(&state.pool)
+        .await?;
+    let hashed: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM chain_accounts WHERE mirror_hash IS NOT NULL")
+            .fetch_one(&state.pool)
+            .await?;
+    let unverified: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM chain_accounts WHERE chain_verified = FALSE")
+            .fetch_one(&state.pool)
+            .await?;
+
+    let drifted = sqlx::query_as::<_, DriftedRow>(
+        "SELECT pubkey AS id, 'hash-mismatch' AS kind, \
+                'stored mirror_hash does not match recomputed row hash' AS detail \
+         FROM chain_accounts \
+         WHERE mirror_hash IS NOT NULL \
+           AND mirror_hash <> encode(digest( \
+                 pubkey || '|' || account_type || '|' || fields::text, 'sha256'), 'hex') \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT pubkey AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM chain_accounts WHERE chain_verified = FALSE LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let drifted_rows = (drifted.len() + unverified_drift.len()) as i64;
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
+    Ok(TableAudit {
+        table: "chain_accounts".into(),
+        total_rows: total,
+        hashed_rows: hashed,
+        unhashed_rows: total - hashed,
+        unverified_rows: unverified,
+        drifted_rows,
+        anchored_rows: 0,
+        unanchored_rows: 0,
+        drift: all_drift,
+    })
+}
+
+/// Typed mirror for the Q-035(a) content-addressed artifact PDA.
+async fn audit_parcel_geometry_artifacts(
+    state: &AppState,
+    limit: usize,
+) -> Result<TableAudit, AppError> {
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM parcel_geometry_artifacts")
+        .fetch_one(&state.pool)
+        .await?;
+    let hashed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM parcel_geometry_artifacts WHERE mirror_hash IS NOT NULL",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let unverified: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM parcel_geometry_artifacts WHERE chain_verified = FALSE",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
+    let drifted = sqlx::query_as::<_, DriftedRow>(
+        "SELECT pubkey AS id, 'hash-mismatch' AS kind, \
+                'stored mirror_hash does not match recomputed row hash' AS detail \
+         FROM parcel_geometry_artifacts \
+         WHERE mirror_hash IS NOT NULL \
+           AND mirror_hash <> encode(digest( \
+                 pubkey || '|' || parcel_pubkey || '|' || content_hash || '|' || \
+                 storage_uri || '|' || registrant || '|' || \
+                 coalesce(to_char(chain_created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), ''), \
+                 'sha256'), 'hex') \
+         LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let unverified_drift = sqlx::query_as::<_, DriftedRow>(
+        "SELECT pubkey AS id, 'chain-unverified' AS kind, \
+                'mirror row not yet confirmed against on-chain state' AS detail \
+         FROM parcel_geometry_artifacts WHERE chain_verified = FALSE LIMIT $1",
+    )
+    .bind(limit as i32)
+    .fetch_all(&state.pool)
+    .await?;
+
+    let drifted_rows = (drifted.len() + unverified_drift.len()) as i64;
+    let mut all_drift = drifted;
+    all_drift.extend(unverified_drift);
+
+    Ok(TableAudit {
+        table: "parcel_geometry_artifacts".into(),
+        total_rows: total,
+        hashed_rows: hashed,
+        unhashed_rows: total - hashed,
+        unverified_rows: unverified,
+        drifted_rows,
+        anchored_rows: 0,
+        unanchored_rows: 0,
+        drift: all_drift,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use uuid::Uuid;
@@ -661,6 +882,7 @@ mod tests {
                  coalesce(name, '') || '|' || \
                  coalesce(status, '') || '|' || \
                  coalesce(ST_AsEWKB(geometry), '') || '|' || \
+                 coalesce(source_geometry, '') || '|' || \
                  coalesce(onchain_id, '') || '|' || \
                  coalesce(geometry_hash, '') || '|' || \
                  coalesce(access_hash, '') || '|' || \
@@ -705,6 +927,104 @@ mod tests {
             .execute(&pool)
             .await
             .expect("delete test parcel");
+    }
+
+    #[tokio::test]
+    async fn mirror_audit_claims_hash_matches_trigger() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping mirror audit test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+
+        let pubkey = format!("claims-audit-{}", Uuid::new_v4());
+        sqlx::query(
+            "INSERT INTO claims_onchain (pubkey, claim_type, status, version, \
+             evidence_count, observation_count, attestation_count, required_attestations) \
+             VALUES ($1, 1, 2, 3, 4, 5, 6, 7)",
+        )
+        .bind(&pubkey)
+        .execute(&pool)
+        .await
+        .expect("insert test claim");
+
+        // Same expression the audit endpoint uses (migration 0057 trigger).
+        let (stored, recomputed): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT mirror_hash, encode(digest( \
+                 coalesce(pubkey, '') || '|' || \
+                 coalesce(claim_id, '') || '|' || \
+                 coalesce(parcel_pubkey, '') || '|' || \
+                 claim_type::text || '|' || \
+                 coalesce(submitted_by, '') || '|' || \
+                 status::text || '|' || \
+                 coalesce(statement_hash, '') || '|' || \
+                 version::text || '|' || \
+                 evidence_count::text || '|' || \
+                 observation_count::text || '|' || \
+                 attestation_count::text || '|' || \
+                 required_attestations::text || '|' || \
+                 coalesce(to_char(chain_created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), '') || '|' || \
+                 coalesce(to_char(chain_updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), ''), 'sha256'), 'hex') \
+             FROM claims_onchain WHERE pubkey = $1",
+        )
+        .bind(&pubkey)
+        .fetch_one(&pool)
+        .await
+        .expect("recompute claim hash");
+        assert!(stored.is_some(), "trigger must compute claims mirror_hash");
+        assert_eq!(stored, recomputed, "claims audit hash must match trigger");
+
+        sqlx::query("DELETE FROM claims_onchain WHERE pubkey = $1")
+            .bind(&pubkey)
+            .execute(&pool)
+            .await
+            .expect("delete test claim");
+        pool.close().await;
+    }
+
+    #[tokio::test]
+    async fn verification_attestation_defaults_are_honest() {
+        let Ok(database_url) = std::env::var("DATABASE_URL") else {
+            eprintln!("skipping mirror audit test: DATABASE_URL is not set");
+            return;
+        };
+        let pool = sqlx::PgPool::connect(&database_url)
+            .await
+            .expect("connect test database");
+
+        // `column_default` is SQL NULL for an explicit `DEFAULT NULL`, so
+        // keep it nullable here: both NULL and the literal "NULL" are honest.
+        let defaults: Vec<(String, Option<String>)> = sqlx::query_as(
+            "SELECT column_name, column_default FROM information_schema.columns \
+             WHERE table_name = 'verification_attestations_onchain' \
+               AND column_name IN ('chain_verified', 'chain_slot', 'chain_signature')",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("query attestation defaults");
+        assert_eq!(defaults.len(), 3, "migration 0058 must be applied");
+        let verified_default = defaults
+            .iter()
+            .find(|(name, _)| name == "chain_verified")
+            .and_then(|(_, value)| value.as_deref())
+            .expect("chain_verified default");
+        assert!(
+            verified_default.contains("false"),
+            "ADR-026: new attestations must start unverified (got {verified_default})"
+        );
+        for column in ["chain_slot", "chain_signature"] {
+            let value = defaults
+                .iter()
+                .find(|(name, _)| name == column)
+                .and_then(|(_, value)| value.as_deref());
+            assert!(
+                value.is_none() || value == Some("NULL"),
+                "{column} must default to NULL, not a fake value (got {value:?})"
+            );
+        }
+        pool.close().await;
     }
 
     #[tokio::test]

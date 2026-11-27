@@ -13,7 +13,9 @@ use terra_registry::{
     ID as PROGRAM_ID, IdentityRights, Parcel, Rights, TerraError,
     cross_border::{Jurisdiction, JurisdictionBinding},
     dispute::{self, Dispute},
-    infra_flag, parcel_status, recovery, right_kind, staking,
+    infra_flag,
+    parcel_geometry_artifact::ParcelGeometryArtifact,
+    parcel_status, recovery, right_kind, staking,
     subdivision::{self, SubdivisionRecord},
     validator_registry::{self, ValidatorRegistry},
     verification,
@@ -32716,4 +32718,95 @@ async fn open_fraud_review_rejects_unregistered_pool() {
         terra_registry::fraud_governance::fraud_status::UNDER_REVIEW,
         "report must not flip to UNDER_REVIEW"
     );
+}
+
+/// Q-035(a): a content-addressed artifact is a separate PDA keyed by parcel
+/// and sha256(bytes); it does not alter the Parcel Borsh layout. Re-registering
+/// the same digest/URI is idempotent, while a different URI for the same
+/// digest is rejected (a digest must identify one immutable byte stream).
+#[tokio::test]
+async fn register_parcel_geometry_artifact_is_content_addressed_and_holder_only() {
+    let (mut ctx, payer) = setup().await;
+    let parcel_pk = register_parcel_ok(&mut ctx, &payer, Pubkey::new_unique()).await;
+
+    let content_hash = [42u8; 32];
+    let (artifact_pk, _) = Pubkey::find_program_address(
+        &[
+            b"parcel_geometry_artifact",
+            parcel_pk.as_ref(),
+            content_hash.as_ref(),
+        ],
+        &PROGRAM_ID,
+    );
+    let uri = "content/sha256/2a/2a/2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a".to_string();
+
+    let build_ix = |storage_uri: &str| Instruction {
+        program_id: PROGRAM_ID,
+        accounts: vec![
+            AccountMeta::new(artifact_pk, false),
+            AccountMeta::new_readonly(parcel_pk, false),
+            AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program_id(), false),
+        ],
+        data: {
+            let mut data = discriminator("global", "register_parcel_geometry_artifact").to_vec();
+            data.extend_from_slice(&content_hash);
+            data.extend_from_slice(&borsh_ser(&storage_uri.to_string()));
+            data
+        },
+    };
+
+    process(&mut ctx, &payer, build_ix(&uri))
+        .await
+        .expect("register_parcel_geometry_artifact failed");
+
+    let artifact: ParcelGeometryArtifact = read_account(&ctx, artifact_pk).await;
+    assert_eq!(artifact.parcel, parcel_pk);
+    assert_eq!(artifact.content_hash, content_hash);
+    assert_eq!(artifact.storage_uri, uri);
+    assert_eq!(artifact.registrant, payer.pubkey());
+    assert_ne!(artifact.created_at, 0);
+
+    // Idempotent confirmation of the exact same artifact.
+    process(&mut ctx, &payer, build_ix(&uri))
+        .await
+        .expect("idempotent re-registration must succeed");
+
+    // A different URI cannot replace the bytes identified by this digest.
+    let swapped = process(&mut ctx, &payer, build_ix("ipfs://different-artifact")).await;
+    assert!(swapped.is_err(), "content hash must be immutable");
+
+    // A non-holder cannot register a new digest for someone else's parcel.
+    let intruder = Keypair::new();
+    let intruder_hash = [43u8; 32];
+    let (intruder_artifact, _) = Pubkey::find_program_address(
+        &[
+            b"parcel_geometry_artifact",
+            parcel_pk.as_ref(),
+            intruder_hash.as_ref(),
+        ],
+        &PROGRAM_ID,
+    );
+    let mut data = discriminator("global", "register_parcel_geometry_artifact").to_vec();
+    data.extend_from_slice(&intruder_hash);
+    data.extend_from_slice(&borsh_ser(&"content/sha256/intruder".to_string()));
+    let unauthorized = process_with(
+        &mut ctx,
+        &payer,
+        &[&payer, &intruder],
+        Instruction {
+            program_id: PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(intruder_artifact, false),
+                AccountMeta::new_readonly(parcel_pk, false),
+                AccountMeta::new_readonly(ownership_pda(&parcel_pk), false),
+                AccountMeta::new(intruder.pubkey(), true),
+                AccountMeta::new_readonly(system_program_id(), false),
+            ],
+            data,
+        },
+    )
+    .await;
+    assert!(unauthorized.is_err(), "only the parcel holder may register");
 }

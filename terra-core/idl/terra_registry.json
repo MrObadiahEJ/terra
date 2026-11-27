@@ -11296,6 +11296,152 @@
       ]
     },
     {
+      "name": "register_parcel_geometry_artifact",
+      "docs": [
+        "Register a content-addressed geometry artifact for an existing parcel",
+        "(Q-035(a)). The `Parcel` Borsh layout is unchanged: this PDA carries",
+        "`sha256(raw GeoJSON bytes)` plus a storage URI. Off-chain readers must",
+        "verify both that digest and the parcel's exterior-ring `geometry_hash`",
+        "before treating the bytes as chain-derived geometry.",
+        "",
+        "PDA: `[\"parcel_geometry_artifact\", parcel, content_hash]`. Only the",
+        "current rights holder may register (or idempotently re-confirm) it."
+      ],
+      "discriminator": [
+        149,
+        254,
+        173,
+        40,
+        43,
+        227,
+        204,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "artifact",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108,
+                  95,
+                  103,
+                  101,
+                  111,
+                  109,
+                  101,
+                  116,
+                  114,
+                  121,
+                  95,
+                  97,
+                  114,
+                  116,
+                  105,
+                  102,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              },
+              {
+                "kind": "arg",
+                "path": "content_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "parcel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  114,
+                  99,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel.id",
+                "account": "Parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ownership",
+          "docs": [
+            "The canonical ownership right; authorization is rechecked in the",
+            "handler so identity-PDA holders follow the transfer_parcel overlay."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  119,
+                  110,
+                  101,
+                  114,
+                  115,
+                  104,
+                  105,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "parcel"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "content_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "storage_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "register_zone_set",
       "discriminator": [
         161,
@@ -17924,6 +18070,19 @@
       ]
     },
     {
+      "name": "ParcelGeometryArtifact",
+      "discriminator": [
+        8,
+        105,
+        58,
+        85,
+        110,
+        205,
+        206,
+        167
+      ]
+    },
+    {
       "name": "PrivacyRequest",
       "discriminator": [
         108,
@@ -19652,6 +19811,19 @@
         17,
         202,
         217
+      ]
+    },
+    {
+      "name": "ParcelGeometryArtifactRegistered",
+      "discriminator": [
+        141,
+        202,
+        231,
+        240,
+        182,
+        156,
+        116,
+        177
       ]
     },
     {
@@ -22065,6 +22237,11 @@
       "code": 6273,
       "name": "InvalidAdminTransfer",
       "msg": "Invalid admin transfer (zero key, same key, or no pending transfer)"
+    },
+    {
+      "code": 6274,
+      "name": "GeometryArtifactMismatch",
+      "msg": "Geometry artifact does not match the parcel, digest, or approved URI"
     }
   ],
   "types": [
@@ -27346,6 +27523,93 @@
           {
             "name": "frozen_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelGeometryArtifact",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parcel",
+            "docs": [
+              "Parcel PDA this artifact belongs to (PDA seed)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "docs": [
+              "SHA-256 of the exact GeoJSON bytes (PDA seed)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_uri",
+            "docs": [
+              "Content-addressed storage reference (S3 key / IPFS CID / gateway URL)."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "registrant",
+            "docs": [
+              "Wallet that paid rent and is authorized for this parcel."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ParcelGeometryArtifactRegistered",
+      "docs": [
+        "Q-035(a): a content-addressed geometry artifact was registered for a",
+        "parcel. `reused = true` means an idempotent re-confirmation of the same",
+        "digest and URI, not a new artifact."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "artifact",
+            "type": "pubkey"
+          },
+          {
+            "name": "parcel",
+            "type": "pubkey"
+          },
+          {
+            "name": "content_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "storage_uri",
+            "type": "string"
+          },
+          {
+            "name": "registrant",
+            "type": "pubkey"
+          },
+          {
+            "name": "reused",
+            "type": "bool"
           }
         ]
       }
